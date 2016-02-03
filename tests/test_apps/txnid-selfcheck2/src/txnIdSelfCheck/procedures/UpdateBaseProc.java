@@ -297,17 +297,21 @@ public class UpdateBaseProc extends VoltProcedure {
             shadow_sum += cnt;
 
             if (v_entries != shadow_entries)
-                //throw new VoltAbortException(
-                        System.out.println("View entries:"+v_entries+" materialized view aggregation does not match the number of shadow entries:"+shadow_entries+" for cid:"+cid);
+                throw new VoltAbortException("View entries:" + v_entries +
+                    " materialized view aggregation does not match the number of shadow entries:" + shadow_entries + " for cid:" + cid);
+
             if (v_max != shadow_max)
-                // throw new VoltAbortException(
-                        System.out.println("View v_max:"+v_max+" materialized view aggregation does not match the shadow max:"+shadow_max+" for cid:"+cid);
+                throw new VoltAbortException("View v_max:" + v_max +
+                    " materialized view aggregation does not match the shadow max:" + shadow_max + " for cid:" + cid);
+
             if (v_min != shadow_min)
-                //throw new VoltAbortException(
-                    System.out.println("View v_min:"+v_min+" materialized view aggregation does not match the shadow min:"+shadow_min+" for cid:"+cid);
+                throw new VoltAbortException("View v_min:" + v_min +
+                    " materialized view aggregation does not match the shadow min:" + shadow_min + " for cid:" + cid);
+
             if (v_sum != shadow_sum)
-                //throw new VoltAbortException(
-                        System.out.println("View v_sum:"+v_sum+" materialized view aggregation does not match the shadow sum:"+shadow_sum+" for cid:"+cid);
+                throw new VoltAbortException("View v_sum:" + v_sum +
+                    " materialized view aggregation does not match the shadow sum:" + shadow_sum + " for cid:" + cid);
+
             voltQueueSQL(p_upsertExViewShadowData, cid, shadow_entries, shadow_max, shadow_min, shadow_sum);
         } else {
             // first time through, get initial values into the shadow table
