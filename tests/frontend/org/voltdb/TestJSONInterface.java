@@ -120,6 +120,8 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestJSONInterface extends TestCase {
+    final static ContentType utf8ApplicationFormUrlEncoded =
+            ContentType.create("application/x-www-form-urlencoded","UTF-8");
 
     ServerThread server;
     Client client;
@@ -163,7 +165,7 @@ public class TestJSONInterface extends TestCase {
             RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
             post.setProtocolVersion(HttpVersion.HTTP_1_1);
             post.setConfig(rc);
-            post.setEntity(new StringEntity(varString, ContentType.APPLICATION_FORM_URLENCODED));
+            post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
             ResponseHandler<String> rh = new ResponseHandler<String>() {
                 @Override
                 public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
