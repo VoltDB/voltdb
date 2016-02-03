@@ -266,15 +266,14 @@ public class HTTPClientInterface {
                 try {
                     queryTimeout = Integer.parseInt(timeoutStr);
                     if (queryTimeout <= 0) {
-                        throw new NumberFormatException();
+                        throw new NumberFormatException("negative query timeout");
                     }
                 } catch(NumberFormatException e) {
                     badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
                     request.setHandled(true);
+                    return;
                 }
-                return;
             }
-
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
