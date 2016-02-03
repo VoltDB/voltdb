@@ -2069,7 +2069,7 @@ class StatusDatabaseAPI(MethodView):
     def get(database_id):
 
         try:
-            client = voltdbclient.FastSerializer("localhost", 212121)
+            client = voltdbclient.FastSerializer(__IP__, 21212)
             proc = voltdbclient.VoltProcedure( client, "@Ping")
             response = proc.call()
             return jsonify({'status': "running"})
