@@ -168,7 +168,7 @@ public class HTTPClientInterface {
         try {
             rsp.getWriter().print(msg);
             rsp.getWriter().flush();
-        } catch (IOException e) {
+        } catch (IOException ignoreThisAsBrowserMustHaveClosed) {
         }
     }
 
@@ -254,6 +254,13 @@ public class HTTPClientInterface {
             String params = request.getParameter("Parameters");
             String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
 
+            // null procs are bad news
+            if (procName == null) {
+                badRequest(jsonp, "Procedure parameter is missing", response);
+                request.setHandled(true);
+                return;
+            }
+
             int queryTimeout = -1;
             if (timeoutStr != null) {
                 try {
@@ -262,18 +269,12 @@ public class HTTPClientInterface {
                         throw new NumberFormatException();
                     }
                 } catch(NumberFormatException e) {
-                    badRequest(jsonp, "Invalid procedure call timeout: " + timeoutStr, response);
+                    badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
                     request.setHandled(true);
-                    return;
                 }
-            }
-
-            // null procs are bad news
-            if (procName == null) {
-                badRequest(jsonp, "Procedure parameter is missing", response);
-                request.setHandled(true);
                 return;
             }
+
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {

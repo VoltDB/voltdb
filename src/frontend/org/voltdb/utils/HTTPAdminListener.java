@@ -889,6 +889,7 @@ public class HTTPAdminListener {
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
             // the default is 200k which well short of out 2M row size limit
             apiRequestHandler.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
+            // close another attack vector where potentially one may send a large number of keys
             apiRequestHandler.setMaxFormKeys(HTTPClientInterface.MAX_FORM_KEYS);
             apiRequestHandler.setHandler(new APIRequestHandler());
 

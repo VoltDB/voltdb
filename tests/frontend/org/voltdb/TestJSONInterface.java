@@ -157,6 +157,9 @@ public class TestJSONInterface extends TestCase {
         URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
         try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
             HttpPost post = new HttpPost(jsonAPIURI);
+            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
+            // to the server to see if the server is willing to accept it. This allows us to test large requests
+            // without incurring server socket connection terminations
             RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
             post.setProtocolVersion(HttpVersion.HTTP_1_1);
             post.setConfig(rc);
