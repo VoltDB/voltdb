@@ -40,6 +40,17 @@ public class TestPlansIn extends PlannerTestCase {
         compile("select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
         compile("select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
         compile("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
+        // IN LISTs once interacted badly with joins and indexes, especially with compound indexes,
+        // so exercise the planner with the possible combinations of using potentially indexable components
+        // in IN LISTs and join clauses.
+        // Note: the index is on NEW_ORDERS (NO_D_ID, NO_W_ID, NO_O_ID).
+        compile("select warehouse.w_id from warehouse, new_order where no_d_id in (5, 7) and no_w_id = w_id;");
+        compile("select district.d_id from district, new_order where no_d_id = d_id and no_w_id in (5, 7);");
+        compile("select order_line.ol_o_id from order_line, new_order where no_d_id in (5, 7) and no_o_id = ol_o_id;");
+        compile("select district.d_id from district, new_order where no_d_id = d_id and no_o_id in (5, 7);");
+        // These two are not actually indexable cases, but they're easy enough to test.
+        compile("select warehouse.w_id from warehouse, new_order where no_w_id = w_id and no_o_id in (5, 7);");
+        compile("select order_line.ol_o_id from order_line, new_order where no_o_id = ol_o_id and no_w_id in (5, 7);");
     }
 
     public void testNonSupportedIn() {

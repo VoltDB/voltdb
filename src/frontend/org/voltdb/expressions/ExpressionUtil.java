@@ -44,6 +44,26 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
+    public static AbstractExpression cloneAndCombine(List<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
+            return null;
+        }
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (AbstractExpression expr : exps) {
+            stack.add((AbstractExpression)expr.clone());
+        }
+
+        // TODO: This code probably doesn't need to go through all this trouble to create AND trees
+        // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
+        // There is an easier algorithm that does not require stacking intermediate results.
+        // Even better, it would be easier here to generate "(D and (C and (B and A)))"
+        // which would also short-circuit slightly faster in the executor.
+        // NOTE: Any change to the structure of the trees produced by this algorithm should be
+        // reflected in the algorithm used to reverse the process in uncombine(AbstractExpression expr).
+
+        return combineStack(stack);
+    }
+
     /**
      *
      * @param exps
@@ -55,6 +75,10 @@ public abstract class ExpressionUtil {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
+        return combineStack(stack);
+    }
+
+    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.
@@ -639,4 +663,5 @@ public abstract class ExpressionUtil {
         }
         return expr;
     }
+
 }

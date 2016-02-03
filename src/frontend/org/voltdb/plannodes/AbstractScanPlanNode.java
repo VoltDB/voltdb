@@ -176,29 +176,22 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * @param predicate the predicate to set
+     * @param innerExpr the predicate to set
      *
      */
-    public void setPredicate(AbstractExpression predicate) {
-        if (predicate != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            m_predicate = (AbstractExpression) predicate.clone();
-        } else {
-            m_predicate = null;
-        }
+    public void setPredicate(List<AbstractExpression> exps) {
+        assert(exps != null);
+        // PlanNodes all need private deep copies of expressions
+        // so that the resolveColumnIndexes results
+        // don't get bashed by other nodes or subsequent planner runs
+        m_predicate = ExpressionUtil.cloneAndCombine(exps);
     }
 
-    public void setScanColumns(Collection<SchemaColumn> scanColumns)
+    protected void setScanColumns(Collection<SchemaColumn> scanColumns)
     {
-        if (scanColumns != null)
-        {
-            for (SchemaColumn col : scanColumns)
-            {
-                m_tableScanSchema.addColumn(col.clone());
-            }
+        assert(scanColumns != null);
+        for (SchemaColumn col : scanColumns) {
+            m_tableScanSchema.addColumn(col.clone());
         }
     }
 
