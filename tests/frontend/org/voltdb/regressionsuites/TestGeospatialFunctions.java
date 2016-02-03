@@ -842,7 +842,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // polygon-to-point
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
                 + "from borders, places where DWithin(borders.region, places.loc, 50000.1) and borders.pk = 1 "
-                + "order by distance, places.pk;";
+                + "order by distance, borders.pk, places.pk;";
         vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertApproximateContentOfTable(new Object[][]
                 {{"Wyoming",    "Cheyenne",                             0.0},
@@ -863,19 +863,19 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // verify results of within using DISTANCE function
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
                 + "from borders, places where (distance(borders.region, places.loc) <= 50000.1) and borders.pk = 1 "
-                + "order by distance, places.pk;";
+                + "order by distance, borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1);
 
         // point-to-point
         sql = "select A.name, B.name, distance(A.loc, B.loc) as distance "
                 + "from places A, places B where DWithin(A.loc, B.loc, 100000) and A.pk <> B.pk "
-                + "order by distance, A.pk;";
+                + "order by distance, A.pk, B.pk;";
         vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
 
         sql = "select A.name, B.name, distance(A.loc, B.loc) as distance "
                 + "from places A, places B where distance(A.loc, B.loc) <= 100000 and A.pk <> B.pk "
-                + "order by distance, A.pk;";
+                + "order by distance, A.pk, B.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1);
 
@@ -883,23 +883,23 @@ public class TestGeospatialFunctions extends RegressionSuite {
         prefix = "Assertion failed comparing results from DWithin and Contains functions: ";
         sql = "select borders.name, places.name "
                 + "from borders, places where DWithin(borders.region, places.loc, 0) "
-                + "order by places.pk;";
+                + "order by borders.pk, places.pk;";
         vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
 
         sql = "select borders.name, places.name "
                 + "from borders, places where Contains(borders.region, places.loc) "
-                + "order by places.pk;";
+                + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1);
 
         sql = "select borders.name, places.name "
                 + "from borders, places where NOT DWithin(borders.region, places.loc, 0) "
-                + "order by places.pk;";
+                + "order by borders.pk, places.pk;";
         vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
 
         sql = "select borders.name, places.name "
                 + "from borders, places where NOT Contains(borders.region, places.loc) "
-                + "order by places.pk;";
+                + "order by borders.pk, places.pk;";
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1);
     }
