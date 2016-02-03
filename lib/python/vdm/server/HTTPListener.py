@@ -491,7 +491,7 @@ def ignore_signals():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 def check_and_start_local_server(database_id, recover=False):
-    if is_voltserver_running():
+    if Get_Voltdb_Process().isProcessRunning:
         return make_response(jsonify({'statusstring': 'A VoltDB Server process is already running'}), 500)
 
     retcode = start_local_server(database_id, recover)
@@ -500,17 +500,37 @@ def check_and_start_local_server(database_id, recover=False):
     else:
         return make_response(jsonify({'statusstring': 'Error starting server'}), 500)
 
-def is_voltserver_running():
+# def is_voltserver_running():
+#     for proc in psutil.process_iter():
+#
+#         try:
+#             cmd = proc.cmdline()
+#             if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
+#
+#                 return True
+#         except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
+#             #print traceback.format_exc()
+#             pass
+#
+#     return False
+
+
+def Get_Voltdb_Process():
+    VoltdbProcess.isProcessRunning = False
+    VoltdbProcess.processId = -1
     for proc in psutil.process_iter():
+
         try:
             cmd = proc.cmdline()
             if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                return True
+                VoltdbProcess.isProcessRunning = True
+                VoltdbProcess.processId = proc.pid
+                return VoltdbProcess
         except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
             #print traceback.format_exc()
             pass
 
-    return False
+    return VoltdbProcess
 
 def start_local_server(database_id, recover=False):
     deploymentcontents = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
@@ -557,6 +577,8 @@ def run_voltserver_process(voltdb_cmd, outfilename):
         my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
         return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                       env=my_env, preexec_fn=ignore_signals, close_fds=True)
+
+
     finally:
         os.chdir(oldwd)
 
@@ -1336,6 +1358,9 @@ IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = { "databaseid" : True, "users" : True}
 
+class VoltdbProcess:
+    isProcessRunning = False
+    processId = -1
 
 class Global:
     """
@@ -1877,16 +1902,11 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-
         try:
-            response = stop_database(database_id)
-	    # Don't use the response in the json we send back
-	    # because voltadmin shutdown gives 'Connection broken' output
-            return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
+            os.kill(Get_Voltdb_Process().processId, signal.SIGTERM)
+            return make_response(jsonify({'statusstring': 'success'}), 200)
         except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
+            return make_response(jsonify({'statusstring': str(err)}), 500)
 
 
 class StartServerAPI(MethodView):
@@ -2047,13 +2067,17 @@ class StatusDatabaseAPI(MethodView):
 
     @staticmethod
     def get(database_id):
+
         try:
-            client = voltdbclient.FastSerializer("localhost", 21212)
+            client = voltdbclient.FastSerializer("localhost", 212121)
             proc = voltdbclient.VoltProcedure( client, "@Ping")
             response = proc.call()
-            return jsonify({'status': response.status})
+            return jsonify({'status': "running"})
         except:
-            return jsonify({'status': 0})
+            if Get_Voltdb_Process().isProcessRunning:
+                return jsonify({'status': "stalled"})
+            else:
+                return jsonify({'status': "stopped"})
 
 
 def main(runner, amodule, config_dir, server):
