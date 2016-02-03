@@ -118,9 +118,9 @@ public class ClientThread extends BenchmarkThread {
 
     void runOne() throws Exception {
         // 1/10th of txns roll back
-        // byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
-        // if we need to disable rollbacks:
-        byte shouldRollback = (byte) 0;
+        byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
+        // if we need to disable rollbacks use this:
+        // byte shouldRollback = (byte) 0;
 
         try {
             String procName = null;
