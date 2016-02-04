@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -268,6 +268,20 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     public SortDirectionType getSortDirection() {
         return m_sortDirection;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        AbstractPlanNode outerTable = m_children.get(0);
+        AbstractPlanNode aggrNode = AggregatePlanNode.getInlineAggregationNode(this);
+        if (aggrNode != null && aggrNode.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        }
+        // Not yet handling ORDER BY expressions based on more than just the left-most table
+        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN || outerTable instanceof AbstractJoinPlanNode) {
+            return outerTable.isOutputOrdered(sortExpressions, sortDirections);
+        }
+        return false;
     }
 
     // TODO: need to extend the sort direction for join from one table to the other table if possible

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -43,7 +43,7 @@ def displayResults():
             fails += 1
         elif val[0] == "WARN":
             warns += 1
-        print "Stats: %-25s %-8s %-9s" % ( key, val[0], val[1] )
+        print "Status: %-25s %-8s %-9s" % ( key, val[0], val[1] )
     if fails > 0:
         print "\nCheck FAILED. Please review."
     elif warns > 0:

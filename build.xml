@@ -20,8 +20,6 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.7"
-            source="1.7"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -142,7 +140,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-        <exclude name='classes-java1.6.jar' />
+        <exclude name='classes-java1.7.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -167,6 +165,7 @@
     <exclude name="**/TestCommandLogServer.class" />
     <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
     <exclude name="**/TestExportBase.class"/>
+    <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
 </patternset>
@@ -736,7 +735,12 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporter.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
+            <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
         </fileset>
     </javadoc>
 
@@ -758,7 +762,7 @@ DISTRIBUTION
     <!-- populate the docs and other core files -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="README"/>
+            <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
             <include name="doc/**"/>
@@ -829,7 +833,6 @@ DISTRIBUTION
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="Click Here to Start.html"/>
             <include name="bin/**"/>
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
@@ -1032,6 +1035,7 @@ DISTRIBUTION
             <fileset dir="${base.dir}/lib">
                 <include name="python/**" />
                 <exclude name="**/*.pyc" />
+                <exclude name="**/tests/**" />
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
@@ -1064,8 +1068,12 @@ CLEANING
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
+  <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
+  </exec>
+  <exec dir='.' executable='/bin/sh'>
+    <arg line="-c 'rm -rf third_party/cpp/pcre2*'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf bundles/*.jar'"/>
@@ -1438,6 +1446,7 @@ NATIVE EE STUFF
   </exec>
 </target>
 
+<!-- Build the jni library. -->
 <target name='jnicompile'
     depends='compile, jnicompile_temp, uptodate_jni_h.check'
     description="Build C++ JNI library."
@@ -1697,7 +1706,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <jvmarg value="-XX:-UseSplitVerifier"/>
+            <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
@@ -1971,6 +1980,7 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
+                <exclude name="**/TestExportBaseSocketExport.class"/>
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>
@@ -2293,6 +2303,15 @@ TEST CASES
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
+    <condition property="config_debug" value="-d ${debug}" else="">
+        <isset property="debug"/>
+    </condition>
+    <condition property="config_postgresql" value="-P" else="">
+        <isset property="postgresql"/>
+    </condition>
+    <condition property="config_postgis" value="-G" else="">
+        <isset property="postgis"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2353,6 +2372,9 @@ TEST CASES
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
+        <arg line="${config_debug}" />
+        <arg line="${config_postgresql}" />
+        <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
@@ -2605,28 +2627,15 @@ UTILITIES
 ***************************************
 -->
 
-<target name='setversion-changestrings'
-        description="Set the version string and recompile some test catalogs">
+<target name='setversion'
+        description="Set the version string">
     <fail unless="newversion" message="ERROR: -Dnewversion=n.m must be set"/>
     <exec dir='.' executable='/usr/bin/env'>
       <arg value="bash" />
       <arg value="tools/change-version.sh"/>
       <arg value='${newversion}' />
     </exec>
-</target>
-
-<target name='setversion-recompile-mockjars' depends='default'
-        description="Set the version string and recompile some test catalogs">
-    <exec dir='${voltpro}/tests/mocktests/catalogs' executable='python'
-          output="/dev/null" logError="True">
-      <env key='VOLTCORE' value='${base.dir}'/>
-      <arg line='regen.py' />
-    </exec>
-</target>
-
-<target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
-        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dnewversion=4.1.1">
-    <echo message='Be sure to commit both repositories'/>
+    <echo message='Be sure to commit this change to the voltdb repository'/>
 </target>
 
 

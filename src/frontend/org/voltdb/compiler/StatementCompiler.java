@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -209,10 +209,12 @@ public abstract class StatementCompiler {
                 " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
         }
 
-        // Check order determinism before accessing the detail which it caches.
+        // Check order and content determinism before accessing the detail which
+        // it caches.
         boolean orderDeterministic = plan.isOrderDeterministic();
         catalogStmt.setIsorderdeterministic(orderDeterministic);
-        boolean contentDeterministic = orderDeterministic || ! plan.hasLimitOrOffset();
+        boolean contentDeterministic = plan.isContentDeterministic()
+                                       && (orderDeterministic || !plan.hasLimitOrOffset());
         catalogStmt.setIscontentdeterministic(contentDeterministic);
         String nondeterminismDetail = plan.nondeterminismDetail();
         catalogStmt.setNondeterminismdetail(nondeterminismDetail);

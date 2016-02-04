@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -691,6 +691,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG7480();
         subTestENG8120();
         subTestENG9032();
+        subTestENG9389();
+        subTestENG9533();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -1639,7 +1641,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
@@ -1662,7 +1664,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
@@ -2374,17 +2376,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    private void nullIndexSearchKeyChecker(Client client, String sql) throws IOException, ProcCallException {
+    private void nullIndexSearchKeyChecker(Client client, String sql, String tbleName, String columnName) throws IOException, ProcCallException {
         VoltTable vt;
         vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
 
-        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
-        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+
+        String sql1;
+        // We replace a select list element with its count.
+        // if tbleName == null,
+        //   Replace "SELECT $columnName" with "SELECT COUNT($columnName)"
+        // else
+        //   Replace "SELECT $tbleName.$columnName" with "SELECT COUNT($tableName.$columnName)"
+        //
+        // Of course, we can't use $tbleName and $columnName, so we need to
+        // do some hacking with strings.
+        //
+        String pattern = ((tbleName == null) ? "" : (tbleName + ".")) + columnName;
+        String selectListElement = "SELECT " + pattern;
+        String repl = "SELECT COUNT(" + pattern + ")";
+        sql1 = sql.replace(selectListElement, repl);
+        assertTrue(sql1.contains(repl + " FROM"));
         vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{0});
-
-        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        String sql2 = sql.replace(selectListElement, "SELECT COUNT(*)");
         assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
         vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{0});
@@ -2415,67 +2430,67 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             // activate # of searchkey is 1
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // activate # of searchkey is 2
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // post predicate
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // nest loop index join
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
 
             if (tb != "R4") {
                 vt = client.callProcedure("@Explain", sql, null).getResults()[0];
                 assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
                 assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
             }
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
         }
 
         truncateTables(client, tables);
@@ -2499,6 +2514,105 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, "T1");
     }
 
+    private void subTestENG9389() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9389 outerjoin is null...");
+        Client client = getClient();
+        String sql;
+
+        sql = "INSERT INTO t1 VALUES (1, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (2, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (3, 2);";
+
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t2 VALUES (2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "INSERT INTO t3 VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3 VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "INSERT INTO t3_no_index VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3_no_index VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
+        // NULL padded row in T3 will trigger the bug ENG-9389
+        // Test with both indexed and unindexed inner table to exercise both
+        // nested-loop and nested-loop-index joins
+        for (String innerTable : new String[] {"t3", "t3_no_index"}) {
+
+            sql = "select t1.A "
+                    + "from t1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "order by t1.A;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = " select t1.A "
+                    + "from T1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = "select t1.A "
+                    + "from t1 inner join t2 on t2.B = t1.B "
+                    + "left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t2.D is null and t3.D is null and t2.B = 2 "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = "select t1.b + t3.d as thesum "
+                    + "from t1 "
+                    + "left outer join " + innerTable + " as t3 "
+                    + "on t1.a = t3.a "
+                    + "where t1.b > 1 "
+                    + "order by thesum;";
+            System.out.println(client.callProcedure("@Explain", sql).getResults()[0]);
+            validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
+        }
+
+        truncateTables(client, new String[]{"T1", "T2", "T3", "T3_NO_INDEX"});
+    }
+
+    private void subTestENG9533() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9533 outerjoin with OR pred...");
+        Client client = getClient();
+        String insStmts[] = {
+                "insert into test1_eng_9533 values (0);",
+                "insert into test1_eng_9533 values (1);",
+                "insert into test1_eng_9533 values (2);",
+                "insert into test1_eng_9533 values (3);",
+                "insert into test2_eng_9533 values (1, 'athing', 'one', 5);",
+                "insert into test2_eng_9533 values (2, 'otherthing', 'two', 10);",
+                "insert into test2_eng_9533 values (3, 'yetotherthing', 'three', 3);"
+        };
+
+        for (String stmt : insStmts) {
+            validateTableOfScalarLongs(client, stmt, new long[] {1});
+        }
+
+        String sqlStmt =
+                "select "
+                + "  id, t_int "
+                + "from test1_eng_9533 "
+                + "  left join test2_eng_9533 "
+                + "  on t_id = id "
+                + "where "
+                + "  id <= 1 or t_int > 4 "
+                + "order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
+
+        validateTableOfLongs(client, sqlStmt, new long[][] {
+                {0, Long.MIN_VALUE},
+                {1, 5},
+                {2, 10}
+        });
+    }
 
     //
     // JUnit / RegressionSuite boilerplate

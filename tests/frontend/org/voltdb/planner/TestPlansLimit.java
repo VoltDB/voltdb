@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,9 +29,12 @@ import java.util.List;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
@@ -164,14 +167,15 @@ public class TestPlansLimit extends PlannerTestCase {
         List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
         // no push down for aggregate nodes
+        //@TODO LIMIT node is inline with aggragate
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by A1 limit 1");
         checkInlineLimitWithOrderby(pns, true);
 
         pns = compileToFragments("select A1 from T1 order by A1 limit 1");
-        checkInlineLimitWithOrderby(pns, true);
+        checkInlineLimitAndOrderbyWithReceive(pns, true);
 
         pns = compileToFragments("select B3 from T3 order by B3 limit 1");
-        checkInlineLimitWithOrderby(pns, true);
+        checkInlineLimitAndOrderbyWithReceive(pns, true);
 
         // no push down
         pns = compileToFragments("select A1, count(*) as tag from T1 group by A1 order by tag limit 1");
@@ -189,8 +193,16 @@ public class TestPlansLimit extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         p = p.getChild(0);
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        if (p instanceof MergeReceivePlanNode) {
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
+            AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(p);
+            if (aggr != null) {
+                assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
+        } else {
+            assertTrue(p instanceof OrderByPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        }
 
         if (pushdown) {
             assertEquals(2, pns.size());
@@ -203,4 +215,24 @@ public class TestPlansLimit extends PlannerTestCase {
         }
     }
 
+    private void checkInlineLimitAndOrderbyWithReceive(List<AbstractPlanNode> pns, boolean pushdown) {
+        AbstractPlanNode p;
+
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof MergeReceivePlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.ORDERBY));
+
+        if (pushdown) {
+            assertEquals(2, pns.size());
+            p = pns.get(1).getChild(0);
+            assertTrue(p instanceof OrderByPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        } else if (pns.size() == 2) {
+            p = pns.get(1).getChild(0);
+            assertFalse(p.toExplainPlanString().toLowerCase().contains("limit"));
+        }
+    }
 }

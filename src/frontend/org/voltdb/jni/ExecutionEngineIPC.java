@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -883,15 +883,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
                 else if (result == ExecutionEngine.ERRORCODE_PROGRESS_UPDATE) {
                     int batchIndex = m_connection.readInt();
-                    short size = m_connection.readShort();
-                    String planNodeName = m_connection.readString(size);
-                    size = m_connection.readShort();
-                    String lastAccessedTable = m_connection.readString(size);
-                    long lastAccessedTableSize = m_connection.readLong();
+                    int planNodeTypeAsInt = m_connection.readInt();
                     long tuplesFound = m_connection.readLong();
                     long currMemoryInBytes = m_connection.readLong();
                     long peakMemoryInBytes = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeTypeAsInt, tuplesFound,
                             currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
                     m_data.putLong(nextStep);
@@ -932,7 +928,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      */
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
 
@@ -943,7 +938,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     throws EEException
     {
         if (returnUniqueViolations) {
-            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
@@ -987,15 +982,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
-
-        ByteBuffer responseBuffer = null;
+        /*//
+        // This code will hang expecting input that never arrives
+        // until voltdbipc is extended to respond with information
+        // negative or positive about "unique violations".
         try {
-            responseBuffer = readMessage();
-        } catch (IOException e) {
+            ByteBuffer responseBuffer = readMessage();
+            if (responseBuffer != null) {
+                return responseBuffer.array();
+            }
+        }
+        catch (IOException e) {
             Throwables.propagate(e);
         }
-
-        if (responseBuffer != null) return responseBuffer.array();
+        //*/
         return null;
     }
 
@@ -1321,7 +1321,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     @Override
@@ -1451,7 +1450,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken)
+                               int remoteClusterId, long undoToken)
     throws EEException
     {
         m_data.clear();
@@ -1460,6 +1459,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
+        m_data.putInt(remoteClusterId);
         m_data.putLong(undoToken);
         m_data.put(log.array());
 

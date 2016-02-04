@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,6 +46,239 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
+
+    //
+    // JUnit / RegressionSuite boilerplate
+    //
+    public TestFunctionsForVoltDBSuite(String name) {
+        super(name);
+    }
+
+    static public junit.framework.Test suite() {
+
+        VoltServerConfig config = null;
+        MultiConfigSuiteBuilder builder =
+            new MultiConfigSuiteBuilder(TestFunctionsForVoltDBSuite.class);
+        boolean success;
+
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        final String literalSchema =
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
+                "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P2 ON COLUMN ID;\n" +
+
+                "CREATE TABLE P3_INLINE_DESC ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(15), " +
+                "DESC2 VARCHAR(15), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+
+                "CREATE TABLE R3 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TINY TINYINT, " +
+                "SMALL SMALLINT, " +
+                "NUM INTEGER, " +
+                "BIG BIGINT, " +
+                "RATIO FLOAT, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "VAR VARCHAR(300), " +
+                "DEC DECIMAL, " +
+                "PRIMARY KEY (ID) ); " +
+
+                "CREATE INDEX R3_IDX_HEX ON R3 (hex(big));" +
+                "CREATE INDEX R3_IDX_bit_shift_left ON R3 (bit_shift_left(big, 3));" +
+                "CREATE INDEX R3_IDX_bit_shift_right ON R3 (bit_shift_right(big, 3));" +
+
+                "CREATE TABLE JS1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+
+                "CREATE TABLE D1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DEC DECIMAL, \n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+
+                "CREATE PROCEDURE IdFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE InnerFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE IdArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE IdArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE SmallArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) BETWEEN 0 AND ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
+                ";\n" +
+
+                "CREATE TABLE JSBAD (\n" +
+                "  ID INTEGER NOT NULL,\n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdFieldProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_ELEMENT(FIELD(DOC, ?), 1) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
+                ";\n" +
+
+                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
+                "\n" +
+                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
+                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                "                                       (LOCK_TIME IS NULL OR " +
+                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
+                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
+                ";\n" +
+
+                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
+                ";\n" +
+
+                "CREATE TABLE BINARYTEST (ID INTEGER, bdata varbinary(256), PRIMARY KEY(ID));" +
+                "";
+        try {
+            project.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
+
+        // load the procedures for the test
+        loadProcedures(project);
+
+        // CONFIG #1: Local Site/Partition running on JNI backend
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // CONFIG #2: Local Site/Partitions running on JNI backend
+        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+/*
+
+        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
+        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+*/
+        // no clustering tests for functions
+
+        return builder;
+    }
+
+    static private void loadProcedures(VoltProjectBuilder project) {
+        // Test DECODE
+        project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
+                        "'Microsoft','li'," +
+                        "'Hewlett Packard','at'," +
+                        "'Gateway','VoltDB'," +
+                        "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODEND", "select desc,  DECODE (desc,'zheng','a') from P1 where id = ?");
+        project.addStmtProcedure("DECODEVERYLONG", "select desc,  DECODE (desc,'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
+        // Test OCTET_LENGTH
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
+        // Test POSITION and CHAR_LENGTH
+        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
+        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
+        project.addStmtProcedure("CHAR_LGTH_PARAM", "select desc, CHAR_LENGTH (?) from P1 where id = ?");
+        // Test SINCE_EPOCH
+        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLISECOND", "select SINCE_EPOCH (MILLISECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROSECOND", "select SINCE_EPOCH (MICROSECOND, TM) from P2 where id = ?");
+        // Test TO_TIMESTAMP
+        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+
+        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
+                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
+                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
+
+        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
+        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
+                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
+                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
+                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
+                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+
+        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
+
+        project.addProcedures(GotBadParamCountsInJava.class);
+    }
 
     public void testExplicitErrorUDF() throws Exception
     {
@@ -126,6 +359,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+
+        // octet length on varbinary
+        cr = client.callProcedure("BINARYTEST.insert", 1, new byte[] {'x', 'i', 'n'});
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "select bdata, OCTET_LENGTH(bdata) from BINARYTEST where ID=1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3, result.getLong(1));
     }
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
@@ -181,7 +424,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, "क्षीण", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 4, null, 10, 1.1);
+
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("CHAR_LENGTH", 1);
@@ -198,13 +443,39 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(8, result.getLong(1));
 
-        // null case
         cr = client.callProcedure("CHAR_LENGTH", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+
+        cr = client.callProcedure("CHAR_LGTH_PARAM", "क्षीण", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("CHAR_LENGTH", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+
+     // try char_length on incompatible data type
+        try {
+            cr = client.callProcedure("@AdHoc",
+                    "select bdata, CHAR_LENGTH(bdata) from BINARYTEST where ID = 1");
+          fail("char_length on columns which are not string expression is not supported");
+        }
+        catch (ProcCallException pce) {
+            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+
+        }
+
     }
 
     public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
@@ -1798,228 +2069,545 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    //
-    // JUnit / RegressionSuite boilerplate
-    //
-    public TestFunctionsForVoltDBSuite(String name) {
-        super(name);
-    }
+    public void testDateadd() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test DATEADD function tests");
 
-    static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestFunctionsForVoltDBSuite.class);
-        boolean success;
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        final String literalSchema =
-                "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); " +
-                "PARTITION TABLE P1 ON COLUMN ID;" +
-
-                "CREATE TABLE P2 ( " +
+        /*
+         *      "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P2 ON COLUMN ID;\n" +
+         */
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
 
-                "CREATE TABLE P3_INLINE_DESC ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(15), " +
-                "DESC2 VARCHAR(15), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); " +
-                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (10000, '2000-01-01 01:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-                "CREATE TABLE R3 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "TINY TINYINT, " +
-                "SMALL SMALLINT, " +
-                "NUM INTEGER, " +
-                "BIG BIGINT, " +
-                "RATIO FLOAT, " +
-                "TM TIMESTAMP DEFAULT NULL, " +
-                "VAR VARCHAR(300), " +
-                "DEC DECIMAL, " +
-                "PRIMARY KEY (ID) ); " +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2001-01-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE INDEX R3_IDX_HEX ON R3 (hex(big));" +
-                "CREATE INDEX R3_IDX_bit_shift_left ON R3 (bit_shift_left(big, 3));" +
-                "CREATE INDEX R3_IDX_bit_shift_right ON R3 (bit_shift_right(big, 3));" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-04-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE TABLE JS1 (\n" +
-                "  ID INTEGER NOT NULL, \n" +
-                "  DOC VARCHAR(8192),\n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE TABLE D1 (\n" +
-                "  ID INTEGER NOT NULL, \n" +
-                "  DEC DECIMAL, \n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(vt.getTimestampAsSqlTimestamp(0), Timestamp.valueOf("2000-01-02 01:00:00.000000"));
 
-                "CREATE PROCEDURE IdFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE InnerFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE IdArrayProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullArrayProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE IdArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE SmallArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) BETWEEN 0 AND ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 02:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE TABLE JSBAD (\n" +
-                "  ID INTEGER NOT NULL,\n" +
-                "  DOC VARCHAR(8192),\n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdFieldProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdArrayProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_ELEMENT(FIELD(DOC, ?), 1) = ?\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:01:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
-                "\n" +
-                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
-                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
-                "                                       (LOCK_TIME IS NULL OR " +
-                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
-                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:01.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
-                ";\n" +
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.001000"), vt.getTimestampAsSqlTimestamp(0));
 
-                "";
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millis, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.001000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.000001"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20000, '2007-01-01 13:10:10.111111');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 1, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.112111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 2, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.113111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 1, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.111112"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 2, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.111113"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20001, '2007-01-01 01:01:01.111111');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 4, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-01-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 13, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-02-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 365, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-01-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 23, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-02 00:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 02:00:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 01:02:00.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 01:01:01.170111"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20002, '2000-01-01 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-01-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-10-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.999000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.999999"), vt.getTimestampAsSqlTimestamp(0));
+
+        //leap year test case
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20003, '2000-02-29 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 20003").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2001-02-28 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20004, '2000-01-31 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 1, TM) FROM P2 WHERE ID = 20004").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 31, TM) FROM P2 WHERE ID = 20004").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-03-02 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20005, '1999-12-31 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-12-31 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 2, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-06-30 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 2, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 60, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 1440, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 86400, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 5184000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 5184000000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 5184000000000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        // Test null interval
+        vt = client.callProcedure(
+                "@AdHoc",
+                "SELECT DATEADD(YEAR, NULL, TM), DATEADD(QUARTER, NULL,TM), DATEADD(MONTH, NULL,TM), "
+                        + "DATEADD(DAY, NULL,TM), DATEADD(HOUR, NULL,TM), DATEADD(MINUTE, NULL,TM), "
+                        + "DATEADD(SECOND, NULL,TM), DATEADD(MILLISECOND, NULL,TM), "
+                        + "DATEADD(MICROSECOND, NULL,TM) FROM P2 WHERE ID = 20005;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(null, vt.getTimestampAsTimestamp(0));
+        assertEquals(null, vt.getTimestampAsTimestamp(1));
+        assertEquals(null, vt.getTimestampAsTimestamp(2));
+        assertEquals(null, vt.getTimestampAsTimestamp(3));
+        assertEquals(null, vt.getTimestampAsTimestamp(4));
+        assertEquals(null, vt.getTimestampAsTimestamp(5));
+        assertEquals(null, vt.getTimestampAsTimestamp(6));
+        assertEquals(null, vt.getTimestampAsTimestamp(7));
+        assertEquals(null, vt.getTimestampAsTimestamp(8));
+
+        // Test null timestamp
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20006, null)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure(
+                "@AdHoc",
+                "SELECT DATEADD(YEAR, 1, TM), DATEADD(QUARTER, 1, TM), DATEADD(MONTH, 1, TM), "
+                        + "DATEADD(DAY, 1, TM), DATEADD(HOUR, 1, TM), DATEADD(MINUTE, 1, TM), "
+                        + "DATEADD(SECOND, 1, TM), DATEADD(MILLISECOND, 1, TM), "
+                        + "DATEADD(MICROSECOND, 1, TM) FROM P2 WHERE ID = 20006;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(null, vt.getTimestampAsTimestamp(0));
+        assertEquals(null, vt.getTimestampAsTimestamp(1));
+        assertEquals(null, vt.getTimestampAsTimestamp(2));
+        assertEquals(null, vt.getTimestampAsTimestamp(3));
+        assertEquals(null, vt.getTimestampAsTimestamp(4));
+        assertEquals(null, vt.getTimestampAsTimestamp(5));
+        assertEquals(null, vt.getTimestampAsTimestamp(6));
+        assertEquals(null, vt.getTimestampAsTimestamp(7));
+        assertEquals(null, vt.getTimestampAsTimestamp(8));
+
+        // Test null or illegal datepart
+        boolean throwed = false;
         try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
+            client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            throwed = true;
         }
+        assertTrue(throwed);
 
-        // Test DECODE
-        project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
-                        "'Microsoft','li'," +
-                        "'Hewlett Packard','at'," +
-                        "'Gateway','VoltDB'," +
-                        "'where') from P1 where id = ?");
-        project.addStmtProcedure("DECODEND", "select desc,  DECODE (desc,'zheng','a') from P1 where id = ?");
-        project.addStmtProcedure("DECODEVERYLONG", "select desc,  DECODE (desc,'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'where') from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
-        // Test OCTET_LENGTH
-        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
-        // Test POSITION and CHAR_LENGTH
-        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
-        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
-        // Test SINCE_EPOCH
-        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MILLISECOND", "select SINCE_EPOCH (MILLISECOND, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MICROSECOND", "select SINCE_EPOCH (MICROSECOND, TM) from P2 where id = ?");
-        // Test TO_TIMESTAMP
-        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
-                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
-                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
+        // Test large intervals caused exceptions
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+       assertTrue(throwed);
 
-        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
-                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
-                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
-                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
-                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
-        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
-                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
-                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
-                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
-                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
-        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        project.addProcedures(GotBadParamCountsInJava.class);
-        // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        // CONFIG #2: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-/*
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-*/
-        // no clustering tests for functions
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
 
-        return builder;
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+    }
+
+    public void testRegexpPosition() throws Exception {
+        System.out.println("STARTING testRegexpPosition");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+        /*
+            "CREATE TABLE P1 ( " +
+            "ID INTEGER DEFAULT 0 NOT NULL, " +
+            "DESC VARCHAR(300), " +
+            "NUM INTEGER, " +
+            "RATIO FLOAT, " +
+            "PAST TIMESTAMP DEFAULT NULL, " +
+            "PRIMARY KEY (ID) ); " +
+         */
+
+       cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE REGEXP_POSITION(DESC, 'TEST') > 0;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') > 0").getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'ci') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'iiccii') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        boolean expectedExceptionThrowed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
+            assertFalse("Expected exception for illegal regular expression in regexp_position.", true);
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Regular Expression Compilation Error: missing closing parenthesis"));
+            expectedExceptionThrowed = true;
+        }
+        assertTrue(expectedExceptionThrowed);
+
+        expectedExceptionThrowed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
+            assertFalse("Expected exception for illegal match flag in regexp_position.", true);
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Illegal Match Flags"));
+            expectedExceptionThrowed = true;
+        }
+        assertTrue(expectedExceptionThrowed);
+
+        // test null strings
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0);
+        assertTrue(vt.wasNull());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (201, NULL);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE ID = 201").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0);
+        assertTrue(vt.wasNull());
+
+        // test utf-8 strings
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (202, 'vVoltDBBB贾贾贾');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[A-Z]贾') FROM P1 WHERE ID = 202;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(9, vt.getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z]贾', 'i') FROM P1 WHERE ID = 202;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(9, vt.getLong(0));
+
+
+        // clear test data
+        cr = client.callProcedure("@AdHoc", "DELETE FROM P1 WHERE ID IN (200, 201, 202);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 }

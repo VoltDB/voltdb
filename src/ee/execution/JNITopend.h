@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,9 +32,12 @@ public:
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-    int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-                std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
-                int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
+    int64_t fragmentProgressUpdate(
+                int32_t batchIndex,
+                PlanNodeType planNodeType,
+                int64_t tuplesProcessed,
+                int64_t currMemoryInBytes,
+                int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
@@ -48,11 +51,11 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
-    int reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type,
-            std::string tableName, Table* exisitingTable,
-            Table* expectedTable, Table* newTable,
-            Table* output);
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 

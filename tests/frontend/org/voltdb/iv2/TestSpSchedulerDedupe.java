@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -117,7 +117,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        Long.MIN_VALUE, // coordHSID
                                        txnId - 1, // truncationHandle
                                        txnId,     // txnId
-                                       System.currentTimeMillis(), // timestamp
+                                       UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, 0), // uniqueID
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,25 +49,18 @@
 
 namespace voltdb {
 
-ReceivePlanNode::~ReceivePlanNode() { }
-
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
 std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
     std::ostringstream buffer;
-    buffer << spacer << "Incoming Table Columns["
-           << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++) {
-        SchemaColumn* col = getOutputSchema()[ctr];
-        buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
-        buffer << "type=" << col->getExpression()->getValueType() << "\n";
-    }
+    AbstractReceivePlanNode::schemaDebugInfo(buffer, getOutputSchema(), "Incoming", spacer);
     return buffer.str();
 }
 
-void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+}
+
 
 } // namespace voltdb

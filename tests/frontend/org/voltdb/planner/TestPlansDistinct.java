@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,10 +26,13 @@ package org.voltdb.planner;
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -359,6 +362,7 @@ public class TestPlansDistinct extends PlannerTestCase {
         // DISTINCT plan node is rewrote with GROUP BY and adds above the original GROUP BY node
         // there may be another projection node in between for complex aggregation case
         boolean hasOrderby = false, hasLimit = false;
+        boolean groupByMergeReceive = false;
         // infer the ORDERBY/LIMIT information from the base line query
         if (apn2 instanceof OrderByPlanNode) {
             hasOrderby = true;
@@ -369,27 +373,53 @@ public class TestPlansDistinct extends PlannerTestCase {
         } else if (apn2 instanceof LimitPlanNode) {
             hasLimit = true;
             apn2 = apn2.getChild(0);
+        } else if (apn2 instanceof MergeReceivePlanNode) {
+            assertTrue(apn2.getInlinePlanNode(PlanNodeType.ORDERBY) != null);
+            hasOrderby = true;
+            hasLimit = apn2.getInlinePlanNode(PlanNodeType.LIMIT) != null;
+            groupByMergeReceive = true;
         }
 
         // check the DISTINCT query plan
+        boolean distinctMergeReceive = false;
         if (hasOrderby) {
-            assertTrue(apn1 instanceof OrderByPlanNode);
-            if (hasLimit) {
-                // check inline limit
-                assertNotNull(apn1.getInlinePlanNode(PlanNodeType.LIMIT));
+            if (apn1 instanceof OrderByPlanNode) {
+                assertTrue(apn1 instanceof OrderByPlanNode);
+                if (hasLimit) {
+                    // check inline limit
+                    assertNotNull(apn1.getInlinePlanNode(PlanNodeType.LIMIT));
+                }
+                apn1 = apn1.getChild(0);
+            } else if (apn1 instanceof MergeReceivePlanNode) {
+                distinctMergeReceive = true;
+                assertNotNull(apn1.getInlinePlanNode(PlanNodeType.ORDERBY));
+                assertEquals(0, apn1.getChildCount());
+            } else {
+                fail("The distinctSQL top node is not OrderBy or MergeReceive.");
             }
-            apn1 = apn1.getChild(0);
         } else if (hasLimit) {
             assertTrue(apn1 instanceof LimitPlanNode);
             apn1 = apn1.getChild(0);
         }
 
         // Check DISTINCT group by plan node
-        assertTrue(apn1 instanceof HashAggregatePlanNode);
-        assertEquals(0, ((HashAggregatePlanNode)apn1).getAggregateTypesSize());
-        assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
-                ((HashAggregatePlanNode)apn1).getGroupByExpressionsSize());
-        apn1 = apn1.getChild(0);
+        if (distinctMergeReceive) {
+            AbstractPlanNode aggr = AggregatePlanNode.getInlineAggregationNode(apn1);
+            assertTrue(aggr instanceof AggregatePlanNode);
+            assertEquals(0, ((AggregatePlanNode)aggr).getAggregateTypesSize());
+            assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
+                ((AggregatePlanNode)aggr).getGroupByExpressionsSize());
+            if (hasLimit) {
+                // check inline limit
+                assertNotNull(aggr.getInlinePlanNode(PlanNodeType.LIMIT));
+            }
+        } else {
+            assertTrue(apn1 instanceof HashAggregatePlanNode);
+            assertEquals(0, ((HashAggregatePlanNode)apn1).getAggregateTypesSize());
+            assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
+                    ((HashAggregatePlanNode)apn1).getGroupByExpressionsSize());
+            apn1 = apn1.getChild(0);
+        }
 
         // check projection node for complex aggregation case
         if (apn1 instanceof ProjectionPlanNode) {
@@ -401,8 +431,15 @@ public class TestPlansDistinct extends PlannerTestCase {
             assertFalse(hasTopProjection2);
         }
 
-        // check the rest plan nodes
-        assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+        // check the rest plan nodes.
+        if (distinctMergeReceive == false && groupByMergeReceive == false) {
+            assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+        } else if (distinctMergeReceive == true && groupByMergeReceive == true) {
+            // In case of applied MergeReceive optimization the apn1 and apn2 nodes
+            // should not have any children
+            assertEquals(0, apn1.getChildCount());
+            assertEquals(0, apn2.getChildCount());
+        }
 
         // Distributed DISTINCT GROUP BY
         if (pns1.size() > 1) {
@@ -423,7 +460,12 @@ public class TestPlansDistinct extends PlannerTestCase {
             assertNotNull(apn2.getInlinePlanNode(PlanNodeType.LIMIT));
 
             apn2 = apn2.getChild(0);
-            assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+            // If the MergeReceive optimization was applied, the explain plan could legitimately
+            // differ (for example, index for grouping purpose vs index for sort order), or different
+            // winners may produce completely different paths.
+            if (distinctMergeReceive == false && groupByMergeReceive == false) {
+                assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+            }
         }
     }
 

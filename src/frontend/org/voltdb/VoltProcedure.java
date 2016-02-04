@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -76,41 +76,8 @@ public abstract class VoltProcedure {
         return new Expectation(Type.EXPECT_SCALAR_MATCH, scalar);
     }
 
-    private ProcedureRunner m_runner;
+    ProcedureRunner m_runner;
     private boolean m_initialized;
-
-    /**
-     * Returns the VoltDB 3.0 transaction ID which is a sequence number instead
-     * of the time-based ID used in pre-3.0 VoltDB. It is less unique in that sequence numbers can revert
-     * if you load data from one volt database into another via CSV or other external methods
-     * that bypass the combination of snapshot restore/command log replay which maintains these per partition
-     * sequence numbers.
-     *
-     * @deprecated Do not use outside of VoltDB internal code.
-     * @return VoltDB 3.0-esque transaction id.
-     *
-     */
-    @Deprecated
-    public long getVoltPrivateRealTransactionIdDontUseMe() {
-        return m_runner.getTransactionId();
-    }
-
-    /**
-     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
-     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
-     *
-     * Allow VoltProcedures access to a unique ID generated for each transaction. Synonym of getUniqueID
-     * that is kept around to support legacy applications
-     *
-     * The id consists of a time based component in the most significant bits followed
-     * by a counter, and then a generator id to allow parallel unique number generation
-     * @return transaction id
-     * @deprecated Use the synonymous getUniqueId() instead
-     */
-    @Deprecated
-    public long getTransactionId() {
-        return m_runner.getUniqueId();
-    }
 
     /**
      * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
@@ -124,6 +91,14 @@ public abstract class VoltProcedure {
      */
     public long getUniqueId() {
         return m_runner.getUniqueId();
+    }
+
+    /**
+     * Get the ID of cluster that the client connects to.
+     * @return An ID that identifies the VoltDB cluster
+     */
+    public int getClusterId() {
+        return m_runner.getClusterId();
     }
 
 
@@ -320,32 +295,5 @@ public abstract class VoltProcedure {
      */
     public void setAppStatusString(String statusString) {
         m_runner.setAppStatusString(statusString);
-    }
-
-    /**
-     * <p>Currently unsupported in VoltDB.</p>
-     * <p>Batch load method for populating a table with a large number of records.</p>
-     *
-     * <p>Faster then calling {@link #voltQueueSQL(SQLStmt, Object...)} and {@link #voltExecuteSQL()} to
-     * insert one row at a time.</p>
-     *
-     * @deprecated This method is not fully tested to be used in all contexts.
-     * @param clusterName Name of the cluster containing the database, containing the table
-     *                    that the records will be loaded in.
-     * @param databaseName Name of the database containing the table to be loaded.
-     * @param tableName Name of the table records should be loaded in.
-     * @param data {@link org.voltdb.VoltTable VoltTable} containing the records to be loaded.
-     *             {@link org.voltdb.VoltTable.ColumnInfo VoltTable.ColumnInfo} schema must match the schema of the table being
-     *             loaded.
-     * @param returnUniqueViolations If true will not fail on unique violations, will return the violating rows.
-     * @return A byte array representing constraint violations in a semi-opaque format.
-     * @throws VoltAbortException on failure.
-     */
-    @Deprecated
-    public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
-    throws VoltAbortException
-    {
-        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
     }
 }

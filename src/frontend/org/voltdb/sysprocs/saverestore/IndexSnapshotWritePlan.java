@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -55,7 +56,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                         Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                         Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                          SiteTracker tracker,
                                          HashinatorSnapshotData hashinatorData,
                                          long timestamp)

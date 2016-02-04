@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -324,7 +324,8 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine target(BackendTarget target) {
         m_backend = target;
-        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND);
+        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND ||
+                             target == BackendTarget.POSTGRESQL_BACKEND);
         return this;
     }
     public BackendTarget target() {
@@ -458,6 +459,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
         cmdline.add("-Djava.library.path=" + java_library_path);
+        /*
+         * Facilitate SPNEGO (Kerberos HTTP) authentication
+         */
+        cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
+
         if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);

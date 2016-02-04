@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -161,6 +161,9 @@ public class SystemProcedureCatalog {
         builder.put("@ApplyBinaryLogMP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogMP",         false, false, false, 0, VoltType.INVALID,   true,  false, false, true, true));
         builder.put("@LoadVoltTableSP",         new Config("org.voltdb.sysprocs.LoadVoltTableSP",          true,  false, false, 0, VoltType.VARBINARY, true,  false, false, true, true));
         builder.put("@LoadVoltTableMP",         new Config("org.voltdb.sysprocs.LoadVoltTableMP",          false, false, false, 0, VoltType.INVALID,   true,  false, false, true, true));
+        builder.put("@ResetDR",                 new Config("org.voltdb.sysprocs.ResetDR",                  false, false, false, 0, VoltType.INVALID,   true,  false, true,  true, false));
+        /* @ExecuteTask is a all-in-one system store procedure and should be ONLY used for internal purpose */
+        builder.put("@ExecuteTask",             new Config("org.voltdb.sysprocs.ExecuteTask",              false, false, false, 0, VoltType.INVALID,   false, false, false, true, true));
         builder.put("@Ping",                    new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@GetPartitionKeys",        new Config(null,                                           false, true,  true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@Subscribe",               new Config(null,                                           false, true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
@@ -169,7 +172,6 @@ public class SystemProcedureCatalog {
         builder.put("@Explain",                 new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@ExplainProc",             new Config(null,                                           true,  true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@SendSentinel",            new Config(null,                                           true,  false, false, 0, VoltType.INVALID,   true,  false, false, true, false));
-        builder.put("@ResetDR",                 new Config(null,                                           true,  false, false, 0, VoltType.INVALID,   false, false, true,  true, false));
         listing = builder.build();
     }
 }

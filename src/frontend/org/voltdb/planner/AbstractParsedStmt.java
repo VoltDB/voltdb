@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -63,11 +64,12 @@ import org.voltdb.types.QuantifierType;
 
 public abstract class AbstractParsedStmt {
 
+    protected String m_contentDeterminismMessage = null;
+
      // Internal statement counter
     public static int NEXT_STMT_ID = 0;
     // Internal parameter counter
     public static int NEXT_PARAMETER_ID = 0;
-
     // The unique id to identify the statement
     public int m_stmtId;
 
@@ -97,7 +99,7 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
+    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
@@ -294,6 +296,7 @@ public abstract class AbstractParsedStmt {
         // The assumption is that FALSE boolean results can replace NULL
         // boolean results in this context without a change in behavior.
         expr = optimizeInExpressions(expr);
+        rejectDisallowedRowOpExpressions(expr);
         // If there were any subquery expressions appearing in a scalar context,
         // we must wrap them in ScalarValueExpressions to avoid wrong answers.
         // See ENG-8226.
@@ -455,7 +458,7 @@ public abstract class AbstractParsedStmt {
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
         // correlated queries it may not be THIS statement but its parent
-        StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+        StmtTableScan tableScan = resolveStmtTableScanByAlias(tableAlias);
         if (tableScan == null) {
             // This never used to happen.  HSQL should make sure all the
             // identifiers are defined.  But something has gone wrong.
@@ -469,7 +472,7 @@ public abstract class AbstractParsedStmt {
             return expr;
         }
 
-        // This a TVE from the correlated expression
+        // This is a TVE from the correlated expression
         int paramIdx = NEXT_PARAMETER_ID++;
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
         m_parameterTveMap.put(paramIdx, expr);
@@ -507,38 +510,46 @@ public abstract class AbstractParsedStmt {
    }
 
    /**
-   *
-   * @param exprNode
-   * @return
-   */
-  private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
-      // Parse individual columnref expressions from the IN output schema
-      List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-      for (VoltXMLElement exprNode : exprNodes) {
-          AbstractExpression expr = parseExpressionNode(exprNode);
-          exprs.add(expr);
-      }
-      return new RowSubqueryExpression(exprs);
-  }
+    *
+    * @param exprNode
+    * @return
+    */
+   private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
+       // Parse individual columnref expressions from the IN output schema
+       List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+       for (VoltXMLElement exprNode : exprNodes) {
+           AbstractExpression expr = parseExpressionNode(exprNode);
+           exprs.add(expr);
+       }
+       return new RowSubqueryExpression(exprs);
+   }
 
-    /**
-     * Return StmtTableScan by table alias. In case of correlated queries, would need
-     * to walk the statement tree up.
-     *
-     * @param stmt
-     * @param tableAlias
-     */
-    private StmtTableScan getStmtTableScanByAlias(String tableAlias) {
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
-        if (tableScan != null) {
-            return tableScan;
-        }
-        if (m_parentStmt != null) {
-            // This may be a correlated subquery
-            return m_parentStmt.getStmtTableScanByAlias(tableAlias);
-        }
-        return null;
-    }
+   public Collection<StmtTableScan> allScans()
+   { return m_tableAliasMap.values(); }
+
+   /**
+    * Return locally defined StmtTableScan by table alias.
+    * @param tableAlias
+    */
+   public StmtTableScan getStmtTableScanByAlias(String tableAlias)
+   { return m_tableAliasMap.get(tableAlias); }
+
+   /**
+    * Return StmtTableScan by table alias. In case of correlated queries,
+    * may need to walk up the statement tree.
+    * @param tableAlias
+    */
+   private StmtTableScan resolveStmtTableScanByAlias(String tableAlias) {
+       StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+       if (tableScan != null) {
+           return tableScan;
+       }
+       if (m_parentStmt != null) {
+           // This may be a correlated subquery
+           return m_parentStmt.resolveStmtTableScanByAlias(tableAlias);
+       }
+       return null;
+   }
 
     /**
      * Add a table to the statement cache.
@@ -569,8 +580,7 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
         }
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
-        assert(tableScan == null);
+        assert(m_tableAliasMap.get(tableAlias) == null);
         StmtSubqueryScan subqueryScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
         m_tableAliasMap.put(tableAlias, subqueryScan);
         return subqueryScan;
@@ -663,6 +673,63 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
+    private void rejectDisallowedRowOpExpressions(AbstractExpression expr) {
+        ExpressionType exprType = expr.getExpressionType();
+
+        // Recurse into the operands of logical operators
+        // searching for row op subquery expressions.
+        if (ExpressionType.CONJUNCTION_AND == exprType ||
+                ExpressionType.CONJUNCTION_OR == exprType) {
+            rejectDisallowedRowOpExpressions(expr.getLeft());
+            rejectDisallowedRowOpExpressions(expr.getRight());
+            return;
+        }
+        if (ExpressionType.OPERATOR_NOT == exprType) {
+            rejectDisallowedRowOpExpressions(expr.getLeft());
+        }
+
+        // The problem cases are all comparison ops.
+        if ( ! (expr instanceof ComparisonExpression)) {
+            return;
+        }
+
+        // The problem cases all have row expressions as an operand.
+        AbstractExpression rowExpression = expr.getLeft();
+        if (rowExpression instanceof RowSubqueryExpression) {
+            rejectDisallowedRowColumns(rowExpression);
+        }
+        rowExpression = expr.getRight();
+        if (rowExpression instanceof RowSubqueryExpression) {
+            rejectDisallowedRowColumns(rowExpression);
+        }
+    }
+
+    private void rejectDisallowedRowColumns(AbstractExpression rowExpression) {
+        // Verify that the ROW OP SUBQUERY expression's ROW operand only
+        // contains column arguments that reference exactly one column.
+        // I (--paul) don't know if it's possible -- in spite of the name
+        // for a RowSubqueryExpression to be used in a context other than
+        // a comparison with a subquery, AND I don't know if that context
+        // needs to have the same guards as the normal subquery comparison
+        // case, but let's err on the side of caution and use the same
+        // guard condition for RowSubqueryExpressions until the current
+        // problematic cases see ENG-9380 can be fully supported and have
+        // been validated with tests.
+        // The only known-safe case is where each (column) argument to a
+        // RowSubqueryExpression is based on exactly one column value.
+        for (AbstractExpression arg : rowExpression.getArgs()) {
+            List<AbstractExpression> tves = arg.findBaseTVEs();
+            if (tves.size() != 1) {
+                if (tves.isEmpty()) {
+                    throw new PlanningErrorException(
+                            "Unsupported use of a constant value in a row column expression.");
+                }
+                throw new PlanningErrorException(
+                        "Unsupported combination of column values in a row column expression.");
+            }
+        }
+    }
+
     /**
      * Perform various optimizations for IN/EXISTS subqueries if possible
      *
@@ -678,7 +745,7 @@ public abstract class AbstractParsedStmt {
             expr.setRight(optimizedRight);
             return expr;
         }
-        if (ExpressionType.COMPARE_EQUAL != expr.getExpressionType()) {
+        if (ExpressionType.COMPARE_EQUAL != exprType) {
             return expr;
         }
         assert(expr instanceof ComparisonExpression);
@@ -689,11 +756,7 @@ public abstract class AbstractParsedStmt {
          * Verify that an IN expression can be safely converted to an EXISTS one
          * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) =>
          * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
-         *
-         * @param expr
-         * @return existsExpr
          */
-
         AbstractExpression inColumns = expr.getLeft();
         if (inColumns instanceof SelectSubqueryExpression) {
             // If the left child is a (SELECT ...) expression itself we can't convert it
@@ -702,12 +765,12 @@ public abstract class AbstractParsedStmt {
             return expr;
         }
 
-        // Must be a SELECT statement
+        // The right hand operand of the equality operation must be a SELECT statement
         AbstractExpression rightExpr = expr.getRight();
         if (!(rightExpr instanceof SelectSubqueryExpression)) {
             return expr;
         }
-        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr.getRight();
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) rightExpr;
         AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
         if (!(subquery instanceof ParsedSelectStmt)) {
             return expr;
@@ -975,6 +1038,7 @@ public abstract class AbstractParsedStmt {
         } else {
             assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
+            leafNode.updateContentDeterminismMessage(((StmtSubqueryScan) tableScan).calculateContentDeterminismMessage());
         }
 
         if (m_joinTree == null) {
@@ -1019,7 +1083,17 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Populate the statement's paramList from the "parameters" element
+     * Populate the statement's paramList from the "parameters" element. Each
+     * parameter has an id and an index, both of which are numeric. It also has
+     * a type and an indication of whether it's a vector parameter. For each
+     * parameter, we create a ParameterValueExpression, named pve, which holds
+     * the type and vector parameter indication. We add the pve to two maps,
+     * m_paramsById and m_paramsByIndex.
+     *
+     * We also set a counter, MAX_PARAMETER_ID, to the largest id in the
+     * expression. This helps give ids to references to correlated expressions
+     * of subqueries.
+     *
      * @param paramsNode
      */
     protected void parseParameters(VoltXMLElement root) {
@@ -1069,7 +1143,7 @@ public abstract class AbstractParsedStmt {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_joinTree != null) {
-          m_joinTree.extractSubQueries(subqueries);
+            m_joinTree.extractSubQueries(subqueries);
         }
 
         return subqueries;
@@ -1170,6 +1244,7 @@ public abstract class AbstractParsedStmt {
         subQuery.m_paramsById.putAll(m_paramsById);
 
         AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        updateContentDeterminismMessage(subQuery.calculateContentDeterminismMessage());
         return subQuery;
     }
 
@@ -1207,7 +1282,7 @@ public abstract class AbstractParsedStmt {
     }
 
     public ParameterValueExpression[] getParameters() {
-        // Is a statement contains subqueries the parameters will be associated with
+        // If a statement contains subqueries the parameters will be associated with
         // the parent statement
         if (m_parentStmt != null) {
             return m_parentStmt.getParameters();
@@ -1444,7 +1519,7 @@ public abstract class AbstractParsedStmt {
         boolean allScansAreDeterministic = true;
         for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
             List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();
-            StmtTableScan tableScan = m_tableAliasMap.get(orderedAlias.getKey());
+            StmtTableScan tableScan = getStmtTableScanByAlias(orderedAlias.getKey());
             if (tableScan == null) {
                 assert(false);
                 return false;
@@ -1529,7 +1604,6 @@ public abstract class AbstractParsedStmt {
         for (ParsedColInfo colInfo : candidateColumns) {
             AbstractExpression colExpr = colInfo.expression;
             if (colExpr instanceof TupleValueExpression) {
-                TupleValueExpression tve = (TupleValueExpression)colExpr;
                 Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
                 if (tveEquivs != null) {
                     for (AbstractExpression expr : tveEquivs) {
@@ -1661,5 +1735,67 @@ public abstract class AbstractParsedStmt {
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
     }
+    public abstract boolean isDML();
 
+    /**
+     * Is the statement a subquery of a DML statement.
+     * Currently, subquery statements initialized through parseFromSubQuery
+     * (as opposed to parseSubquery) do NOT initialize m_parentStmt so they
+     * are indistinguishable from top-level statements. There is a plan to
+     * "fix" that for greater simplicity/consistency.
+     * https://issues.voltdb.com/browse/ENG-9313
+     * This code SHOULD work acceptably with or without that fix,
+     * because we do not allow FROM clause subqueries in DML statements.
+     * Regardless, the current caller has no requirement to return true
+     * if THIS statement is DML.
+     * @return
+     */
+    public boolean topmostParentStatementIsDML() {
+        if (m_parentStmt == null) {
+            return false; // Do not need to check if THIS statement is DML.
+        }
+        // A parent DML statement is always the root parent because DML is not
+        // allowed in subqueries.
+        if (m_parentStmt.isDML()) {
+            return true;
+        }
+        // For queries (potentially subqueries), keep searching upward.
+        return m_parentStmt.topmostParentStatementIsDML();
+    }
+
+    /**
+     * Return an error message iff this statement is inherently content
+     * deterministic. Some operations can cause non-determinism. Notably,
+     * aggregate functions of floating point type can cause non-deterministic
+     * round-off error. The default is to return null, which means the query is
+     * inherently deterministic.
+     *
+     * Note that this has nothing to do with limit-order non-determinism.
+     *
+     * @return An error message if this statement is *not* inherently content
+     *         deterministic. Otherwise we return null.
+     */
+    public abstract String calculateContentDeterminismMessage();
+
+    /**
+     * Just fetch the content determinism message. Don't do any calculations.
+     */
+    protected final String getContentDeterminismMessage() {
+        return m_contentDeterminismMessage;
+    }
+
+    /**
+     * Set the content determinism message, but only if it's currently non-null.
+     *
+     * @param msg
+     */
+    protected void updateContentDeterminismMessage(String msg) {
+        if (m_contentDeterminismMessage == null) {
+            m_contentDeterminismMessage = msg;
+        }
+    }
+
+    public boolean isContentDetermistic() {
+        return m_contentDeterminismMessage != null;
+    }
 }

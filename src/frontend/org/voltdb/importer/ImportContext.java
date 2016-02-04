@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,12 +66,6 @@ public interface ImportContext extends InternalConnectionContext {
      * @return true if successfully accepted the work.
      */
     public boolean callProcedure(ProcedureCallback cb, Invocation invocation);
-
-    /**
-     * Returns max time in nanoseconds a call to callProcedure waits in backpressure.
-     * @return
-     */
-    public long getBackpressureTimeout();
 
     /**
      * This is the real handler dont need to call or extend anything

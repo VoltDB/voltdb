@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -660,24 +660,28 @@ public class CatalogDiffEngine {
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
 
-        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
-            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
-            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " while DR is enabled";
-            }
-            else {
+        if (suspect instanceof Cluster) {
+            if (field.equals("drFlushInterval")) {
                 return null;
+            } else if (field.equals("drProducerPort")) {
+                // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
+                if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
+                    restrictionQualifier = " while DR is enabled";
+                }
+                else {
+                    return null;
+                }
+            } else if (field.equals("drMasterHost")) {
+                String source = (String)suspect.getField("drMasterHost");
+                if (source.isEmpty() && (Boolean)suspect.getField("drConsumerEnabled")) {
+                    restrictionQualifier = " while DR is enabled";
+                }
+                else {
+                    return null;
+                }
             }
         }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            String source = (String)suspect.getField("drMasterHost");
-            if (source.isEmpty() && (Boolean)suspect.getField("drConsumerEnabled")) {
-                restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
+
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {

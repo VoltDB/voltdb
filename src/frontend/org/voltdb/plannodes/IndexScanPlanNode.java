@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -323,6 +323,78 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public SortDirectionType getSortDirection() {
         return m_sortDirection;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        // The output is unordered if there is an inline hash aggregate
+        AbstractPlanNode agg = AggregatePlanNode.getInlineAggregationNode(this);
+        if (agg != null && agg.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        }
+
+        // Verify that all sortDirections match
+        for(SortDirectionType sortDirection : sortDirections) {
+            if (sortDirection != getSortDirection()) {
+                return false;
+            }
+        }
+        // Verify that all sort expressions are covered by the consecutive index expressions
+        // starting from the first one
+        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
+        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
+        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
+                indexedExprs, indexedColRefs);
+        int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
+        if (indexExprCount < sortExpressions.size()) {
+            // Not enough index expressions to cover all of the sort expressions
+            return false;
+        }
+        if (columnIndex) {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan())) {
+                    return false;
+                }
+            }
+        } else {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedExprs, idxToCover)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<AbstractExpression> indexedExprs,
+            int idxToCover) {
+        assert(idxToCover < indexedExprs.size());
+        AbstractExpression indexExpression = indexedExprs.get(idxToCover);
+        List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
+        if (bindings != null) {
+            m_bindings.addAll(bindings);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,
+            int idxToCover, StmtTableScan tableScan) {
+        assert(idxToCover < indexedColRefs.size());
+        TupleValueExpression tve = null;
+        if (sortExpression instanceof TupleValueExpression) {
+            tve = (TupleValueExpression) sortExpression;
+        }
+        if (tve != null && tableScan.getTableAlias().equals(tve.getTableAlias())) {
+            ColumnRef indexColumn = indexedColRefs.get(idxToCover);
+            if (indexColumn.getColumn().getTypeName().equals(tve.getColumnName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

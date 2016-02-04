@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,8 +24,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import javax.security.auth.Subject;
+
 import org.voltcore.logging.VoltLogger;
 
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.FluentIterable;
 
@@ -51,6 +54,7 @@ public class AuthenticatedConnectionCache {
     final int m_port;
     final int m_adminPort;
     final int m_targetSize; // goal size of the client cache
+    private boolean m_isClosing;
 
     /**
      * Metadata about a connection.
@@ -61,7 +65,8 @@ public class AuthenticatedConnectionCache {
         String user;
         byte[] hashedPassword;
         int passHash;
-        ClientAuthHashScheme scheme;
+        ClientAuthScheme scheme;
+        Subject subject;
     }
 
     /**
@@ -103,12 +108,66 @@ public class AuthenticatedConnectionCache {
 
     public class ClientWithHashScheme {
         public final Client m_client;
-        public final ClientAuthHashScheme m_scheme;
+        public final ClientAuthScheme m_scheme;
 
-        public ClientWithHashScheme(Client client, ClientAuthHashScheme scheme) {
+        public ClientWithHashScheme(Client client, ClientAuthScheme scheme) {
             m_client = client;
             m_scheme = scheme;
         }
+    }
+
+    public synchronized ClientWithHashScheme getClient(Subject subject, boolean admin) throws IOException {
+        if (subject == null) {
+            return null;
+        }
+        Optional<DelegatePrincipal> opt = ConnectionUtil.getDelegate(subject);
+        if (!opt.isPresent()) {
+            throw new IOException("Subject " + subject + " does not contain suported principals");
+        }
+        DelegatePrincipal principal = opt.get();
+        String userName = principal.getName();
+        String userNameWithAdminSuffix = null;
+        if (userName != null && !userName.trim().isEmpty()) {
+            if (userName.endsWith(ADMIN_SUFFIX)) {
+                throw new IOException("User name cannot end with " + ADMIN_SUFFIX);
+            }
+            userNameWithAdminSuffix = userName + ADMIN_SUFFIX;
+        }
+
+        final ClientAuthScheme scheme = ClientAuthScheme.SPNEGO;
+        String ckey = (admin ? userNameWithAdminSuffix : userName) + scheme;
+        Connection conn = m_connections.get(ckey);
+        if (conn != null) {
+            conn.refCount++;
+        } else {
+            conn = new Connection();
+            conn.refCount = 1;
+            conn.subject = subject;
+            conn.user = userName;
+
+            ClientConfig config = new ClientConfig(subject, new StatusListener(conn));
+
+            conn.client = (ClientImpl) ClientFactory.createClient(config);
+            conn.scheme = scheme;
+
+            try {
+                conn.client.createConnection(m_hostname, (admin ? m_adminPort : m_port));
+            } catch (IOException e) {
+                try {
+                    conn.client.close();
+                } catch (InterruptedException ex) {
+                    throw new IOException(
+                            "Unable to close rejected authenticated "
+                          + (admin ? "admin " : "") + "client connection.", ex
+                          );
+                }
+                conn = null;
+                throw e;
+            }
+            m_connections.put(ckey, conn);
+            attemptToShrinkPoolIfNeeded();
+        }
+        return new ClientWithHashScheme(conn.client, scheme);
     }
 
     public synchronized ClientWithHashScheme getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
@@ -163,7 +222,7 @@ public class AuthenticatedConnectionCache {
             assert(m_adminUnauthClient != null);
 
             return new ClientWithHashScheme(admin ? m_adminUnauthClient : m_unauthClient,
-                    ClientAuthHashScheme.HASH_SHA256);
+                    ClientAuthScheme.HASH_SHA256);
         }
 
         // AUTHENTICATED
@@ -172,8 +231,8 @@ public class AuthenticatedConnectionCache {
             passHash = Arrays.hashCode(hashedPassword);
         }
 
-        ClientAuthHashScheme scheme = (hashedPassword == null ?
-                ClientAuthHashScheme.HASH_SHA256 : ClientAuthHashScheme.getByUnencodedLength(hashedPassword.length));
+        ClientAuthScheme scheme = (hashedPassword == null ?
+                ClientAuthScheme.HASH_SHA256 : ClientAuthScheme.getByUnencodedLength(hashedPassword.length));
         String ckey = (admin ? userNameWithAdminSuffix : userName) + scheme;
         Connection conn = m_connections.get(ckey);
         if (conn != null) {
@@ -244,7 +303,7 @@ public class AuthenticatedConnectionCache {
      * @param force this is sent true in case we just lost network and so the connection I thought this will not happen
      * in internally connected clients but have seen it in strange/unknown/unreproducible cases.
      */
-    public synchronized void releaseClient(Client client, ClientAuthHashScheme scheme, boolean force) {
+    public synchronized void releaseClient(Client client, ClientAuthScheme scheme, boolean force) {
         ClientImpl ci = (ClientImpl) client;
         if (force) {
             if (client == this.m_unauthClient) {
@@ -268,8 +327,8 @@ public class AuthenticatedConnectionCache {
         }
         String ckey = userNameBuilder.toString() + scheme;
         Connection conn = m_connections.get(ckey);
-        if (conn == null) {
-            throw new RuntimeException("Released client not in pool.");
+        if (conn == null) { // already closed and cleaned up by closeAll. Nothing more to do.
+            return;
         }
         if (force) {
             //Dont bother with target size of pool and remove dead connection.
@@ -297,9 +356,14 @@ public class AuthenticatedConnectionCache {
         }
     }
 
+    public boolean isClosing() {
+        return m_isClosing;
+    }
+
     //Close all and just clear stuff.
     public synchronized void closeAll()
     {
+        m_isClosing = true;
         if (m_unauthClient != null)
         {
             closeClient(m_unauthClient);

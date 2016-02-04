@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,20 +17,14 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
-import java.util.Map;
+import java.util.List;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
-public class ReceivePlanNode extends AbstractPlanNode {
-
-    final static String m_nondeterminismDetail = "multi-fragment plan results can arrive out of order";
+public class ReceivePlanNode extends AbstractReceivePlanNode {
 
     public ReceivePlanNode() {
         super();
@@ -56,30 +50,7 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     public void resolveColumnIndexes()
     {
-        // Need to order and resolve indexes of output columns
-        assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        assert (input_schema.equals(m_outputSchema));
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
-    }
-
-    @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
-    }
-
-    @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
+        resolveColumnIndexes(m_outputSchema);
     }
 
     @Override
@@ -88,32 +59,8 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
-        // ReceiveNode is a dead end. This method is not intended to cross fragments
-        // even within a pre-fragmented plan tree.
-    }
-
-    /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return previously cached value.
-     */
-    @Override
-    public boolean isOrderDeterministic() {
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
         return false;
     }
 
-    /**
-     * Accessor
-     */
-    @Override
-    public String nondeterminismDetail() { return m_nondeterminismDetail; }
-
-    @Override
-    public boolean reattachFragment( SendPlanNode child  ) {
-        this.addAndLinkChild(child);
-        return true;
-    }
 }

@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -26,19 +26,19 @@
     <target name="socketstream">
         <antcall target="osgibundle">
             <param name="bundle.name" value="socketstream"/>
-            <param name="activator" value="org.voltdb.importclient.SocketStreamImporter"/>
+            <param name="activator" value="org.voltdb.importclient.socket.ServerSocketImporterFactory"/>
             <param name="bundle.displayname" value="SocketStreamImporter"/>
-            <param name="include.classpattern" value="SocketStream*.class"/>
+            <param name="include.classpattern" value="socket/ServerSocket*.class"/>
         </antcall>
     </target>
 
     <target name="pullsocketimporter">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/pullsocketimporter.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importclient/PullSocketImporter*.class"/>
+            <include name="org/voltdb/importclient/socket/PullSocketImporter*.class"/>
             <include name="org/voltdb/importclient/ImportBaseException.class"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.PullSocketImporter" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.socket.PullSocketImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="PullSocketImporter OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="PullSocketImporter" />
@@ -52,9 +52,9 @@
     <target name="log4jsocketimporter">
         <antcall target="osgibundle">
             <param name="bundle.name" value="log4jsocketimporter"/>
-            <param name="activator" value="org.voltdb.importclient.Log4jSocketHandlerImporter"/>
+            <param name="activator" value="org.voltdb.importclient.log4j.Log4jSocketImporterFactory"/>
             <param name="bundle.displayname" value="Log4jSocketImporter"/>
-            <param name="include.classpattern" value="Log4jSocket*.class"/>
+            <param name="include.classpattern" value="log4j/*.class"/>
         </antcall>
     </target>
 
@@ -67,7 +67,7 @@
         <zipgroupfileset dir="${base.dir}/lib/" includes="scala-library-2.10.4.jar" />
         <zipgroupfileset dir="${base.dir}/lib" includes="kafka_2.10-0.8.2.1.jar" />
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporter" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="KafkaStream OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
@@ -91,6 +91,23 @@
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
                 <attribute name="Import-Package" value="${default.imports}" />
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="voltcsvformatter">
+        <mkdir dir="${bundles.dir}" />
+        <jar destfile="${bundles.dir}/voltcsvformatter.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatter.class"/>
+            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatterFactory.class"/>
+            <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
+            <manifest>
+                <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory" />
+                <attribute name="Bundle-ManifestVersion" value="2" />
+                <attribute name="Bundle-Name" value="Builtin CSV Formatter OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="VoltCSVFormatter" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="DynamicImport-Package" value="*" />
             </manifest>
         </jar>
     </target>

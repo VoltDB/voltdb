@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,10 +19,10 @@
 
 #include <iostream>
 #include <limits>
+#include <stx/btree.h>
 #include <boost/iterator/iterator_facade.hpp>
 #include "storage/TupleBlock.h"
 #include "common/tabletuple.h"
-#include "structures/CompactingSet.h"
 
 namespace voltdb {
 
@@ -89,18 +89,19 @@ class ElasticIndexKey
 };
 
 /**
- * Required comparison operator for ElasticIndexKey.
+ * Required less than comparison operator for ElasticIndexKey.
  */
 class ElasticIndexComparator
 {
   public:
-    int operator()(const ElasticIndexKey &a, const ElasticIndexKey &b) const;
+    bool operator()(const ElasticIndexKey &a, const ElasticIndexKey &b) const;
 };
 
 /**
  * The elastic index (set)
  */
-class ElasticIndex : public CompactingSet<ElasticIndexKey, ElasticIndexComparator>
+class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparator,
+                                    stx::btree_default_set_traits<ElasticIndexKey> >
 {
     friend class ElasticIndexIterator;
 
@@ -336,16 +337,10 @@ inline char *ElasticIndexKey::getTupleAddress() const
 /**
  * Required less than comparison operator method for ElasticIndexKey.
  */
-inline int ElasticIndexComparator::operator()(
+inline bool ElasticIndexComparator::operator()(
        const ElasticIndexKey &a, const ElasticIndexKey &b) const
 {
-    if (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptrVal < b.m_ptrVal)) {
-        return -1;
-    } else if (a.m_hash > b.m_hash || (a.m_hash == b.m_hash && a.m_ptrVal > b.m_ptrVal)) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return (a.m_hash < b.m_hash || (a.m_hash == b.m_hash && a.m_ptrVal < b.m_ptrVal));
 }
 
 /**
@@ -396,7 +391,7 @@ inline bool ElasticIndex::add(const ElasticIndexKey &key)
 {
     bool inserted = false;
     if (!exists(key)) {
-        inserted = insert(key);
+        inserted = insert(key).second;
         assert(inserted);
     }
     return inserted;
@@ -474,11 +469,11 @@ inline void ElasticIndex::printKeys(std::ostream &os, int32_t limit, const Tuple
     int32_t upto = 0;
     for (const_iterator itr = begin(); itr != end() && upto < limit; ++itr) {
 
-        TableTuple tuple = TableTuple(itr.key().getTupleAddress(), schema);
+        TableTuple tuple = TableTuple(itr->getTupleAddress(), schema);
         ElasticHash tupleHash = generateHash(table, tuple);
 
-        os << itr.key() << ", is ";
-        if (itr.key().getHash() != tupleHash) {
+        os << *itr << ", is ";
+        if (itr->getHash() != tupleHash) {
             os << "NOT ";
         }
         os << "a correct hash for its tuple address (pending delete: "

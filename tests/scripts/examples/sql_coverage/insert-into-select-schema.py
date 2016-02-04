@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -24,7 +24,7 @@
 
 {
     "SOURCE_P1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -32,7 +32,7 @@
         "indexes": ("ID")
         },
     "SOURCE_P2": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -40,7 +40,7 @@
         "indexes": ("ID")
         },
     "SOURCE_R1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -48,7 +48,7 @@
         "indexes": ("ID")
         },
     "TARGET_P1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),

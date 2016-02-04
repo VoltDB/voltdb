@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -301,7 +301,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
     int num_of_inner_cols = (m_joinType != JOIN_TYPE_INNER)? null_inner_tuple.sizeInValues() : 0;
-    ProgressMonitorProxy pmp(m_engine, this, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this);
 
     // The table view to keep track of inner tuples that don't match any of outer tuples for FULL joins
     TableView innerTableView;
@@ -311,6 +311,28 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     }
 
     TableTuple join_tuple;
+    // It's not immediately obvious here, so there's some subtlety to
+    // note with respect to the schema of the join_tuple.
+    //
+    // The inner_tuple is used to represent the values from the inner
+    // table in the case of the join predicate passing, and for left
+    // outer joins, the null_tuple is used if there is no match.  Both
+    // of these tuples include the complete schema of the table being
+    // scanned.  The inner table is being scanned via an inlined scan
+    // node, so there is no temp table corresponding to it.
+    //
+    // Predicates that are evaluated against the inner table should
+    // therefore use the complete schema of the table being scanned.
+    //
+    // The join_tuple is the tuple that contains the values that we
+    // actually want to put in the output of the join (or to aggregate
+    // if there is an inlined agg plan node).  This tuple needs to
+    // omit the unused columns from the inner table.  The inlined
+    // index scan itself has an inlined project node that defines the
+    // columns that should be output by the join, and omits those that
+    // are not needed.  So the join_tuple contains the columns we're
+    // using from the outer table, followed by the "projected" schema
+    // for the inlined scan of the inner table.
     if (m_aggExec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
@@ -597,7 +619,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 }
             }
         }
-   }
+    }
 
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_finish();

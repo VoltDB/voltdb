@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -113,6 +113,8 @@ class FastSerializer:
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
     VOLTTYPE_VARBINARY = 25
+    VOLTTYPE_GEOGRAPHY_POINT = 26
+    VOLTTYPE_GEOGRAPHY = 27
 
     # SQL NULL indicator for object type serializations (string, decimal)
     NULL_STRING_INDICATOR = -1

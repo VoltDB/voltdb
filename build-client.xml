@@ -20,9 +20,9 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.6"
-            source="1.6"
-            bootclasspath="${vendor.lib.dir}/classes-java1.6.jar"
+            target="1.7"
+            source="1.7"
+            bootclasspath="${vendor.lib.dir}/classes-java1.7.jar"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -77,6 +77,7 @@
 
 <fileset id="vendor.src.files" dir="${vendor.src.dir}"
         includes="com/google_voltpatches/**/*.java
+                  org/codehaus_voltpatches/mojo/**/*.java
                   javax/annotation_voltpatches/**/*.java
                   org/apache/cassandra_voltpatches/MurmurHash3.java
                   org/apache/commons_voltpatches/cli/**/*.java
@@ -87,12 +88,6 @@
                   org/cliffc_voltpatches/**/*.java
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
-                  org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
                   "
@@ -133,6 +128,8 @@
                   org/voltdb/PrivateVoltTableFactory.java
                   org/voltdb/parser/JDBCParser.java
                   org/voltdb/parser/SQL*.java
+                  org/voltdb/types/GeographyValue.java
+                  org/voltdb/types/GeographyPointValue.java
                   org/voltdb/types/TimestampType.java
                   org/voltdb/types/VoltDecimalHelper.java
                   org/voltdb/utils/Base64.java
@@ -150,12 +147,6 @@
                   org/voltdb/VoltTableRow.java
                   org/voltdb/VoltType.java
                   org/voltdb/VoltTypeException.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/Invocation.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
                   "
 />
 
@@ -209,6 +200,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
         </fileset>
     </javadoc>
 </target>

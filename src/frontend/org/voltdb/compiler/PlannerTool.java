@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,7 @@ import org.voltdb.utils.Encoder;
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger compileLog = new VoltLogger("COMPILE");
 
     private final Database m_database;
     private final Cluster m_cluster;
@@ -109,7 +110,7 @@ public class PlannerTool {
     }
 
     private void logException(Exception e, String fmtLabel) {
-        hostLog.error(fmtLabel + ": ", e);
+        compileLog.error(fmtLabel + ": ", e);
     }
 
     /**
@@ -131,8 +132,16 @@ public class PlannerTool {
             assert(plan != null);
         }
         catch (Exception e) {
-            logException(e, "Error compiling query");
-            throw new RuntimeException("Error compiling query: " + e.toString() + " (Stack trace has been logged).", e);
+            /*
+             * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
+             * are at least somewhat expected.
+             */
+            String loggedMsg = "";
+            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
+                logException(e, "Error compiling query");
+                loggedMsg = " (Stack trace has been written to the log.)";
+            }
+            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
         }
 
         if (plan == null) {
@@ -260,8 +269,16 @@ public class PlannerTool {
                     partitioning = plan.getStatementPartitioning();
                 }
             } catch (Exception e) {
-                logException(e, "Error compiling query");
-                throw new RuntimeException("Error compiling query: " + e.toString() + " (Stack trace has been logged.)",
+                /*
+                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
+                 * they are at least somewhat expected.
+                 */
+                String loggedMsg = "";
+                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+                    logException(e, "Error compiling query");
+                    loggedMsg = " (Stack trace has been written to the log.)";
+                }
+                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
                                            e);
             }
 

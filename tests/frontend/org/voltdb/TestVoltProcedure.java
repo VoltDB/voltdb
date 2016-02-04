@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,12 +56,12 @@ import static org.mockito.Mockito.mock;
 import java.math.BigDecimal;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -233,6 +233,15 @@ public class TestVoltProcedure extends TestCase {
         }
     }
 
+     class GetClusterIdProcedure extends NullProcedureWrapper {
+        public VoltTable[] run(Object arg) {
+            clusterId = getClusterId();
+            return new VoltTable[0];
+        }
+
+        public int clusterId;
+    }
+
     static class NullProcedureWrapper extends VoltProcedure {
         VoltTable runQueryStatement(SQLStmt stmt, Object... params) {
             assert false;
@@ -263,6 +272,7 @@ public class TestVoltProcedure extends TestCase {
     MockStatsAgent agent;
     ParameterSet nullParam;
     private long executionSiteId;
+    private final int expectedClusterId = 5;
 
     @Override
     public void setUp()
@@ -293,9 +303,11 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(NPEProcedure.class.getName());
         manager.addProcedureForTest(LargeNumberOfTablesProc.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
+        manager.addProcedureForTest(GetClusterIdProcedure.class.getName());
         site = mock(SiteProcedureConnection.class);
         doReturn(42).when(site).getCorrespondingPartitionId();
         doReturn(executionSiteId).when(site).getCorrespondingSiteId();
+        doReturn(expectedClusterId).when(site).getCorrespondingClusterId();
         nullParam = ParameterSet.fromArrayNoCopy(new Object[]{null});
     }
 
@@ -451,6 +463,17 @@ public class TestVoltProcedure extends TestCase {
         assertFalse(statsRow[0][8].equals(0));
         assertFalse(statsRow[0][9].equals(0));
         assertTrue(((Long)statsRow[0][9]) > 0L);
+    }
+
+    public void testGetClusterId() {
+        GetClusterIdProcedure gcip = new GetClusterIdProcedure();
+        ProcedureRunner runner = new ProcedureRunner(
+                gcip, site, null,
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
+        runner.setupTransaction(null);
+        ClientResponse r = runner.call((Object) null);
+        assertEquals(expectedClusterId, gcip.clusterId);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
 
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {

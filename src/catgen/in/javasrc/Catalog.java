@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -99,9 +99,7 @@ public class Catalog extends CatalogType {
                 catch (Exception ex) {
                     String msg = "Invalid catalog command on line " + ctr + "\n" +
                         "Contents: '" + line + "'\n";
-                    ex.printStackTrace();
                     throw new RuntimeException(msg, ex);
-
                 }
                 ctr++;
             }

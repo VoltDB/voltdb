@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,7 +44,6 @@ CopyOnWriteContext::CopyOnWriteContext(
                                                                "COW of " + table.name(),
                                                                &table, NULL)),
              m_pool(2097152, 320),
-             m_blocks(surgeon.getData()),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
              m_totalTuples(totalTuples),
@@ -52,6 +51,7 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
+             m_deletes(0),
              m_updates(0)
 {
 }
@@ -82,7 +82,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
 
     m_surgeon.activateSnapshot();
 
-    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks));
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon));
 
     return ACTIVATION_SUCCEEDED;
 }
@@ -167,33 +167,22 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * table with the tuples that were backed up.
              */
             m_finishedTableScan = true;
+            // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
-
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
              * persistent table.
              */
-            if (m_tuplesRemaining > 0) {
-                int32_t skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-                int32_t skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
-
-                /*
-                 * Start with fresh iterators and count how many rows are visible
-                 * to hint at why the right number of rows may not have been processed
-                 */
-                m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks));
-                int32_t cowCount = 0;
-                while (m_iterator->next(tuple)) {
-                    cowCount++;
+            size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
+            size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
+            if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
+                int32_t skippedDirtyRows = 0;
+                int32_t skippedInactiveRows = 0;
+                if (!m_finishedTableScan) {
+                    skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+                    skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
                 }
-
-                int32_t iterationCount = 0;
-                TupleIterator *iter = table.makeIterator();
-                while (iter->next(tuple)) {
-                    iterationCount++;
-                }
-                delete iter;
 
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
@@ -203,32 +192,56 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                          "Original tuple count: %jd\n"
                          "Active tuple count: %jd\n"
                          "Remaining tuple count: %jd\n"
+                         "Pending block count: %jd\n"
+                         "Pending load block count: %jd\n"
                          "Compacted block count: %jd\n"
                          "Dirty insert count: %jd\n"
+                         "Dirty delete count: %jd\n"
                          "Dirty update count: %jd\n"
                          "Partition column: %d\n"
                          "Skipped dirty rows: %d\n"
-                         "Skipped inactive rows: %d\n"
-                         "Discovered COW rows: %d\n"
-                         "Discovered iteration rows: %d\n",
+                         "Skipped inactive rows: %d\n",
                          table.name().c_str(),
                          table.tableType().c_str(),
                          (intmax_t)m_totalTuples,
                          (intmax_t)table.activeTupleCount(),
                          (intmax_t)m_tuplesRemaining,
+                         (intmax_t)allPendingCnt,
+                         (intmax_t)pendingLoadCnt,
                          (intmax_t)m_blocksCompacted,
                          (intmax_t)m_inserts,
+                         (intmax_t)m_deletes,
                          (intmax_t)m_updates,
                          table.partitionColumn(),
                          skippedDirtyRows,
-                         skippedInactiveRows,
-                         cowCount,
-                         iterationCount);
-                // Use a format string to prevent overzealous compiler warnings.
-                throwFatalException("%s", message);
-            }
-            // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
-            if (m_tuplesRemaining < 0)  {
+                         skippedInactiveRows);
+
+                // If m_tuplesRemaining is not 0, we somehow corrupted the iterator. To make a best effort
+                // at continuing unscathed, we will make sure all the blocks are back in the non-pending snapshot
+                // lists and hope that the next snapshot handles everything correctly. We assume that the iterator
+                // at least returned it's currentBlock to the lists.
+                if (allPendingCnt > 0) {
+                    // We have orphaned or corrupted some tables. Let's make them pristine.
+                    TBMapI iter = m_surgeon.getData().begin();
+                    while (iter != m_surgeon.getData().end()) {
+                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
+                        iter++;
+                    }
+                }
+                if (!m_surgeon.blockCountConsistent()) {
+                    throwFatalException("%s", message);
+                }
+                else {
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+                    m_tuplesRemaining = 0;
+                    outputStreams.close();
+                    for (size_t i = 0; i < outputStreams.size(); i++) {
+                        retPositions.push_back((int)outputStreams.at(i).position());
+                    }
+                    return TABLE_STREAM_SERIALIZATION_ERROR;
+                }
+            } else if (m_tuplesRemaining < 0)  {
+                // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
                 m_tuplesRemaining = 0;
             }
         }
@@ -283,35 +296,19 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
     if (tuple.isDirty() || m_finishedTableScan) {
         return true;
     }
-
-    /**
-     * Find out which block the address is contained in. Lower bound returns the first entry
-     * in the index >= the address. Unless the address happens to be equal then the block
-     * we are looking for is probably the previous entry. Then check if the address fits
-     * in the previous entry. If it doesn't then the block is something new.
-     */
-    TBPtr block = PersistentTable::findBlock(tuple.address(), m_blocks, getTable().getTableAllocationSize());
-    if (block.get() == NULL) {
-        // tuple not in snapshot region, don't care about this tuple
-        return true;
-    }
+    // This is a 'loose' count of the number of deletes because COWIterator could be past this
+    // point in the block.
+    m_deletes++;
 
     /**
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    return !iter->needToDirtyTuple(block->address(), tuple.address());
+    return !iter->needToDirtyTuple(tuple.address());
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     assert(m_iterator != NULL);
-
-    if (newTuple) {
-        m_inserts++;
-    }
-    else {
-        m_updates++;
-    }
 
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
@@ -331,25 +328,20 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     }
 
     /**
-     * Find out which block the address is contained in.
-     */
-    TBPtr block = PersistentTable::findBlock(tuple.address(), m_blocks, getTable().getTableAllocationSize());
-    if (block.get() == NULL) {
-        // tuple not in snapshot region, don't care about this tuple, no need to dirty it
-        tuple.setDirtyFalse();
-        return;
-    }
-
-    /**
      * Now check where this is relative to the COWIterator.
      */
     CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (iter->needToDirtyTuple(block->address(), tuple.address())) {
+    if (iter->needToDirtyTuple(tuple.address())) {
         tuple.setDirtyTrue();
-        /**
-         * Don't back up a newly introduced tuple, just mark it as dirty.
-         */
-        if (!newTuple) {
+
+        if (newTuple) {
+            /**
+             * Don't back up a newly introduced tuple, just mark it as dirty.
+             */
+            m_inserts++;
+        }
+        else {
+            m_updates++;
             m_backedUpTuples->insertTupleNonVirtualWithDeepCopy(tuple, &m_pool);
         }
     } else {
@@ -360,38 +352,17 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     assert(m_iterator != NULL);
-    assert(!m_finishedTableScan);
+    if (m_finishedTableScan) {
+        // There was a compaction while we are iterating through the m_backedUpTuples
+        // TempTable. Don't do anything because the passed in block is a PersistentTable
+        // block
+        return;
+    }
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-    if (iter->m_blockIterator != m_blocks.end()) {
-        TBPtr nextBlock = iter->m_blockIterator.value();
-        //The next block is the one that was compacted away
-        //Need to move the iterator forward to skip it
-        if (nextBlock == block) {
-            iter->m_blockIterator++;
-
-            //There is another block after the one that was compacted away
-            if (iter->m_blockIterator != m_blocks.end()) {
-                TBPtr newNextBlock = iter->m_blockIterator.value();
-                m_blocks.erase(block->address());
-                iter->m_blockIterator = m_blocks.find(newNextBlock->address());
-                iter->m_end = m_blocks.end();
-                assert(iter->m_blockIterator != m_blocks.end());
-            } else {
-                //No block after the one compacted away
-                //set everything to end
-                m_blocks.erase(block->address());
-                iter->m_blockIterator = m_blocks.end();
-                iter->m_end = m_blocks.end();
-            }
-        } else {
-            //Some random block was compacted away. Remove it and regenerate the iterator
-            m_blocks.erase(block->address());
-            iter->m_blockIterator = m_blocks.find(nextBlock->address());
-            iter->m_end = m_blocks.end();
-            assert(iter->m_blockIterator != m_blocks.end());
-        }
-    }
+        TBPtr nextBlock = iter->m_blockIterator.data();
+                TBPtr newNextBlock = iter->m_blockIterator.data();
+    iter->notifyBlockWasCompactedAway(block);
 }
 
 bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {

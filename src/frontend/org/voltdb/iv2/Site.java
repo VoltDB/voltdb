@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
@@ -44,8 +45,11 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostGISBackend;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -68,6 +72,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -89,9 +94,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -137,9 +142,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     final InitiatorMailbox m_initiatorMailbox;
 
-    // Almighty execution engine and its HSQL sidekick
+    // Almighty execution engine and its (HSQL or PostgreSQL) backend sidekick
     ExecutionEngine m_ee;
-    HsqlBackend m_hsql;
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Stats
     final TableStats m_tableStats;
@@ -277,6 +282,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_isLowestSiteId = m_siteId == lowestSiteId;
                 return m_isLowestSiteId;
             }
+        }
+
+        @Override
+        public int getClusterId() {
+            return getCorrespondingClusterId();
         }
 
 
@@ -457,16 +467,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void initialize()
     {
         if (m_backend == BackendTarget.NONE) {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = new MockExecutionEngine();
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
-                                                       m_context);
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
             m_ee = new MockExecutionEngine();
         }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = initializeEE();
         }
 
@@ -486,6 +503,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         String hostname = CoreUtils.getHostnameOrAddress();
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
+        Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
@@ -496,10 +514,25 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
+                        deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        hashinatorConfig,
+                        m_mpDrGateway != null);
+            }
+            else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
+                Class<?> spyClass = Class.forName("org.mockito.Mockito");
+                Method spyMethod = spyClass.getDeclaredMethod("spy", Object.class);
+                ExecutionEngine internalEE = new ExecutionEngineJNI(
+                        m_context.cluster.getRelativeIndex(),
+                        m_siteId,
+                        m_partitionId,
+                        CoreUtils.getHostIdFromHSId(m_siteId),
+                        hostname,
+                        m_context.cluster.getDrclusterid(),
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
+                eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {
                 // set up the EE over IPC
@@ -511,8 +544,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDrclusterid(),
-                            m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                            deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
@@ -717,8 +749,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void shutdown()
     {
         try {
-            if (m_hsql != null) {
-                HsqlBackend.shutdownInstance();
+            if (m_non_voltdb_backend != null) {
+                m_non_voltdb_backend.shutdownInstance();
             }
             if (m_ee != null) {
                 m_ee.release();
@@ -751,7 +783,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers, drTupleStreamInfo,
@@ -786,6 +818,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getCorrespondingHostId()
     {
         return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override
@@ -918,9 +956,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override
@@ -936,6 +974,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         long partitionSequenceNumber = resultBuffer.getLong();
         long partitionSpUniqueId = resultBuffer.getLong();
         long partitionMpUniqueId = resultBuffer.getLong();
+        int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
         TupleStreamStateInfo info = null;
@@ -944,10 +983,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long replicatedSpUniqueId = resultBuffer.getLong();
             long replicatedMpUniqueId = resultBuffer.getLong();
             DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
-
-            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo);
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo, drVersion);
         } else {
-            info = new TupleStreamStateInfo(partitionInfo);
+            info = new TupleStreamStateInfo(partitionInfo, drVersion);
         }
         return info;
     }
@@ -1320,12 +1358,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, byte log[]) throws EEException {
+                               long uniqueId, int remoteClusterId,
+                               byte log[]) throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            getNextUndoToken(m_currentTxnId));
+                            remoteClusterId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
@@ -1336,5 +1375,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public int getBatchTimeout() {
         return m_ee.getBatchTimeout();
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4);
+        paramBuffer.putInt(drVersion);
+        m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
+        hostLog.info("DR protocol version has been set to " + drVersion);
     }
 }

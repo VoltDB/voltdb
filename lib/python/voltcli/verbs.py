@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -344,9 +344,10 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs, pro_version):
         self.name        = name
         self.version     = version
+        self.pro_version       = pro_version
         self.description = description.strip()
         self.VOLT        = VOLT
         self.scan_dirs   = scan_dirs
@@ -424,6 +425,11 @@ class ServerBundle(JavaBundle):
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
+	verb.add_options(
+            cli.StringListOption(None, '--ignore', 'skip_requirements',
+                             '''requirements to skip when start voltdb:
+			     thp - Checking for Transparent Huge Pages (THP) has been disabled.  Use of THP can cause VoltDB to run out of memory. Do not disable this check on production systems.''',
+                             default = None))
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
                              'specify the location of the deployment file',
@@ -462,8 +468,19 @@ class ServerBundle(JavaBundle):
     def go(self, verb, runner):
         if self.check_environment_config:
             incompatible_options = checkconfig.test_hard_requirements()
-            if incompatible_options is not None:
-                utility.abort(incompatible_options)
+            for k,v in  incompatible_options.items():
+                state = v[0]
+                if state == 'PASS' :
+                    pass
+                elif state == "WARN":
+                    utility.warning(v[1])
+                elif state == 'FAIL' :
+                    if k in checkconfig.skippableRequirements.keys() and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
+                        utility.warning(v[1])
+                    else:
+                        utility.abort(v[1])
+                else:
+                    utility.error(v[1])
         final_args = None
         if self.subcommand in ('create', 'recover'):
             if runner.opts.replica:

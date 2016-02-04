@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,7 +56,8 @@ const int COLUMN_COUNT = 5;
 // total: 39
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
-const int MAGIC_TRANSACTION_SIZE = 36;
+const int MAGIC_END_TRANSACTION_SIZE = 22;
+const int MAGIC_TRANSACTION_SIZE = MAGIC_BEGIN_TRANSACTION_SIZE + MAGIC_END_TRANSACTION_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
@@ -124,7 +125,7 @@ public:
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
+        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
                                currentSpHandle, currentSpHandle, *m_tuple, type, index);
     }
 
@@ -642,7 +643,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     size_t mark1;
     size_t mark2;
     {
-        DRTupleStreamDisableGuard guard(&m_wrapper, NULL);
+        DRTupleStreamDisableGuard guard(m_context.get());
         mark1 = appendTuple(10, 11);
         mark2 = appendTuple(11, 12);
     }

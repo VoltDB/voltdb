@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -574,7 +574,7 @@ public class Benchmark {
 
         // get stats
         try {
-            ClientResponse cr = client.callProcedure("Summarize");
+            ClientResponse cr = client.callProcedure("Summarize_Replica", config.threadoffset, config.threads);
             if (cr.getStatus() != ClientResponse.SUCCESS) {
                 log.error("Failed to call Summarize proc at startup. Exiting.");
                 log.error(((ClientResponseImpl) cr).toJSONString());

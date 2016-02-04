@@ -218,14 +218,55 @@ final class RangeVariable {
     }
 
     /**
-     * Retruns index for column
+     * Returns the index for column, given only the column name.
      *
      * @param columnName name of column
      * @return int index or -1 if not found
      */
     public int findColumn(String columnName) {
+        return findColumn(null, columnName);
+    }
 
+    /**
+     * Returns the index for the column given the column's table name
+     * and column name.  If the table name is null, there is no table
+     * name specified.  For example, in a query "select C from T" there
+     * is no table name, so tableName would be null.  In the query
+     * "select T.C from T" tableName would be the string "T".  Don't
+     * return any column found in a USING join condition.
+     *
+     * @param tableName
+     * @param columnName
+     * @return
+     */
+    public int findColumn(String tableName, String columnName) {
+        // The namedJoinColumnExpressions are ExpressionColumn objects
+        // for columns named in USING conditions.  Each range variable
+        // has a possibly empty list of these.  If two range variables are
+        // operands of a join with a USING condition, both get the same list
+        // of USING columns.  In our semantics the query
+        //      select T2.C from T1 join T2 using(C);
+        // selects T2.C.  This is not standard behavior, but it seems to
+        // be common to mysql and postgresql.  The query
+        //      select C from T1 join T2 using(C);
+        // selects the C from T1 or T2, since the using clause says
+        // they will have the same value.  In the query
+        //      select C from T1 join T2 using(C), T3;
+        // where T3 has a column named C, there is an ambiguity, since
+        // the first join tree (T1 join T2 using(C)) has a column named C and
+        // T3 has another C column.  In this case we need the T1.C notation.
+        // The query
+        //      select T1.C from T1 join T2 using(C), T3;
+        // will select the C from the first join tree, and
+        //      select T3.C from T1 join T2 using(C), T3;
+        // will select the C from the second join tree, which is just T3.
+
+        // If we don't have a table name and there are some USING columns,
+        // then look into them.  If the name is in the USING columns, it
+        // is not in this range variable.  The function getColumnExpression
+        // will fetch this using variable in another search.
         if (namedJoinColumnExpressions != null
+                && tableName == null
                 && namedJoinColumnExpressions.containsKey(columnName)) {
             return -1;
         }

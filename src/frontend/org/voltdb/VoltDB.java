@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -108,7 +108,7 @@ public class VoltDB {
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
         /** select normal JNI backend.
-         *  IPC, Valgrind, and HSQLDB are the other options.
+         *  IPC, Valgrind, HSQLDB, and PostgreSQL are the other options.
          */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
@@ -226,6 +226,8 @@ public class VoltDB {
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
+        public int m_queryTimeout = 0;
+
         /** Force catalog upgrade even if version matches. */
         public static boolean m_forceCatalogUpgrade = false;
 
@@ -279,6 +281,12 @@ public class VoltDB {
                 }
                 else if (arg.equals("hsqldb")) {
                     m_backend = BackendTarget.HSQLDB_BACKEND;
+                }
+                else if (arg.equals("postgresql")) {
+                    m_backend = BackendTarget.POSTGRESQL_BACKEND;
+                }
+                else if (arg.equals("postgis")) {
+                    m_backend = BackendTarget.POSTGIS_BACKEND;
                 }
                 else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
@@ -605,6 +613,10 @@ public class VoltDB {
             assert(testObj.isDirectory());
             assert(testObj.canWrite());
             return testObj.getAbsolutePath() + File.separator + jarname;
+        }
+
+        public int getQueryTimeout() {
+           return m_config.m_queryTimeout;
         }
 
     }

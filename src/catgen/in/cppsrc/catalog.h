@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -105,7 +105,7 @@ public:
     static void hexDecodeString(const std::string &hexString, char *buffer);
 
     /** pass in a buffer at twice as long as the string */
-    static void hexEncodeString(const char *string, char *buffer);
+    static void hexEncodeString(const char *string, char *buffer, size_t len);
 
     /** return by out-param a copy of the recently deleted paths. */
     void getDeletedPaths(std::vector<std::string> &deletions);

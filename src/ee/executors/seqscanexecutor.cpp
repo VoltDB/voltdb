@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -113,7 +113,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Seq Scan :\n %s", m_outputTable->debug().c_str());
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", output_table->debug().c_str());
         return true;
     }
 
@@ -187,7 +187,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
-        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
+        ProgressMonitorProxy pmp(m_engine, this);
         TableTuple temp_tuple;
         if (m_aggExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();

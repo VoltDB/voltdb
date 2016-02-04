@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -81,6 +81,12 @@ typedef boost::unordered_set<NValue,
  * It is specified as a parameter class that determines the type of the ifDistinct data member.
  */
 struct Distinct : public AggregateNValueSetType {
+
+    explicit Distinct(Pool* memoryPool)
+        : m_memoryPool(memoryPool)
+    {
+    }
+
     bool excludeValue(const NValue& val)
     {
         // find this value in the set.  If it doesn't exist, add
@@ -89,11 +95,27 @@ struct Distinct : public AggregateNValueSetType {
         iterator setval = find(val);
         if (setval == end())
         {
-            insert(val);
+            if (val.getSourceInlined()) {
+                // We only come here in the case of inlined VARCHAR or
+                // VARBINARY data.  The tuple backing this NValue may
+                // change, so we need to allocate a copy of the data
+                // for the value stored in the unordered set to remain
+                // valid.
+                NValue newval = val;
+                assert(m_memoryPool != NULL);
+                newval.allocateObjectFromInlinedValue(m_memoryPool);
+                insert(newval);
+            }
+            else {
+                insert(val);
+            }
             return false; // Include value just this once.
         }
         return true; // Never again this value;
     }
+
+private:
+    Pool* m_memoryPool;
 };
 
 /**
@@ -102,6 +124,9 @@ struct Distinct : public AggregateNValueSetType {
  * It is specified as a parameter class that determines the type of the ifDistinct data member.
  */
 struct NotDistinct {
+    // Pool argument is provided only so
+    // interface matches Distinct, above.
+    explicit NotDistinct(Pool*) { }
     void clear() { }
     bool excludeValue(const NValue& val)
     {
@@ -114,7 +139,13 @@ template<class D>
 class SumAgg : public Agg
 {
   public:
-    SumAgg() {}
+    // We're providing a NULL pool argument here to ifDistinct because
+    // SUM only operates on numeric values which don't have the same
+    // issues as inlined strings.
+    SumAgg()
+        : ifDistinct(NULL)
+    {
+    }
 
     virtual void advance(const NValue& val)
     {
@@ -146,7 +177,14 @@ template<class D>
 class AvgAgg : public Agg
 {
 public:
-    AvgAgg() : m_count(0) {}
+    // We're providing a NULL pool argument here to ifDistinct because
+    // AVG only operates on numeric values which don't have the same
+    // issues as inlined strings.
+    AvgAgg()
+        : ifDistinct(NULL)
+        , m_count(0)
+    {
+    }
 
     virtual void advance(const NValue& val)
     {
@@ -190,7 +228,11 @@ template<class D>
 class CountAgg : public Agg
 {
 public:
-    CountAgg() : m_count(0) {}
+    CountAgg(Pool* memoryPool)
+        : ifDistinct(memoryPool)
+        , m_count(0)
+    {
+    }
 
     virtual void advance(const NValue& val)
     {
@@ -364,8 +406,8 @@ public:
         // bit patterns representing the same value (positive/negative
         // zero, and [de-]normalized numbers).  This is also enforced
         // in the front end.
-        assert(ValuePeeker::peekValueType(val) != VALUE_TYPE_VARCHAR
-               && ValuePeeker::peekValueType(val) != VALUE_TYPE_VARBINARY
+        assert((! isVariableLengthType(ValuePeeker::peekValueType(val)))
+               && ValuePeeker::peekValueType(val) != VALUE_TYPE_POINT
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
 
         int32_t valLength = 0;
@@ -453,11 +495,10 @@ public:
         // deserialize the hyperloglog and merge it with the
         // agg's HLL instance.
 
-        int32_t len = ValuePeeker::peekObjectLength_withoutNull(val);
-        char* data = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(val));
-        assert (len > 0);
-
-        std::istringstream iss(std::string(data, static_cast<size_t>(len)));
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(val, &length);
+        assert (length > 0);
+        std::istringstream iss(std::string(buf, length));
         hll::HyperLogLog distHll(registerBitWidth());
         distHll.restore(iss);
         hyperLogLog().merge(distHll);
@@ -479,9 +520,9 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) MaxAgg(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_COUNT:
         if (isDistinct) {
-            return new (memoryPool) CountAgg<Distinct>();
+            return new (memoryPool) CountAgg<Distinct>(&memoryPool);
         }
-        return new (memoryPool) CountAgg<NotDistinct>();
+        return new (memoryPool) CountAgg<NotDistinct>(&memoryPool);
     case EXPRESSION_TYPE_AGGREGATE_SUM:
         if (isDistinct) {
             return new (memoryPool) SumAgg<Distinct>();

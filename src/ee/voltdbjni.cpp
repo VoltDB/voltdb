@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -110,6 +110,8 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "storage/DRTupleStream.h"
+#include "storage/CompatibleDRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
@@ -1181,7 +1183,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[2]));
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[2]);
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
             hashinator.reset(LegacyHashinator::newInstance(configValue));
@@ -1225,7 +1227,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[0]));
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[0]);
         engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {
@@ -1363,7 +1365,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
 SHAREDLIB_JNIEXPORT jlong JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jlong undoToken)
+    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jint remoteClusterId, jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1378,7 +1380,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     VOLT_DEBUG("applying binary log in C++...");
 
     try {
-        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken,
+        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken,
                                engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
@@ -1420,10 +1422,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * Signature: ()[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz) {
+  (JNIEnv *env, jclass clazz, jboolean compatible) {
     try {
         char *output = new char[1024 * 256];
-        int32_t length = DRTupleStream::getTestDRBuffer(output);
+        int32_t length;
+        if (compatible) {
+            length = CompatibleDRTupleStream::getTestDRBuffer(output);
+        } else {
+            length = DRTupleStream::getTestDRBuffer(output);
+        }
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
         ::memcpy(arrayBytes, output, length);

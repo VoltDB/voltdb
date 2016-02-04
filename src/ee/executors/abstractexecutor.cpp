@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,6 +46,7 @@
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
+#include "expressions/abstractexpression.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
@@ -179,3 +180,24 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
 
 
 AbstractExecutor::~AbstractExecutor() {}
+
+AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
+    const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
+{
+    assert(keys.size() == dirs.size());
+    assert(std::find(m_dirs.begin(), m_dirs.end(), SORT_DIRECTION_TYPE_INVALID) == m_dirs.end());
+}
+
+bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) const
+{
+    for (size_t i = 0; i < m_keyCount; ++i)
+    {
+        AbstractExpression* k = m_keys[i];
+        SortDirectionType dir = m_dirs[i];
+        int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
+
+        if (cmp < 0) return (dir == SORT_DIRECTION_TYPE_ASC);
+        if (cmp > 0) return (dir == SORT_DIRECTION_TYPE_DESC);
+    }
+    return false; // ta == tb on these keys
+}

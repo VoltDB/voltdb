@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,37 +20,123 @@
 
 #include "ContiguousAllocator.h"
 
-#include <cstdlib>
+#include <cassert>
+#include <cstring>
 
 namespace voltdb
 {
-    // A semi-generic class to provide a compacting pool of objects of
-    // fixed-size elementSize.  I think with some creative interface
-    // definition and some templating this could be made into a more
-    // generic pool that would be able to handle the backpointer
-    // updating as well.
+// Provide a compacting pool of objects of fixed size. Each object is assumed
+// to have a single char* pointer referencing it in the caller for the lifetime
+// of the allocation.
+// TODO: Strictly speaking, relocation could continue to work as long as there
+// was only one referring pointer AT A GIVEN TIME. That would simply require
+// that the CompactingPool allocation get notified of the "move"
+// -- but this simple API is not yet implemented, so the referring pointer
+// must remain at a fixed address for the lifetime of the allocation
+// -- only the allocation itself can be moved.
+// We may loosen this requirement in the future, if needed.
+// Note, once the caller provides a "forward pointer" to the allocation, it
+// gives up control of the forward pointer's value for the lifetime of the
+// allocation. The caller must avoid copying or caching this pointer or
+// exposing it to asynchronous uses on other threads.
+// Whenever Compacting Pool code is passed control on the current thread,
+// it reserves the right to relocate past allocations on the thread and reset
+// their forward pointers to copied versions of their allocations.
+// Currently, this only happens when (other) allocations are freed.
     class CompactingPool
     {
     public:
         // Create a compacting pool.  As memory is required, it will
-        // allocate buffers of size elementSize * elementsPerBuffer bytes
-        CompactingPool(int32_t elementSize, int32_t elementsPerBuffer);
+        // allocate buffers of size elementSize * elementsPerBuffer bytes.
+    CompactingPool(int32_t elementSize, int32_t elementsPerBuffer)
+      : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
+    { }
 
-        // get a pointer to elementSize bytes of free memory
-        void* malloc();
+    void* malloc(char** referrer)
+    {
+        Relocatable* result =
+            Relocatable::fromAllocation(m_allocator.alloc(), referrer);
+        // Going forward, the compacting pool manages the value of
+        // *referrer -- "the pointer to the allocation",
+        // but it's initial value is set by the caller BASED ON --
+        // THAT IS, RELATIVE TO BUT NOT NECCESARILY EQUAL TO --
+        // the value returned here.
+        // This allows this allocator to be part of a layering of
+        // allocators that each injects its own header information
+        // into the allocation and returns an offset into the allocation
+        // to the actual caller responsible for storing the pointer
+        // value.
+        // Future maintenance of the referrer only assumes that it must
+        // point to an address at the same relative offset from the
+        // actual allocation address before and after the allocation is
+        // relocated.
+        return result->m_data;
+    }
 
-        // Returns true if an element got compacted into this free'd space
-        // element must be a pointer returned by malloc()
-        bool free(void* element);
+    void free(void* element)
+    {
+        Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
+        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+        if (last != vacated) {
+            // Notify last's referrer that it is about to relocate
+            // to the location vacated by element.
+            // Use relative addresses to maintain the same byte offset between
+            // *(last->m_referringPtr) and its referent.
+            // This allows layered allocators to have injected their own header
+            // structures between the start of the Relocatable's m_data and the
+            // address that the top allocator returned to its caller to store
+            // and use for its own data.
+            *(last->m_referringPtr) += (vacated->m_data - last->m_data);
+            // copy the last entry into the newly vacated spot
+            memcpy(vacated, last, m_allocator.allocationSize());
+        }
+        // retire the last entry.
+        m_allocator.trim();
+    }
 
-        // Return the number of bytes allocated for this pool.
-        size_t getBytesAllocated() const;
+    std::size_t getBytesAllocated() const
+    { return m_allocator.bytesAllocated(); }
+
+    static int32_t FIXED_OVERHEAD_PER_ENTRY()
+    { return static_cast<int32_t>(sizeof(Relocatable)); }
 
     private:
-        int32_t m_size;
         ContiguousAllocator m_allocator;
-    };
-}
 
+    /// The layout of a relocatable allocation,
+    /// including overhead for managing the relocation process.
+    /// The layout contains a back-pointer to the referring pointer that
+    /// the caller provided for the allocation. The back-pointer is
+    /// stored in a header that is completely invisible to the caller.
+    /// The caller is exposed only to the remaining "data" part of the
+    /// allocation, of at least their requested size.
+    /// So, the address of this data part is the proper return value for
+    /// malloc (initial location) and the proper target address to use
+    /// for later updates to the referring pointer (the new location for
+    /// the allocation).
+    struct Relocatable {
+        char** m_referringPtr;
+        char m_data[0];
+
+        static Relocatable* fromAllocation(void* allocation, char** referrer)
+        {
+            Relocatable* result = reinterpret_cast<Relocatable*>(allocation);
+            result->m_referringPtr = referrer;
+            return result;
+        }
+
+        static Relocatable* backtrackFromCallerData(void* data)
+        {
+            // "-1" for a Relocatable* subtracts sizeof(Relocatable) ==
+            // sizeof(m_referringPtr) == 8 bytes.
+            Relocatable* result = reinterpret_cast<Relocatable*>(data)-1;
+            // the data addresses should line up perfectly.
+            assert(data == result->m_data);
+            return result;
+        }
+    };
+};
+
+} // namespace voltdb
 
 #endif // _EE_STRUCTURES_COMPACTINGPOOL_H_

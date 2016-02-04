@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -115,6 +117,24 @@ public class VoltTableUtil {
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }
+                }
+                else if (type == VoltType.GEOGRAPHY_POINT) {
+                    final GeographyPointValue pt = vt.getGeographyPointValue(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = Constants.CSV_NULL;
+                    }
+                    else {
+                        fields[ii] = pt.toString();
+                    }
+                }
+                else if (type == VoltType.GEOGRAPHY) {
+                    final GeographyValue gv = vt.getGeographyValue(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = Constants.CSV_NULL;
+                    }
+                    else {
+                        fields[ii] = gv.toString();
+                    }
                 }
             }
             csv.writeNext(fields);

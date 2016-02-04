@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -32,6 +31,8 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -128,12 +129,17 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
     static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
 
-    static final AtomicInteger expandCountDouble = new AtomicInteger(0);
-
     boolean m_readOnly = false;
     int m_rowStart = -1; // the beginning of the row data (points to before the row count int)
     int m_rowCount = -1;
     int m_colCount = -1;
+
+    // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
+    private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
+
+    // memoized offsets used when users iterate rows with fetchrow()
+    private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
+    private int m_memoizedBufferOffset;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
@@ -712,16 +718,23 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final VoltTableRow fetchRow(int index) {
         assert(verifyTableInvariants());
+
+        // check bounds
         if ((index < 0) || (index >= m_rowCount)) {
             throw new IndexOutOfBoundsException("index = " + index + "; rows = " + m_rowCount);
         }
 
-        int pos = m_rowStart + 4;
-        for (int i = 0; i < index; i++) {
-            // add 4 bytes as the row size is non-inclusive
-            pos += m_buffer.getInt(pos) + 4;
+        // if no memoized value or looking in front of the memoized value, reset
+        if ((m_memoizedRowOffset == NO_MEMOIZED_ROW_OFFSET) || (index < m_memoizedRowOffset)) {
+            m_memoizedRowOffset = 0; m_memoizedBufferOffset = m_rowStart + ROW_COUNT_SIZE;
         }
-        Row retval = new Row(pos + 4);
+
+        while (m_memoizedRowOffset < index) {
+            // add 4 bytes as the row size is non-inclusive
+            m_memoizedBufferOffset += m_buffer.getInt(m_memoizedBufferOffset) + ROW_HEADER_SIZE;
+            m_memoizedRowOffset++;
+        }
+        Row retval = new Row(m_memoizedBufferOffset + ROW_HEADER_SIZE);
         retval.m_activeRowIndex = index;
         return retval;
     }
@@ -769,10 +782,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_buffer.putDouble(VoltType.NULL_FLOAT);
                 break;
             case STRING:
-                m_buffer.putInt(NULL_STRING_INDICATOR);
-                break;
+            case GEOGRAPHY:
             case VARBINARY:
                 m_buffer.putInt(NULL_STRING_INDICATOR);
+                break;
+            case GEOGRAPHY_POINT:
+                GeographyPointValue.serializeNull(m_buffer);
                 break;
             case DECIMAL:
                 VoltDecimalHelper.serializeNull(m_buffer);
@@ -905,6 +920,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     else {
                         throw new ClassCastException();
                     }
+                    break;
+                }
+
+                case GEOGRAPHY: {
+                    GeographyValue gv = (GeographyValue)value;
+                    m_buffer.putInt(gv.getLengthInBytes());
+                    gv.flattenToBuffer(m_buffer);
+                    break;
+                }
+
+                case GEOGRAPHY_POINT: {
+                    GeographyPointValue pt = (GeographyPointValue)value;
+                    pt.flattenToBuffer(m_buffer);
                     break;
                 }
 
@@ -1166,6 +1194,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      * Tables containing a single row and a single integer column can be read using this convenience
      * method.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
      * @return The integer row value.
      */
     public final long asScalarLong() {
@@ -1182,13 +1212,21 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         final VoltType colType = getColumnType(0);
         switch (colType) {
         case TINYINT:
-            return m_buffer.get(m_rowStart + 8);
+            final byte tinyInt = m_buffer.get(m_rowStart + 8);
+            m_wasNull = (tinyInt == VoltType.NULL_TINYINT);
+            return tinyInt;
         case SMALLINT:
-            return m_buffer.getShort(m_rowStart + 8);
+            final short smallInt = m_buffer.getShort(m_rowStart + 8);
+            m_wasNull = (smallInt == VoltType.NULL_SMALLINT);
+            return smallInt;
         case INTEGER:
-            return m_buffer.getInt(m_rowStart + 8);
+            final int integer = m_buffer.getInt(m_rowStart + 8);
+            m_wasNull = (integer == VoltType.NULL_INTEGER);
+            return integer;
         case BIGINT:
-            return m_buffer.getLong(m_rowStart + 8);
+            final long bigInt = m_buffer.getLong(m_rowStart + 8);
+            m_wasNull = (bigInt == VoltType.NULL_BIGINT);
+            return bigInt;
         default:
             throw new IllegalStateException(
                     "table must contain exactly 1 integral value; column 1 is type = " + colType.name());
@@ -1292,6 +1330,24 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         buffer.append(bd.toString());
                     }
                     break;
+                case GEOGRAPHY_POINT:
+                    GeographyPointValue pt = r.getGeographyPointValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(pt.toString());
+                    }
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = r.getGeographyValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(gv.toString());
+                    }
+                    break;
                 default:
                     // should not get here ever
                     throw new IllegalStateException("Table column had unexpected type.");
@@ -1315,104 +1371,125 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public String toFormattedString() {
 
         final int MAX_PRINTABLE_CHARS = 30;
-        final String ELIPSIS = "...";
+        // chose print width for geography column such that it can print polygon in
+        // aligned manner with geography column for a polygon up to:
+        // a polygon composed of 4 vertices + 1 repeat vertex,
+        // one ring, each coordinate of vertex having 5 digits space including the sign of lng/lat
+        final int MAX_PRINTABLE_CHARS_GEOGRAPHY = 74;
+
+        final String ELLIPSIS = "...";
+        final String DECIMAL_FORMAT = "%01.12f";
 
         StringBuffer sb = new StringBuffer();
 
-        int columnCount = this.getColumnCount();
+        int columnCount = getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
+        // start with minimum padding based on length of column names. this gets
+        // increased later as needed
         for (int i = 0; i < columnCount; i++) {
-            padding[i] = this.getColumnName(i).length(); // min value to be increased later
+            padding[i] = getColumnName(i).length(); // min value to be increased later
         }
-        this.resetRowPosition();
+        resetRowPosition();
 
-        // Compute the padding needed for each column of the table (note must
+        // Compute the padding needed for each column of the table (note: must
         // visit every row)
-        while (this.advanceRow()) {
+        while (advanceRow()) {
             for (int i = 0; i < columnCount; i++) {
-                Object v = this.get(i, this.getColumnType(i));
-                if (this.wasNull()) {
-                    v = "NULL";
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
+                int width;
+                if (wasNull()) {
+                    width = 4;
                 }
-                int len = 0; // length
-                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
-                    len = ((byte[]) v).length * 2;
-                } else {
-                    len = v.toString().length();
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    String valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
+                    width = valueStr.length();
                 }
                 // crop long strings and such
-                if (len > MAX_PRINTABLE_CHARS) {
-                    len = MAX_PRINTABLE_CHARS;
+                else {
+                    if (colType == VoltType.VARBINARY) {
+                        width = ((byte[]) value).length * 2;
+                    }
+                    else {
+                        width = value.toString().length();
+                    }
+                    if ( ((colType == VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS_GEOGRAPHY)) ||
+                         ((colType != VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS)) ) {
+                        width = (colType == VoltType.GEOGRAPHY) ? MAX_PRINTABLE_CHARS_GEOGRAPHY : MAX_PRINTABLE_CHARS;
+                    }
                 }
 
-                // compute the max for each column
-                if (len > padding[i]) {
-                    padding[i] = len;
+                // Adjust the max width for each column
+                if (width > padding[i]) {
+                    padding[i] = width;
                 }
             }
         }
 
-        // Determine the formatting string for each column
+        String pad = ""; // no pad before first column header.
         for (int i = 0; i < columnCount; i++) {
             padding[i] += 1;
-            fmt[i] = "%1$"
-                    + ((this.getColumnType(i) == VoltType.STRING
-                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
-                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                    + padding[i] + "s";
-        }
+            // Determine the formatting string for each column
+            VoltType colType = getColumnType(i);
+            String justification = (colType.isVariableLength() ||
+                    colType == VoltType.TIMESTAMP ||
+                    colType == VoltType.GEOGRAPHY_POINT) ? "-" : "";
+            fmt[i] = "%1$" + justification + padding[i] + "s";
 
-        // Create the column headers
-        for (int i = 0; i < columnCount; i++) {
-            sb.append(String.format("%1$-" + padding[i] + "s",
-                    this.getColumnName(i)));
-            if (i < columnCount - 1) {
-                sb.append(" ");
+            // Serialize the column headers
+            sb.append(pad).append(String.format("%1$-" + padding[i] + "s",
+                    getColumnName(i)));
+            pad = " ";
             }
-        }
         sb.append("\n");
 
-        // Create the separator between the column headers and the rows of data
+        // Serialize the separator between the column headers and the rows of data
+        pad = "";
         for (int i = 0; i < columnCount; i++) {
             char[] underline_array = new char[padding[i]];
             Arrays.fill(underline_array, '-');
-            sb.append(new String(underline_array));
-            if (i < columnCount - 1) {
-                sb.append(" ");
-            }
+            sb.append(pad).append(new String(underline_array));
+            pad = " ";
         }
         sb.append("\n");
 
-        // Now display each row of data.
-        this.resetRowPosition();
-        while (this.advanceRow()) {
+        // Serialize each formatted row of data.
+        resetRowPosition();
+        while (advanceRow()) {
+            pad = "";
             for (int i = 0; i < columnCount; i++) {
-                Object value = this.get(i, this.getColumnType(i));
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
                 String valueStr;
-                if (this.wasNull()) {
+                if (wasNull()) {
                     valueStr = "NULL";
                 }
-                else if (this.getColumnType(i) == VoltType.VARBINARY) {
-                    valueStr = Encoder.hexEncode((byte[]) value);
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
                 }
+                else {
+                    if (colType == VoltType.VARBINARY) {
+                    valueStr = Encoder.hexEncode((byte[]) value);
+                        // crop long varbinaries
+                        if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                            valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
+                }
+                    }
                 else {
                     valueStr = value.toString();
                 }
-                // truncate long values
-                if ((this.getColumnType(i) == VoltType.VARBINARY) && (valueStr.length() > MAX_PRINTABLE_CHARS)) {
-                    valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
                 }
-                sb.append(String.format(fmt[i], valueStr));
-                if (i < columnCount - 1) {
-                    sb.append(" ");
+                sb.append(pad).append(String.format(fmt[i], valueStr));
+                pad = " ";
                 }
-            }
             sb.append("\n");
         }
 
         // Idempotent. Reset the row position for the next guy...
-        this.resetRowPosition();
+        resetRowPosition();
 
         return sb.toString();
     }

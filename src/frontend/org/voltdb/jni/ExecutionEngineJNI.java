@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -469,7 +469,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void toggleProfiler(final int toggle) {
         nativeToggleProfiler(pointer, toggle);
-        return;
     }
 
     @Override
@@ -606,9 +605,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken) throws EEException
+                               int remoteClusterId, long undoToken) throws EEException
     {
-        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
         if (rowCount < 0) {
             throwExceptionForError((int)rowCount);
         }

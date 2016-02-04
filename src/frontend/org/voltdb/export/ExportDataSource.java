@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -103,6 +103,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
+    private volatile boolean m_mastershipAccepted = false;
 
     /**
      * Create a new data source.
@@ -823,7 +824,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //These are single threaded so no need to lock.
             m_lastAckUSO = uso;
             if (!m_replicaRunning) {
-                exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
+                exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
                 m_isMaster = false;
                 acceptMastership();
@@ -863,6 +864,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+        } else {
+            exportLog.info("Ack with 0 for source ");
         }
     }
 
@@ -871,7 +874,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @return
      */
     public boolean setMaster() {
-        exportLog.info("Setting master for partition: " + getPartitionId() + " Replica running " + m_replicaRunning);
+        exportLog.info("Setting master for partition: " + getPartitionId() + " Table " + getTableName() + " Replica running " + m_replicaRunning);
         m_isMaster = true;
         boolean rval = m_replicaRunning;
         m_replicaRunning = false;
@@ -887,14 +890,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public void acceptMastership() {
+    public synchronized void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+        if (m_mastershipAccepted) {
+            exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+            return;
+        }
+        m_mastershipAccepted = true;
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (!m_es.isShutdown() || !m_closed) {
-                        exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
+                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();
                     }
                 } catch (Exception e) {

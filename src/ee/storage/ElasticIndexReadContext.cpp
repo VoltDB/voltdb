@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -231,8 +231,7 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     // Delete the indexed tuples that were streamed.
     // Undo token release will cause the index to delete the corresponding items
     // via notifications.
-    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream(),
-            ExecutorContext::getExecutorContext()->drReplicatedStream());
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {

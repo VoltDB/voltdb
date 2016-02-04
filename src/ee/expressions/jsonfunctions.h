@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -327,12 +327,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
         throwCastSQLException(pathNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
-    const char* docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    int32_t lenDoc;
+    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
-    int32_t lenPath = pathNVal.getObjectLength_withoutNull();
-    const char* pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
+    int32_t lenPath;
+    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
     std::string result;
     if (doc.get(pathChars, lenPath, result)) {
         return getTempStringValue(result.c_str(), result.length() - 1);
@@ -356,8 +356,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     if (indexNVal.isNull()) {
         return getNullStringValue();
     }
-    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
-    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    int32_t lenDoc;
+    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
     const std::string doc(docChars, lenDoc);
 
     int32_t index = indexNVal.castAsIntegerAndGetValue();
@@ -365,7 +365,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     Json::Value root;
     Json::Reader reader;
 
-    if( ! reader.parse(doc, root)) {
+    if ( ! reader.parse(doc, root)) {
         char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
@@ -376,7 +376,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     }
 
     // only array type contains elements. objects, primitives do not
-    if( ! root.isArray()) {
+    if ( ! root.isArray()) {
         return getNullStringValue();
     }
 
@@ -416,14 +416,14 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
         throwCastSQLException(getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    int32_t lenDoc = getObjectLength_withoutNull();
-    char *docChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
+    int32_t lenDoc;
+    const char* docChars = getObject_withoutNull(&lenDoc);
     const std::string doc(docChars, lenDoc);
 
     Json::Value root;
     Json::Reader reader;
 
-    if( ! reader.parse(doc, root)) {
+    if ( ! reader.parse(doc, root)) {
         char msg[1024];
         // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
@@ -434,7 +434,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
     }
 
     // only array type contains indexed elements. objects, primitives do not
-    if( ! root.isArray()) {
+    if ( ! root.isArray()) {
         return getNullValue(VALUE_TYPE_INTEGER);
     }
 
@@ -456,10 +456,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
         return docNVal;
     }
     if (pathNVal.isNull()) {
-        throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid SET_FIELD path argument (SQL null)");
+        throw SQLException(SQLException::data_exception_invalid_parameter,
+                           "Invalid SET_FIELD path argument (SQL null)");
     }
     if (valueNVal.isNull()) {
-        throw SQLException(SQLException::data_exception_invalid_parameter, "Invalid SET_FIELD value argument (SQL null)");
+        throw SQLException(SQLException::data_exception_invalid_parameter,
+                           "Invalid SET_FIELD value argument (SQL null)");
     }
 
     if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
@@ -474,22 +476,25 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
         throwCastSQLException(valueNVal.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    int32_t lenDoc = docNVal.getObjectLength_withoutNull();
-    const char* docChars = reinterpret_cast<char*>(docNVal.getObjectValue_withoutNull());
+    int32_t lenDoc;
+    const char* docChars = docNVal.getObject_withoutNull(&lenDoc);
     JsonDocument doc(docChars, lenDoc);
 
-    int32_t lenPath = pathNVal.getObjectLength_withoutNull();
-    const char* pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
-    int32_t lenValue = valueNVal.getObjectLength_withoutNull();
-    const char* valueChars = reinterpret_cast<char*>(valueNVal.getObjectValue_withoutNull());
+    int32_t lenPath;
+    const char* pathChars = pathNVal.getObject_withoutNull(&lenPath);
+    int32_t lenValue;
+    const char* valueChars = valueNVal.getObject_withoutNull(&lenValue);
+
     try {
         doc.set(pathChars, lenPath, valueChars, lenValue);
         std::string value = doc.value();
         return getTempStringValue(value.c_str(), value.length() - 1);
-    } catch (std::bad_alloc& too_large) {
+    }
+    catch (std::bad_alloc& too_large) {
         std::string pathForDiagnostic(pathChars, lenPath);
-        throwDynamicSQLException("Insufficient memory for SET_FIELD operation with path argument: %s",
-                                 pathForDiagnostic.c_str());
+        throwDynamicSQLException(
+            "Insufficient memory for SET_FIELD operation with path argument: %s",
+            pathForDiagnostic.c_str());
     }
 }
 

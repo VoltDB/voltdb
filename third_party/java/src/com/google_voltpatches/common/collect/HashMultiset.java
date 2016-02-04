@@ -29,7 +29,7 @@ import java.util.HashMap;
  *
  * @author Kevin Bourrillion
  * @author Jared Levy
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible(serializable = true, emulated = true)
 public final class HashMultiset<E> extends AbstractMapBasedMultiset<E> {
@@ -62,8 +62,7 @@ public final class HashMultiset<E> extends AbstractMapBasedMultiset<E> {
    * @param elements the elements that the multiset should contain
    */
   public static <E> HashMultiset<E> create(Iterable<? extends E> elements) {
-    HashMultiset<E> multiset =
-        create(Multisets.inferDistinctElements(elements));
+    HashMultiset<E> multiset = create(Multisets.inferDistinctElements(elements));
     Iterables.addAll(multiset, elements);
     return multiset;
   }
@@ -87,12 +86,10 @@ public final class HashMultiset<E> extends AbstractMapBasedMultiset<E> {
   }
 
   @GwtIncompatible("java.io.ObjectInputStream")
-  private void readObject(ObjectInputStream stream)
-      throws IOException, ClassNotFoundException {
+  private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
     stream.defaultReadObject();
     int distinctElements = Serialization.readCount(stream);
-    setBackingMap(
-        Maps.<E, Count>newHashMapWithExpectedSize(distinctElements));
+    setBackingMap(Maps.<E, Count>newHashMap());
     Serialization.populateMultiset(this, stream, distinctElements);
   }
 

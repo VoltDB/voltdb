@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -92,7 +92,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
@@ -112,6 +112,7 @@ import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -122,7 +123,9 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -147,13 +150,16 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_DELIMITER = ",";
 
     // DR conflicts export table name prefix
-    public static final String DR_CONFLICTS_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+    public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
+    public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
     // DR conflicts export group name
-    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_AUTOGEN_DR_CONFLICTS";
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_XDCR_CONFLICTS";
     public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
-    public static final String DEFAULT_DR_CONFLICTS_NONCE = "MyExport";
-    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
+    public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+
+    final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -363,6 +369,17 @@ public abstract class CatalogUtil {
         }
 
         return retval;
+    }
+
+    /**
+     * A getSortedCatalogItems variant with the result list filled in-place
+     * @param <T> The type of item to sort.
+     * @param items The set of catalog items.
+     * @param sortFieldName The name of the field to sort on.
+     * @param An output list of catalog items, sorted on the specified field.
+     */
+    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
+        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
     }
 
     /**
@@ -626,7 +643,7 @@ public abstract class CatalogUtil {
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
-            setDrInfo(catalog, deployment.getDr());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
             validateResourceMonitorInfo(deployment);
         }
@@ -899,6 +916,16 @@ public abstract class CatalogUtil {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
         }
+        ResourceMonitorType rm = ss.getResourcemonitor();
+        if (rm == null) {
+            rm = new ResourceMonitorType();
+            ss.setResourcemonitor(rm);
+        }
+        ResourceMonitorType.Memorylimit mem = rm.getMemorylimit();
+        if (mem == null) {
+            mem = new ResourceMonitorType.Memorylimit();
+            rm.setMemorylimit(mem);
+        }
     }
 
     /**
@@ -1156,7 +1183,97 @@ public abstract class CatalogUtil {
         return processorProperties;
     }
 
-    private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+    public static class ImportConfiguration {
+        private final String m_formatName;
+        private final Properties m_moduleProps;
+        private final Properties m_formatterProps;
+
+        private AbstractFormatterFactory m_formatterFactory = null;
+
+        public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
+            m_formatName = formatName;
+            m_moduleProps = moduleProps;
+            m_formatterProps = formatterProps;
+        }
+
+        public String getFormatName() {
+            return m_formatName;
+        }
+
+        public Properties getmoduleProperties() {
+            return m_moduleProps;
+        }
+
+        public Properties getformatterProperties() {
+            return m_formatterProps;
+        }
+
+        public void setFormatterFactory(AbstractFormatterFactory formatterFactory) {
+            m_formatterFactory = formatterFactory;
+        }
+
+        public AbstractFormatterFactory getFormatterFactory() {
+            return m_formatterFactory;
+        }
+    }
+
+    private static String buildBundleURL(String bundle, boolean alwaysBundle) {
+        String modulePrefix = "osgi|";
+        InputStream is;
+        try {
+            //Make sure we can load stream
+            is = (new URL(bundle)).openStream();
+        } catch (Exception ex) {
+            is = null;
+        }
+        String bundleUrl = bundle;
+        if (is == null) {
+            try {
+                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    hostLog.info("Module base is: " + rpath + "/../bundles/");
+                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + bundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    bundleUrl = "file:" + bpath;
+                } else {
+                    String bpath = bundlelocation + "/" + bundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    bundleUrl = "file:" + bpath;
+                }
+            } catch (URISyntaxException | FileNotFoundException ex) {
+                is = null;
+            }
+        }
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ex) {
+            }
+        } else if (!alwaysBundle) {
+            //Not a URL try as a class
+            try {
+                CatalogUtil.class.getClassLoader().loadClass(bundleUrl);
+                modulePrefix = "class|";
+            }
+            catch (ClassNotFoundException ex2) {
+                String msg =
+                        "Import failed to configure, failed to load module by URL or classname provided" +
+                        " import module: " + bundleUrl;
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
+        } else {
+            String msg =
+                    "Import failed to configure, failed to load module by URL or classname provided" +
+                    " format module: " + bundleUrl;
+            hostLog.error(msg);
+            throw new DeploymentCheckException(msg);
+        }
+        return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
+    }
+
+    private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1172,72 +1289,51 @@ public abstract class CatalogUtil {
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
 
-        Properties processorProperties = new Properties();
-        String modulePrefix = "osgi|";
-        InputStream is;
-        try {
-            //Make sure we can load stream
-            is = (new URL(importBundleUrl)).openStream();
-        } catch (Exception ex) {
-            is = null;
+        Properties moduleProps = new Properties();
+        Properties formatterProps = new Properties();
+
+        String formatBundle = importConfiguration.getFormat();
+        String formatName = null;
+        if (formatBundle != null && formatBundle.trim().length() > 0) {
+            if ("csv".equalsIgnoreCase(formatBundle) || "tsv".equalsIgnoreCase(formatBundle)) {
+                formatName = formatBundle;
+                formatBundle = "voltcsvformatter.jar";
+            } else if (JAR_EXTENSION_RE.matcher(formatBundle).matches()) {
+                int typeIndex = formatBundle.lastIndexOf("/");
+                formatName = formatBundle.substring(typeIndex + 1);
+                formatBundle = formatBundle.substring(0, typeIndex);
+            } else {
+                throw new DeploymentCheckException("Import format " + formatBundle + " not valid.");
+            }
+            formatterProps.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle, true));
         }
-        if (is == null) {
-            try {
-                String bundlelocation = System.getProperty("voltdbbundlelocation");
-                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
-                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                    hostLog.info("Module base is: " + rpath + "/../bundles/");
-                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
-                    is = new FileInputStream(new File(bpath));
-                    importBundleUrl = "file:" + bpath;
-                } else {
-                    String bpath = bundlelocation + "/" + importBundleUrl;
-                    is = new FileInputStream(new File(bpath));
-                    importBundleUrl = "file:" + bpath;
-                }
-            } catch (URISyntaxException | FileNotFoundException ex) {
-                is = null;
-            }
-        }
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException ex) {
-            }
-        } else {
-            //Not a URL try as a class
-            try {
-                CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);
-                modulePrefix = "class|";
-            }
-            catch (ClassNotFoundException ex2) {
-                String msg =
-                        "Import failed to configure, failed to load module by URL or classname provided" +
-                        " import module: " + importBundleUrl;
-                hostLog.error(msg);
-                throw new DeploymentCheckException(msg);
-            }
-        }
+
         if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
+            moduleProps.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl, false));
         }
 
-        List<PropertyType> configProperties = importConfiguration.getProperty();
-        if (configProperties != null && ! configProperties.isEmpty()) {
-
-            for( PropertyType configProp: configProperties) {
-                String key = configProp.getName();
-                String value = configProp.getValue();
+        List<PropertyType> importProperties = importConfiguration.getProperty();
+        if (importProperties != null && ! importProperties.isEmpty()) {
+            for( PropertyType prop: importProperties) {
+                String key = prop.getName();
+                String value = prop.getValue();
                 if (!key.toLowerCase().contains("passw")) {
-                    processorProperties.setProperty(key, value.trim());
+                    moduleProps.setProperty(key, value.trim());
                 } else {
                     //Dont trim passwords
-                    processorProperties.setProperty(key, value);
+                    moduleProps.setProperty(key, value);
                 }
             }
         }
 
-        return processorProperties;
+        List<PropertyType> formatProperties = importConfiguration.getFormatProperty();
+        if (formatProperties != null && ! formatProperties.isEmpty()) {
+            for( PropertyType prop: formatProperties) {
+                formatterProps.setProperty(prop.getName(), prop.getValue());
+            }
+        }
+
+        return new ImportConfiguration(formatName, moduleProps, formatterProps);
     }
 
     /**
@@ -1367,8 +1463,8 @@ public abstract class CatalogUtil {
         }
     }
 
-    public static Map<String, Properties> getImportProcessorConfig(ImportType importType) {
-        Map<String, Properties> processorConfig = new HashMap<String, Properties>();
+    public static Map<String, ImportConfiguration> getImportProcessorConfig(ImportType importType) {
+        Map<String, ImportConfiguration> processorConfig = new HashMap<String, ImportConfiguration>();
         if (importType == null) {
             return processorConfig;
         }
@@ -1382,7 +1478,8 @@ public abstract class CatalogUtil {
                 streamList.add(importConfiguration.getModule());
             }
 
-            Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
+
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
@@ -1683,10 +1780,10 @@ public abstract class CatalogUtil {
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
-                sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
-                sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
+                sha1hex = extractPassword(user.getPassword(), ClientAuthScheme.HASH_SHA1);
+                sha256hex = extractPassword(user.getPassword(), ClientAuthScheme.HASH_SHA256);
             } else if (user.getPassword().length() == 104) {
-                int sha1len = ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHA1);
+                int sha1len = ClientAuthScheme.getHexencodedDigestLength(ClientAuthScheme.HASH_SHA1);
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
@@ -1754,30 +1851,54 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+        int clusterId;
+        Cluster cluster = catalog.getClusters().get("cluster");
         if (dr != null) {
-            Cluster cluster = catalog.getClusters().get("cluster");
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
-            cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
+
+            // Backward compatibility to support cluster id in DR tag
+            if (clusterType.getId() == null && dr.getId() != null) {
+                clusterId = dr.getId();
+            } else if (clusterType.getId() != null && dr.getId() == null) {
+                clusterId = clusterType.getId();
+            } else if (clusterType.getId() == null && dr.getId() == null) {
+                clusterId = 0;
+            } else {
+                if (clusterType.getId() == dr.getId()) {
+                    clusterId = clusterType.getId();
+                } else {
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                            + "deprecated, please remove");
+                }
+            }
+            cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
+        } else {
+            if (clusterType.getId() != null) {
+                clusterId = clusterType.getId();
+            } else {
+                clusterId = 0;
+            }
         }
+        cluster.setDrclusterid(clusterId);
     }
 
     /** Read a hashed password from password.
      *  SHA* hash it once to match what we will get from the wire protocol
      *  and then hex encode it
      * */
-    private static String extractPassword(String password, ClientAuthHashScheme scheme) {
+    private static String extractPassword(String password, ClientAuthScheme scheme) {
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+            md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (final NoSuchAlgorithmException e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
@@ -2227,8 +2348,45 @@ public abstract class CatalogUtil {
             outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
+            // k-safe file export
+            PropertyType ksafe = new PropertyType();
+            ksafe.setName("replicated");
+            ksafe.setValue("true");
+            defaultConfiguration.getProperty().add(ksafe);
+
+            // skip internal export columns
+            PropertyType skipinternal = new PropertyType();
+            skipinternal.setName("skipinternals");
+            skipinternal.setValue("true");
+            defaultConfiguration.getProperty().add(skipinternal);
+
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;
+    }
+
+    /*
+     * Given an index return its expressions or list of indexed columns
+     *
+     * @param index  Catalog Index
+     * @param tableScan table
+     * @param indexedExprs   index expressions. This list remains empty if the index is just on simple columns.
+     * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
+     * @return true if this is a column based index
+     */
+    public static boolean getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs) {
+        String exprsjson = index.getExpressionsjson();
+        if (exprsjson.isEmpty()) {
+            CatalogUtil.getSortedCatalogItems(index.getColumns(), "index", indexedColRefs);
+        } else {
+            try {
+                AbstractExpression.fromJSONArrayString(exprsjson, tableScan, indexedExprs);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+        }
+        return exprsjson.isEmpty();
     }
 }

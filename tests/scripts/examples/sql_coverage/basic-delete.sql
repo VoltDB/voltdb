@@ -11,9 +11,12 @@
 
 -- Required preprocessor macros (with example values):
 -- {@aftermath = " _math _value[int:1,3]"}
+-- {@cmp = "_cmp"} -- all comparison operators (=, <>, !=, <, >, <=, >=)
+-- {@columntype = "decimal"}
 -- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}
 -- {@comparabletype = "numeric"}
+-- {@dmltable = "_table"}
 -- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
 
 --SELECT
@@ -31,10 +34,10 @@ INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test logic operators (AND) with comparison ops
-DELETE FROM @dmltable WHERE (_variable[@columntype] _cmp @comparableconstant) _logicop @columnpredicate
+DELETE FROM @dmltable WHERE (_variable[@columntype] @cmp @comparableconstant) _logicop @columnpredicate
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test arithmetic operators (+, -, *, /) with comparison ops
-DELETE FROM @dmltable WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
+DELETE FROM @dmltable WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant
 

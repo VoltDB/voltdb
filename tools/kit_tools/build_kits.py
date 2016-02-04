@@ -89,7 +89,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d -Dkitbuild=true %s clean dist.pro" % (defaultlicensedays, build_args))
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -DallowDrActiveActive=true -Dlicensedays=%d -Dkitbuild=true %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -285,7 +285,7 @@ versionMac = "unknown"
 releaseDir = "unknown"
 
 # get ssh config [key_filename, hostname]
-CentosSSHInfo = getSSHInfoForHost("volt5f")
+CentosSSHInfo = getSSHInfoForHost("volt15a")
 MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 

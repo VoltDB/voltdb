@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -54,6 +55,10 @@ import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansSubQueries extends PlannerTestCase {
+    @Override
+    protected void setUp() throws Exception {
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
+    }
 
     public void testSelectOnlyGuard() {
         // Can only have expression subqueries in SELECT statements
@@ -727,7 +732,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "(SELECT C, SUM(D) as SD FROM P1 GROUP BY C) T1, P2 where T1.C = P2.A ",
                 joinErrorMsg);
 
-        planNodes = compileToFragments("select C, SD FROM " +
+        planNodes = compileToFragments("select T1.C, T1.SD FROM " +
                 "(SELECT C, SUM(D) as SD FROM P1 GROUP BY C) T1, R1 Where T1.C = R1.C ");
         assertEquals(2, planNodes.size());
 
@@ -761,7 +766,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "(SELECT A, C, SUM(D) as SD FROM P1 WHERE A = 3 GROUP BY A, C) T1 ");
         assertEquals(1, planNodes.size());
 
-        planNodes = compileToFragments("select C, SD FROM " +
+        planNodes = compileToFragments("select T1.C, T1.SD FROM " +
                 "(SELECT A, C, SUM(D) as SD FROM P1 WHERE A = 3 GROUP BY A, C) T1, R1 WHERE T1.C = R1.C ");
         assertEquals(1, planNodes.size());
 
@@ -828,18 +833,18 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         // Check inlined index scan
         pn = ((NestLoopIndexPlanNode) nlpn).getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkPrimaryKeyIndexScan(pn, "P2", "A","D");
+        checkPrimaryKeyIndexScan(pn, "P2", "A", "D");
 
 
-        planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1) T1 " +
+        planNodes = compileToFragments("SELECT P2.A, P2.C FROM P2, (SELECT A, C FROM P1) T1 " +
                 "where T1.A = P2.A and P2.A = 1");
         assertEquals(1, planNodes.size());
 
-        planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1) T1 " +
+        planNodes = compileToFragments("SELECT P2.A, P2.C FROM P2, (SELECT A, C FROM P1) T1 " +
                 "where T1.A = P2.A and T1.A = 1");
         assertEquals(1, planNodes.size());
 
-        planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1 where P1.A = 3) T1 " +
+        planNodes = compileToFragments("SELECT P2.A, P2.C FROM P2, (SELECT A, C FROM P1 where P1.A = 3) T1 " +
                 "where T1.A = P2.A ");
         assertEquals(1, planNodes.size());
 
@@ -871,12 +876,12 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertEquals(1, planNodes.size());
 
         planNodes = compileToFragments("select * from p2, " +
-                "(select * from (SELECT A, D FROM P1, P3 where P1.A = P3.A) T1) T2 " +
+                "(select * from (SELECT P1.A, P1.D FROM P1, P3 where P1.A = P3.A) T1) T2 " +
                 "where p2.A = T2.A");
         assertEquals(2, planNodes.size());
 
         planNodes = compileToFragments("select * from p2, " +
-                "(select * from (SELECT A, D FROM P1, P3 where P1.A = P3.A) T1) T2 " +
+                "(select * from (SELECT P1.A, P1.D FROM P1, P3 where P1.A = P3.A) T1) T2 " +
                 "where p2.A = T2.A and P2.A = 1");
         assertEquals(1, planNodes.size());
 
@@ -1143,6 +1148,33 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
+        // Add distinct option to aggregate inside of subquery
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A ");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeyIndexScan(pn, "P2");
+
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         // single partition filter inside subquery
         planNodes = compileToFragments(
@@ -1305,9 +1337,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     /*
-     * LIMIT/OFFSET/DISTINCT/GROUP BY are not always the bad guys.
-     * When they apply on the replicated table only, the subquery contains this case should
-     * be able to drop the receive node if it has partition table in other places.
+     * LIMIT/OFFSET/DISTINCT/GROUP BY are not always bad guys.
+     * When they apply on the replicated table only, the subquery that
+     * contains them should be able to drop the receive node at the top
+     * of subqueries' partitioned tables.
      */
     public void testFineGrainedCases() {
         // LIMIT comes from replicated table which has no receive node
@@ -1387,10 +1420,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         // inline limit with order by
-        assertTrue(pn instanceof OrderByPlanNode);
+        assertTrue(pn instanceof MergeReceivePlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ReceivePlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 
         pn = planNodes.get(1).getChild(0);
         // inline limit with order by
@@ -1548,7 +1580,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
 
         // Nested LIMIT/OFFSET
-        failToCompile("SELECT * FROM (SELECT A, R1.C FROM R1, " +
+        failToCompile("SELECT * FROM (SELECT R1.A, R1.C FROM R1, " +
                 "                     (SELECT A, C FROM P1 LIMIT 5) T0 where R1.A = T0.A ) T1, P2 " +
                 "where T1.A = P2.A", joinErrorMsg);
 
@@ -1573,11 +1605,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
         failToCompile("SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C LIMIT 5) T1, " +
                 "                    (SELECT A, C FROM R2) T2, P3 " +
                 "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
-
-        // Invalid aggregate distinct
-        failToCompile(
-                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, P1 " +
-                "where T1.A = P1.A ", joinErrorMsg);
 
         // Error in one of the sub-queries and return exception directly for the whole statement
         String sql = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, " +
@@ -1605,9 +1632,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0).getChild(0);
 
         assertFalse(pn.toExplainPlanString().contains("DISTINCT"));
-        assertTrue(pn.toExplainPlanString().contains("LOOP INNER JOIN")); // this join can be pushed down also in future
 
         pn = planNodes.get(1).getChild(0);
+        // this join can be pushed down.
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("LOOP INNER JOIN"));
+        pn = pn.getChild(0);
+        // This is a trivial subquery result scan.
+        assertTrue(pn instanceof SeqScanPlanNode);
+        pn = pn.getChild(0);
+        // This is the subquery plan.
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertTrue(pn.toExplainPlanString().contains("SUM DISTINCT(P2.D"));
@@ -1683,18 +1717,18 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkQueriesPlansAreTheSame(sql1, sql2);
 
         sql1 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
-                "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT Distinct P1.A, P1.C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A";
         sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
-                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A group by P1.A, C) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT P1.A, P1.C FROM P1,R2 where P1.A = R2.A group by P1.A, P1.C) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A";
         checkQueriesPlansAreTheSame(sql1, sql2);
 
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT DISTINCT T0.A FROM R1, " +
-                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT P1.A, P1.C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
         assertEquals(2, planNodes.size());
@@ -1712,11 +1746,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "where T1.A = P2.A");
 
         sql1 =  "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
-                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT P1.A, P1.C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A";
         sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
-                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A GROUP BY T0.A, R1.C) T1, " +
+                "                (SELECT P1.A, P1.C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A GROUP BY T0.A, R1.C) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A";
         checkQueriesPlansAreTheSame(sql1, sql2);
@@ -1749,9 +1783,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSeqScan(pn.getChild(1), "T2", "A");
         checkSeqScan(pn.getChild(1).getChild(0), "R2", "A");
 
-        // TODO(xin): hsql does not complain about the ambiguous column A, but use 'T1' as default.
-        // FIX(xin): throw compiler exception for this query.
-        pn = compile("select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2) T2 ");
+        pn = compile("select T1.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2) T2 ");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         checkOutputSchema("T1", pn, "A");
@@ -1826,7 +1858,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         AbstractPlanNode nlpn;
 
         // Left Outer join
-        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C ");
+        planNodes = compileToFragments("SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C ");
         assertEquals(1, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1843,7 +1875,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         // Join with partitioned tables
 
         // Join on coordinator: LEFT OUTER JOIN, replicated table on left side
-        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
+        planNodes = compileToFragments("SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1866,7 +1898,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Group by inside of the subquery
         // whether it contains group by or not does not matter, because we check it by whether inner side is partitioned or not
-        planNodes = compileToFragments("SELECT A, C FROM R1 LEFT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
+        planNodes = compileToFragments("SELECT R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1914,7 +1946,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
 
         // Right outer join
-        planNodes = compileToFragments("SELECT A, C FROM R1 RIGHT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
+        planNodes = compileToFragments("SELECT R1.A, R1.C FROM R1 RIGHT JOIN (SELECT A, count(*) C FROM P1 GROUP BY A) T1 ON T1.C = R1.C ");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -1962,7 +1994,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         // Join locally: inner join case for subselects
-        planNodes = compileToFragments("SELECT A, C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
+        planNodes = compileToFragments("SELECT R1.A, R1.C FROM R1 INNER JOIN (SELECT A, C FROM P1) T1 ON T1.C = R1.C ");
         assertEquals(2, planNodes.size());
         pn = planNodes.get(0).getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
@@ -2282,10 +2314,4 @@ public class TestPlansSubQueries extends PlannerTestCase {
             }
         }
     }
-
-    @Override
-    protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
-    }
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -174,6 +174,45 @@ public class MatchChecks {
             return false;
         }
         return true;
+    }
+
+    protected static String getImportStats(Client client) {
+        VoltTable importStats = statsCall(client);
+        String statsString = null;
+
+        while (importStats.advanceRow()) {
+            statsString = importStats.getString("IMPORTER_NAME") + ", " +
+                    importStats.getString("PROCEDURE_NAME") + ", " + importStats.getLong("SUCCESSES") + ", " +
+                    importStats.getLong("FAILURES") + ", " + importStats.getLong("OUTSTANDING_REQUESTS") + ", " +
+                    importStats.getLong("RETRIES");
+            //log.info("statsString:" + statsString);
+        }
+        return statsString;
+    }
+
+    protected static long[] getImportValues(Client client) {
+        VoltTable importStats = statsCall(client);
+        long stats[] = {0, 0, 0, 0};
+
+        while (importStats.advanceRow()) {
+            int statnum = 0;
+            stats[statnum++] = importStats.getLong("SUCCESSES");
+            stats[statnum++] = importStats.getLong("FAILURES");
+            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
+            stats[statnum++] = importStats.getLong("RETRIES");
+        }
+        return stats;
+    }
+
+    protected static VoltTable statsCall(Client client) {
+        VoltTable importStats = null;
+
+        try {
+            importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
+        } catch (Exception e) {
+            log.error("Stats query failed");
+        }
+        return importStats;
     }
 }
 

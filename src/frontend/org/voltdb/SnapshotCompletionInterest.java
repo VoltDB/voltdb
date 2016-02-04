@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ public interface SnapshotCompletionInterest {
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
+        public final int drVersion;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -47,7 +48,8 @@ public interface SnapshotCompletionInterest {
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
-                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
+                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+                final int drVersion) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -58,6 +60,7 @@ public interface SnapshotCompletionInterest {
             this.exportSequenceNumbers = exportSequenceNumbers;
             this.drSequenceNumbers = drSequenceNumbers;
             this.remoteDCLastIds = remoteDCLastIds;
+            this.drVersion = drVersion;
         }
 
         // Factory method for simplified instances used in testing,
@@ -67,10 +70,11 @@ public interface SnapshotCompletionInterest {
                 String nonce,
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
-                boolean truncationSnapshot) {
+                boolean truncationSnapshot,
+                int drVersion) {
             return new SnapshotCompletionEvent(
                     path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null);
+                    true, "", null, null, null, drVersion);
         }
     }
 

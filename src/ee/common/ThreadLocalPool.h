@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,15 +34,21 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
-    static const int POOLED_MAX_VALUE_LENGTH;
+    /// The layout of an allocation segregated by size,
+    /// including overhead to help identify the size-specific
+    /// pool from which the allocation must be freed.
+    /// Uses placement new and a constructor to overlay onto
+    /// the variable-length raw internal allocation and
+    /// initialize the requested size as a prefix field.
+    /// The m_data field makes it easy to access the user
+    /// data at its fixed offset.
+    struct Sized {
+        int32_t m_size;
+        char m_data[0];
+        Sized(int32_t requested_size) : m_size(requested_size) { }
+    };
 
-    /**
-     * Return the nearest power-of-two-plus-or-minus buffer size that
-     * will be allocated for an object of the given length
-     * TODO: internalize this function and CompactingStringStorage into
-     * ThreadLocalPool.cpp.
-     */
-    static std::size_t getAllocationSizeForObject(std::size_t length);
+    static const int POOLED_MAX_VALUE_LENGTH;
 
     /**
      * Allocate space from a page of objects of the requested size.
@@ -95,14 +101,19 @@ public:
      * a function that allowed the persistent pointer to be safely relocated
      * and re-registered.
      */
-    static char* allocateRelocatable(std::size_t sz);
+    static Sized* allocateRelocatable(char** referrer, int32_t sz);
+
+    /**
+     * Return the rounded-up buffer size that was allocated for the string.
+     */
+    static int32_t getAllocationSizeForRelocatable(Sized* string);
 
     /**
      * Deallocate the object returned by allocateRelocatable.
      * This implements continuous compaction which can have the side effect of
      * relocating some other allocation.
      */
-    static void freeRelocatable(std::size_t sz, char* string);
+    static void freeRelocatable(Sized* string);
 };
 }
 

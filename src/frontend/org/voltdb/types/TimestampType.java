@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -85,11 +85,14 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
     }
 
     /**
-     * Construct from a timestamp string in YYYY-MM-DD-SS.sss format.
+     * Construct from a timestamp string in a complete date or time format.
      * This is typically used for reading CSV data or data output
      * from {@link java.sql.Timestamp}'s string format.
      *
-     * @param param A string in YYYY-MM-DD-SS.sss format.
+     * @param param A string in one of these formats:
+     *        "YYYY-MM-DD", "YYYY-MM-DD HH:MM:SS",
+     *        OR "YYYY-MM-DD HH:MM:SS.sss" with sss
+     *        allowed to be from 0 up to 6 significant digits.
      */
     public TimestampType(String param) {
         this(microsFromJDBCformat(param));

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,8 +34,8 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -404,7 +404,7 @@ public class QueryPlanner {
         bestPlan.resetPlanNodeIds(1);
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
+        List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit
             m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
@@ -418,14 +418,14 @@ public class QueryPlanner {
         }
         // ... enable for debug */
         if (receives.size() == 1) {
-            ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+            AbstractReceivePlanNode recvNode = (AbstractReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }
 
         return bestPlan;
     }
 
-    private static void fragmentize(CompiledPlan plan, ReceivePlanNode recvNode) {
+    private static void fragmentize(CompiledPlan plan, AbstractReceivePlanNode recvNode) {
         assert(recvNode.getChildCount() == 1);
         AbstractPlanNode childNode = recvNode.getChild(0);
         assert(childNode instanceof SendPlanNode);

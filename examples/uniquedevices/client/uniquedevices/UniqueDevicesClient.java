@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -254,7 +254,7 @@ public class UniqueDevicesClient {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Unique Device ID counting results
-        System.out.println("\n" + HORIZONTAL_RULE + " Unique Device ID Couting Results\n" + HORIZONTAL_RULE);
+        System.out.println("\n" + HORIZONTAL_RULE + " Unique Device ID Counting Results\n" + HORIZONTAL_RULE);
         System.out.printf("A total of %,9d device ids were processed and %d failed (%.2f percent).\n\n",
                 totalVotes.get(),
                 failedVotes.get(),

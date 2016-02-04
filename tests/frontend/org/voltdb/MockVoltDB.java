@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -197,10 +197,9 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
-    public void setDRProducerClusterId(int clusterId)
+    public void setDRProducerEnabled()
     {
         getCluster().setDrproducerenabled(true);
-        getCluster().setDrclusterid(clusterId);
     }
 
     public void setDRConsumerConnectionEnabled(boolean enabled) {
@@ -622,6 +621,7 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            @Override
             public boolean isDrActiveActiveAllowed() {
                 // TestExecutionSite (and probably others)
                 // use MockVoltDB without requiring unique

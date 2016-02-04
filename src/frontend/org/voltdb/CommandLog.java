@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,6 +77,13 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
+    /**
+     * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+     * Thread it through here because the durability listener is owned by the command log thread.
+     * @param uniqueId    The last durable unique ID passed from the master.
+     */
+    void initializeLastDurableUniqueId(DurabilityListener listener, long uniqueId);
+
     interface CompletionChecks {
         /**
          * Use the current CompletionChecks object to create a new CompletionChecks object
@@ -89,8 +96,14 @@ public interface CommandLog {
          * Add a new transaction to the per-scheduler durable transaction tracker
          * @param task
          */
-
         public void addTask(TransactionTask task);
+
+        /**
+         * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+         * @param uniqueId    The last durable unique ID passed from the master.
+         */
+        void setLastDurableUniqueId(long uniqueId);
+
         /**
          * Get the number of TransactionTasks tracked by this instance of CompletionChecks
          * @return
@@ -102,13 +115,6 @@ public interface CommandLog {
          * Durability Listener notifications
          */
         public void processChecks();
-
-        /**
-         * This is like processChecks but executed when we started a sync but there were no
-         * new transactions. This is used to start non-commmand-logged system procedures
-         * when synchronous command logging is set
-         */
-        public void checkForSyncLoggedSysProcs();
     }
 
     public interface DurabilityListener {
@@ -133,6 +139,12 @@ public interface CommandLog {
         public void addTransaction(TransactionTask pendingTask);
 
         /**
+         * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+         * @param uniqueId    The last durable unique ID passed from the master.
+         */
+        void initializeLastDurableUniqueId(long uniqueId);
+
+        /**
          * Used by CommandLog to calculate the next task list size
          */
         public int getNumberOfTasks();
@@ -148,13 +160,6 @@ public interface CommandLog {
          * @param completionChecks
          */
         void processDurabilityChecks(CompletionChecks completionChecks);
-
-        /**
-        * Make sure Non-Durable SysProcs get executed with Synchronous Command Logging
-        * and no other pending transactions
-        * @param completionChecks
-        */
-        void checkForSyncLoggedSysProcs(CompletionChecks completionChecks);
     }
 
     /**

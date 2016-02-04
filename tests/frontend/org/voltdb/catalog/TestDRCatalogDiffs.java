@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDRCatalogDiffs {
@@ -740,6 +741,26 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(nodeOneSchema, nodeTwoSchema);
         assertFalse(diff.supported());
         assertTrue(diff.errors().contains("Incompatible DR modes between two clusters"));
+    }
+
+    @Test
+    public void testUnknownSchemaOption() throws Exception {
+        String masterSchema =
+                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 BIGINT NOT NULL);\n" +
+                "DR TABLE T1;";
+        Catalog masterCatalog = createCatalog(masterSchema);
+
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
+        String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
+        decodedCommands = decodedCommands.replaceFirst("set \\$PREV isDRed true", "set \\$PREV isDRed true\nset \\$PREV isASquirrel false");
+        boolean threw = false;
+        try {
+            DRCatalogDiffEngine.deserializeCatalogCommandsForDr(Encoder.compressAndBase64Encode(decodedCommands));
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("$PREV isASquirrel false"));
+            threw = true;
+        }
+        assertTrue(threw);
     }
 
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {

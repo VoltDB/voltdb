@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,15 +53,6 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public void validate() throws Exception {
-        super.validate();
-
-        if ((m_args.size() != m_parameterIdxList.size()))
-            throw new Exception("ERROR: A row expression is invalid");
-
-    }
-
-    @Override
     public String explain(String impliedTableName) {
         String result = "(";
         String connector = "";
@@ -84,10 +75,7 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
         if (expr instanceof TupleValueExpression || expr instanceof AggregateExpression) {
             // Create a matching PVE for this expression to be used on the EE side
             // to get the original expression value
-            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
-            m_parameterIdxList.add(paramIdx);
-            ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
-            pves.add(pve);
+            addCorrelationParameterValueExpression(expr, pves);
             return;
         }
         collectParameterValueExpressions(expr.getLeft(), pves);
@@ -98,4 +86,5 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
             }
         }
     }
+
 }

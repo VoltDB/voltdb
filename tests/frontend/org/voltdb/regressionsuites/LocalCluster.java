@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -83,6 +83,7 @@ public class LocalCluster implements VoltServerConfig {
     protected int m_siteCount;
     int m_hostCount;
     int m_kfactor = 0;
+    int m_clusterId;
     protected BackendTarget m_target;
     protected String m_jarFileName;
     boolean m_running = false;
@@ -94,6 +95,7 @@ public class LocalCluster implements VoltServerConfig {
     VoltProjectBuilder m_builder;
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
+    int m_replicationPort = -1;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -167,6 +169,18 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public LocalCluster(String jarFileName,
+            int siteCount,
+            int hostCount,
+            int kfactor,
+            int clusterId,
+            BackendTarget target,
+            boolean isRejoinTest)
+    {
+        this(jarFileName, siteCount, hostCount, kfactor, clusterId, target,
+            FailureState.ALL_RUNNING, false, isRejoinTest, null);
+    }
+
+    public LocalCluster(String jarFileName,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -182,6 +196,20 @@ public class LocalCluster implements VoltServerConfig {
                         int siteCount,
                         int hostCount,
                         int kfactor,
+                        BackendTarget target,
+                        FailureState failureState,
+                        boolean debug,
+                        boolean isRejoinTest,
+                        Map<String, String> env) {
+        this(jarFileName, siteCount, hostCount, kfactor, 0, target,
+                failureState, debug, isRejoinTest, env);
+    }
+
+    public LocalCluster(String jarFileName,
+                        int siteCount,
+                        int hostCount,
+                        int kfactor,
+                        int clusterId,
                         BackendTarget target,
                         FailureState failureState,
                         boolean debug,
@@ -225,6 +253,7 @@ public class LocalCluster implements VoltServerConfig {
         } else {
             m_kfactor = kfactor;
         }
+        m_clusterId = clusterId;
         m_debug = debug;
         m_jarFileName = jarFileName;
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
@@ -323,10 +352,19 @@ public class LocalCluster implements VoltServerConfig {
         m_callingMethodName = name;
     }
 
+    public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
+        if (!m_compiled) {
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId) != null;
+            templateCmdLine.pathToDeployment(builder.getPathToDeployment());
+            m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
+        }
+        return m_compiled;
+    }
+
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, null, m_clusterId) != null;
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -337,7 +375,7 @@ public class LocalCluster implements VoltServerConfig {
     public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    null, true, snapshotPath, ppdPrefix);
+                    null, m_clusterId, true, snapshotPath, ppdPrefix);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -356,7 +394,7 @@ public class LocalCluster implements VoltServerConfig {
 
         if (!m_compiled) {
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    adminPort, adminOnStartup);
+                    adminPort, adminOnStartup, m_clusterId);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -384,6 +422,10 @@ public class LocalCluster implements VoltServerConfig {
         m_hostCount = hostCount;
         // Force recompilation
         m_compiled = false;
+    }
+
+    public void setReplicationPort(int port) {
+        m_replicationPort = port;
     }
 
     void startLocalServer(int hostId, boolean clearLocalDataDirectories) {
@@ -658,11 +700,16 @@ public class LocalCluster implements VoltServerConfig {
         }
         try {
             cmdln.internalPort(portGenerator.nextInternalPort());
-            // set the dragent port. it uses the start value and
-            // the next two sequential port numbers - so burn those two.
-            cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
-            portGenerator.next();
-            portGenerator.next();
+            if (m_replicationPort != -1) {
+                int index = m_hasLocalServer ? hostId + 1 : hostId;
+                cmdln.drAgentStartPort(m_replicationPort + index);
+            } else {
+             // set the dragent port. it uses the start value and
+                // the next two sequential port numbers - so burn those two.
+                cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
+                portGenerator.next();
+                portGenerator.next();
+            }
 
             // add the ipc ports
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
@@ -759,6 +806,7 @@ public class LocalCluster implements VoltServerConfig {
                     + File.separator
                     + "LC-"
                     + getFileName() + "-"
+                    + m_clusterId + "-"
                     + hostId + "-"
                     + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
                     + ".txt";
@@ -864,6 +912,7 @@ public class LocalCluster implements VoltServerConfig {
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
             rejoinCmdLn.startCommand(startAction);
+            rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
 
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.

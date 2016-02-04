@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ public enum BatchTimeoutOverrideType {
 
     public static final int BATCH_TIMEOUT_VERSION = 1;
     public static final int NO_TIMEOUT = -1;
+    public static final int DEFAULT_TIMEOUT = 10000;
 
     public byte getValue() {
         return m_value;
