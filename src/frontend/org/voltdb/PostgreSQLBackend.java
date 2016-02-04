@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -119,6 +121,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     private static final boolean DEBUG = false;
+    protected static boolean DEBUG_TRANSFORM_SQL = false;
+    protected static FileWriter TRANSFORM_SQL_FILE_WRITER = null;
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -158,6 +162,22 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         super("PostgreSQL", "org.postgresql.Driver",
                 "jdbc:postgresql:" + databaseName,
                 username, password);
+        // If '-Dsqlcoverage.transform.sql.file=...' was specified on the
+        // command line, print debug info when transforming SQL statements
+        // into a format that PostgreSQL can understand
+        String transformSqlOutputFile = System.getProperty("sqlcoverage.transform.sql.file", null);
+        if (transformSqlOutputFile == null) {
+            DEBUG_TRANSFORM_SQL = false;
+            TRANSFORM_SQL_FILE_WRITER = null;
+        } else {
+            DEBUG_TRANSFORM_SQL = true;
+            try {
+                TRANSFORM_SQL_FILE_WRITER = new FileWriter(transformSqlOutputFile, true);
+            } catch (IOException e) {
+                System.out.println("Caught IOException:\n    " + e
+                        + "\nSQL transform debug output will go to stdout.");
+            }
+        }
     }
 
     /** Constructor specifying a username and password, with default (PostgreSQL) 'database'. */
@@ -575,11 +595,36 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                                 transformOrderByQuery(dml) )))));
     }
 
+    /** Optionally (only if both the DEBUG_TRANSFORM_SQL constant and the
+     *  <i>print</i> argument are true), prints the original and modified
+     *  SQL statements, to a "Transform SQL" output file, for the current
+     *  SQLCoverage test suite (if any). */
+    static protected void debugPrintTransformSql(String originalSql, String modifiedSql, boolean print) {
+        if (DEBUG_TRANSFORM_SQL && print) {
+            try {
+                if (TRANSFORM_SQL_FILE_WRITER != null) {
+                    TRANSFORM_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
+                    TRANSFORM_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
+                } else {
+                    System.out.println("original SQL: " + originalSql);
+                    System.out.println("modified SQL: " + modifiedSql);
+                }
+            } catch (IOException e) {
+                System.out.println("Caught IOException:\n    " + e);
+                System.out.println("original SQL: " + originalSql);
+                System.out.println("modified SQL: " + modifiedSql);
+            }
+        }
+    }
+
     /** Optionally, modifies DDL statements in such a way that PostgreSQL
      *  results will match VoltDB results; and then passes the remaining
      *  work to the base class version. */
     protected void runDDL(String ddl, boolean transformDdl) {
-        super.runDDL((transformDdl ? transformDDL(ddl) : ddl));
+        String modifiedDdl = (transformDdl ? transformDDL(ddl) : ddl);
+        debugPrintTransformSql(ddl, modifiedDdl, transformDdl
+                && ddl != null && !ddl.equals(modifiedDdl));
+        super.runDDL(modifiedDdl);
     }
 
     /** Modifies DDL statements in such a way that PostgreSQL results will
@@ -607,7 +652,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  match VoltDB results; and then passes the remaining work to the base
      *  class version. */
     protected VoltTable runDML(String dml, boolean transformDml) {
-        return super.runDML((transformDml ? transformDML(dml) : dml));
+        String modifiedDml = (transformDml ? transformDML(dml) : dml);
+        debugPrintTransformSql(dml, modifiedDml, transformDml
+                && dml != null && !dml.equals(modifiedDml));
+        return super.runDML(modifiedDml);
     }
 
     /** Modifies queries in such a way that PostgreSQL results will match VoltDB
@@ -633,6 +681,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } catch (SQLException ex) {
                 System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
                 ex.printStackTrace();
+            }
+            if (TRANSFORM_SQL_FILE_WRITER != null) {
+                TRANSFORM_SQL_FILE_WRITER.close();
+                TRANSFORM_SQL_FILE_WRITER = null;
             }
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);

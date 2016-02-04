@@ -74,6 +74,29 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
+class MockHashinator : public TheHashinator {
+public:
+    static MockHashinator* newInstance() {
+        return new MockHashinator();
+    }
+
+    ~MockHashinator() {}
+
+protected:
+   int32_t hashinate(int64_t value) const {
+       return 0;
+   }
+
+   int32_t hashinate(const char *string, int32_t length) const {
+       return 0;
+   }
+
+   int32_t partitionForToken(int32_t hashCode) const {
+       // partition of VoltDBEngine super of MockVoltDBEngine is 0
+       return -1;
+   }
+};
+
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
@@ -109,6 +132,7 @@ public:
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                                                                m_exportSchema, exportColumnName,
                                                                m_exportStream, true);
+        setHashinator(MockHashinator::newInstance());
     }
     ~MockVoltDBEngine() {
         delete m_conflictExportTable;

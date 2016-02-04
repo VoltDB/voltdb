@@ -43,6 +43,8 @@ class ClusterSettingsTest extends TestBase {
                 expect: 'to be on Cluster Settings page'
                 at ClusterSettingsPage
 
+                browser.driver.executeScript("VdmUI.isTestServer = true;",1)
+
                 break
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 println("ElementNotVisibleException: Unable to Start the test")
@@ -53,21 +55,37 @@ class ClusterSettingsTest extends TestBase {
 
     def createEditDeleteServer() {
         int value = 0
+        when: 'Create database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
+        then: 'Choose new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
         when: 'Get the count for next server'
         count = 1
         while(count<numberOfTrials) {
-            count++
             try {
-                waitFor { $(id:getIdOfServer(count)).isDisplayed() }
+                waitFor { $(getCssPathOfServer(count)).isDisplayed() }
             } catch(geb.waiting.WaitTimeoutException e) {
                 break
             }
+            count++
         }
         value = count
+        println("The count for test " + count)
         and: 'Set the id for new server'
-        String deleteId = getIdOfDeleteButton(value)
-        String editId   = getIdOfEditButton(value)
-        String serverId = getIdOfServer(value)
+        String deleteId = getCssPathOfDeleteServer(1)
+        String editId   = getCssPathOfEditServer(1)
+        String serverId = getCssPathOfServer(1)
+        println("this " + " " + serverId + " " + editId)
         then: 'Click Add Server button to open popup'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -80,6 +98,8 @@ class ClusterSettingsTest extends TestBase {
                 println("Unable to find Add Server popup - Retrying")
             } catch(geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find Add Server button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
             }
         }
 
@@ -126,13 +146,83 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Check if the server is created or not'
         try {
-            waitFor { $(id:getIdOfServer(value)).isDisplayed() }
-            $(id:getIdOfServer(value)).text() == "new_host"
+            waitFor { $(serverId).text() == "new_host" }
+            println($(serverId).text() + " get Id of server")
             println("The new server was created")
         } catch(geb.waiting.WaitTimeoutException e) {
             println("Test Fail: The new server was not created")
             assert false
         }
+//
+
+        try {
+            waitFor(10) { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+            println("waited")
+        }
+
+        when: 'Click edit button to open the edit popup'
+        for(count=1; count<numberOfTrials; count++) {
+            try {
+                waitFor { $(editId).click() }
+                waitFor { popupAddServerButtonOk.isDisplayed() }
+                break
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find edit button - Retrying")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find the edit popup - Retrying")
+                report "123"
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'provide value for edit'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_edited_server") }
+                waitFor { popupAddServerHostNameField.value("new_edited_host") }
+                waitFor { popupAddServerDescriptionField.value("") }
+                waitFor { popupAddServerClientListenerField.value("192.168.0.10:8000") }
+                waitFor { popupAddServerAdminListenerField.value("192.168.0.20:8000") }
+                waitFor { popupAddServerHttpListenerField.value("192.168.0.30:8000") }
+                waitFor { popupAddServerInternalListenerField.value("192.168.0.40:8000") }
+                waitFor { popupAddServerZookeeperListenerField.value("192.168.0.50:8000") }
+                waitFor { popupAddServerReplicationListenerField.value("192.168.0.60:8000") }
+                waitFor { popupAddServerInternalInterfaceField.value("192.168.0.70") }
+                waitFor { popupAddServerExternalInterfaceField.value("192.168.0.80") }
+                waitFor { popupAddServerPublicInterfaceField.value("192.168.0.90") }
+                waitFor { popupAddServerPlacementGroupField.value("new_value_for_placement)") }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to text fields - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: 'Click ok and confirm the edit'
+        for(count=1; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                waitFor { $(serverId).isDisplayed() }
+                waitFor { $(serverId).text().equals("new_edited_host") }
+                println("The server was edited")
+                break
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find edit button - Retrying")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find edited server - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { $(serverId).isDisplayed() }
+                    waitFor { $(serverId).text().equals("new_edited_host") }
+                    println("The server was edited")
+                    break
+                } catch(geb.waiting.WaitTimeoutException exc) {
+                    println("Unable to find edited server - Retrying")
+                }
+            }
+        }
+/*
 
         when: 'Click edit button to open the edit popup'
         for(count=1; count<numberOfTrials; count++) {
@@ -181,41 +271,89 @@ class ClusterSettingsTest extends TestBase {
                 println("Unable to find edit button - Retrying")
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to find edited server - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { $(id:serverId).isDisplayed() }
+                    waitFor { $(id:serverId).text().equals("new_edited_host") }
+                    println("The server was edited")
+                    break
+                } catch(geb.waiting.WaitTimeoutException exc) {
+                    println("Unable to find edited server - Retrying")
+                }
             }
         }
+*/
 
-        when: 'Click delete button to open the delete popup'
-        for(count=1; count<numberOfTrials; count++) {
+        try {
+            waitFor(10) { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+            println("waited")
+        }
+
+        when:
+        for(count=0; count<numberOfTrials; count++) {
             try {
-                $(id:deleteId).click()
+                //$(deleteId).click()
+                $("#deleteServer_2").click()
                 waitFor { popupDeleteServerButtonOk.isDisplayed() }
+                report '1'
+                try {
+                    waitFor { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    println("waited")
+                }
+                report '123'
+                popupDeleteServerButtonOk.click()
+                report '12345'
+                waitFor { !$(popupDeleteServerButtonOk).isDisplayed() }
+                report '1234567'
+
+                try {
+                    waitFor { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    println("waited")
+                }
+                report '123456789'
+                waitFor { trialerror.text().equals("No servers available.") }
                 break
             } catch(geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find delete button - Retrying")
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to find the delete popup - Retrying")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element - Retrying")
             }
         }
-        String countNext = 0
-        then: 'Click ok and confirm the deletion'
+        then:
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupDeleteServerButtonOk.click()
-                waitFor { !$(id:serverId).isDisplayed() }
+                waitFor { !$(serverId).click() }
+                break
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                println("Unable to find the delete ok button - Retrying")
+                println("Unable to find delete button - Retrying")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find the delete popup - Retrying")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 try {
-                    waitFor { $(id:serverId).isDisplayed() }
-                } catch (geb.waiting.WaitTimeoutException exc) {
-                    println("The server was deleted")
+                    waitFor { !$(serverId).click() }
                     break
+                } catch(geb.waiting.WaitTimeoutException exc) {
+                    println("Unable to find the delete popup - Retrying")
                 }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("The server was deleted")
-                break
             }
         }
+
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
+        println()
     }
 
     def "Ensure Server name and Host name is not empty"(){

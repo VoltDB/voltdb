@@ -48,6 +48,11 @@ class TestBase extends GebReportingSpec {
     static int numberOfTrials = 5
     static int waitTime = 10
     int count
+
+    String create_DatabaseTest_File = "src/resources/create_DatabaseTest.csv"
+    int indexOfNewDatabase = 0
+    int indexOfLocal = 1
+
     static final boolean DEFAULT_DEBUG_PRINT = false
     static final int DEFAULT_WINDOW_WIDTH  = 1500
     static final int DEFAULT_WINDOW_HEIGHT = 1000

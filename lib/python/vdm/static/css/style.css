@@ -1209,10 +1209,14 @@ a.clustBtn:hover {
 }
 .playColor {
 	color: #76bd1d;
-	font-size: 50px;
+	font-size: 45px;
 	float: left;
 }
-
+.stopColor {
+ 	color: #c70000;
+ 	font-size: 45px;
+  	float: left;
+}
 .loading-small {
     background: #fff url(../images/loader-small.GIF) no-repeat center center;
     height: 20px;

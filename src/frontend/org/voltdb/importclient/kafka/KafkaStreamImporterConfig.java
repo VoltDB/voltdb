@@ -243,8 +243,10 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                             ));
                     continue;
                 }
+                int partitionCount = 0;
                 for (TopicMetadata item : metaData) {
                     for (PartitionMetadata part : item.partitionsMetadata()) {
+                        ++partitionCount;
                         URI uri;
                         try {
                             uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
@@ -252,11 +254,22 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                             throw new KafkaConfigurationException("unable to create topic resource URI", ex);
                         }
                         Broker leader = part.leader();
+                        if (leader == null) {
+                            attempts.add(new FailedMetaDataAttempt(
+                                    "Failed to get leader broker for topic " + topic
+                                    + " partition " + part.partitionId() + " from host " + hp.getHost(), null
+                                    ));
+                            continue;
+                        }
                         KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
                                 part.partitionId(), new HostAndPort(leader.host(), leader.port()),
                                 groupId, fetchSize, soTimeout, procedure, formatterFactory);
                         configs.put(uri, config);
                     }
+                }
+                if (configs.size() != partitionCount) {
+                    configs.clear();
+                    continue;
                 }
             } catch (Exception e) {
                 attempts.add(new FailedMetaDataAttempt(
@@ -272,7 +285,9 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 attempt.log();
             }
             attempts.clear();
-            throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
+            if (configs.isEmpty()) {
+                throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
+            }
         }
         return configs;
     }

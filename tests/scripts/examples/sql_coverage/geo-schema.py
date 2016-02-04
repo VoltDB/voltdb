@@ -28,9 +28,10 @@
                     ("PT2", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
                     ("PT3", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
                     ("POLY1", FastSerializer.VOLTTYPE_GEOGRAPHY),
-#                     ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
-#                     ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
-                    ("ID", FastSerializer.VOLTTYPE_INTEGER)),
+                    ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
+                    ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
         },
@@ -39,9 +40,10 @@
                     ("PT2", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
                     ("PT3", FastSerializer.VOLTTYPE_GEOGRAPHY_POINT),
                     ("POLY1", FastSerializer.VOLTTYPE_GEOGRAPHY),
-#                     ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
-#                     ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
-                    ("ID", FastSerializer.VOLTTYPE_INTEGER)),
+                    ("POLY2", FastSerializer.VOLTTYPE_GEOGRAPHY),
+                    ("POLY3", FastSerializer.VOLTTYPE_GEOGRAPHY),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
         }

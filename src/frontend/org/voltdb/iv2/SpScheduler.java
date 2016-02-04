@@ -443,8 +443,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * update the txnid to match the one from the CL
              */
             if (message.isForReplay()) {
-                newSpHandle = message.getTxnId();
-                setMaxSeenTxnId(newSpHandle);
+                TxnEgo ego = advanceTxnEgo();
+                newSpHandle = ego.getTxnId();
+                // ENG-9779
+                if (!m_outstandingTxns.isEmpty()) {
+                    m_replaySequencer.dump(m_mailbox.getHSId());
+                    tmLog.error("Detecting attempt to run SP txn(txnId=" + TxnEgo.txnIdToString(newSpHandle) +
+                            ") while there are outstanding MP txns: " + m_outstandingTxns.keySet() + " " +
+                            TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
+                }
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();

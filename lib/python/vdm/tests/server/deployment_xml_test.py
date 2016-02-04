@@ -1,38 +1,54 @@
-# This file is part of VoltDB.
+"""
+This file is part of VoltDB.
 
-# Copyright (C) 2008-2016 VoltDB Inc.
-#
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
+Copyright (C) 2008-2016 VoltDB Inc.
 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
+This file contains original code and/or modifications of original code.
+Any modifications made by VoltDB Inc. are licensed under the following
+terms and conditions:
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+"""
 
 
 import unittest
 import requests
 import xmlrunner
 from xml.etree import ElementTree
+import socket
 
-__url__ = 'http://localhost:8000/api/1.0/databases/1/deployment/'
-__db_url__ = 'http://localhost:8000/api/1.0/databases/'
+__host_name__ = socket.gethostname()
+__host_or_ip__ = socket.gethostbyname(__host_name__)
+
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/1/deployment/'
+__db_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
+
+
+def get_last_db_id():
+    response = requests.get(__db_url__)
+    value = response.json()
+    if value:
+        db_length = len(value['databases'])
+        last_db_id = value['databases'][db_length-1]['id']
+
+    return last_db_id
 
 
 class Database(unittest.TestCase):
@@ -51,17 +67,14 @@ class Database(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
     def tearDown(self):
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-            # Delete database
-            db_url = __db_url__ + str(last_db_id)
-            response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
-        else:
-            print "The database list is empty"
+        last_db_id = get_last_db_id()
+        # Delete database
+        # if last_db_id == 0 or last_db_id==None:
+        db_url = __db_url__ + str(last_db_id)
+        response = requests.delete(db_url)
+        self.assertEqual(response.status_code, 200)
+        # else:
+        #     print "The database list is empty"
 
 
 class XML(Database):
@@ -85,14 +98,7 @@ class XML(Database):
         """
             test xml default attributes
         """
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-        else:
-            raise self.fail('The database list is empty')
-
+        last_db_id = get_last_db_id()
         xml_url = __db_url__ + str(last_db_id) + '/deployment/'
 
         data = requests.get(xml_url)
@@ -164,7 +170,7 @@ class Deployment(unittest.TestCase):
 
     def setUp(self):
         """Create a db"""
-        url = 'http://localhost:8000/api/1.0/databases/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(url, json=db_data, headers=headers)
@@ -173,13 +179,14 @@ class Deployment(unittest.TestCase):
         else:
             self.assertEqual(response.status_code, 404)
 
-        url_dep = "http://localhost:8000/api/1.0/deployment/2"
+        last_db_id = get_last_db_id()
+        url_dep = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/' + str(last_db_id)
         json_data = {
             "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
-            "paths": {"voltdbroot": {"path": "voltdbroot"}, "snapshots": {"path": "snapshotstest"},
+            "paths": {"voltdbroot": {"path": "voltdbroottest"}, "snapshots": {"path": "snapshotstest"},
                       "exportoverflow":
-                          {"path": "export_overflowtest"}, "commandlog": {"path": "command_logtest"},
+                          {"path": "export_overflow"}, "commandlog": {"path": "command_logtest"},
                       "commandlogsnapshot": {"path": "command_log_snapshot"}},
             "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
                                     "enabled": True},
@@ -191,7 +198,7 @@ class Deployment(unittest.TestCase):
                            "synchronous": False, "enabled": False, "logsize": 1024},
             "systemsettings": {"temptables": {"maxsize": 100}, "snapshot": {"priority": 6},
                                "elastic": {"duration": 50, "throughput": 2},
-                               "query": {"timeout": 0},
+                               "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
                                                        {"name": "SNAPSHOTS", "size": "2"},
@@ -215,7 +222,7 @@ class Deployment(unittest.TestCase):
 
     def tearDown(self):
         """Delte a db"""
-        url = 'http://localhost:8000/api/1.0/databases/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
         response = requests.get(url)
         value = response.json()
         if value:
@@ -233,7 +240,11 @@ class UpdateDeployment(Deployment):
     def test_updated_deployment_xml(self):
         """ensure update deployment is working properly"""
 
-        data = requests.get("http://localhost:8000/api/1.0/databases/2/deployment/")
+        last_db_id = get_last_db_id()
+        # Delete database
+        db_url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'+str(last_db_id)+'/deployment/'
+                # url + str(last_db_id)
+        data = requests.get(db_url)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:
@@ -244,9 +255,9 @@ class UpdateDeployment(Deployment):
                     if subnode.tag == "commandlogsnapshot":
                         self.assertEqual(subnode.attrib['path'], "command_log_snapshot")
                     if subnode.tag == "voltdbroot":
-                        self.assertEqual(subnode.attrib['path'], "voltdbroot")
+                        self.assertEqual(subnode.attrib['path'], "voltdbroottest")
                     if subnode.tag == "exportoverflow":
-                        self.assertEqual(subnode.attrib['path'], "export_overflowtest")
+                        self.assertEqual(subnode.attrib['path'], "export_overflow")
                     if subnode.tag == "commandlog":
                         self.assertEqual(subnode.attrib['path'], "command_logtest")
             if child.tag == "snapshots":
@@ -263,7 +274,7 @@ class UpdateDeployment(Deployment):
             if child.tag == "systemsettings":
                 for subnode in child:
                     if subnode.tag == "query":
-                        self.assertEqual(subnode.attrib['timeout'], "0")
+                        self.assertEqual(subnode.attrib['timeout'], "10000")
                     if subnode.tag == "temptables":
                         self.assertEqual(subnode.attrib['maxsize'], "100")
                     if subnode.tag == "snapshot":

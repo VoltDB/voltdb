@@ -28,19 +28,13 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 
---TODO: this should be randomized:
---{@insertvals = "_id, pointFromText('POINT(0 0)'), pointFromText('POINT(-71.0 42.0)'), null, polygonFromText('POLYGON((-1 -1, 1 -1, 1 1, -1 1, -1 -1))')"}
-{@insertvals = "_id, pointFromText('POINT(0 0)'), pointFromText('POINT(-71.0 42.0)'), null, polygonFromText('POLYGON((-1 -1, 1 -1, 1 1, -1 1, -1 -1))')"}
---{@insertvals = "_id, pointFromText('POINT(_value[decimal:-1,1] _value[decimal:-1,1])'), null, pointFromText('POINT(_value[decimal:-1,1] _value[decimal:-1,1])'), polygonFromText('POLYGON((_value[decimal:-0.9,-0.3] _value[decimal:-0.9,-0.3], _value[decimal:0.3,0.9] _value[decimal:-0.9,-0.3], _value[decimal:0.3,0.9] _value[decimal:0.3,0.9], _value[decimal:-0.9,-0.3] _value[decimal:0.3,0.9], _value[decimal:-0.9,-0.3] _value[decimal:-0.9,-0.3]))')"}
+{@insertvals = "_id, _value[point], _value[point null25], _value[point null50], null, null, null, null"}
 
-{@onefun = ""}  -- There are no handy unary point-to-point or polygon-to-polygon functions.
+{@onefun = ""}  -- There are no handy unary point-to-point functions.
 {@optionalfn = "_geofun"}
--- TODO: perhaps change this to use "AsText" (not LONGITUDE, LATITUDE, AREA), once fully supported (?);
--- and then, perhaps back to "*", once the Python client works (?? - only if results are comparable with PostGIS, so probably not)
-{@star = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), AREA(POLY1)"}
-{@lhsstar = "LHS.ID, LONGITUDE(LHS.PT1), LATITUDE(LHS.PT1), LONGITUDE(LHS.PT2), LATITUDE(LHS.PT2), AREA(LHS.POLY1)"}
+{@star    = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), LONGITUDE(PT3), LATITUDE(PT3)"}
+{@lhsstar = "LHS.ID, LONGITUDE(LHS.PT1), LATITUDE(LHS.PT1), LONGITUDE(LHS.PT2), LATITUDE(LHS.PT2), LONGITUDE(LHS.PT3), LATITUDE(LHS.PT3)"}
 
-{@updatecolumn = "PT2"}
+{@updatecolumn = "PT3"}
 {@updatesource = "PT1"}
---TODO: this should be randomized (e.g. "_value[point]"??):
-{@updatevalue = "pointFromText('POINT(1.01 -1.01)')"}
+{@updatevalue = "_value[point null25]"}
