@@ -2627,28 +2627,15 @@ UTILITIES
 ***************************************
 -->
 
-<target name='setversion-changestrings'
-        description="Set the version string and recompile some test catalogs">
+<target name='setversion'
+        description="Set the version string">
     <fail unless="newversion" message="ERROR: -Dnewversion=n.m must be set"/>
     <exec dir='.' executable='/usr/bin/env'>
       <arg value="bash" />
       <arg value="tools/change-version.sh"/>
       <arg value='${newversion}' />
     </exec>
-</target>
-
-<target name='setversion-recompile-mockjars' depends='default'
-        description="Set the version string and recompile some test catalogs">
-    <exec dir='${voltpro}/tests/mocktests/catalogs' executable='python'
-          output="/dev/null" logError="True">
-      <env key='VOLTCORE' value='${base.dir}'/>
-      <arg line='regen.py' />
-    </exec>
-</target>
-
-<target name='setversion' depends='setversion-changestrings, setversion-recompile-mockjars'
-        description="Set the version string and recompile some test catalogsin VOLTPRO. Specify version as -Dnewversion=4.1.1">
-    <echo message='Be sure to commit both repositories'/>
+    <echo message='Be sure to commit this change to the voltdb repository'/>
 </target>
 
 
