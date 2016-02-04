@@ -181,6 +181,7 @@ def map_deployment(request, database_id):
     Returns:
         Deployment object in required format.
     """
+
     deployment = filter(lambda t: t['databaseid'] == database_id, Global.DEPLOYMENT)
 
     if 'cluster' in request.json and 'elastic' in request.json['cluster']:
@@ -2075,7 +2076,6 @@ class DatabaseDeploymentAPI(MethodView):
         deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
         return Response(deployment_content, mimetype='text/xml')
 
-
     @staticmethod
     def put(database_id):
         file = request.files['file']
@@ -2088,18 +2088,22 @@ class DatabaseDeploymentAPI(MethodView):
                     return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
                 else:
                     if type(xml_final['deployment']) is dict:
-                        deployment_json = get_deployment_from_xml(xml_final['deployment'], 'dict')
+                        deployment_json = get_deployment_from_xml(xml_final['deployment'], 'dict')[0]
                         req = DictClass()
                         req.json = {}
                         req.json = deployment_json
                         inputs = JsonInputs(req)
                         if not inputs.validate():
                             return jsonify(success=False, errors=inputs.errors)
+                        map_deployment(req, database_id)
+                        sync_configuration()
+                        write_configuration_file()
+                        return jsonify({'status': 'success'})
                     else:
                         return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
-                return jsonify({'status': 'success'})
-            except Exception, err:
-                return jsonify({'status': 'failure', 'error': err})
+
+            except Exception as err:
+                return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
         else:
             return jsonify({'status': 'failure', 'error': 'Invalid file type.'})
 
