@@ -2132,13 +2132,31 @@ class VdmAPI(MethodView):
 
 
 class StatusDatabaseAPI(MethodView):
-    """Class to handle request to issue recover cmd on a server."""
+    """Class to return status of database and its servers."""
 
     @staticmethod
     def get(database_id):
 
         try:
             client = voltdbclient.FastSerializer(__IP__, 21212)
+            proc = voltdbclient.VoltProcedure( client, "@Ping")
+            response = proc.call()
+            return jsonify({'status': "running"})
+        except:
+            if Get_Voltdb_Process().isProcessRunning:
+                return jsonify({'status': "stalled"})
+            else:
+                return jsonify({'status': "stopped"})
+
+class StatusDatabaseServerAPI(MethodView):
+    """Class to return status of servers"""
+
+    @staticmethod
+    def get(database_id, server_id):
+
+        server = [server for server in Global.SERVERS if server['id'] == server_id]
+        try:
+            client = voltdbclient.FastSerializer(server[0]['hostname'], 21212)
             proc = voltdbclient.VoltProcedure( client, "@Ping")
             response = proc.call()
             return jsonify({'status': "running"})
@@ -2236,6 +2254,7 @@ def main(runner, amodule, config_dir, server):
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
     DATABASE_DEPLOYMENT_VIEW = DatabaseDeploymentAPI.as_view('database_deployment_api')
     STATUS_DATABASE_VIEW = StatusDatabaseAPI.as_view('status_database_api')
+    STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
@@ -2269,6 +2288,7 @@ def main(runner, amodule, config_dir, server):
 
     APP.add_url_rule('/api/1.0/deployment/<int:database_id>', view_func=DEPLOYMENT_VIEW, methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/deployment/users/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
