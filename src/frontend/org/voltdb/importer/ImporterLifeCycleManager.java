@@ -21,7 +21,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -181,15 +180,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             }
         }
 
-        if (!missingRemovedURLs.isEmpty() && !missingAddedURLs.isEmpty()) {
-            Set<String> missingURLs = new HashSet<>(missingRemovedURLs);
-            missingURLs.addAll(missingAddedURLs);
-            s_logger.error("The source for Import has changed its configuration. Importer URL: " +
-                    Joiner.on(", ").join(missingURLs) + ". Pause and Resume the database to refresh the importer.");
-            if (s_logger.isDebugEnabled()) {
-                s_logger.debug("Missing added URLs: " + Joiner.on(", ").join(missingAddedURLs));
-                s_logger.debug("Missing removed URLs: " + Joiner.on(", ").join(missingRemovedURLs));
-            }
+        if (!missingRemovedURLs.isEmpty() || !missingAddedURLs.isEmpty()) {
+            s_logger.error("The source for Import has changed its configuration. Removed importer URL(s): (" +
+                    Joiner.on(", ").join(missingRemovedURLs) + "), added importer URL(s): (" +
+                    Joiner.on(", ").join(missingAddedURLs) + "). Pause and Resume the database to refresh the importer.");
         }
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
