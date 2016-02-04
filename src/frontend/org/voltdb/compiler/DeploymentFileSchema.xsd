@@ -397,7 +397,7 @@
         <xs:complexType>
           <xs:attribute name="name" type="userRoleNameString" use="required"/>
           <xs:attribute name="roles" type="userRoleNameString"/>
-          <xs:attribute name="password" type="passwordString" use="required"/>
+          <xs:attribute name="password" type="xs:string" use="required"/>
           <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
@@ -405,12 +405,6 @@
   </xs:complexType>
 
   <xs:simpleType name="userRoleNameString">
-	<xs:restriction base="xs:string">
-      <xs:pattern value="[A-Za-z0-9,_@\-\.\*]+"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-  <xs:simpleType name="passwordString">
 	<xs:restriction base="xs:string">
       <xs:pattern value="[\S]+"/>
     </xs:restriction>

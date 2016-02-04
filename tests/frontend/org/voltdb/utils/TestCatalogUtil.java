@@ -387,7 +387,7 @@ public class TestCatalogUtil extends TestCase {
                 "<jsonapi enabled='true'/>" +
                 "</httpd>" +
                 "<users> " +
-                "<user name=\"fancypants\" password=\"ad min\" roles=\"administrator\"/>" +
+                "<user name=\"fancy$pants\" password=\"ad min\" roles=\"admin:!\"/>" +
                 "</users>" +
                 "</deployment>";
 
@@ -410,7 +410,7 @@ public class TestCatalogUtil extends TestCase {
 
         tmpRole = VoltProjectBuilder.writeStringToTempFile(badPassword);
         res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
-        assertTrue(res.contains("Error parsing deployment"));
+        assertFalse(res.contains("Error parsing deployment"));
 
         catalog_db.getGroups().add("lo uno");
         tmpRole = VoltProjectBuilder.writeStringToTempFile(badRoles);
