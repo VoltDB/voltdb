@@ -2096,6 +2096,18 @@ class DatabaseDeploymentAPI(MethodView):
                         if not inputs.validate():
                             return jsonify(success=False, errors=inputs.errors)
                         map_deployment(req, database_id)
+                        Global.DEPLOYMENT_USERS = []
+                        if 'users' in req.json and 'user' in req.json['users']:
+                            for user in req.json['users']['user']:
+                                Global.DEPLOYMENT_USERS.append(
+                                    {
+                                        'name': user['name'],
+                                        'roles': user['roles'],
+                                        'password': user['password'],
+                                        'plaintext': user['plaintext'],
+                                        'databaseid': database_id
+                                    }
+                                )
                         sync_configuration()
                         write_configuration_file()
                         return jsonify({'status': 'success'})
