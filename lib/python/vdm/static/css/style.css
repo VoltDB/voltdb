@@ -181,13 +181,15 @@ label.ccErrorMsg {
 }
 .editServerDatabase {
     height: 30px;
-    background-position: 39px -165px;
-    cursor: pointer;
+    background-position: -8px -165px;
+
 }
 .editServerDatabaseTxt {
-    padding: 0 0 0 41px;
+    padding: 0;
     font-size: 12px;
+
 }
+.btnUpdateDatabase {cursor:pointer;}
 .preload { width:100px;
     height: 100px;
     position: fixed;
@@ -1127,6 +1129,9 @@ table.tblPopup {
     line-height: 12px;
     height: auto;
 }
+
+.btnDbList { cursor:pointer;}
+.btnDbList:hover{ color:#c70000;}
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1143,6 +1148,7 @@ padding:5px; margin:0 0 0 10px; width:47.5%}
 	right:25%;
     /*add what you want here*/
 }
+.modal.custom .addDatabaseModal { width:35%;}
 .navbar {
 	min-height: 52px;
 }
