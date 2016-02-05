@@ -185,16 +185,20 @@ label.ccErrorMsg {
 
 }
 .editServerDatabaseTxt {
-    padding: 0;
+    padding: 10px 10px 5px 0px;
     font-size: 12px;
 
 }
-.btnUpdateDatabase {cursor:pointer;}
+.btnUpdateDatabase {cursor:pointer; padding:0 0 0 10px; }
 .preload { width:100px;
     height: 100px;
     position: fixed;
     top: 50%;
-    left: 50%;}
+    left: 50%;
+
+    }
+
+ .btnDeleteDatabase {padding:10px 10px 5px 10px;}
 
 .deleteDatabaseServer {
     height: 26px;
@@ -459,11 +463,12 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 
 .tblDatabase tr td:nth-child(1) {
 	width: 80%;
-	position: relative;
-	top: -13px;
 	padding-left:20px;
 	font-weight: bold;
+	vertical-align:middle;
+
 }
+.tblDatabase tr td:nth-child(1):hover{background-color:#eeeeee;}
 .tblDatabase tr td:nth-child(2) {
 	text-align: center;
 }
@@ -471,7 +476,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	width: 5%;
 }
 .tblDatabase tr td {
-	padding: 5px 10px 3px 10px;
+	/*padding: 5px 10px 3px 10px;*/
 
 
 }
@@ -1130,7 +1135,7 @@ table.tblPopup {
     height: auto;
 }
 
-.btnDbList { cursor:pointer;}
+.btnDbList { cursor:pointer; padding:20px 0;}
 .btnDbList:hover{ color:#c70000;}
 /*************overwriting the bootstrap***************/
 
