@@ -864,6 +864,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+        } else {
+            exportLog.info("Ack with 0 for source ");
         }
     }
 
