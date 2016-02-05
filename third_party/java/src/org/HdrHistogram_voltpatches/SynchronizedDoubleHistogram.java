@@ -12,114 +12,87 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
-import java.nio.LongBuffer;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Locale;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 
 /**
- * <h3>An integer values High Dynamic Range (HDR) Histogram that is synchronized as a whole</h3>
+ * <h3>A floating point values High Dynamic Range (HDR) Histogram that is synchronized as a whole</h3>
  * <p>
- * A {@link SynchronizedHistogram} is a variant of {@link Histogram} that is
+ * A {@link SynchronizedDoubleHistogram} is a variant of {@link org.HdrHistogram_voltpatches.DoubleHistogram} that is
  * synchronized as a whole, such that queries, copying, and addition operations are atomic with relation to
- * modification on the {@link SynchronizedHistogram}, and such that external accessors (e.g. iterations on the
- * histogram data) that synchronize on the {@link SynchronizedHistogram} instance can safely assume that no
+ * modification on the {@link SynchronizedDoubleHistogram}, nd such that external accessors (e.g. iterations on the
+ * histogram data) that synchronize on the {@link SynchronizedDoubleHistogram} instance can safely assume that no
  * modifications to the histogram data occur within their synchronized block.
  * <p>
  * It is important to note that synchronization can result in blocking recoding calls. If non-blocking recoding
- * operations are required, consider using {@link ConcurrentHistogram}, {@link AtomicHistogram}, or (recommended)
- * {@link Recorder} or {@link org.HdrHistogram_voltpatches.SingleWriterRecorder} which were intended for concurrent operations.
+ * operations are required, consider using {@link org.HdrHistogram_voltpatches.ConcurrentDoubleHistogram}, or (recommended)
+ * {@link DoubleRecorder} which were intended for concurrent operations.
  * <p>
- * See package description for {@link org.HdrHistogram} and {@link org.HdrHistogram_voltpatches.Histogram} for more details.
+ * {@link SynchronizedDoubleHistogram} supports the recording and analyzing sampled data value counts across a
+ * configurable dynamic range of floating point (double) values, with configurable value precision within the range.
+ * Dynamic range is expressed as a ratio between the highest and lowest non-zero values trackable within the histogram
+ * at any given time. Value precision is expressed as the number of significant [decimal] digits in the value recording,
+ * and provides control over value quantization behavior across the value range and the subsequent value resolution at
+ * any given level.
+ * <p>
+ * Auto-ranging: Unlike integer value based histograms, the specific value range tracked by a {@link
+ * SynchronizedDoubleHistogram} is not specified upfront. Only the dynamic range of values that the histogram can
+ * cover is (optionally) specified. E.g. When a {@link ConcurrentDoubleHistogram} is created to track a dynamic range of
+ * 3600000000000 (enough to track values from a nanosecond to an hour), values could be recorded into into it in any
+ * consistent unit of time as long as the ratio between the highest and lowest non-zero values stays within the
+ * specified dynamic range, so recording in units of nanoseconds (1.0 thru 3600000000000.0), milliseconds (0.000001
+ * thru 3600000.0) seconds (0.000000001 thru 3600.0), hours (1/3.6E12 thru 1.0) will all work just as well.
+ * <p>
+ * Auto-resizing: When constructed with no specified dynamic range (or when auto-resize is turned on with {@link
+ * SynchronizedDoubleHistogram#setAutoResize}) a {@link SynchronizedDoubleHistogram} will auto-resize its dynamic
+ * range to include recorded values as they are encountered. Note that recording calls that cause auto-resizing may
+ * take longer to execute, as resizing incurs allocation and copying of internal data structures.
+ * <p>
+ * Attempts to record non-zero values that range outside of the specified dynamic range (or exceed the limits of
+ * of dynamic range when auto-resizing) may results in {@link ArrayIndexOutOfBoundsException} exceptions, either
+ * due to overflow or underflow conditions. These exceptions will only be thrown if recording the value would have
+ * resulted in discarding or losing the required value precision of values already recorded in the histogram.
+ * <p>
+ * See package description for {@link org.HdrHistogram} for details.
  */
 
-
-public class SynchronizedHistogram extends Histogram {
+public class SynchronizedDoubleHistogram extends DoubleHistogram {
 
     /**
-     * Construct an auto-resizing SynchronizedHistogram with a lowest discernible value of 1 and an auto-adjusting
-     * highestTrackableValue. Can auto-resize up to track values up to (Long.MAX_VALUE / 2).
+     * Construct a new auto-resizing DoubleHistogram using a precision stated as a number of significant
+     * decimal digits.
      *
      * @param numberOfSignificantValueDigits Specifies the precision to use. This is the number of significant
      *                                       decimal digits to which the histogram will maintain value resolution
      *                                       and separation. Must be a non-negative integer between 0 and 5.
      */
-    public SynchronizedHistogram(final int numberOfSignificantValueDigits) {
-        this(1, 2, numberOfSignificantValueDigits);
+    public SynchronizedDoubleHistogram(final int numberOfSignificantValueDigits) {
+        this(2, numberOfSignificantValueDigits);
         setAutoResize(true);
     }
 
     /**
-     * Construct a SynchronizedHistogram given the Highest value to be tracked and a number of significant decimal digits. The
-     * histogram will be constructed to implicitly track (distinguish from 0) values as low as 1.
+     * Construct a new DoubleHistogram with the specified dynamic range (provided in
+     * {@code highestToLowestValueRatio}) and using a precision stated as a number of significant
+     * decimal digits.
      *
-     * @param highestTrackableValue The highest value to be tracked by the histogram. Must be a positive
-     *                              integer that is {@literal >=} 2.
+     * @param highestToLowestValueRatio specifies the dynamic range to use
      * @param numberOfSignificantValueDigits Specifies the precision to use. This is the number of significant
      *                                       decimal digits to which the histogram will maintain value resolution
      *                                       and separation. Must be a non-negative integer between 0 and 5.
      */
-    public SynchronizedHistogram(final long highestTrackableValue, final int numberOfSignificantValueDigits) {
-        this(1, highestTrackableValue, numberOfSignificantValueDigits);
+    public SynchronizedDoubleHistogram(final long highestToLowestValueRatio, final int numberOfSignificantValueDigits) {
+        super(highestToLowestValueRatio, numberOfSignificantValueDigits, SynchronizedHistogram.class);
     }
 
     /**
-     * Construct a SynchronizedHistogram given the Lowest and Highest values to be tracked and a number of significant
-     * decimal digits. Providing a lowestDiscernibleValue is useful is situations where the units used
-     * for the histogram's values are much smaller that the minimal accuracy required. E.g. when tracking
-     * time values stated in nanosecond units, where the minimal accuracy required is a microsecond, the
-     * proper value for lowestDiscernibleValue would be 1000.
-     *
-     * @param lowestDiscernibleValue The lowest value that can be tracked (distinguished from 0) by the histogram.
-     *                               Must be a positive integer that is {@literal >=} 1. May be internally rounded
-     *                               down to nearest power of 2.
-     * @param highestTrackableValue The highest value to be tracked by the histogram. Must be a positive
-     *                              integer that is {@literal >=} (2 * lowestDiscernibleValue).
-     * @param numberOfSignificantValueDigits Specifies the precision to use. This is the number of significant
-     *                                       decimal digits to which the histogram will maintain value resolution
-     *                                       and separation. Must be a non-negative integer between 0 and 5.
-     */
-    public SynchronizedHistogram(final long lowestDiscernibleValue, final long highestTrackableValue, final int numberOfSignificantValueDigits) {
-        super(lowestDiscernibleValue, highestTrackableValue, numberOfSignificantValueDigits);
-    }
-
-    /**
-     * Construct a histogram with the same range settings as a given source histogram,
+     * Construct a {@link SynchronizedDoubleHistogram} with the same range settings as a given source,
      * duplicating the source's start/end timestamps (but NOT it's contents)
      * @param source The source histogram to duplicate
      */
-    public SynchronizedHistogram(final AbstractHistogram source) {
+    public SynchronizedDoubleHistogram(final ConcurrentDoubleHistogram source) {
         super(source);
-    }
-
-    /**
-     * Construct a new histogram by decoding it from a ByteBuffer.
-     * @param buffer The buffer to decode from
-     * @param minBarForHighestTrackableValue Force highestTrackableValue to be set at least this high
-     * @return The newly constructed histogram
-     */
-    public static SynchronizedHistogram decodeFromByteBuffer(final ByteBuffer buffer,
-                                                             final long minBarForHighestTrackableValue) {
-        return decodeFromByteBuffer(buffer, SynchronizedHistogram.class, minBarForHighestTrackableValue);
-    }
-
-    /**
-     * Construct a new histogram by decoding it from a compressed form in a ByteBuffer.
-     * @param buffer The buffer to decode from
-     * @param minBarForHighestTrackableValue Force highestTrackableValue to be set at least this high
-     * @return The newly constructed histogram
-     * @throws DataFormatException on error parsing/decompressing the buffer
-     */
-    public static SynchronizedHistogram decodeFromCompressedByteBuffer(final ByteBuffer buffer,
-                                                                       final long minBarForHighestTrackableValue) throws DataFormatException {
-        return decodeFromCompressedByteBuffer(buffer, SynchronizedHistogram.class, minBarForHighestTrackableValue);
-    }
-
-    @Override
-    public synchronized long getTotalCount() {
-        return super.getTotalCount();
     }
 
     @Override
@@ -133,28 +106,19 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized void recordValue(final long value) throws ArrayIndexOutOfBoundsException {
+    public synchronized void recordValue(final double value) throws ArrayIndexOutOfBoundsException {
         super.recordValue(value);
     }
 
     @Override
-    public synchronized void recordValueWithCount(final long value, final long count) throws ArrayIndexOutOfBoundsException {
+    public synchronized void recordValueWithCount(final double value, final long count) throws ArrayIndexOutOfBoundsException {
         super.recordValueWithCount(value, count);
     }
 
     @Override
-    public synchronized void recordValueWithExpectedInterval(final long value, final long expectedIntervalBetweenValueSamples)
+    public synchronized void recordValueWithExpectedInterval(final double value, final double expectedIntervalBetweenValueSamples)
             throws ArrayIndexOutOfBoundsException {
         super.recordValueWithExpectedInterval(value, expectedIntervalBetweenValueSamples);
-    }
-
-    /**
-     * @deprecated
-     */
-    @Override
-    public synchronized void recordValue(final long value, final long expectedIntervalBetweenValueSamples)
-            throws ArrayIndexOutOfBoundsException {
-        super.recordValue(value, expectedIntervalBetweenValueSamples);
     }
 
     @Override
@@ -163,25 +127,25 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized SynchronizedHistogram copy() {
-        SynchronizedHistogram toHistogram = new SynchronizedHistogram(this);
-        toHistogram.add(this);
-        return toHistogram;
+    public synchronized DoubleHistogram copy() {
+        final DoubleHistogram targetHistogram =
+                new DoubleHistogram(this);
+        integerValuesHistogram.copyInto(targetHistogram.integerValuesHistogram);
+        return targetHistogram;
     }
 
     @Override
-    public synchronized SynchronizedHistogram copyCorrectedForCoordinatedOmission(
-            final long expectedIntervalBetweenValueSamples) {
-        SynchronizedHistogram toHistogram = new SynchronizedHistogram(this);
-        toHistogram.addWhileCorrectingForCoordinatedOmission(this, expectedIntervalBetweenValueSamples);
-        return toHistogram;
+    public synchronized DoubleHistogram copyCorrectedForCoordinatedOmission(final double expectedIntervalBetweenValueSamples) {
+        final DoubleHistogram targetHistogram =
+                new DoubleHistogram(this);
+        targetHistogram.addWhileCorrectingForCoordinatedOmission(this, expectedIntervalBetweenValueSamples);
+        return targetHistogram;
     }
 
-
     @Override
-    public void copyInto(final AbstractHistogram targetHistogram) {
+    public synchronized void copyInto(final DoubleHistogram targetHistogram) {
         // Synchronize copyInto(). Avoid deadlocks by synchronizing in order of construction identity count.
-        if (identity < targetHistogram.identity) {
+        if (integerValuesHistogram.identity < targetHistogram.integerValuesHistogram.identity) {
             synchronized (this) {
                 synchronized (targetHistogram) {
                     super.copyInto(targetHistogram);
@@ -197,11 +161,11 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public void copyIntoCorrectedForCoordinatedOmission(final AbstractHistogram targetHistogram,
-                                                        final long expectedIntervalBetweenValueSamples) {
+    public synchronized void copyIntoCorrectedForCoordinatedOmission(final DoubleHistogram targetHistogram,
+                                                        final double expectedIntervalBetweenValueSamples) {
         // Synchronize copyIntoCorrectedForCoordinatedOmission(). Avoid deadlocks by synchronizing in order
         // of construction identity count.
-        if (identity < targetHistogram.identity) {
+        if (integerValuesHistogram.identity < targetHistogram.integerValuesHistogram.identity) {
             synchronized (this) {
                 synchronized (targetHistogram) {
                     super.copyIntoCorrectedForCoordinatedOmission(targetHistogram, expectedIntervalBetweenValueSamples);
@@ -217,48 +181,48 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public void add(final AbstractHistogram otherHistogram) {
+    public synchronized void add(final DoubleHistogram fromHistogram) throws ArrayIndexOutOfBoundsException {
         // Synchronize add(). Avoid deadlocks by synchronizing in order of construction identity count.
-        if (identity < otherHistogram.identity) {
+        if (integerValuesHistogram.identity < fromHistogram.integerValuesHistogram.identity) {
             synchronized (this) {
-                synchronized (otherHistogram) {
-                    super.add(otherHistogram);
+                synchronized (fromHistogram) {
+                    super.add(fromHistogram);
                 }
             }
         } else {
-            synchronized (otherHistogram) {
+            synchronized (fromHistogram) {
                 synchronized (this) {
-                    super.add(otherHistogram);
+                    super.add(fromHistogram);
                 }
             }
         }
     }
 
+
     @Override
-    public void subtract(final AbstractHistogram otherHistogram)
-            throws ArrayIndexOutOfBoundsException, IllegalArgumentException {
+    public synchronized void subtract(final DoubleHistogram fromHistogram) {
         // Synchronize subtract(). Avoid deadlocks by synchronizing in order of construction identity count.
-        if (identity < otherHistogram.identity) {
+        if (integerValuesHistogram.identity < fromHistogram.integerValuesHistogram.identity) {
             synchronized (this) {
-                synchronized (otherHistogram) {
-                    super.subtract(otherHistogram);
+                synchronized (fromHistogram) {
+                    super.subtract(fromHistogram);
                 }
             }
         } else {
-            synchronized (otherHistogram) {
+            synchronized (fromHistogram) {
                 synchronized (this) {
-                    super.subtract(otherHistogram);
+                    super.subtract(fromHistogram);
                 }
             }
         }
     }
 
     @Override
-    public void addWhileCorrectingForCoordinatedOmission(final AbstractHistogram fromHistogram,
-                                                         final long expectedIntervalBetweenValueSamples) {
+    public synchronized void addWhileCorrectingForCoordinatedOmission(final DoubleHistogram fromHistogram,
+                                                         final double expectedIntervalBetweenValueSamples) {
         // Synchronize addWhileCorrectingForCoordinatedOmission(). Avoid deadlocks by synchronizing in
         // order of construction identity count.
-        if (identity < fromHistogram.identity) {
+        if (integerValuesHistogram.identity < fromHistogram.integerValuesHistogram.identity) {
             synchronized (this) {
                 synchronized (fromHistogram) {
                     super.addWhileCorrectingForCoordinatedOmission(fromHistogram, expectedIntervalBetweenValueSamples);
@@ -272,24 +236,15 @@ public class SynchronizedHistogram extends Histogram {
             }
         }
     }
-    @Override
-    public synchronized void shiftValuesLeft(final int numberOfBinaryOrdersOfMagnitude) {
-        super.shiftValuesLeft(numberOfBinaryOrdersOfMagnitude);
-    }
 
     @Override
-    public synchronized void shiftValuesRight(final int numberOfBinaryOrdersOfMagnitude) {
-        super.shiftValuesRight(numberOfBinaryOrdersOfMagnitude);
-    }
-
-    @Override
-    public boolean equals(final Object other){
+    public synchronized boolean equals(final Object other) {
         if ( this == other ) {
             return true;
         }
         if (other instanceof AbstractHistogram) {
-            AbstractHistogram otherHistogram = (AbstractHistogram) other;
-            if (identity < otherHistogram.identity) {
+            DoubleHistogram otherHistogram = (DoubleHistogram) other;
+            if (integerValuesHistogram.identity < otherHistogram.integerValuesHistogram.identity) {
                 synchronized (this) {
                     synchronized (otherHistogram) {
                         return super.equals(otherHistogram);
@@ -310,13 +265,13 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized long getLowestDiscernibleValue() {
-        return super.getLowestDiscernibleValue();
+    public synchronized long getTotalCount() {
+        return super.getTotalCount();
     }
 
     @Override
-    public synchronized long getHighestTrackableValue() {
-        return super.getHighestTrackableValue();
+    public synchronized double getIntegerToDoubleValueConversionRatio() {
+        return super.getIntegerToDoubleValueConversionRatio();
     }
 
     @Override
@@ -325,32 +280,37 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized long sizeOfEquivalentValueRange(final long value) {
+    public synchronized long getHighestToLowestValueRatio() {
+        return super.getHighestToLowestValueRatio();
+    }
+
+    @Override
+    public synchronized double sizeOfEquivalentValueRange(final double value) {
         return super.sizeOfEquivalentValueRange(value);
     }
 
     @Override
-    public synchronized long lowestEquivalentValue(final long value) {
+    public synchronized double lowestEquivalentValue(final double value) {
         return super.lowestEquivalentValue(value);
     }
 
     @Override
-    public synchronized long highestEquivalentValue(final long value) {
+    public synchronized double highestEquivalentValue(final double value) {
         return super.highestEquivalentValue(value);
     }
 
     @Override
-    public synchronized long medianEquivalentValue(final long value) {
+    public synchronized double medianEquivalentValue(final double value) {
         return super.medianEquivalentValue(value);
     }
 
     @Override
-    public synchronized long nextNonEquivalentValue(final long value) {
+    public synchronized double nextNonEquivalentValue(final double value) {
         return super.nextNonEquivalentValue(value);
     }
 
     @Override
-    public synchronized boolean valuesAreEquivalent(final long value1, final long value2) {
+    public synchronized boolean valuesAreEquivalent(final double value1, final double value2) {
         return super.valuesAreEquivalent(value1, value2);
     }
 
@@ -380,17 +340,17 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized long getMinValue() {
+    public synchronized double getMinValue() {
         return super.getMinValue();
     }
 
     @Override
-    public synchronized long getMaxValue() {
+    public synchronized double getMaxValue() {
         return super.getMaxValue();
     }
 
     @Override
-    public synchronized long getMinNonZeroValue() {
+    public synchronized double getMinNonZeroValue() {
         return super.getMinNonZeroValue();
     }
 
@@ -410,22 +370,23 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized long getValueAtPercentile(final double percentile) {
+    public synchronized double getValueAtPercentile(final double percentile) {
         return super.getValueAtPercentile(percentile);
     }
 
     @Override
-    public synchronized double getPercentileAtOrBelowValue(final long value) {
+    public synchronized double getPercentileAtOrBelowValue(final double value) {
         return super.getPercentileAtOrBelowValue(value);
     }
 
     @Override
-    public synchronized long getCountBetweenValues(final long lowValue, final long highValue) throws ArrayIndexOutOfBoundsException {
+    public synchronized double getCountBetweenValues(final double lowValue, final double highValue)
+            throws ArrayIndexOutOfBoundsException {
         return super.getCountBetweenValues(lowValue, highValue);
     }
 
     @Override
-    public synchronized long getCountAtValue(final long value) throws ArrayIndexOutOfBoundsException {
+    public synchronized long getCountAtValue(final double value) throws ArrayIndexOutOfBoundsException {
         return super.getCountAtValue(value);
     }
 
@@ -435,12 +396,13 @@ public class SynchronizedHistogram extends Histogram {
     }
 
     @Override
-    public synchronized LinearBucketValues linearBucketValues(final long valueUnitsPerBucket) {
+    public synchronized LinearBucketValues linearBucketValues(final double valueUnitsPerBucket) {
         return super.linearBucketValues(valueUnitsPerBucket);
     }
 
     @Override
-    public synchronized LogarithmicBucketValues logarithmicBucketValues(final long valueUnitsInFirstBucket, final double logBase) {
+    public synchronized LogarithmicBucketValues logarithmicBucketValues(final double valueUnitsInFirstBucket,
+                                                           final double logBase) {
         return super.logarithmicBucketValues(valueUnitsInFirstBucket, logBase);
     }
 
@@ -472,14 +434,17 @@ public class SynchronizedHistogram extends Histogram {
                                              final int percentileTicksPerHalfDistance,
                                              final Double outputValueUnitScalingRatio,
                                              final boolean useCsvFormat) {
-        super.outputPercentileDistribution(printStream, percentileTicksPerHalfDistance, outputValueUnitScalingRatio, useCsvFormat);
+        super.outputPercentileDistribution(
+                printStream,
+                percentileTicksPerHalfDistance,
+                outputValueUnitScalingRatio,
+                useCsvFormat);
     }
 
     @Override
     public synchronized int getNeededByteBufferCapacity() {
         return super.getNeededByteBufferCapacity();
     }
-
 
     @Override
     public synchronized int encodeIntoByteBuffer(final ByteBuffer buffer) {
@@ -496,10 +461,5 @@ public class SynchronizedHistogram extends Histogram {
     @Override
     public synchronized int encodeIntoCompressedByteBuffer(final ByteBuffer targetBuffer) {
         return super.encodeIntoCompressedByteBuffer(targetBuffer);
-    }
-
-    private void readObject(final ObjectInputStream o)
-            throws IOException, ClassNotFoundException {
-        o.defaultReadObject();
     }
 }

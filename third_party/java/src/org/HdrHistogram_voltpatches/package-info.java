@@ -11,21 +11,30 @@
  * integer value range with configurable value precision within the range. Value precision is expressed as the number
  * of significant digits in the value recording, and provides control over value quantization behavior across the
  * value range and the subsequent value resolution at any given level.
+ * </p>
  * <p>
  * In contrast to traditional histograms that use linear, logarithmic, or arbitrary sized bins or buckets,
  * HdrHistograms use a fixed storage internal data representation that simultaneously supports an arbitrarily high
  * dynamic range and arbitrary precision throughout that dynamic range. This capability makes HdrHistograms extremely
  * useful for tracking and reporting on the distribution of percentile values with high resolution and across a wide
  * dynamic range -- a common need in latency behavior characterization.
+ * </p>
  * <p>
  * The HdrHistogram package was specifically designed with latency and performance sensitive applications in mind.
  * Experimental u-benchmark measurements show value recording times as low as 3-6 nanoseconds on modern
- * (circa 2012) Intel CPUs. All Histogram variants maintain a fixed cost in both space and time. A Histogram's memory
- * footprint is constant, with no allocation operations involved in recording data values or in iterating through them.
- * The memory footprint is fixed regardless of the number of data value samples recorded, and depends solely on
- * the dynamic range and precision chosen. The amount of work involved in recording a sample is constant, and
- * directly computes storage index locations such that no iteration or searching is ever involved in recording
- * data values.
+ * (circa 2012) Intel CPUs. All Histogram variants can maintain a fixed cost in both space and time. When not
+ * configured to auto-resize, a Histogram's memory footprint is constant, with no allocation operations involved in
+ * recording data values or in iterating through them. The memory footprint is fixed regardless of the number of data
+ * value samples recorded, and depends solely on the dynamic range and precision chosen. The amount of work involved in
+ * recording a sample is constant, and directly computes storage index locations such that no iteration or searching
+ * is ever involved in recording data values.
+ * <p>
+ *     NOTE: Histograms can optionally be configured to auto-resize their dynamic range as a convenience feature.
+ *     When configured to auto-resize, recording operations that need to expand a histogram will auto-resize its
+ *     dynamic range to include recorded values as they are encountered. Note that recording calls that cause
+ *     auto-resizing may take longer to execute, and that resizing incurs allocation and copying of internal data
+ *     structures.
+ * </p>
  * <p>
  * The combination of high dynamic range and precision is useful for collection and accurate post-recording
  * analysis of sampled value data distribution in various forms. Whether it's calculating or
@@ -34,6 +43,7 @@
  * resolution allows for accurate post-recording analysis with low [and ultimately configurable] loss in
  * accuracy when compared to performing the same analysis directly on the potentially infinite series of sourced
  * data values samples.
+ * </p>
  * <p>
  * An HdrHistogram histogram is usually configured to maintain value count data with a resolution good enough
  * to support a desired precision in post-recording analysis and reporting on the collected data. Analysis can include
@@ -42,6 +52,7 @@
  * available on the collected value count data. In practice, a precision levels of 2 or 3 decimal points are most
  * commonly used, as they maintain a value accuracy of +/- ~1% or +/- ~0.1% respectively for derived distribution
  * statistics.
+ * </p>
  * <p>
  * A good example of HdrHistogram use would be tracking of latencies across a wide dynamic range. E.g. from a
  * microsecond to an hour. A Histogram can be configured to track and later report on the counts of observed integer
@@ -53,40 +64,39 @@
  * <br>
  * Code for this use example would include these basic elements:
  * <br>
- * <code>
  * <pre>
- * {@link org.HdrHistogram.Histogram} histogram = new {@link org.HdrHistogram.Histogram}(3600000000L, 3);
+ * <code>
+ * {@link org.HdrHistogram_voltpatches.Histogram} histogram = new {@link org.HdrHistogram_voltpatches.Histogram}(3600000000L, 3);
  * .
  * .
  * .
  * // Repeatedly record measured latencies:
- * histogram.{@link org.HdrHistogram.AbstractHistogram#recordValue(long) recordValue}(latency);
+ * histogram.{@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValue(long) recordValue}(latency);
  * .
  * .
  * .
  * // Report histogram percentiles, expressed in msec units:
- * histogram.{@link org.HdrHistogram.AbstractHistogram#getHistogramData() getHistogramData}().{@link org.HdrHistogram.HistogramData#outputPercentileDistribution(java.io.PrintStream, Double) outputPercentileDistribution}(histogramLog, 1000.0);
- * </pre>
+ * histogram.{@link org.HdrHistogram_voltpatches.AbstractHistogram#outputPercentileDistribution(java.io.PrintStream, Double) outputPercentileDistribution}(histogramLog, 1000.0)};
  * </code>
- *
+ * </pre>
  * Specifying 3 decimal points of precision in this example guarantees that value quantization within the value range
  * will be no larger than 1/1,000th (or 0.1%) of any recorded value. This example Histogram can be therefor used to
  * track, analyze and report the counts of observed latencies ranging between 1 microsecond and 1 hour in magnitude,
  * while maintaining a value resolution 1 microsecond (or better) up to 1 millisecond, a resolution of 1 millisecond
  * (or better) up to one second, and a resolution of 1 second (or better) up to 1,000 seconds. At it's maximum tracked
  * value (1 hour), it would still maintain a resolution of 3.6 seconds (or better).
- * <p>
  * <h3>Histogram variants and internal representation</h3>
- * The HdrHistogram package includes multiple implementations of the {@link org.HdrHistogram.AbstractHistogram} class:
+ * The HdrHistogram package includes multiple implementations of the {@link org.HdrHistogram_voltpatches.AbstractHistogram} class:
  * <ul>
- *  <li> {@link org.HdrHistogram.Histogram}, which is the commonly used Histogram form and tracks value counts
+ *  <li> {@link org.HdrHistogram_voltpatches.Histogram}, which is the commonly used Histogram form and tracks value counts
  * in <b><code>long</code></b> fields. </li>
- *  <li>{@link org.HdrHistogram.IntHistogram} and {@link org.HdrHistogram.ShortHistogram}, which track value counts
+ *  <li>{@link org.HdrHistogram_voltpatches.IntCountsHistogram} and {@link org.HdrHistogram_voltpatches.ShortCountsHistogram}, which track value counts
  * in <b><code>int</code></b> and
  * <b><code>short</code></b> fields respectively, are provided for use cases where smaller count ranges are practical
  * and smaller overall storage is beneficial (e.g. systems where tens of thousands of in-memory histogram are
  * being tracked).</li>
- *  <li>{@link org.HdrHistogram.AtomicHistogram} and {@link org.HdrHistogram.SynchronizedHistogram}</li>
+ *  <li>{@link org.HdrHistogram_voltpatches.AtomicHistogram}, {@link org.HdrHistogram_voltpatches.ConcurrentHistogram}
+ *  and {@link org.HdrHistogram_voltpatches.SynchronizedHistogram}</li>
  * </ul>
  * <p>
  * Internally, data in HdrHistogram variants is maintained using a concept somewhat similar to that of floating
@@ -99,63 +109,64 @@
  * Both dynamic range and resolution are configurable, with <b><code>highestTrackableValue</code></b>
  * controlling dynamic range, and <b><code>numberOfSignificantValueDigits</code></b> controlling
  * resolution.
- * <p>
+ * </p>
  * <h3>Synchronization and concurrent access</h3>
- * In the interest of keeping value recording cost to a minimum, the commonly used {@link org.HdrHistogram.Histogram}
- * class and it's {@link org.HdrHistogram.IntHistogram} and {@link org.HdrHistogram.ShortHistogram} variants are NOT
- * internally synchronized, and do NOT use atomic variables. Callers wishing to make potentially concurrent,
- * multi-threaded updates or queries against Histogram objects should either take care to externally synchronize and/or
- * order their access, or use the {@link org.HdrHistogram.SynchronizedHistogram} or
- * {@link org.HdrHistogram.AtomicHistogram} variants.
+ * In the interest of keeping value recording cost to a minimum, the commonly used {@link org.HdrHistogram_voltpatches.Histogram}
+ * class and it's {@link org.HdrHistogram_voltpatches.IntCountsHistogram} and {@link org.HdrHistogram_voltpatches.ShortCountsHistogram}
+ * variants are NOT internally synchronized, and do NOT use atomic variables. Callers wishing to make potentially
+ * concurrent, multi-threaded updates or queries against Histogram objects should either take care to externally
+ * synchronize and/or order their access, or use the {@link org.HdrHistogram_voltpatches.ConcurrentHistogram},
+ * {@link org.HdrHistogram_voltpatches.AtomicHistogram}, or {@link org.HdrHistogram_voltpatches.SynchronizedHistogram} variants.
  * <p>
- * It's worth mentioning that since Histogram objects are additive, it is common practice to use per-thread,
- * non-synchronized histograms for the recording fast path, and "flipping" the actively recorded-to histogram
- * (usually with some non-locking variants on the fast path) and having a summary/reporting thread perform
- * histogram aggregation math across time and/or threads.
+ * A common pattern seen in histogram value recording involves recording values in a critical path (multi-threaded
+ * or not), coupled with a non-critical path reading the recorded data for summary/reporting purposes. When such
+ * continuous non-blocking recording operation (concurrent or not) is desired even when sampling, analyzing, or
+ * reporting operations are needed, consider using the {@link org.HdrHistogram_voltpatches.Recorder} and
+ * {@link org.HdrHistogram_voltpatches.SingleWriterRecorder} variants that were specifically designed for that purpose.
+ * Recorders provide a recording API similar to Histogram, and internally maintain and coordinate active/inactive
+ * histograms such that recording remains wait-free in the presense of accurate and stable interval sampling.
  * </p>
  * <p>
+ * It is worth mentioning that since Histogram objects are additive, it is common practice to use per-thread
+ * non-synchronized histograms or {@link org.HdrHistogram_voltpatches.SingleWriterRecorder}s, and using a summary/reporting
+ * thread perform histogram aggregation math across time and/or threads.
+ * </p>
  * <h3>Iteration</h3>
  * Histograms supports multiple convenient forms of iterating through the histogram data set, including linear,
  * logarithmic, and percentile iteration mechanisms, as well as means for iterating through each recorded value or
- * each possible value level. The iteration mechanisms are accessible through the {@link org.HdrHistogram.HistogramData}
- * available through  {@link org.HdrHistogram.AbstractHistogram#getHistogramData()}.
- * Iteration mechanisms all provide {@link org.HdrHistogram.HistogramIterationValue} data points along the
- * histogram's iterated data set, and are available for the default (corrected) histogram data set
- * via the following {@link org.HdrHistogram.HistogramData} methods:
+ * each possible value level. The iteration mechanisms all provide {@link org.HdrHistogram.HistogramIterationValue}
+ * data points along the histogram's iterated data set, and are available via the following methods:
  * <ul>
- *     <li>{@link org.HdrHistogram.HistogramData#percentiles percentiles} :
- *     An {@link java.lang.Iterable}<{@link org.HdrHistogram.HistogramIterationValue}> through the
+ *     <li>{@link org.HdrHistogram_voltpatches.AbstractHistogram#percentiles percentiles} :
+ *     An {@link java.lang.Iterable}{@literal <}{@link org.HdrHistogram.HistogramIterationValue}{@literal >} through the
  *     histogram using a {@link org.HdrHistogram.PercentileIterator} </li>
- *     <li>{@link org.HdrHistogram.HistogramData#linearBucketValues linearBucketValues} :
- *     An {@link java.lang.Iterable}<{@link org.HdrHistogram.HistogramIterationValue}> through
+ *     <li>{@link org.HdrHistogram_voltpatches.AbstractHistogram#linearBucketValues linearBucketValues} :
+ *     An {@link java.lang.Iterable}{@literal <}{@link org.HdrHistogram.HistogramIterationValue}{@literal >} through
  *     the histogram using a {@link org.HdrHistogram.LinearIterator} </li>
- *     <li>{@link org.HdrHistogram.HistogramData#logarithmicBucketValues logarithmicBucketValues} :
- *     An {@link java.lang.Iterable}<{@link org.HdrHistogram.HistogramIterationValue}>
+ *     <li>{@link org.HdrHistogram_voltpatches.AbstractHistogram#logarithmicBucketValues logarithmicBucketValues} :
+ *     An {@link java.lang.Iterable}{@literal <}{@link org.HdrHistogram.HistogramIterationValue}{@literal >}
  *     through the histogram using a {@link org.HdrHistogram.LogarithmicIterator} </li>
- *     <li>{@link org.HdrHistogram.HistogramData#recordedValues recordedValues} :
- *     An {@link java.lang.Iterable}<{@link org.HdrHistogram.HistogramIterationValue}> through
+ *     <li>{@link org.HdrHistogram_voltpatches.AbstractHistogram#recordedValues recordedValues} :
+ *     An {@link java.lang.Iterable}{@literal <}{@link org.HdrHistogram.HistogramIterationValue}{@literal >} through
  *     the histogram using a {@link org.HdrHistogram.RecordedValuesIterator} </li>
- *     <li>{@link org.HdrHistogram.HistogramData#allValues allValues} :
- *     An {@link java.lang.Iterable}<{@link org.HdrHistogram.HistogramIterationValue}> through
+ *     <li>{@link org.HdrHistogram_voltpatches.AbstractHistogram#allValues allValues} :
+ *     An {@link java.lang.Iterable}{@literal <}{@link org.HdrHistogram.HistogramIterationValue}{@literal >} through
  *     the histogram using a {@link org.HdrHistogram.AllValuesIterator} </li>
  * </ul>
  * <p>
  * Iteration is typically done with a for-each loop statement. E.g.:
- * <br><code>
- * <pre>
- * for (HistogramIterationValue v : histogram.getHistogramData().percentiles(<i>percentileTicksPerHalfDistance</i>)) {
+ * <br><pre><code>
+ * for (HistogramIterationValue v : histogram.percentiles(<i>percentileTicksPerHalfDistance</i>)) {
  *     ...
  * }
- * </pre>
- * </code>
+ * </code></pre>
  * or
- * <br><code>
- * <pre>
- * for (HistogramIterationValue v : histogram.getHistogramData().linearBucketValues(<i>valueUnitsPerBucket</i>)) {
+ * <br><pre><code>
+ * for (HistogramIterationValue v : histogram.linearBucketValues(<i>valueUnitsPerBucket</i>)) {
  *     ...
  * }
- * </pre>
  * </code>
+ * </pre>
  * The iterators associated with each iteration method are resettable, such that a caller that would like to avoid
  * allocating a new iterator object for each iteration loop can re-use an iterator to repeatedly iterate through the
  * histogram. This iterator re-use usually takes the form of a traditional for loop using the Iterator's
@@ -163,18 +174,17 @@
  *
  * to avoid allocating a new iterator object for each iteration loop:
  * <br>
- * <code>
  * <pre>
- * PercentileIterator iter = histogram.getHistogramData().percentiles().iterator(<i>percentileTicksPerHalfDistance</i>);
+ * <code>
+ * PercentileIterator iter = histogram.percentiles().iterator(<i>percentileTicksPerHalfDistance</i>);
  * ...
  * iter.reset(<i>percentileTicksPerHalfDistance</i>);
  * for (iter.hasNext() {
  *     HistogramIterationValue v = iter.next();
  *     ...
  * }
- * </pre>
  * </code>
- * <p>
+ * </pre>
  * <h3>Equivalent Values and value ranges</h3>
  * <p>
  * Due to the finite (and configurable) resolution of the histogram, multiple adjacent integer data values can
@@ -183,14 +193,14 @@
  * lowest and highest equivalent values for any given value, as we as determining whether two values are equivalent,
  * and for finding the next non-equivalent value for a given value (useful when looping through values, in order
  * to avoid double-counting count).
- * <p>
- * <h3>Raw vs. corrected recording variants</h3>
+ * </p>
+ * <h3>Raw vs. corrected recording</h3>
  * <p>
  * Regular, raw value data recording into an HdrHistogram is achieved with the
- * {@link org.HdrHistogram.AbstractHistogram#recordValue(long) recordValue()} method.
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValue(long) recordValue()} method.
  * <p>
  * Histogram variants also provide an auto-correcting
- * {@link org.HdrHistogram.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
  * form in support of a common use case found when histogram values are used to track response time
  * distribution in the presence of Coordinated Omission - an extremely common phenomenon found in latency recording
  * systems.
@@ -199,12 +209,14 @@
  * typically correlate with "bad" results. This coordinated (non random) omission of source data, if left uncorrected,
  * will then dramatically skew any overall latency stats computed on the recorded information, as the recorded data set
  * itself will be significantly skewed towards good results.
- * <p><
+ * </p>
+ * <p>
  * When a value recorded in the histogram exceeds the
  * <b><code>expectedIntervalBetweenValueSamples</code></b> parameter, recorded histogram data will
  * reflect an appropriate number of additional values, linearly decreasing in steps of
  * <b><code>expectedIntervalBetweenValueSamples</code></b>, down to the last value
  * that would still be higher than <b><code>expectedIntervalBetweenValueSamples</code></b>).
+ * </p>
  * <p>
  * To illustrate why this corrective behavior is critically needed in order to accurately represent value
  * distribution when large value measurements may lead to missed samples, imagine a system for which response
@@ -216,40 +228,64 @@
  * An normally recorded (uncorrected) data histogram collected for such a hypothetical system (over the 200 second
  * scenario above) would show ~99.99% of results at 1msec or below, which is obviously "not right". In contrast, a
  * histogram that records the same data using the auto-correcting
- * {@link org.HdrHistogram.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
  * method with the knowledge of an expectedIntervalBetweenValueSamples of 10msec will correctly represent the
  * real world response time distribution of this hypothetical system. Only ~50% of results will be at 1msec or below,
  * with the remaining 50% coming from the auto-generated value records covering the missing increments spread between
  * 10msec and 100 sec.
+ * </p>
  * <p>
  * Data sets recorded with and with
- * {@link org.HdrHistogram.AbstractHistogram#recordValue(long) recordValue()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValue(long) recordValue()}
  * and with
- * {@link org.HdrHistogram.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
  * will differ only if at least one value recorded was greater than it's
  * associated <b><code>expectedIntervalBetweenValueSamples</code></b> parameter.
  * Data sets recorded with
- * {@link org.HdrHistogram.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValueWithExpectedInterval(long, long) recordValueWithExpectedInterval()}
  * parameter will be identical to ones recorded with
- * {@link org.HdrHistogram.AbstractHistogram#recordValue(long) recordValue()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#recordValue(long) recordValue()}
  * it if all values recorded via the <b><code>recordValue</code></b> calls were smaller
  * than their associated <b><code>expectedIntervalBetweenValueSamples</code></b> parameters.
+ * </p>
  * <p>
  * In addition to at-recording-time correction option, Histrogram variants also provide the post-recording correction
  * methods
- * {@link org.HdrHistogram.AbstractHistogram#copyCorrectedForCoordinatedOmission(long) copyCorrectedForCoordinatedOmission()}
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#copyCorrectedForCoordinatedOmission(long) copyCorrectedForCoordinatedOmission()}
  * and
- * {@link org.HdrHistogram.AbstractHistogram#addWhileCorrectingForCoordinatedOmission(AbstractHistogram, long) addWhileCorrectingForCoordinatedOmission()}.
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#addWhileCorrectingForCoordinatedOmission(AbstractHistogram, long) addWhileCorrectingForCoordinatedOmission()}.
  * These methods can be used for post-recording correction, and are useful when the
  * <b><code>expectedIntervalBetweenValueSamples</code></b> parameter is estimated to be the same for all recorded
  * values. However, for obvious reasons, it is important to note that only one correction method (during or post
  * recording) should be be used on a given histogram data set.
+ * </p>
  * <p>
  * When used for response time characterization, the recording with the optional
- * </code></b>expectedIntervalBetweenValueSamples</code></b> parameter will tend to produce data sets that would
+ * <code><b>expectedIntervalBetweenValueSamples</b></code> parameter will tend to produce data sets that would
  * much more accurately reflect the response time distribution that a random, uncoordinated request would have
  * experienced.
- * <p>
+ * </p>
+ * <h3>Floating point values and DoubleHistogram variants</h3>
+ * The above discussion relates to integer value histograms (the various subclasses of
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram} and their related supporting classes). HdrHistogram supports floating
+ * point value recording and reporting with a similar set of classes, including the
+ * {@link org.HdrHistogram_voltpatches.DoubleHistogram}, {@link org.HdrHistogram_voltpatches.ConcurrentDoubleHistogram} and
+ * {@link org.HdrHistogram_voltpatches.SynchronizedDoubleHistogram} histogram classes. Support for floating point value
+ * iteration is provided with {@link org.HdrHistogram.DoubleHistogramIterationValue} and related iterator classes (
+ * {@link org.HdrHistogram.DoubleLinearIterator}, {@link org.HdrHistogram.DoubleLogarithmicIterator},
+ * {@link org.HdrHistogram.DoublePercentileIterator}, {@link org.HdrHistogram.DoubleRecordedValuesIterator},
+ * {@link org.HdrHistogram.DoubleAllValuesIterator}). Support for interval recording is provided with
+ * {@link org.HdrHistogram_voltpatches.DoubleRecorder} and
+ * {@link org.HdrHistogram_voltpatches.SingleWriterDoubleRecorder}.
+ * <h4>Auto-ranging in floating point histograms</h4>
+ * Unlike integer value based histograms, the specific value range tracked by a {@link
+ * org.HdrHistogram_voltpatches.DoubleHistogram} (and variants) is not specified upfront. Only the dynamic range of values
+ * that the histogram can cover is (optionally) specified. E.g. When a {@link org.HdrHistogram_voltpatches.DoubleHistogram}
+ * is created to track a dynamic range of 3600000000000 (enough to track values from a nanosecond to an hour),
+ * values could be recorded into into it in any consistent unit of time as long as the ratio between the highest
+ * and lowest non-zero values stays within the specified dynamic range, so recording in units of nanoseconds
+ * (1.0 thru 3600000000000.0), milliseconds (0.000001 thru 3600000.0) seconds (0.000000001 thru 3600.0), hours
+ * (1/3.6E12 thru 1.0) will all work just as well.
  * <h3>Footprint estimation</h3>
  * Due to it's dynamic range representation, Histogram is relatively efficient in memory space requirements given
  * the accuracy and dynamic range it covers. Still, it is useful to be able to estimate the memory footprint involved
@@ -266,9 +302,9 @@
  *          (log2RoundedUp((highestTrackableValue) / subBucketSize) + 2) *
  *          subBucketSize
  *
- * </pre></code>
+ * </code></pre>
  * A conservative (high) estimate of a Histogram's footprint in bytes is available via the
- * {@link org.HdrHistogram.AbstractHistogram#getEstimatedFootprintInBytes() getEstimatedFootprintInBytes()} method.
+ * {@link org.HdrHistogram_voltpatches.AbstractHistogram#getEstimatedFootprintInBytes() getEstimatedFootprintInBytes()} method.
  */
 
 package org.HdrHistogram_voltpatches;
