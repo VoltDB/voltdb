@@ -198,7 +198,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         while (results[0].advanceRow()) {
             byte histogramBytes[] = results[0].getVarbinary("HISTOGRAM");
             Histogram h = AbstractHistogram.fromCompressedBytes(histogramBytes, CompressionStrategySnappy.INSTANCE);
-            invocations += h.getHistogramData().getTotalCount();
+            invocations += h.getTotalCount();
         }
         assertTrue(invocations > 0);
     }

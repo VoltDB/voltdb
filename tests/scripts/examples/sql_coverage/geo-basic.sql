@@ -274,12 +274,17 @@ SELECT ID, LONGITUDE(PT1), LATITUDE(PT1) from _table G51 WHERE _maybe CONTAINS(P
 SELECT ID, AsText(PT1),    AsText(POLY1) from _table G52 WHERE _maybe CONTAINS(POLY1,PT1) AND @ignoreinvalidpolys
 SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G53 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignoreinvalidpolys
 SELECT ID, AsText(PT2),    AsText(POLY1) from _table G54 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignoreinvalidpolys
+SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G55 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignoreinvalidpolys
+SELECT ID, AsText(PT2),    AsText(POLY2) from _table G56 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignoreinvalidpolys
 -- Test UPDATE using CENTROID, and re-test CONTAINS afterward
-UPDATE _table G55 SET PT2 = CENTROID(POLY1)
+-- (Note: the restriction to only use valid polygons here is only an issue on Ubuntu 12.04, for some reason)
+UPDATE _table G55 SET PT2 = CENTROID(POLY1)              WHERE                                @ignoreinvalidpolys
 -- (Note: certain polygons avoided here, whose CENTROID has known differences between VoltDB & PostGIS)
-SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G56 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignorecentroiddiffs
-SELECT ID, AsText(PT2),    AsText(POLY1) from _table G57 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignorecentroiddiffs
+SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G63 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignorecentroiddiffs
+SELECT ID, AsText(PT2),    AsText(POLY1) from _table G64 WHERE _maybe CONTAINS(POLY1,PT2) AND @ignorecentroiddiffs
+SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G65 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignorecentroiddiffs
+SELECT ID, AsText(PT2),    AsText(POLY2) from _table G66 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignorecentroiddiffs
 
 -- These won't work until CONTAINS (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, CONTAINS(POLY1,PT1), LONGITUDE(PT1), LATITUDE(PT1) from _table G58
-SELECT ID, CONTAINS(POLY1,PT1), AsText(PT1),    AsText(POLY1) from _table G59
+SELECT ID, CONTAINS(POLY1,PT1), LONGITUDE(PT1), LATITUDE(PT1) from _table G67
+SELECT ID, CONTAINS(POLY1,PT1), AsText(PT1),    AsText(POLY1) from _table G68
