@@ -45,7 +45,6 @@ import time
 import traceback
 import urllib
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
-from validation import ValidationError
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import DeploymentConfig
 import glob
@@ -1572,12 +1571,11 @@ def check_size_value(value, key):
     try:
         split_value = str_value.split('%')
         if len(split_value) > 1:
-            #return jsonify({'error': 'Invalid memory limit value.'})
-            raise ValidationError('Invalid ' + key + ' value.')
+            return jsonify({'error': 'Invalid ' + key + ' value.'})
         int_value = int(str_value)
         if int_value < 0 or int_value >= 2147483647:
-            raise ValidationError(key + ' value must be between 0 and 2147483647.')
-        return jsonify({'status':'sucess'})
+            return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+        return jsonify({'status':'success'})
     except Exception, exp:
         return jsonify({'error': str(exp)})
 
@@ -2135,6 +2133,7 @@ class StartDatabaseAPI(MethodView):
 
         return start_database(database_id)
 
+
 class StartServerAPI(MethodView):
     """Class to handle request to start a server."""
 
@@ -2190,9 +2189,6 @@ class StopDatabaseAPI(MethodView):
             return make_response(jsonify({'statusstring': 'success'}), 200)
         except Exception, err:
             return make_response(jsonify({'statusstring': str(err)}), 500)
-
-
-
 
 
 class RecoverServerAPI(MethodView):
@@ -2443,7 +2439,6 @@ class StatusDatabaseAPI(MethodView):
             status.append({'status': 'stopped'})
 
         return jsonify({'status':status, 'serverDetails': serverDetails})
-
 
 
 class StatusDatabaseServerAPI(MethodView):
