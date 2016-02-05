@@ -1816,6 +1816,7 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is saved otherwise the error message.
         """
         sync_configuration()
+
         write_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
@@ -1832,7 +1833,6 @@ class DatabaseAPI(MethodView):
         database = {
             'id': database_id,
             'name': request.json['name'],
-            'deployment': request.json.get('deployment', ""),
             'members': []
         }
         Global.DATABASES.append(database)
@@ -1869,8 +1869,6 @@ class DatabaseAPI(MethodView):
             abort(404)
 
         current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
-        current_database[0]['deployment'] = \
-            request.json.get('deployment', current_database[0]['deployment'])
         sync_configuration()
         write_configuration_file()
         return jsonify({'database': current_database[0], 'status': 1})
@@ -2528,7 +2526,7 @@ def main(runner, amodule, config_dir, server):
                                'public-interface': "", 'client-listener': "", 'internal-listener': "",
                                'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                                'zookeeper-listener': "", 'placement-group': ""})
-        Global.DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+        Global.DATABASES.append({'id': 1, 'name': "local", "members": [1]})
 
     write_configuration_file()
 
