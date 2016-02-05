@@ -40,7 +40,7 @@
  * a topic quickly.
  */
 
-package kafkaimporter.client.kafkaimporter;
+package client.kafkaimporter;
 
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -103,6 +103,7 @@ public class KafkaImportBenchmark {
     static TableChangeMonitor exportMon;
     static TableChangeMonitor importMon;
     static MatchChecks matchChecks;
+    static Producer kafkaProducer;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -119,7 +120,7 @@ public class KafkaImportBenchmark {
         @Option(desc = "Maximum export TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
+        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
         String servers = "localhost";
 
         @Option(desc = "Number of rows to expect to import from the Kafka topic")
@@ -136,6 +137,22 @@ public class KafkaImportBenchmark {
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
+
+        // options for the Kafka producer methods
+        @Option(desc = "Kafka topic")
+        String kafkatopic = "T1_KAFKAEXPORTTABLE1";
+
+        @Option(desc = "Kafka cluster server list -- <host>:9092,....")
+        String kafkaserverlist = "localhost:9092";
+
+        @Option(desc = "Pause interval (seconds) for Kafka producer")
+        int producerpause = 0;
+
+        @Option(desc = "Cycle time (seconds) for Kafka producer")
+        int producercycletime = 60;
+
+        @Option(desc = "Rows/second rate for Kafka producer")
+        long producerrate = 10000;
 
         @Override
         public void validate() {
@@ -338,17 +355,21 @@ public class KafkaImportBenchmark {
         Config config = new Config();
         config.parse(KafkaImportBenchmark.class.getName(), args);
 
-        // connect to one or more servers, loop until success
+        // connect to one or more servers, method loops until success
         dbconnect(config.servers, config.ratelimit);
 
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
+        kafkaProducer = new Producer(config.kafkatopic, config.kafkaserverlist, config.producerrate, config.producercycletime, config.producerpause, config.expected_rows);
 
         log.info("Starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
         runner.start();
         runner.join(); // writers are done
+
+        log.info("Starting Kafka producer");
+        kafkaProducer.run();
 
         long exportRowCount = 0;
         if (config.useexport) {
