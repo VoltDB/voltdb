@@ -46,6 +46,8 @@ import traceback
 import urllib
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 
+from validation import ValidationError
+
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import DeploymentConfig
 import glob
@@ -1228,6 +1230,162 @@ def get_deployment_from_xml(deployment_xml, is_list):
     return deployments
 
 
+def get_deployment_for_upload(deployment_xml, is_list):
+    new_deployment = {}
+    deployments = []
+    for field in deployment_xml:
+        if field == 'export':
+            try:
+                if deployment_xml[field] is not None:
+                    if type(deployment_xml[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                else:
+                    new_deployment[field] = deployment_xml[field]
+            except Exception, exp:
+                return {'error': 'Export: ' + str(exp)}
+        elif field == 'import':
+            try:
+                if deployment_xml[field] is not None:
+                    if type(deployment_xml[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                else:
+                    new_deployment[field] = deployment_xml[field]
+            except Exception, exp:
+                return {'error': 'Import: ' + str(exp)}
+        elif field == 'admin-mode':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['adminstartup'] = parse_bool_string(deployment_xml[field]['adminstartup'])
+                new_deployment[field]['port'] = int(deployment_xml[field]['port'])
+            except Exception, err:
+                return {'Error': 'Admin-mode: ' + str(err)}
+        elif field == 'cluster':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['hostcount'] = int(deployment_xml[field]['hostcount'])
+                new_deployment[field]['kfactor'] = int(deployment_xml[field]['kfactor'])
+                new_deployment[field]['sitesperhost'] = int(deployment_xml[field]['sitesperhost'])
+                new_deployment[field]['elastic'] = str(deployment_xml[field]['elastic'])
+                new_deployment[field]['schema'] = str(deployment_xml[field]['schema'])
+            except Exception, err:
+                return {'error': 'Cluster: ' + str(err)}
+        elif field == 'commandlog':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                new_deployment[field]['synchronous'] = parse_bool_string(deployment_xml[field]['synchronous'])
+                new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
+                new_deployment[field]['frequency'] = {}
+                new_deployment[field]['frequency']['transactions'] = int(deployment_xml[field]['frequency']['transactions'])
+                new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
+            except Exception, err:
+                return {'error': 'Commandlog: ' + str(err)}
+        elif field == 'heartbeat':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['timeout'] = int(deployment_xml[field]['timeout'])
+            except Exception, err:
+                return {'error': 'Heartbeat: ' + str(err)}
+        elif field == 'httpd':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['port'] = int(deployment_xml[field]['port'])
+                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                new_deployment[field]['jsonapi'] = {}
+                new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment_xml[field]['jsonapi']['enabled'])
+            except Exception, err:
+                return {'error': 'HTTPD: ' + str(err)}
+        elif field == 'partition-detection':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                new_deployment[field]['snapshot'] = {}
+                new_deployment[field]['snapshot']['prefix'] = parse_bool_string(deployment_xml[field]['snapshot']['prefix'])
+            except Exception, err:
+                return {'error': 'Partition-Detection: ' + str(err)}
+        elif field == 'security':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
+            except Exception, err:
+                return {'error': 'Security: ' + str(err)}
+        elif field == 'snapshot':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                new_deployment[field]['frequency'] = str(deployment_xml[field]['frequency'])
+                new_deployment[field]['prefix'] = str(deployment_xml[field]['prefix'])
+                new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
+            except Exception, err:
+                return {'error': 'Snapshot: ' + str(err)}
+        elif field == 'systemsettings':
+            try:
+                new_deployment[field] = {}
+                new_deployment[field]['elastic'] = {}
+                new_deployment[field]['elastic']['duration'] = int(deployment_xml[field]['elastic']['duration'])
+                new_deployment[field]['elastic']['throughput'] = int(deployment_xml[field]['elastic']['throughput'])
+                new_deployment[field]['query'] = {}
+                new_deployment[field]['query']['timeout'] = int(deployment_xml[field]['query']['timeout'])
+                new_deployment[field]['snapshot'] = {}
+                new_deployment[field]['snapshot']['priority'] = int(deployment_xml[field]['snapshot']['priority'])
+                new_deployment[field]['temptables'] = {}
+                new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
+
+                if 'resourcemonitor' not in deployment_xml[field] or deployment_xml[field]['resourcemonitor'] is None:
+                    if 'resourcemonitor'  in deployment_xml[field]:
+                        new_deployment[field]['resourcemonitor'] = None
+                else:
+                    new_deployment[field]['resourcemonitor'] = {}
+                    if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
+                        new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
+
+                    if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in deployment_xml[field]['resourcemonitor']['disklimit']:
+                        if type(deployment_xml[field]['resourcemonitor']['disklimit']['feature']) is list:
+                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
+                        else:
+                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
+            except Exception, err:
+                return {'error': 'SystemSettings: ' + str(err)}
+        elif field == 'dr':
+            try:
+                if deployment_xml[field] is not None:
+                    new_deployment[field] = {}
+                    new_deployment[field]['id'] = int(deployment_xml[field]['id'])
+                    new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
+                    if 'port' in deployment_xml[field]:
+                        new_deployment[field]['port'] = int(deployment_xml[field]['port'])
+                    if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']:
+                        new_deployment[field]['connection'] = {}
+                        new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
+
+            except Exception, err:
+                return {'error': 'DR: ' + str(err)}
+        elif field == 'users':
+            try:
+                if deployment_xml[field] is not None:
+                    new_deployment[field] = {}
+                    if type(deployment_xml[field]['user']) is list:
+                        new_deployment[field]['user'] = []
+                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'list')
+                    else:
+                        new_deployment[field]['user'] = []
+                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'dict')
+            except Exception, err:
+                return {'error': 'Users: ' + str(err)}
+        else:
+            new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
+
+    deployments.append(new_deployment)
+    return deployments
+
+
 def get_deployment_export_field(export_xml, is_list):
     new_export = {}
     exports = []
@@ -1368,6 +1526,26 @@ def etree_to_dict(t):
     return d
 
 
+def replace_last(source_string, replace_what, replace_with):
+    head, sep, tail = source_string.rpartition(replace_what)
+    return head + replace_with + tail
+
+
+def check_size_value(value, key):
+    str_value = replace_last(value, '%', '')
+    try:
+        split_value = str_value.split('%')
+        if len(split_value) > 1:
+            #return jsonify({'error': 'Invalid memory limit value.'})
+            raise ValidationError('Invalid ' + key + ' value.')
+        int_value = int(str_value)
+        if int_value < 0 or int_value >= 2147483647:
+            raise ValidationError(key + ' value must be between 0 and 2147483647.')
+        return jsonify({'status':'sucess'})
+    except Exception, exp:
+        return jsonify({'error': str(exp)})
+
+
 def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
 
@@ -1384,9 +1562,11 @@ IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = { "databaseid" : True, "users" : True}
 
+
 class VoltdbProcess:
     isProcessRunning = False
     processId = -1
+
 
 class Global:
     """
@@ -1781,6 +1961,25 @@ class deploymentAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
+            if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and \
+                            'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
+                size = str(request.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
+                response = json.loads(check_size_value(size, 'memorylimit').data)
+                if 'error' in response:
+                    return jsonify({'error': response['error']})
+            disk_limit_arr = []
+            if 'disklimit' in request.json['systemsettings']['resourcemonitor'] and \
+                            'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                    size = feature['size']
+                    if feature['name'] in disk_limit_arr:
+                        return jsonify({'error': 'Duplicate items are not allowed.'})
+                    disk_limit_arr.append(feature['name'])
+                    response = json.loads(check_size_value(size, 'disklimit').data)
+                    if 'error' in response:
+                        return jsonify({'error': response['error']})
+
         # if 'users' in request.json:
         #     if 'user' in request.json['users']:
         #         prev_username = ''
@@ -2088,13 +2287,48 @@ class DatabaseDeploymentAPI(MethodView):
                     return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
                 else:
                     if type(xml_final['deployment']) is dict:
-                        deployment_json = get_deployment_from_xml(xml_final['deployment'], 'dict')[0]
+                        deployment_data = get_deployment_for_upload(xml_final['deployment'], 'dict')
+                        if type(deployment_data) is dict:
+                            if 'error' in deployment_data:
+                                return jsonify({'error': deployment_data['error']})
+                        else:
+                            deployment_json = deployment_data[0]
                         req = DictClass()
                         req.json = {}
                         req.json = deployment_json
                         inputs = JsonInputs(req)
                         if not inputs.validate():
                             return jsonify(success=False, errors=inputs.errors)
+                        if 'systemsettings' in req.json and 'resourcemonitor' in req.json['systemsettings']:
+                            if 'memorylimit' in req.json['systemsettings']['resourcemonitor'] and \
+                                            'size' in req.json['systemsettings']['resourcemonitor']['memorylimit']:
+                                size = str(req.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
+                                response = json.loads(check_size_value(size, 'memorylimit').data)
+                                if 'error' in response:
+                                    return jsonify({'error': response['error']})
+                            disk_limit_arr = []
+                            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
+                                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
+                                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                                    size = feature['size']
+                                    if feature['name'] in disk_limit_arr:
+                                        return jsonify({'error': 'Duplicate items are not allowed.'})
+                                    disk_limit_arr.append(feature['name'])
+                                    response = json.loads(check_size_value(size, 'disklimit').data)
+                                    if 'error' in response:
+                                        return jsonify({'error': response['error']})
+                        if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
+                            frequency_unit = ['h', 'm', 's']
+                            frequency = str(req.json['snapshot']['frequency'])
+                            last_char =  frequency[len(frequency)-1]
+                            if last_char not in frequency_unit:
+                                return jsonify({'error': 'Snapshot: Invalid frequency value.'})
+                            frequency = frequency[:-1]
+                            try:
+                                int_frequency = int(frequency)
+                            except Exception, exp:
+                                return jsonify({'error': 'Snapshot: ' + str(exp)})
+
                         map_deployment(req, database_id)
                         Global.DEPLOYMENT_USERS = []
                         if 'users' in req.json and 'user' in req.json['users']:
@@ -2147,6 +2381,7 @@ class StatusDatabaseAPI(MethodView):
                 return jsonify({'status': "stalled"})
             else:
                 return jsonify({'status': "stopped"})
+
 
 class StatusDatabaseServerAPI(MethodView):
     """Class to return status of servers"""

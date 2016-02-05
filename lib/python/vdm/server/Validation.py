@@ -391,7 +391,8 @@ schema = {
                 },
                 "prefix": {
                     "id": "prefix",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_.]+$"
                 },
                 "enabled": {
                     "id": "enabled",
@@ -479,6 +480,7 @@ schema = {
                                     "stream": {
                                         "id": "stream",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "enabled": {
                                         "id": "enabled",
@@ -541,6 +543,7 @@ schema = {
                                     "module": {
                                         "id": "module",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "enabled": {
                                         "id": "enabled",
@@ -617,8 +620,8 @@ schema = {
                         "maxsize": {
                             "id": "maxsize",
                             "type": "integer",
-                            "minimum": 0,
-                            "maxvalue": 2147483647
+                            "minimum": 1,
+                            "maximum": 2147483647
                         }
                     },
                     "additionalProperties": False
@@ -675,7 +678,6 @@ schema = {
                                 "size": {
                                     "id": "size",
                                     "type": "string",
-                                    "minimum": 0,
                                 }
                             },
                             "additionalProperties": False
@@ -697,7 +699,9 @@ schema = {
                                             },
                                             "size": {
                                                 "id": "size",
-                                                "type": "string"
+                                                "type": "string",
+                                                "minimum": 0,
+                                                "maximum": 2147483647
                                             }
                                         },
                                         "additionalProperties": False
@@ -754,7 +758,7 @@ schema = {
                     "id": "port",
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 65536
+                    "maximum": 65535
                 },
                 "connection": {
                     "id": "connection",
