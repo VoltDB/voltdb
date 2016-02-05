@@ -312,6 +312,21 @@ public:
         }
     }
 
+    void updateSpecificTuple(PersistentTable *table, voltdb::TableTuple tuple, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
+        TableTuple tempTuple = table->tempTuple();
+        tempTuple.copy(tuple);
+        int value = ::rand();
+        tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
+        if (setFrom != NULL) {
+            setFrom->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+        }
+        if (setTo != NULL) {
+            setTo->insert(*reinterpret_cast<const int64_t*>(tempTuple.address() + 1));
+        }
+        table->updateTuple(tuple, tempTuple);
+        m_tuplesUpdated++;
+    }
+
     void doRandomInsert(PersistentTable *table, T_ValueSet *set = NULL) {
         addRandomUniqueTuples(table, 1, set);
         m_tuplesInserted++;
@@ -319,20 +334,9 @@ public:
     }
 
     void doRandomUpdate(PersistentTable *table, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
-        voltdb::TableTuple tuple(table->schema());
-        voltdb::TableTuple tempTuple = table->tempTuple();
+        TableTuple tuple(table->schema());
         if (tableutil::getRandomTuple(table, tuple)) {
-            tempTuple.copy(tuple);
-            int value = ::rand();
-            tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
-            if (setFrom != NULL) {
-                setFrom->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
-            }
-            if (setTo != NULL) {
-                setTo->insert(*reinterpret_cast<const int64_t*>(tempTuple.address() + 1));
-            }
-            table->updateTuple(tuple, tempTuple);
-            m_tuplesUpdated++;
+            updateSpecificTuple(table, tuple, setFrom, setTo);
         }
     }
 
@@ -371,8 +375,8 @@ public:
         }
     }
 
-    void doForcedCompaction(PersistentTable *table) {
-        table->doForcedCompaction();
+    bool doForcedCompaction(PersistentTable *table) {
+        return table->doForcedCompaction();
     }
 
     void checkTuples(size_t tupleCount, const T_ValueSet& expected, const T_ValueSet& received) {
@@ -1147,7 +1151,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks);
+    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 

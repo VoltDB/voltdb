@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
@@ -505,6 +506,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
+            }
+            else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
+                Class<?> spyClass = Class.forName("org.mockito.Mockito");
+                Method spyMethod = spyClass.getDeclaredMethod("spy", Object.class);
+                ExecutionEngine internalEE = new ExecutionEngineJNI(
+                        m_context.cluster.getRelativeIndex(),
+                        m_siteId,
+                        m_partitionId,
+                        CoreUtils.getHostIdFromHSId(m_siteId),
+                        hostname,
+                        m_context.cluster.getDrclusterid(),
+                        m_context.cluster.getDeployment().get("deployment").
+                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        hashinatorConfig,
+                        m_mpDrGateway != null);
+                eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {
                 // set up the EE over IPC
