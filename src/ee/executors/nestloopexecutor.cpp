@@ -242,7 +242,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         join_tuple = m_tmpOutputTable->tempTuple();
     }
 
-    while (iterator0.next(outer_tuple) && whereEvaluator.isUnderLimit()) {
+    while (whereEvaluator.isUnderLimit() && iterator0.next(outer_tuple)) {
         pmp.countdownProgress();
 
         // populate output table's temp tuple with outer table's values
