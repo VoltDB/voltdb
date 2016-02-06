@@ -97,8 +97,7 @@ std::vector<uint64_t> TempTable::getBlockAddresses() const
 {
     std::vector<uint64_t> blockAddresses;
     blockAddresses.reserve(m_data.size());
-    for(std::vector<TBPtr>::const_iterator iter = m_data.begin(); iter != m_data.end(); ++iter)
-    {
+    for (std::vector<TBPtr>::const_iterator iter = m_data.begin(); iter != m_data.end(); ++iter) {
         blockAddresses.push_back((uint64_t) (*iter)->address());
     }
     return blockAddresses;

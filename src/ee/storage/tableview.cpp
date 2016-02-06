@@ -54,6 +54,9 @@
 namespace voltdb {
 
 const char TableView::INACTIVE_TUPLE = -1;
+const char TableView::ACTIVE_TUPLE = 0;
+const char TableView::MARKED_TUPLE = 1;
+
 const uint64_t TableView::INVALID_INDEX = std::numeric_limits<uint64_t>::max();
 
 TableView::TableView() :

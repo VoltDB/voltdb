@@ -68,6 +68,8 @@ class TableView {
     public:
 
     static const char INACTIVE_TUPLE;
+    static const char ACTIVE_TUPLE;
+    static const char MARKED_TUPLE;
 
     friend class TableView_iter<uint64_t>;
     friend class TableView_iter<uint64_t const>;
@@ -78,8 +80,7 @@ class TableView {
     TableView();
 
     /**
-     * Initialize TableView with the Table data and set the value for each active tuple
-     * to MARKER
+     * Initialize TableView from a table
      */
     void init(Table* table , char initVal);
 
@@ -206,7 +207,7 @@ class TableView_iter
      * Default constructor
      */
     TableView_iter(char marker = 0)
-      : m_tableView(0), m_tupleIdx(), m_marker(marker), m_tupleIdxPtr(&m_tupleIdx)
+      : m_tableView(0), m_tupleIdx(), m_marker(marker)
     {}
 
 private:
@@ -219,11 +220,11 @@ private:
      * have the TableView value set to the MARKER
      */
     explicit TableView_iter(TableView* m_tableView, char marker = 0)
-      : m_tableView(m_tableView), m_tupleIdx(TableView::INVALID_INDEX), m_marker(marker), m_tupleIdxPtr(&m_tupleIdx)
+      : m_tableView(m_tableView), m_tupleIdx(TableView::INVALID_INDEX), m_marker(marker)
     {
         if (!m_tableView->empty())
         {
-            moveToNextTuple();
+            increment();
         }
     }
 
@@ -231,14 +232,8 @@ private:
      * Constructor. Sets the iterator position pointing to the specified position - usually the end
      */
     explicit TableView_iter(const TableView* m_tableView, size_t tupleIdx, char marker = 0)
-        :  m_tableView(m_tableView), m_tupleIdx(tupleIdx), m_marker(marker), m_tupleIdxPtr(&m_tupleIdx)
+        :  m_tableView(m_tableView), m_tupleIdx(tupleIdx), m_marker(marker)
     {}
-
-    // Forward Iteration Support
-    void increment()
-    {
-        moveToNextTuple();
-    }
 
     bool equal(TableView_iter const& other) const
     {
@@ -249,10 +244,11 @@ private:
 
     Value& dereference() const
     {
-        return *m_tupleIdxPtr;
+        return (Value&)m_tupleIdx;
     }
 
-    void moveToNextTuple()
+    // Forward Iteration Support
+    void increment()
     {
         uint64_t lastActiveTupleIndex = m_tableView->getLastActiveTupleIndex();
         do
@@ -262,9 +258,8 @@ private:
     }
 
     const TableView* m_tableView;
-    uint64_t m_tupleIdx;
+    Value m_tupleIdx;
     char m_marker;
-    Value* m_tupleIdxPtr;
 };
 
 inline
