@@ -654,23 +654,23 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNullColumn) {
     createIndexes();
 
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
     ASSERT_FALSE(indexPair1.first == NULL);
 
-    beginTxn(m_engine, 99, 99, 98, 70);
+    beginTxn(99, 99, 98, 70);
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(0));
     temp_tuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
     TableTuple tuple = insertTuple(m_otherTableWithIndex, temp_tuple);
-    endTxn(m_engine, true);
+    endTxn(true);
 
     flushAndApply(99);
 
     EXPECT_EQ(1, m_otherTableWithIndexReplica->activeTupleCount());
 
-    beginTxn(m_engine, 100, 100, 99, 71);
+    beginTxn(100, 100, 99, 71);
     deleteTuple(m_otherTableWithIndex, tuple);
-    endTxn(m_engine, true);
+    endTxn(true);
 
     flushAndApply(100);
 
