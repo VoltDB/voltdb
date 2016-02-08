@@ -228,6 +228,13 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
     cmpdb_path = os.path.abspath(os.path.join(output_dir, comparison_database_lower + ".data"))
     jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
+    modified_sql_path = None
+    debug_transform_sql_arg = ''
+    global debug_transform_sql
+    if debug_transform_sql:
+        if comparison_database == 'PostgreSQL' or comparison_database == 'PostGIS':
+            modified_sql_path = os.path.abspath(os.path.join(output_dir, 'postgresql_transform.out'))
+            debug_transform_sql_arg = ' -Dsqlcoverage.transform.sql.file='+modified_sql_path
     template = config["template"]
 
     global normalize
@@ -256,6 +263,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     command = " ".join(args[2:])
     command += " schema=" + os.path.basename(config['ddl'])
+    if debug_transform_sql:
+        command = command.replace(" -server ", debug_transform_sql_arg+" -server ")
 
     random_state = random.getstate()
     if "template-jni" in config:
@@ -342,7 +351,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     try:
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
-                                  jni_path, output_dir, report_all, extraStats, comparison_database)
+                                  jni_path, output_dir, report_all, extraStats, comparison_database,
+                                  modified_sql_path)
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
@@ -658,6 +668,8 @@ if __name__ == "__main__":
     parser.add_option("-G", "--postgis", action="store_true",
                       dest="postgis", default=False,
                       help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
+    parser.add_option("-d", "--debug", dest="debug", default=None,
+                      help="pass a debug option to the Non-VoltDB backend, e.g., to the PostgreSQL backend")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -695,6 +707,9 @@ if __name__ == "__main__":
         comparison_database = 'PostgreSQL'
     if options.postgis:
         comparison_database = 'PostGIS'
+    debug_transform_sql = False
+    if options.debug == 'transform_sql':
+        debug_transform_sql = True
 
     testConfigKits = {}
     defaultHost = "localhost"
