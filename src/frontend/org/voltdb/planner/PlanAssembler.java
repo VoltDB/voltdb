@@ -2728,10 +2728,10 @@ public class PlanAssembler {
     }
 
     /**
-     * Verify if an expression from the input list is NULL-rejecting for any of the table from the list
+     * Verify if an expression from the input list is NULL-rejecting for any of the tables from the list
      * @param tableAliases list of tables
      * @param exprs list of expressions
-     * @return TRUE if there is a NULL-rejection expression
+     * @return TRUE if there is a NULL-rejecting expression
      */
     private static boolean isNullRejecting(Collection<String> tableAliases, List<AbstractExpression> exprs) {
         for (AbstractExpression expr : exprs) {

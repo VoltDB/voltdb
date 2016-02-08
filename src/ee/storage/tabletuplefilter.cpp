@@ -46,20 +46,20 @@
 #include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tableview.h"
+#include "storage/tabletuplefilter.h"
 
 #include <algorithm>
 #include <limits>
 
 namespace voltdb {
 
-const char TableView::INACTIVE_TUPLE = -1;
-const char TableView::ACTIVE_TUPLE = 0;
-const char TableView::MARKED_TUPLE = 1;
+const char TableTupleFilter::INACTIVE_TUPLE = -1;
+const char TableTupleFilter::ACTIVE_TUPLE = 0;
+const char TableTupleFilter::MARKED_TUPLE = 1;
 
-const uint64_t TableView::INVALID_INDEX = std::numeric_limits<uint64_t>::max();
+const uint64_t TableTupleFilter::INVALID_INDEX = std::numeric_limits<uint64_t>::max();
 
-TableView::TableView() :
+TableTupleFilter::TableTupleFilter() :
     m_tuples(),
     m_blocks(),
     m_blockIndexes(),
@@ -70,9 +70,9 @@ TableView::TableView() :
     m_lastActiveTupleIndex(std::numeric_limits<uint64_t>::max())
     {}
 
-void TableView::init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength)
+void TableTupleFilter::init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength)
 {
-    m_tuples.insert(m_tuples.end(), blocks.size() * tuplesPerBlock, TableView::INACTIVE_TUPLE);
+    m_tuples.insert(m_tuples.end(), blocks.size() * tuplesPerBlock, TableTupleFilter::INACTIVE_TUPLE);
     m_blocks.insert(m_blocks.end(), blocks.begin(), blocks.end());
     m_tuplesPerBlock = tuplesPerBlock;
     m_tupleLength = tupleLength;
@@ -83,7 +83,7 @@ void TableView::init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBloc
     }
 }
 
-void TableView::init(Table* table , char initVal)
+void TableTupleFilter::init(Table* table)
 {
     assert(table != NULL);
 
@@ -92,11 +92,11 @@ void TableView::init(Table* table , char initVal)
     TableTuple tuple(table->schema());
     TableIterator iterator = table->iterator();
     while (iterator.next(tuple)) {
-        initTupleBit(tuple, initVal);
+        initActiveTuple(tuple);
     }
 }
 
-uint64_t TableView::findBlockIndex(uint64_t tupleAddress)
+uint64_t TableTupleFilter::findBlockIndex(uint64_t tupleAddress)
 {
     if (m_prevBlockAddress > tupleAddress || (tupleAddress - m_prevBlockAddress)/ m_tupleLength >= m_tuplesPerBlock) {
         // This tuple belongs to a different block that the last tuple did
