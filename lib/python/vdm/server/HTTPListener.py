@@ -1392,7 +1392,7 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        server = [server for server in Global.SERVERS if server['name'] == request.json['name']]
+        server = [server for server in Global.SERVERS if server['name'] == request.json['name'] and server['name'] != '']
         if len(server) > 0:
             return make_response(jsonify({'error': 'Server name already exists'}), 404)
 
