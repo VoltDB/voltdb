@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -155,24 +156,40 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         builder.putAll(Maps.filterKeys(oldReference, notUriIn(assignment.getRemoved())));
         List<AbstractImporter> toStop = new ArrayList<>();
+        List<String> missingRemovedURLs = new ArrayList<>();
+        List<String> missingAddedURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
-            try {
-                AbstractImporter importer = oldReference.get(removed);
-                if (importer!=null) {
-                    toStop.add(importer);
+            if (m_configs.containsKey(removed)) {
+                try {
+                    AbstractImporter importer = oldReference.get(removed);
+                    if (importer!=null) {
+                        toStop.add(importer);
+                    }
+                } catch(Exception e) {
+                    s_logger.warn(
+                            String.format("Error calling stop on %s in importer %s", removed.toString(), m_factory.getTypeName()),
+                            e);
                 }
-            } catch(Exception e) {
-                s_logger.warn(
-                        String.format("Error calling stop on %s in importer %s", removed.toString(), m_factory.getTypeName()),
-                        e);
+            } else {
+                missingRemovedURLs.add(removed.toString());
             }
         }
 
         List<AbstractImporter> newImporters = new ArrayList<>();
         for (final URI added: assignment.getAdded()) {
-            AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
-            newImporters.add(importer);
-            builder.put(added, importer);
+            if (m_configs.containsKey(added)) {
+                AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
+                newImporters.add(importer);
+                builder.put(added, importer);
+            } else {
+                missingAddedURLs.add(added.toString());
+            }
+        }
+
+        if (!missingRemovedURLs.isEmpty() || !missingAddedURLs.isEmpty()) {
+            s_logger.error("The source for Import has changed its configuration. Removed importer URL(s): (" +
+                    Joiner.on(", ").join(missingRemovedURLs) + "), added importer URL(s): (" +
+                    Joiner.on(", ").join(missingAddedURLs) + "). Pause and Resume the database to refresh the importer.");
         }
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
