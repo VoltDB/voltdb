@@ -135,7 +135,7 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        Set<String> collectionFilesList = listCollection(m_config.skipheapdump);
+        Set<String> collectionFilesList = setCollection(m_config.skipheapdump);
 
         if (m_config.dryrun) {
             System.out.println("List of the files to be collected:");
@@ -248,7 +248,7 @@ public class Collector {
         }
     }
 
-    private static Set<String> listCollection(boolean skipHeapDump) {
+    private static Set<String> setCollection(boolean skipHeapDump) {
         Set<String> collectionFilesList = new HashSet<String>();
 
         try {

@@ -36,6 +36,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -206,6 +207,21 @@ public class TestCollector {
                object.put("format", "'.'" + fileDate);
                jsonArray.put(object);
            }
+
+           VoltFile repeatFileFolder = new VoltFile(logFolder, "test");
+           repeatFileFolder.mkdir();
+           VoltFile file = new VoltFile(repeatFileFolder, fileNamePrefix + fileDates[0]);
+           file.createNewFile();
+
+           BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
+           writer.write(fileText);
+           writer.close();
+
+           JSONObject object = new JSONObject();
+           object.put("path", file.getCanonicalPath());
+           object.put("format", "'.'" + fileDates[0]);
+           jsonArray.put(object);
+
            FileOutputStream fos = new FileOutputStream(configInfoPath);
            fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
            fos.close();
@@ -324,7 +340,7 @@ public class TestCollector {
             if (z.getName().startsWith(rootDir + File.separator + "voltdb_logs" + File.separator))
                 logCount++;
         }
-        assertEquals(logCount, 3);
+        assertEquals(logCount, 4);
         collectionZip.close();
     }
 
@@ -349,5 +365,18 @@ public class TestCollector {
         assertEquals(logCount, 1);
         resetCurrentTime = true;
         collectionZip.close();
+    }
+
+    @Test
+    public void testRepeatFileName() throws Exception {
+
+        createLogFiles();
+
+        ZipFile collectionZip = collect(voltDbRootPath, true, 3);
+
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        ZipEntry repeatFile = collectionZip.getEntry(rootDir + File.separator + "voltdb_logs" + File.separator +
+                "volt-junit-fulllog.txt." + formatter.format(new Date()) + "(1)");
+        assertNotNull(repeatFile);
     }
 }
