@@ -69,6 +69,10 @@ def create_response(statusstr, statuscode):
     Utility method to create response JSON
     """
     return make_response(jsonify( { 'statusstring': statusstr } ), statuscode)
+
+class VoltdbProcess:
+    isProcessRunning = False
+    processId = -1
     
 class VoltDatabase:
     """Represents a Volt database"""
@@ -157,6 +161,23 @@ class VoltDatabase:
                 pass
     
         return False
+
+    def Get_Voltdb_Process(self):
+        VoltdbProcess.isProcessRunning = False
+        VoltdbProcess.processId = -1
+        for proc in psutil.process_iter():
+
+            try:
+                cmd = proc.cmdline()
+                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
+                    VoltdbProcess.isProcessRunning = True
+                    VoltdbProcess.processId = proc.pid
+                    return VoltdbProcess
+            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
+                # print traceback.format_exc()
+                pass
+
+        return VoltdbProcess
     
     def start_local_server(self, recover=False):
         """
@@ -318,3 +339,4 @@ class VoltDatabase:
     
         args = [ '-H', server[0]['hostname'], server[0]['name'] ]
         return self.run_voltdb_cmd('voltadmin', 'stop', args)
+

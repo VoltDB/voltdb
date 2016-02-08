@@ -45,6 +45,7 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, Con
 import DeploymentConfig
 import voltdbserver
 import glob
+import psutil
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
@@ -490,6 +491,7 @@ def map_deployment_users(request, user):
 
 def get_volt_jar_dir():
     return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
+
 
 def get_configuration():
     deployment_json = {
@@ -1329,6 +1331,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 
+
 class DictClass(dict):
     pass
 
@@ -1336,12 +1339,6 @@ class DictClass(dict):
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = {"databaseid": True, "users": True}
-
-
-
-class VoltdbProcess:
-    isProcessRunning = False
-    processId = -1
 
 
 class Global:
@@ -1879,28 +1876,6 @@ class StartDatabaseAPI(MethodView):
                                  500)
 
 
-class StartServerAPI(MethodView):
-    """Class to handle request to start a server."""
-
-    @staticmethod
-    def put(database_id, server_id):
-        """
-        Starts VoltDB database server on the specified server
-        Args:
-            database_id (int): The id of the database that should be started
-            server_id (int): The id of the server node that is to be started
-        Returns:
-            Status string indicating if the server node was started successfully
-        """
-
-        try:
-            return check_and_start_local_server(database_id)
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
-
-
 class RecoverDatabaseAPI(MethodView):
     """Class to handle request to start servers on all nodes of a database."""
 
@@ -1916,6 +1891,7 @@ class RecoverDatabaseAPI(MethodView):
 
         database = voltdbserver.VoltDBServer(database_id)
         return database.start_database()
+
 
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
@@ -2229,7 +2205,8 @@ class StatusDatabaseServerAPI(MethodView):
             response = proc.call()
             return jsonify({'status': "running"})
         except:
-            if Get_Voltdb_Process().isProcessRunning:
+            voltProcess = voltdbserver.VoltDatabase(database_id)
+            if voltProcess.Get_Voltdb_Process().isProcessRunning:
                 return jsonify({'status': "stalled"})
             else:
                 return jsonify({'status': "stopped"})
