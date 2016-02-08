@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.voltcore.logging.Level;
@@ -287,7 +286,9 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  version. */
     @Override
     public void runDDL(String ddl) {
-        super.runDDL(transformDDL(ddl), false);
+        String modifiedDdl = transformDDL(ddl);
+        debugPrintTransformSql(ddl, modifiedDdl, ddl != null && !ddl.equals(modifiedDdl));
+        super.runDDL(modifiedDdl, false);
     }
 
     /** Modifies queries in such a way that PostgreSQL/PostGIS results will
@@ -295,7 +296,9 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  class version. */
     @Override
     public VoltTable runDML(String dml) {
-        return super.runDML(transformDML(dml), false);
+        String modifiedDml = transformDML(dml);
+        debugPrintTransformSql(dml, modifiedDml, dml != null && !dml.equals(modifiedDml));
+        return super.runDML(modifiedDml, false);
     }
 
 }

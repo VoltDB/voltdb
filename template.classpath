@@ -47,6 +47,9 @@
     <classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
     <classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.13.jar"/>
     <classpathentry kind="lib" path="lib/felix.jar"/>
+    <classpathentry kind="lib" path="lib/httpclient-4.3.2.jar"/>
+    <classpathentry kind="lib" path="lib/httpcore-4.3.2.jar"/>
+    <classpathentry kind="lib" path="lib/commons-logging-1.1.3.jar"/>
 
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>

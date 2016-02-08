@@ -957,8 +957,6 @@ public class DDLCompiler {
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
-                guardForGeoColumns(tableXML, tableName, DR);
-
                 if (tableXML.attributes.containsKey("export")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid DR statement: table %s is an export table", tableName));
