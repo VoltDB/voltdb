@@ -128,18 +128,29 @@ class VoltDatabase:
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
 
-    def start_server(server_id, recover=False):
+    def start_server(self, server_id, recover=False):
         """
         Sends start request to the specified server
         """
+        members = []
+        current_database = [database for database in HTTPListener.Global.DATABASES if database['id'] == self.database_id]
+        if not current_database:
+            return create_response('No database found for id: %u' % self.database_id, 404)
+        else:
+            members = current_database[0]['members']
+        if not members or server_id not in members:
+            return create_response('No server with id %u configured for the database: %u' % (server_id, self.database_id), 404)
+
+        server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+        if not server:
+            return create_response('Server details not found for id: %u' % server_id, 404)
+
         action = 'start'
         if recover:
             action = 'recover'
-
         try:
-            server = find_server(server_id)
             url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
-                              (server['hostname'], HTTPListener.__PORT__, self.database_id, action)
+                              (server[0]['hostname'], HTTPListener.__PORT__, self.database_id, action)
             response = requests.put(url)
             return create_response(json.loads(response.text)['statusstring'], response.status_code)
         except Exception, err:
