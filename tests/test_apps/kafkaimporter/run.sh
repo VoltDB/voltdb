@@ -34,10 +34,13 @@ fi
 APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/kafka*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/kafka*.jar; \
+    \ls -1 "$VOLTDB_LIB"/slf4j-api-1.6.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 # LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -139,13 +142,13 @@ function async-benchmark-help() {
 function async-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH \
-        kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
+        client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
-        --ratelimit=20000 \
         --duration=180 \
+        --kafkaserverlist=localhost:9092 \
         --alltypes=false \
-        --useexport=true \
-        --expected_rows=1194113 \
+        --useexport=false \
+        --expected_rows=6000000 \
         --servers=localhost
 }
 
