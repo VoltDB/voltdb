@@ -87,7 +87,7 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    static int32_t getTestDRBuffer(char *out);
+    static int32_t getTestDRBuffer(int32_t parimaryKeyNValue, int32_t partitionId, char *out);
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
