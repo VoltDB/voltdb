@@ -117,7 +117,7 @@ protected:
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
-        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature, &drStream, false);
+        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature, false);
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);

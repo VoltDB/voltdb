@@ -160,7 +160,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
     @Override
@@ -175,7 +174,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
-
     }
 
     @Override
@@ -214,9 +212,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config)
-    {
-
+    public void updateHashinator(TheHashinator.HashinatorConfig config) {
     }
 
     @Override

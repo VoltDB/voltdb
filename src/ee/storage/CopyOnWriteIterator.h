@@ -33,33 +33,43 @@ public:
 
     CopyOnWriteIterator(
         PersistentTable *table,
-        PersistentTableSurgeon *surgeon,
-        TBMap blocks);
+        PersistentTableSurgeon *surgeon);
 
-    /**
-     * When a tuple is "dirty" it is still active, but will never be a "found" tuple
-     * since it is skipped. The tuple may be dirty because it was deleted (this is why it is always skipped). In that
-     * case the CopyOnWriteContext calls this to ensure that the iteration finds the correct number of tuples
-     * in the used portion of the table blocks and doesn't overrun to the uninitialized block memory because
-     * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
-     */
-    bool needToDirtyTuple(const char *blockAddress, const char *tupleAddress) {
-        if (blockAddress < m_currentBlock->address()) {
-            return false;
-        }
-
-        if (blockAddress > m_currentBlock->address()) {
-            return true;
-        }
-
-        if (tupleAddress >= m_location) {
-            return true;
-        } else {
-            return false;
-        }
-    }
+    bool needToDirtyTuple(char *tupleAddress);
 
     bool next(TableTuple &out);
+
+    void notifyBlockWasCompactedAway(TBPtr block) {
+        if (m_blockIterator != m_end) {
+            TBPtr nextBlock = m_blockIterator.data();
+            //The next block is the one that was compacted away
+            //Need to move the iterator forward to skip it
+            if (nextBlock == block) {
+                m_blockIterator++;
+
+                //There is another block after the one that was compacted away
+                if (m_blockIterator != m_end) {
+                    TBPtr newNextBlock = m_blockIterator.data();
+                    m_blocks.erase(block->address());
+                    m_blockIterator = m_blocks.find(newNextBlock->address());
+                    m_end = m_blocks.end();
+                    assert(m_blockIterator != m_end);
+                } else {
+                    //No block after the one compacted away
+                    //set everything to end
+                    m_blocks.erase(block->address());
+                    m_blockIterator = m_blocks.end();
+                    m_end = m_blocks.end();
+                }
+            } else {
+                //Some random block was compacted away. Remove it and regenerate the iterator
+                m_blocks.erase(block->address());
+                m_blockIterator = m_blocks.find(nextBlock->address());
+                m_end = m_blocks.end();
+                assert(m_blockIterator != m_end);
+            }
+        }
+    }
 
     virtual ~CopyOnWriteIterator() {}
 
@@ -77,7 +87,8 @@ private:
     PersistentTableSurgeon *m_surgeon;
 
     /**
-     * Index of the current block being iterated over
+     * Copied and sorted tuple blocks that can be binary searched in order to find out. The pair
+     * contains the block address as well as the original index of the block.
      */
     TBMap m_blocks;
     TBMapI m_blockIterator;
