@@ -828,7 +828,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
         final double DISTANCE_EPSILON = 1.0e-8;
         Client client = getClient();
         populateTables(client);
+        String sql;
 
+     // polygon-to-point
+        sql = "create procedure DWithin_Proc as select borders.name, places.name, distance(borders.region, places.loc) as distance "
+                + "from borders, places where DWithin(borders.region, places.loc, ?) and borders.pk = 1 "
+                + "order by distance, borders.pk, places.pk;";
+        client.callProcedure("@AdHoc", sql);
         client.callProcedure("places.Insert", 50, "San Jose",
                 GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
         client.callProcedure("places.Insert", 51, "Boston",
@@ -836,14 +842,11 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         VoltTable vt1;
         VoltTable vt2;
-        String sql;
+
         String prefix;
 
         // polygon-to-point
-        sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
-                + "from borders, places where DWithin(borders.region, places.loc, 50000.1) and borders.pk = 1 "
-                + "order by distance, borders.pk, places.pk;";
-        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt1 = client.callProcedure("DWithin_Proc", 50000.1).getResults()[0];
         assertApproximateContentOfTable(new Object[][]
                 {{"Wyoming",    "Cheyenne",                             0.0},
                  {"Wyoming",    "Point on N Wyoming Border",            0.0},
@@ -933,8 +936,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
         verifyStmtFails(client, sql, expectedMsg);
 
         sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, NULL);";
-        expectedMsg = "data type cast needed for parameter or null literal: "
-                    + "input type DISTANCE to DWITHIN function must be non-negative numeric value";
+        expectedMsg = "data type cast needed for parameter or null literal: " +
+                      "input argument distance to DWITHIN function can't be NULL literal";
         verifyStmtFails(client, sql, expectedMsg);
     }
 
@@ -967,9 +970,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
         catch (Exception e) {
             fail();
         }
-
+        project.setUseDDLSchema(true);
         config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
+
         assertTrue(success);
         builder.addServerConfig(config);
 
