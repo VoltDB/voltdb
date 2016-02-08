@@ -21,6 +21,7 @@
 #include "common/types.h"
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
@@ -444,9 +445,9 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
+int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partitionId, char *outBytes) {
     DRTupleStream stream;
-    stream.configure(42);
+    stream.configure(partitionId);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
@@ -465,12 +466,14 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
+    // update the primary key column
+    tuple.setNValue(0, ValueFactory::getIntegerValue(primaryKeyNValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
     for (int ii = 0; ii < 100;) {
-        int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
-        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
+        int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, partitionId);
+        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
 
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
@@ -481,12 +484,12 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-    stream.endTransaction(uid);
+//    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
+//    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
+//    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+//    stream.endTransaction(uid);
 
-    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
+    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
