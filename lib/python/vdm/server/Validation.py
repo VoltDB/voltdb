@@ -604,7 +604,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 4000
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
