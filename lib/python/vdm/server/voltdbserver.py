@@ -40,6 +40,7 @@ import subprocess
 import time
 import traceback
 
+
 class G:
     """
     Global variables used by voltdbserver
@@ -51,6 +52,7 @@ class G:
     OUTFILE_TIME = str(time.time())
     OUTFILE_COUNTER = 0
 
+
 def ignore_signals():
     """
     Used when forking voltdbserver process to ignore certain signals
@@ -58,11 +60,13 @@ def ignore_signals():
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+
 def get_voltdb_dir():
     """
     Utility method to get voltdb bin directory
     """
     return os.path.realpath(os.path.join(HTTPListener.Global.MODULE_PATH, '../../../..', 'bin'))
+
 
 def create_response(statusstr, statuscode):
     """
@@ -70,10 +74,12 @@ def create_response(statusstr, statuscode):
     """
     return make_response(jsonify( { 'statusstring': statusstr } ), statuscode)
 
+
 class VoltdbProcess:
     isProcessRunning = False
     processId = -1
-    
+
+
 class VoltDatabase:
     """Represents a Volt database"""
 
@@ -384,7 +390,9 @@ class VoltDatabase:
             processId = self.Get_Voltdb_Process().processId
             if processId is not None and processId != -1:
                 os.kill(processId, signal.SIGKILL)
-            return create_response('success', 200)
+                return create_response('success', 200)
+            else:
+                return create_response('process not found', 200)
         except Exception, err:
             return create_response(str(err), 500)
 
