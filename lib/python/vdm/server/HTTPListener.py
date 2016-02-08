@@ -2526,7 +2526,7 @@ def main(runner, amodule, config_dir, server):
                                'public-interface': "", 'client-listener': "", 'internal-listener': "",
                                'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                                'zookeeper-listener': "", 'placement-group': ""})
-        Global.DATABASES.append({'id': 1, 'name': "local", "members": [1]})
+        Global.DATABASES.append({'id': 1, 'name': "Database", "members": [1]})
 
     write_configuration_file()
 
