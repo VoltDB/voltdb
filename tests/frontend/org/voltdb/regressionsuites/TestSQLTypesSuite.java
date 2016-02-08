@@ -228,7 +228,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         new Column("A_FLOAT", VoltType.FLOAT, true,
                    VoltType.NULL_FLOAT,
                    5.1,
-                   Double.MIN_VALUE, // NULL is -1.7E308.
+                   Double.MAX_VALUE - new Double(10E291), // NULL is -1.7E308.
                    new Double(14.5),
                    Double.MAX_VALUE),
         new Column("A_TIMESTAMP", VoltType.TIMESTAMP, false,
@@ -1053,6 +1053,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             for (int i = 0; i < COLS; i++) {
                 params[i + 2] = (i == k) ? m_minValues[i] : m_midValues[i];
                 assert (params[i + 2] != null);
+                assert (!params[i + 2].equals(new Double(VoltType.NULL_FLOAT)));
             }
 
             // Perform the inserts and execute selects, verifying the
