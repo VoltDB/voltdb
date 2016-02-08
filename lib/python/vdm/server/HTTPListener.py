@@ -1896,8 +1896,29 @@ class RecoverDatabaseAPI(MethodView):
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
 
+    # @staticmethod
+    # def put(database_id):
+    #     """
+    #     Stops the specified VoltDB
+    #     Args:
+    #         database_id (int): The id of the database that should be stopped
+    #     Returns:
+    #         Status string indicating if the stop request was sent successfully
+    #     """
+    #     try:
+    #         server = voltdbserver.VoltDatabase(database_id)
+    #         response = server.stop_database()
+    #         # Don't use the response in the json we send back
+    #         # because voltadmin shutdown gives 'Connection broken' output
+    #         return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
+    #     except Exception, err:
+    #         print traceback.format_exc()
+    #         return make_response(jsonify({'statusstring': str(err)}),
+    #                              500)
+
     @staticmethod
     def put(database_id):
+
         """
         Stops the specified VoltDB
         Args:
@@ -1905,16 +1926,14 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-        try:
-            server = voltdbserver.VoltDatabase(database_id)
-            response = server.stop_database()
-            # Don't use the response in the json we send back
-            # because voltadmin shutdown gives 'Connection broken' output
-            return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
+        # try:
+        #     test = Get_Voltdb_Process().processId
+        #     # os.kill(Get_Voltdb_Process().processId, signal.SIGTERM)
+        #     return make_response(jsonify({'statusstring': 'success'}), 200)
+        # except Exception, err:
+        #     return make_response(jsonify({'statusstring': str(err)}), 500)
+        server = voltdbserver.VoltDatabase(database_id)
+        return server.kill_database(database_id)
 
 
 class StartServerAPI(MethodView):
@@ -1979,8 +1998,8 @@ class StopServerAPI(MethodView):
 
         try:
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.stop_server(server_id)
-            return make_response(jsonify({'statusstring': response}), 200)
+            response = server.kill_server(server_id)
+            return response
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2200,7 +2219,7 @@ class StatusDatabaseServerAPI(MethodView):
 
         server = [server for server in Global.SERVERS if server['id'] == server_id]
         try:
-            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 212121)
             proc = voltdbclient.VoltProcedure(client, "@Ping")
             response = proc.call()
             return jsonify({'status': "running"})

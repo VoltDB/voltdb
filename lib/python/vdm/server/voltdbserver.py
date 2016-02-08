@@ -340,3 +340,51 @@ class VoltDatabase:
         args = [ '-H', server[0]['hostname'], server[0]['name'] ]
         return self.run_voltdb_cmd('voltadmin', 'stop', args)
 
+    def kill_database(self, database_id):
+        members = []
+        current_database = [database for database in HTTPListener.Global.DATABASES if database['id'] == database_id]
+        if not current_database:
+            abort(404)
+        else:
+            members = current_database[0]['members']
+        if not members:
+            return create_response('No servers configured for the database', 500)
+
+        server_id = members[0]
+        server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+        if not server:
+            return create_response('Server details not found for id ' + server_id, 404)
+
+        # Now stop each server
+        failed = False
+        server_status = {}
+        action = "stop"
+        for server_id in members:
+            server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+            curr = server[0]
+            try:
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s') % \
+                      (curr['hostname'], HTTPListener.__PORT__, database_id, server_id, action)
+                response = requests.put(url)
+                if (response.status_code != requests.codes.ok):
+                    failed = True
+                server_status[curr['hostname']] = json.loads(response.text)['statusstring']
+            except Exception, err:
+                failed = True
+                print traceback.format_exc()
+                server_status[curr['hostname']] = str(err)
+
+        if failed:
+            return create_response('There were errors starting servers: ' + str(server_status) ,500)
+        else:
+            return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+
+    def kill_server(self, server_id):
+        try:
+            processId = self.Get_Voltdb_Process().processId
+            if processId is not None and processId != -1:
+                os.kill(processId, signal.SIGKILL)
+            return create_response('success', 200)
+        except Exception, err:
+            return create_response(str(err), 500)
+
