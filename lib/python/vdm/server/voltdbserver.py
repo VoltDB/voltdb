@@ -112,8 +112,8 @@ class VoltDatabase:
             server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
             curr = server[0]
             try:
-                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s') % \
-                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, server_id, action)
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
+                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, action)
                 response = requests.put(url)
                 if (response.status_code != requests.codes.ok):
                     failed = True
@@ -127,6 +127,24 @@ class VoltDatabase:
             return create_response('There were errors starting servers: ' + str(server_status), 500)
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+
+    def start_server(server_id, recover=False):
+        """
+        Sends start request to the specified server
+        """
+        action = 'start'
+        if recover:
+            action = 'recover'
+
+        try:
+            server = find_server(server_id)
+            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
+                              (server['hostname'], HTTPListener.__PORT__, self.database_id, action)
+            response = requests.put(url)
+            return create_response(json.loads(response.text)['statusstring'], response.status_code)
+        except Exception, err:
+            print traceback.format_exc()
+            return create_response(str(err), 500)
 
     def check_and_start_local_server(self, recover=False):
         """
@@ -145,7 +163,7 @@ class VoltDatabase:
     
     def is_voltserver_running(self):
         """
-        Checks the set of running process to find out if voltdb server is running
+        Checks the set of running processes to find out if voltdb server is running
         """
         for proc in psutil.process_iter():
             try:
