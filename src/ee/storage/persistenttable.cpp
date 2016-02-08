@@ -1730,7 +1730,7 @@ std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
     std::vector<uint64_t> blockAddresses;
     blockAddresses.reserve(m_data.size());
     for(TBMap::const_iterator i = m_data.begin(); i != m_data.end(); ++i) {
-            blockAddresses.push_back((uint64_t)i.value()->address());
+            blockAddresses.push_back((uint64_t)i->second->address());
     }
     return blockAddresses;
 }

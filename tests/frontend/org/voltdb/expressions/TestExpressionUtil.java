@@ -294,7 +294,7 @@ public class TestExpressionUtil extends TestCase {
         // sure that all of our sub-trees are contained within the new tree and that their
         // structure has not changed
         //
-        TestExpressionTreeWalker tertWalker = new TestExpressionTreeWalker() {
+        TestExpressionTreeWalker treeWalker = new TestExpressionTreeWalker() {
             @Override
             public void callback(AbstractExpression exp) {
                 //
@@ -320,7 +320,7 @@ public class TestExpressionUtil extends TestCase {
                 }
             }
         };
-        tertWalker.traverse(combined_exp);
+        treeWalker.traverse(combined_exp);
 
         //
         // Test  variadic combine
@@ -343,7 +343,7 @@ public class TestExpressionUtil extends TestCase {
         }
         assertNotNull(var_combined_exp);
         assertEquals(var_combined_exp.getExpressionType(), ExpressionType.CONJUNCTION_AND);
-        tertWalker.traverse(var_combined_exp);
+        treeWalker.traverse(var_combined_exp);
     }
 
     // This is basically just a check that the rules in

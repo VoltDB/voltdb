@@ -43,8 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VOLTDB_TABLEVIEW_H
-#define VOLTDB_TABLEVIEW_H
+#ifndef VOLTDB_TABLETUPLEFILTER_H
+#define VOLTDB_TABLETUPLEFILTER_H
 
 #include "common/tabletuple.h"
 
@@ -59,11 +59,24 @@ namespace voltdb {
 class Table;
 
 template<typename Value>
-class TableView_iter;
-typedef TableView_iter<uint64_t> TableView_iterator;
-typedef TableView_iter<uint64_t const> TableView_const_iterator;
+class TableTupleFilter_iter;
+typedef TableTupleFilter_iter<uint64_t> TableTupleFilter_iterator;
+typedef TableTupleFilter_iter<uint64_t const> TableTupleFilter_const_iterator;
 
-class TableView {
+/**
+ * A lightweight representation of a table - a contiguous array where each tuple
+ * (active and non-active) is represented as a byte with a certain value. The physical tuple address
+ * in the real table and the corresponding tuple index in the TableTupleFilter are related by the following
+ * equation:
+ *
+ * Tuple Index = (Tuple Address - Tuple Block Address) / Tuple Size + Block Offset
+ *
+ * where Block Offset is the index of the first tuple in the block into the array:
+ *
+ * Block Offset = Block Number * Tuples Per Block
+ *
+ */
+class TableTupleFilter {
 
     public:
 
@@ -71,23 +84,24 @@ class TableView {
     static const char ACTIVE_TUPLE;
     static const char MARKED_TUPLE;
 
-    friend class TableView_iter<uint64_t>;
-    friend class TableView_iter<uint64_t const>;
+    friend class TableTupleFilter_iter<uint64_t>;
+    friend class TableTupleFilter_iter<uint64_t const>;
 
     /**
      * Default constructor
      */
-    TableView();
+    TableTupleFilter();
 
     /**
-     * Initialize TableView from a table
+     * Initialize TableTupleFilter from a table by setting the value for all active tuples
+     * to ACTIVE_TUPLE(0) and advancing the last active tuple index
      */
-    void init(Table* table , char initVal);
+    void init(Table* table);
 
     /**
-     * Update active tuple. Returns the tuple index
+     * Update an active tuple and return the tuple index
      */
-    uint64_t setTupleBit(const TableTuple& tuple, char marker)
+    uint64_t updateTuple(const TableTuple& tuple, char marker)
     {
         uint64_t tupleIdx = getTupleIndex(tuple);
         assert(tupleIdx <= m_lastActiveTupleIndex && m_lastActiveTupleIndex != INVALID_INDEX);
@@ -99,7 +113,7 @@ class TableView {
     /**
      * Returns the tuple value
      */
-    char getTupleBit(size_t tupleIdx) const
+    char getTupleValue(size_t tupleIdx) const
     {
         assert(tupleIdx < m_tuples.size());
         return m_tuples[tupleIdx];
@@ -122,13 +136,13 @@ class TableView {
     }
 
     // Iterators
-    TableView_iterator begin(char marker);
+    TableTupleFilter_iterator begin(char marker);
 
-    TableView_iterator end(char marker);
+    TableTupleFilter_iterator end(char marker);
 
-    TableView_const_iterator begin(char marker) const;
+    TableTupleFilter_const_iterator begin(char marker) const;
 
-    TableView_const_iterator end(char marker) const;
+    TableTupleFilter_const_iterator end(char marker) const;
 
     private:
 
@@ -144,16 +158,15 @@ class TableView {
     }
 
     /**
-     * Initialize tuple and advance last active tuple index
+     * Initialize an active tuple by setting its value to ACTIVE_TUPLE and advance last active tuple index.
      * This method should be called only once during the initialization.
-     * To update tuple value use setTupleBit method
+     * To update tuple value use updateTuple method
      */
-    void initTupleBit(const TableTuple& tuple, char marker)
+    void initActiveTuple(const TableTuple& tuple)
     {
-        assert(marker != INACTIVE_TUPLE);
         uint64_t tupleIdx = getTupleIndex(tuple);
         assert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
-        m_tuples[tupleIdx] = marker;
+        m_tuples[tupleIdx] = ACTIVE_TUPLE;
         // Advance last active tuple index if necessary
         if (m_lastActiveTupleIndex == INVALID_INDEX || m_lastActiveTupleIndex < tupleIdx)
         {
@@ -189,16 +202,17 @@ class TableView {
 };
 
 /**
- * TableView Iterator. Implements FORWARD ITERATOR Concept.
+ * TableTupleFilter Iterator. Implements FORWARD ITERATOR Concept.
  * Iterates over the tuples that have a certain value set in
- * underline TableView.
+ * underline TableTupleFilter.
  *
- * Const and Non-Const versions
+ * Value is expected to be one of "uint64_t" or "const uint64_t"
+ * for Non-Const and Const iterator versions
  */
 template<typename Value>
-class TableView_iter
+class TableTupleFilter_iter
   : public boost::iterator_facade<
-        TableView_iter<Value>
+        TableTupleFilter_iter<Value>
       , Value
       , boost::forward_traversal_tag>
 {
@@ -206,23 +220,23 @@ class TableView_iter
     /**
      * Default constructor
      */
-    TableView_iter(char marker = 0)
-      : m_tableView(0), m_tupleIdx(), m_marker(marker)
+    TableTupleFilter_iter(char marker = 0)
+      : m_tableFilter(0), m_tupleIdx(), m_marker(marker)
     {}
 
 private:
 
-    friend class TableView;
+    friend class TableTupleFilter;
     friend class boost::iterator_core_access;
 
     /**
      * Constructor. Sets the iterator position pointing to the first tuple that
-     * have the TableView value set to the MARKER
+     * have the TableTupleFilter value set to the MARKER
      */
-    explicit TableView_iter(TableView* m_tableView, char marker = 0)
-      : m_tableView(m_tableView), m_tupleIdx(TableView::INVALID_INDEX), m_marker(marker)
+    explicit TableTupleFilter_iter(TableTupleFilter* m_tableFilter, char marker = 0)
+      : m_tableFilter(m_tableFilter), m_tupleIdx(TableTupleFilter::INVALID_INDEX), m_marker(marker)
     {
-        if (!m_tableView->empty())
+        if (!m_tableFilter->empty())
         {
             increment();
         }
@@ -231,14 +245,14 @@ private:
     /**
      * Constructor. Sets the iterator position pointing to the specified position - usually the end
      */
-    explicit TableView_iter(const TableView* m_tableView, size_t tupleIdx, char marker = 0)
-        :  m_tableView(m_tableView), m_tupleIdx(tupleIdx), m_marker(marker)
+    explicit TableTupleFilter_iter(const TableTupleFilter* m_tableFilter, size_t tupleIdx, char marker = 0)
+        :  m_tableFilter(m_tableFilter), m_tupleIdx(tupleIdx), m_marker(marker)
     {}
 
-    bool equal(TableView_iter const& other) const
+    bool equal(TableTupleFilter_iter const& other) const
     {
         // Shouldn't compare iterators from different tables and looking for different values
-        assert(m_tableView == other.m_tableView && m_marker == other.m_marker);
+        assert(m_tableFilter == other.m_tableFilter && m_marker == other.m_marker);
         return m_tupleIdx == other.m_tupleIdx;
     }
 
@@ -250,45 +264,45 @@ private:
     // Forward Iteration Support
     void increment()
     {
-        uint64_t lastActiveTupleIndex = m_tableView->getLastActiveTupleIndex();
+        uint64_t lastActiveTupleIndex = m_tableFilter->getLastActiveTupleIndex();
         do
         {
             ++m_tupleIdx;
-        } while(m_tupleIdx <= lastActiveTupleIndex && m_tableView->getTupleBit(m_tupleIdx) != m_marker);
+        } while(m_tupleIdx <= lastActiveTupleIndex && m_tableFilter->getTupleValue(m_tupleIdx) != m_marker);
     }
 
-    const TableView* m_tableView;
+    const TableTupleFilter* m_tableFilter;
     Value m_tupleIdx;
     char m_marker;
 };
 
 inline
-TableView_iterator TableView::begin(char marker)
+TableTupleFilter_iterator TableTupleFilter::begin(char marker)
 {
-    return TableView_iterator(this, marker);
+    return TableTupleFilter_iterator(this, marker);
 }
 
 inline
-TableView_iterator TableView::end(char marker)
+TableTupleFilter_iterator TableTupleFilter::end(char marker)
 {
-    uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableView::INVALID_INDEX) ?
-        getLastActiveTupleIndex() + 1 : TableView::INVALID_INDEX;
-    return TableView_iterator(this, lastActiveTupleIndex, marker);
+    uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableTupleFilter::INVALID_INDEX) ?
+        getLastActiveTupleIndex() + 1 : TableTupleFilter::INVALID_INDEX;
+    return TableTupleFilter_iterator(this, lastActiveTupleIndex, marker);
 }
 
 inline
-TableView_const_iterator TableView::begin(char marker) const
+TableTupleFilter_const_iterator TableTupleFilter::begin(char marker) const
 {
-    return TableView_const_iterator(this, marker);
+    return TableTupleFilter_const_iterator(this, marker);
 }
 
 inline
-TableView_const_iterator TableView::end(char marker) const
+TableTupleFilter_const_iterator TableTupleFilter::end(char marker) const
 {
-    uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableView::INVALID_INDEX) ?
-        getLastActiveTupleIndex() + 1 : TableView::INVALID_INDEX;
-    return TableView_const_iterator(this, lastActiveTupleIndex, marker);
+    uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableTupleFilter::INVALID_INDEX) ?
+        getLastActiveTupleIndex() + 1 : TableTupleFilter::INVALID_INDEX;
+    return TableTupleFilter_const_iterator(this, lastActiveTupleIndex, marker);
 }
 
 }
-#endif // VOLTDB_TABLEVIEW_H
+#endif // VOLTDB_TABLETUPLEFILTER_H

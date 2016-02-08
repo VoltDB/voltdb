@@ -57,7 +57,7 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tableview.h"
+#include "storage/tabletuplefilter.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
@@ -71,60 +71,37 @@
 using namespace std;
 using namespace voltdb;
 
-static const char UNMATCHED_TUPLE(0);
-static const char MATCHED_TUPLE(1);
+static const char UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
+static const char MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
-struct PredicateLimitEvaluator
-{
-    PredicateLimitEvaluator(const AbstractExpression * wherePredicate, int limit, int offset) :
-        m_wherePredicate(wherePredicate),
-        m_limit(limit),
-        m_offset(offset),
-        m_tuple_skipped(),
-        m_tuple_ctr()
-    {}
+void NestLoopExecutor::CountingPostfilter::init(const AbstractExpression * postfilter, int limit, int offset) {
+    m_postfilter = postfilter;
+    m_limit = limit;
+    m_offset = offset;
+    m_tuple_skipped = 0;
+    m_tuple_ctr = 0;
+}
 
-    // Returns true is LIMIT is not reached yet
-    bool isUnderLimit() const {
-        return m_limit == -1 || m_tuple_ctr < m_limit;
-    }
-
-    void setAboveLimit() {
-        assert (m_limit != -1);
-        m_tuple_ctr = m_limit;
-    }
-
-    // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-    bool eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
-        if (m_wherePredicate == NULL || m_wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
-            // Check if we have to skip this tuple because of offset
-            if (m_tuple_skipped < m_offset) {
-                m_tuple_skipped++;
-                return false;
-            }
-            ++m_tuple_ctr;
-            return true;
+// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
+bool NestLoopExecutor::CountingPostfilter::eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
+    if (m_postfilter == NULL || m_postfilter->eval(&outer_tuple, &inner_tuple).isTrue()) {
+        // Check if we have to skip this tuple because of offset
+        if (m_tuple_skipped < m_offset) {
+            m_tuple_skipped++;
+            return false;
         }
-        return false;
+        ++m_tuple_ctr;
+        return true;
     }
+    return false;
+}
 
-    private:
-    const AbstractExpression *m_wherePredicate;
-    const int m_limit;
-    const int m_offset;
-
-    int m_tuple_skipped;
-    int m_tuple_ctr;
-
-};
-
-bool NestLoopExecutor::outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
-    if (m_aggExec != NULL) {
-        return m_aggExec->p_execute_tuple(join_tuple);
+void NestLoopExecutor::outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
+    if (m_aggExec != NULL && m_aggExec->p_execute_tuple(join_tuple)) {
+        m_postfilter.setAboveLimit();
     }
     m_tmpOutputTable->insertTempTuple(join_tuple);
     pmp.countdownProgress();
-    return false;
 }
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -208,11 +185,11 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     JoinType join_type = node->getJoinType();
     assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT || join_type == JOIN_TYPE_FULL);
 
-    // The table view to keep track of inner tuples that don't match any of outer tuples for FULL joins
-    TableView innerTableView;
+    // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
+    TableTupleFilter innerTableFilter;
     if (join_type == JOIN_TYPE_FULL) {
         // Prepopulate the view with all inner tuples
-        innerTableView.init(inner_table, UNMATCHED_TUPLE);
+        innerTableFilter.init(inner_table);
     }
 
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
@@ -230,8 +207,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine, this);
-    PredicateEvaluator whereEvaluator(wherePredicate, limit, offset);
-    PredicateLimitEvaluator whereEvaluator(wherePredicate, limit, offset);
+    // Init the postfilter
+    CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {
@@ -242,7 +219,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         join_tuple = m_tmpOutputTable->tempTuple();
     }
 
-    while (whereEvaluator.isUnderLimit() && iterator0.next(outer_tuple)) {
+    while (m_postfilter.isUnderLimit() && iterator0.next(outer_tuple)) {
         pmp.countdownProgress();
 
         // populate output table's temp tuple with outer table's values
@@ -259,7 +236,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
             // By default, the delete as we go flag is false.
             TableIterator iterator1 = inner_table->iterator();
-            while (whereEvaluator.isUnderLimit() && iterator1.next(inner_tuple)) {
+            while (m_postfilter.isUnderLimit() && iterator1.next(inner_tuple)) {
                 pmp.countdownProgress();
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
@@ -268,15 +245,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     // The inner tuple passed the join predicate
                     if (join_type == JOIN_TYPE_FULL) {
                         // Mark it as matched
-                        innerTableView.setTupleBit(inner_tuple, MATCHED_TUPLE);
+                        innerTableFilter.updateTuple(inner_tuple, MATCHED_TUPLE);
                     }
                     // Filter the joined tuple
-                    if (whereEvaluator.eval(outer_tuple, inner_tuple)) {
+                    if (m_postfilter.eval(outer_tuple, inner_tuple)) {
                         // Matched! Complete the joined tuple with the inner column values.
                         join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
-                        if (outputTuple(join_tuple, pmp)) {
-                            whereEvaluator.setAboveLimit();
-                        }
+                        outputTuple(join_tuple, pmp);
                     }
                 }
             } // END INNER WHILE LOOP
@@ -285,14 +260,12 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         // Left Outer Join
         //
-        if (join_type != JOIN_TYPE_INNER && !outerMatch && whereEvaluator.isUnderLimit()) {
+        if (join_type != JOIN_TYPE_INNER && !outerMatch && m_postfilter.isUnderLimit()) {
             // Still needs to pass the filter
-            if (whereEvaluator.eval(outer_tuple, null_inner_tuple)) {
+            if (m_postfilter.eval(outer_tuple, null_inner_tuple)) {
                 // Matched! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, null_inner_tuple, 0, inner_cols);
-                if (outputTuple(join_tuple, pmp)) {
-                    whereEvaluator.setAboveLimit();
-                }
+                outputTuple(join_tuple, pmp);
             }
         } // END IF LEFT OUTER JOIN
     } // END OUTER WHILE LOOP
@@ -300,25 +273,23 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     // FULL Outer Join. Iterate over the unmatched inner tuples
     //
-    if (join_type == JOIN_TYPE_FULL && whereEvaluator.isUnderLimit()) {
+    if (join_type == JOIN_TYPE_FULL && m_postfilter.isUnderLimit()) {
         // Preset outer columns to null
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, outer_cols);
 
-        TableView_iterator endItr = innerTableView.end(UNMATCHED_TUPLE);
-        for (TableView_iterator itr = innerTableView.begin(UNMATCHED_TUPLE);
-                itr != endItr && whereEvaluator.isUnderLimit(); ++itr) {
+        TableTupleFilter_iterator endItr = innerTableFilter.end(UNMATCHED_TUPLE);
+        for (TableTupleFilter_iterator itr = innerTableFilter.begin(UNMATCHED_TUPLE);
+                itr != endItr && m_postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
-            uint64_t tupleAddr = innerTableView.getTupleAddress(*itr);
+            uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
             assert(inner_tuple.isActive());
-            if (whereEvaluator.eval(null_outer_tuple, inner_tuple)) {
+            if (m_postfilter.eval(null_outer_tuple, inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
-                if (outputTuple(join_tuple, pmp)) {
-                    whereEvaluator.setAboveLimit();
-                }
+                outputTuple(join_tuple, pmp);
             }
         }
    }

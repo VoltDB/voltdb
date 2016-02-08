@@ -150,7 +150,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             if (joinType == JoinType.INNER) {
                 return generateInnerJoinOrdersForTree(subTree);
             } else if (joinType == JoinType.LEFT) {
-                return generateOuteroinOrdersForTree(subTree);
+                return generateOuterJoinOrdersForTree(subTree);
             } else if (joinType == JoinType.FULL) {
                 return generateFullJoinOrdersForTree(subTree);
             } else {
@@ -201,7 +201,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param subTree join tree
      * @return list of valid join orders
      */
-    private static List<JoinNode> generateOuteroinOrdersForTree(JoinNode subTree) {
+    private static List<JoinNode> generateOuterJoinOrdersForTree(JoinNode subTree) {
         List<JoinNode> treePermutations = new ArrayList<>();
         treePermutations.add(subTree);
         return treePermutations;
