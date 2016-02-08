@@ -161,6 +161,8 @@ label.ccErrorMsg {
 	height: 22px;
 	background-position: 0 -200px;
 	display: inline-block;
+	position:relative;
+	top:2px;
 }
 .stop {
 	width: 40px;
@@ -576,7 +578,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	display: block;
 	font-weight: bold;
 	height: 34px;
-	margin: 10px 32px 10px 20px;
+	margin: 10px 20px 10px 20px;
 	padding: 0 0px 5px 0;
 	width: 111px;
 }
@@ -584,12 +586,18 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	color: #000000;
 }
 
-.btnAddServer {padding: 0px 10px 7px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
+.btnAddServer {padding: 0px 15px 7px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
 .btnAddServer:hover, .btnAddServer:active, .btnAddServer:focus {background:#ccc; color:#222; border:none;}
 .addServer a:hover, .addServer a:active, .addServer a:focus {
 	color: #000000;
 }
+.btnDeleteServer { cursor:pointer;}
+.showMore a { font-size:13px; font-weight:bold;}
+/*.form-horizontal > .panel-group > .panel-default, .form-horizontal > .panel-group > .panel-default > .panel-heading {border-color:#ffffff; background:#ffffff;}
 
+.form-horizontal > .panel-group .panel-heading + .panel-collapse > .panel-body, .panel-group .panel-heading + .panel-collapse > .list-group { border-top:none;}*/
+.form-horizontal >.panel-group { margin:0 69px 0 76px;}
+.form-horizontal >.panel-group > .panel-default > .panel-collapse > .panel-body > .form-group > .col-sm-8 label {padding:5px 5px 10px 0;}
 ul.addServerList {
 	margin: 0;
 	padding: 0;
