@@ -1316,7 +1316,7 @@ def check_size_value(value, key):
         if len(split_value) > 1:
             return jsonify({'error': 'Invalid ' + key + ' value.'})
         int_value = int(str_value)
-        if int_value < 0 or int_value >= 2147483647:
+        if int_value < 0 or int_value > 2147483647:
             return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
         return jsonify({'status':'success'})
     except Exception, exp:
@@ -1392,7 +1392,7 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        server = [server for server in Global.SERVERS if server['name'] == request.json['name']]
+        server = [server for server in Global.SERVERS if server['name'] == request.json['name'] and server['name'] != '']
         if len(server) > 0:
             return make_response(jsonify({'error': 'Server name already exists'}), 404)
 
