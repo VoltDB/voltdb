@@ -85,6 +85,14 @@ function workload() {
         -P $YCSB_HOME/workloads/$WORKLOAD -P workload.properties -P base.properties
 }
 
+function scaleworkload() {
+    # if a client doesn't exist, build one
+    if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
+    # run the YCSB workload, which must exist at $YCSB_HOME/workloads
+    VOLTDB=$VOLTDB_BIN python ycsb_scaler.py java -cp "$CLASSPATH:$CLIENTNAME.jar" com.yahoo.ycsb.Client -t -s -db com.yahoo.ycsb.db.VoltClient4 \
+        -P $YCSB_HOME/workloads/$WORKLOAD -P workload.properties -P base.properties
+}
+
 function load() {
     # if a client doesn't exist, build one
     if [ ! -f $CLIENTNAME.jar ]; then makeclient; fi
@@ -94,7 +102,7 @@ function load() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|makeclient|server [hostname]|load|workload [file]}"
+    echo "Usage: ./run.sh {clean|catalog|makeclient|server [hostname]|load|[scale]workload [file]}"
 }
 
 # check if an explicit target was specified
