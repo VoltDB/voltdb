@@ -146,4 +146,9 @@ public class LegacyHashinator extends TheHashinator {
         }
         return set;
     }
+
+    @Override
+    public int getPartitionFromHashedToken(int hashedToken) {
+        return java.lang.Math.abs(hashedToken % catalogPartitionCount);
+    }
 }
