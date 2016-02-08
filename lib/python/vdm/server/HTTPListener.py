@@ -1633,8 +1633,13 @@ class RecoverDatabaseAPI(MethodView):
             Status string indicating if the database start request was sent successfully
         """
 
-        database = voltdbserver.VoltDBServer(database_id)
-        return database.start_database()
+        try:
+            database = voltdbserver.VoltDatabase(database_id)
+            return database.start_database(True)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
 
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
@@ -1662,7 +1667,7 @@ class StopDatabaseAPI(MethodView):
 
 
 class StartServerAPI(MethodView):
-    """Class to handle request to start a server."""
+    """Class to handle request to start a server for this database."""
 
     @staticmethod
     def put(database_id, server_id):
@@ -1672,7 +1677,28 @@ class StartServerAPI(MethodView):
             database_id (int): The id of the database that should be started
             server_id (int): The id of the server node that is to be started
         Returns:
-            Status string indicating if the server node was started successfully
+            Status string indicating if the server node start request was sent successfully
+        """
+
+        try:
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.start_server(server_id)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
+
+class StartLocalServerAPI(MethodView):
+    """Class to handle request to start local server for this database."""
+
+    @staticmethod
+    def put(database_id):
+        """
+        Starts VoltDB database server on this local machine
+        Args:
+            database_id (int): The id of the database that should be started
+        Returns:
+            Status string indicating if the server start request was sent successfully
         """
 
         try:
@@ -1685,17 +1711,16 @@ class StartServerAPI(MethodView):
 
 
 class RecoverServerAPI(MethodView):
-    """Class to handle request to issue recover cmd on a server."""
+    """Class to handle request to issue recover cmd on this local server."""
 
     @staticmethod
-    def put(database_id, server_id):
+    def put(database_id):
         """
-        Issues recover cmd on the specified server
+        Issues recover cmd on this local server
         Args:
             database_id (int): The id of the database that should be started
-            server_id (int): The id of the server node that is to be started
         Returns:
-            Status string indicating if the server node was started successfully
+            Status string indicating if the request was sent successfully
         """
 
         try:
@@ -1889,6 +1914,7 @@ def main(runner, amodule, config_dir, server):
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
+    START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
     RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
     STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
     START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
@@ -1918,7 +1944,9 @@ def main(runner, amodule, config_dir, server):
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
