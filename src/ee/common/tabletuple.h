@@ -381,18 +381,18 @@ private:
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline void serializeColumnToExport(ExportSerializeOutput &io, int colOffset, int colIndex, uint8_t *nullArray) const {
+    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the null array.
-        if (isNull(colIndex)) {
-            // turn on colIndex'th bit of nullArray
-            int byte = (colOffset + colIndex) >> 3;
-            int bit = (colOffset + colIndex) % 8;
+        if (value.isNull()) {
+            // turn on offset'th bit of nullArray
+            int byte = offset >> 3;
+            int bit = offset % 8;
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
         } else {
-            getNValue(colIndex).serializeToExport_withoutNull(io);
+            value.serializeToExport_withoutNull(io);
         }
     }
 
@@ -829,7 +829,7 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
 {
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
-        serializeColumnToExport(io, colOffset, i, nullArray);
+        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
 }
 
@@ -839,9 +839,11 @@ inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
     if (!interestingColumns) {
         serializeToExport(io, colOffset, nullArray);
     } else {
+        // relative index in the interesting column vector, used to find the correct bit in the null array
+        int colIndex = 0;
         std::vector<int> cols = *interestingColumns;
-        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
-            serializeColumnToExport(io, colOffset, *cit, nullArray);
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit, ++colIndex) {
+            serializeColumnToExport(io, colOffset + colIndex, getNValue(*cit), nullArray);
         }
     }
 }

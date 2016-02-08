@@ -36,6 +36,7 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -230,4 +231,13 @@ public abstract class BaseInitiator implements Initiator
     }
 
     abstract protected void acceptPromotion() throws Exception;
+
+    public ExecutionEngine debugGetSpiedEE() {
+        if (m_executionSite.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
+            return m_executionSite.m_ee;
+        }
+        else {
+            return null;
+        }
+    }
 }

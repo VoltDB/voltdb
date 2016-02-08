@@ -1455,14 +1455,16 @@ void PersistentTable::doIdleCompaction() {
     }
 }
 
-void PersistentTable::doForcedCompaction() {
+bool PersistentTable::doForcedCompaction() {
     if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
-        return;
+        return false;
     }
     bool hadWork1 = true;
     bool hadWork2 = true;
+    int64_t notPendingCompactions = 0;
+    int64_t pendingCompactions = 0;
 
     char msg[512];
     snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
@@ -1504,10 +1506,12 @@ void PersistentTable::doForcedCompaction() {
         if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
             //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
             hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+            notPendingCompactions++;
         }
         if (!m_blocksPendingSnapshot.empty() && hadWork2) {
             //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
             hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+            pendingCompactions++;
         }
     }
     //If compactions have been failing lately, but it didn't fail this time
@@ -1521,9 +1525,10 @@ void PersistentTable::doForcedCompaction() {
     }
 
     assert(!compactionPredicate());
-    snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %zd",
-             ((intmax_t)allocatedTupleCount()));
+    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd",
+            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+    return (notPendingCompactions + pendingCompactions) > 0;
 }
 
 void PersistentTable::printBucketInfo() {

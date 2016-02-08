@@ -144,7 +144,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * derived classes. This needs to be implemented by each interface
      * as data is required from the execution engine.
      */
-    abstract protected void throwExceptionForError(final int errorCode);
+    protected abstract void throwExceptionForError(final int errorCode);
 
     @Override
     public void deserializedBytes(final int numBytes) {
@@ -471,7 +471,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId,
+    public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
                                                 long undoQuantumToken,
                                                 byte[] predicates);
@@ -491,7 +491,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
     /** Releases the Engine object. */
-    abstract public void release() throws EEException, InterruptedException;
+    public abstract void release() throws EEException, InterruptedException;
 
     public static byte[] getStringBytes(String string) {
         try {
@@ -506,10 +506,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Pass the catalog to the engine */
-    abstract protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
+    protected abstract void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
+    public abstract void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     public void setBatch(int batchIndex) {
         m_currentBatchIndex = batchIndex;
@@ -567,11 +567,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
-    abstract public VoltTable serializeTable(int tableId) throws EEException;
+    public abstract VoltTable serializeTable(int tableId) throws EEException;
 
-    abstract public long getThreadLocalPoolAllocations();
+    public abstract long getThreadLocalPoolAllocations();
 
-    abstract public byte[] loadTable(
+    public abstract byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
         long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
@@ -581,7 +581,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param logLevels Levels to set
      * @throws EEException
      */
-    abstract public boolean setLogLevels(long logLevels) throws EEException;
+    public abstract boolean setLogLevels(long logLevels) throws EEException;
 
     /**
      * This method should be called roughly every second. It allows the EE
@@ -589,13 +589,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    abstract public void tick(long time, long lastCommittedSpHandle);
+    public abstract void tick(long time, long lastCommittedSpHandle);
 
     /**
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    abstract public void quiesce(long lastCommittedSpHandle);
+    public abstract void quiesce(long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -605,7 +605,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param now Timestamp to return with each row
      * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
-    abstract public VoltTable[] getStats(
+    public abstract VoltTable[] getStats(
             StatsSelector selector,
             int locators[],
             boolean interval,
