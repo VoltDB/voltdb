@@ -319,8 +319,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 // of variable length type
                 if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
                     // for variable length, where the search key was greater than the column length,
-                    // logic above has generated shrinked key and updated the lookup operator
-                    // that can be used for search. So don't decrement activeNumOfSearchKeys
+                    // logic above has generated shrinked key, updated index lookup up and inserted
+                    // the generated in search tuple. So no need to decrement activeNumOfSearchKeys
                     // for this case
                     activeNumOfSearchKeys--;
                 }

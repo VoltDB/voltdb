@@ -135,52 +135,90 @@ public class TestIndexOverflowSuite extends RegressionSuite {
 
         VoltTable vt, expectedVT;
         String sql;
+        String prefix = "Assertion failed for Index Test with one search key exceeding defined variable length column";
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 < 'abbd' order by id, VC1;";
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abb' order by id, VC1;";
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abbd' order by id, VC1;";
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abbd'order by id, VC1;";
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abbd'order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT = client.callProcedure("@AdHoc", "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abb';").getResults()[0];
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 >= 'abbd' order by id, VC1;";
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 < 'abbd' order by id, VC1;";
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abb' order by id, VC1;";
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abbd' order by id, VC1;";
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
         sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abbd';";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abb' order by id, VC1;";
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 >= 'abbd' order by id, VC1;";
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
-        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+        assertTablesAreEqual(prefix, expectedVT, vt);
+
+        prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abc' OR VC2 > 'abb' order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 >= 'abcd' OR VC2 >= 'abbd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abc' AND VC2 > 'abb' order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abcd' AND VC2 > 'abbd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, expectedVT, vt);
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abc' OR VC2 <= 'abb' order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abcd' OR VC2 <= 'abbd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abc' AND VC2 <= 'abb' order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 < 'abcd' AND VC2 < 'abbd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, expectedVT, vt);
+
+        prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column involving Join";
+        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE A, INDEXED_VL_TABLE B where A.VC1 <= 'abc' AND B.VC2 > 'abb' order by A.VC1, B.VC2;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE A, INDEXED_VL_TABLE B where A.VC1 < 'abcd' AND B.VC2 > 'abbd' order by A.VC1, B.VC2;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, expectedVT, vt);
     }
 
     //
