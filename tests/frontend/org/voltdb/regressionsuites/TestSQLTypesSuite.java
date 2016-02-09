@@ -228,7 +228,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         new Column("A_FLOAT", VoltType.FLOAT, true,
                    VoltType.NULL_FLOAT,
                    5.1,
-                   VoltType.NULL_FLOAT + new Double(10E291), // NULL is -1.7E308.
+                   Math.nextAfter(VoltType.NULL_FLOAT, 0), // NULL is -1.7E308.
                    new Double(14.5),
                    Double.MAX_VALUE),
         new Column("A_TIMESTAMP", VoltType.TIMESTAMP, false,
