@@ -1309,9 +1309,10 @@ public class ExpressionColumn extends Expression {
                 // Column references which name columns in tables in the
                 // from clause are handled later an.
                 java.util.Set<SelectListAliasResolution> foundNames = new java.util.TreeSet<SelectListAliasResolution>();
-                Expression lastExpr = null;
+                Expression firstFoundExpr = null;
                 for (int i = 0; i < length; i++) {
-                     // Ferret out the table name, column name
+                    ExpressionColumn ecol = (columns[i] instanceof ExpressionColumn) ? (ExpressionColumn)columns[i] : null;
+                    // Ferret out the table name, column name
                     // and alias name from this select column.
                     // If the alias name is null, then use the column name.
                     // This may be null as well.
@@ -1349,7 +1350,7 @@ public class ExpressionColumn extends Expression {
                             }
                         }
                     }
-
+                }
                 // If we only got one answer, then we just return it.
                 // If we got more than one, then we print an ambiguous
                 // error message.  If we got no message, we let HSQL
