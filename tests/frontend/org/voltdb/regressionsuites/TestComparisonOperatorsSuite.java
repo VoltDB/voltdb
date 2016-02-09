@@ -82,52 +82,12 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
                 "VC2 VARCHAR(16)," +    // not inlined
                 "VB1 VARBINARY(6)," +   // inlined
                 "VB2 VARBINARY(64));" + // not inlined
-
-                "CREATE TABLE INDEXED_VC_TABLE (" +
-                "ID INTEGER DEFAULT 0 NOT NULL PRIMARY KEY," +
-                "VC1 VARCHAR(3) NOT NULL," +
-                "VC2 VARCHAR(3 BYTES) NOT NULL);" + // inlined
-                // create index on varchar
-                "CREATE INDEX VC1_INDEXED_VC ON INDEXED_VC_TABLE (VC1);"+
-                "CREATE INDEX VC2_INDEXED_VC ON INDEXED_VC_TABLE (VC2);"+
                 "";
 
             project.addLiteralSchema(literalSchema);
     }
 
-    public void testIndexedComparision() throws Exception
-    {
-        if(!isHSQL()) {
-            System.out.println("\nSTARTING test Indexed Comparison ...");
-            Client client = getClient();
-            try {
-                int count = 0;
-                // this does not trigger indexed scan
-                VoltTable vt = client.callProcedure("INDEXED_VC_TABLE.Insert", count++, "abb", "abb").getResults()[0];
-                vt = client.callProcedure("INDEXED_VC_TABLE.Insert", count++, "aaa", "aaa").getResults()[0];
-                vt = client.callProcedure("INDEXED_VC_TABLE.Insert", count++, "abc", "abc").getResults()[0];
-                vt = client.callProcedure("INDEXED_VC_TABLE.Insert", count++, "abd", "abd").getResults()[0];
-
-                //vt = client.callProcedure("@AdHoc", "Select * from INDEXED_VC_TABLE;").getResults()[0];
-                //System.out.println("without indexed scan: " + vt.toString());
-
-                //vt = client.callProcedure("@AdHoc", "Select * from INDEXED_VC_TABLE where VC2 < 'abcd';").getResults()[0];
-                //System.out.println("What is this triggering: " + vt.toString());
-
-                //vt = client.callProcedure("@AdHoc", "Select * from INDEXED_VC_TABLE where VC1 < 'abbd' and ID > 0;").getResults()[0];
-                vt = client.callProcedure("@AdHoc", "Select * from INDEXED_VC_TABLE where VC1 < 'abbd';").getResults()[0];
-                System.out.println("VC1" + vt.toString());
-
-                vt = client.callProcedure("@AdHoc", "Select * from INDEXED_VC_TABLE where VC2 > 'abbd';").getResults()[0];
-                System.out.println("VC1" + vt.toString());
-            }
-            catch (ProcCallException excp) {
-                System.out.println("!!!!! " + excp.getMessage());
-            }
-        }
-    }
-
-    public void notestIsDistinctFrom() throws Exception
+    public void testIsDistinctFrom() throws Exception
     {
         // is Distinct from operator does not work on HSQL-backend based. It results
         // in run time exception with message "unsupported internal operation: Expression"
@@ -300,7 +260,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         verifyStmtFails(client, sql, "incompatible data types in combination");
     }
 
-    public void notestCaseWhen() throws Exception {
+    public void testCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
         Client cl = getClient();
         VoltTable vt;
@@ -442,7 +402,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
 
     }
 
-    public void notestCaseWhenLikeDecodeFunction() throws Exception {
+    public void testCaseWhenLikeDecodeFunction() throws Exception {
         System.out.println("STARTING test Case When like decode function...");
         Client cl = getClient();
         String sql;
@@ -475,18 +435,18 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         try {
             setUpSchema(project);
             // CONFIG #1: Local Site/Partitions running on JNI backend
-            config = new LocalCluster("try-voltdbBackend.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+            config = new LocalCluster("try-voltdbBackend.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
-/*
+
             // CONFIG #2: HSQL
             config = new LocalCluster("try-hsqlBackend.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
-*/
+
         }
         catch(IOException excp) {
             assertFalse(true);
