@@ -2231,19 +2231,22 @@ class StatusDatabaseAPI(MethodView):
     def get(database_id):
         serverDetails = []
         status = []
-        result = get_configuration()
+
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
         has_stalled = False
         has_stopped = False
         has_run = False
-        if len(result['vdm']['members']) == 0:
+        if len(database[0]['members']) == 0:
             return jsonify({'status':'errorNoMembers'})
-        for member in result['vdm']['members']:
+        for server_id in database[0]['members']:
+
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
             url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
-                  (member['hostname'], __PORT__, database_id, member['id'])
+                  (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
             try:
                 response = requests.get(url)
             except:
-                return jsonify({'status':'error', 'hostname':member['hostname']})
+                return jsonify({'status':'error', 'hostname':server[0]['hostname']})
 
             if response.json()['status'] == "stalled":
                 if not has_stalled:
@@ -2254,7 +2257,7 @@ class StatusDatabaseAPI(MethodView):
             elif response.json()['status'] == "stopped":
                 if not has_stopped:
                     has_stopped = True
-        serverDetails.append({member['hostname']: response.json()})
+        serverDetails.append({server[0]['hostname']: response.json()})
 
         if has_stalled:
             status.append({'status': 'stalled'})
