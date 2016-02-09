@@ -1387,7 +1387,7 @@ class ServerAPI(MethodView):
                     abort(404)
                 return jsonify({'server': make_public_server(server[0])})
         else:
-            return jsonify({'statusstring': 'Given server with id, %u doesn\'t belong to database with id, %u' %(server_id,database_id) })
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
 
     @staticmethod
     def post(database_id):
@@ -1401,14 +1401,6 @@ class ServerAPI(MethodView):
         inputs = ServerInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
-
-        server = [server for server in Global.SERVERS if server['name'] == request.json['name'] and server['name'] != '']
-        if len(server) > 0:
-            return make_response(jsonify({'error': 'Server name already exists'}), 404)
-
-        server = [server for server in Global.SERVERS if server['hostname'] == request.json['hostname']]
-        if len(server) > 0:
-            return make_response(jsonify({'error': 'Host name already exists'}), 404)
 
         if not Global.SERVERS:
             server_id = 1
@@ -1486,7 +1478,7 @@ class ServerAPI(MethodView):
             write_configuration_file()
             return jsonify({'result': True})
         else:
-            return jsonify({'statusstring': 'Given server with id, %u doesn\'t belong to database with id, %u' %(server_id,database_id) })
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
 
     @staticmethod
     def put(database_id, server_id):
@@ -1544,7 +1536,7 @@ class ServerAPI(MethodView):
             write_configuration_file()
             return jsonify({'server': current_server[0], 'status': 1})
         else:
-            return jsonify({'statusstring': 'Given server with id, %u doesn\'t belong to database with id, %u' %(server_id,database_id) })
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
 
 
 class DatabaseAPI(MethodView):
