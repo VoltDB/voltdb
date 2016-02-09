@@ -161,7 +161,8 @@ public class KafkaImportBenchmark {
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
+            // if 0, means we're not expecting any rows -- part of new offset checking test
+            // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (producer == "client" && producerpause > displayinterval)
@@ -353,6 +354,32 @@ public class KafkaImportBenchmark {
         }
     }
 
+    public static boolean verifyZero() {
+        log.info("+++ Checking for zero rows in KAFKAIMPORTTABLE1");
+        log.info("+++ Wait for 1 minute for import to settle");
+        Thread.sleep(1 * 1000 * 60); // wait for 1 minute
+        count = MatchChecks.getImportTableRowCount(config.alltypes, client); // imported count
+        if (count == 0)
+            endTest(true);
+        else
+            endTest(false);
+    }
+
+
+    public static void endTest(boolean testResult) {
+        client.drain();
+        client.close();
+
+        if (testResult == true) {
+            log.info("Test passed!");
+            System.exit(0);
+        } else {
+            log.info("Test failed!");
+            System.exit(1);
+        }
+    }
+
+
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
      *
@@ -362,6 +389,7 @@ public class KafkaImportBenchmark {
     public static void main(String[] args) throws Exception {
 
         VoltLogger log = new VoltLogger("Benchmark.main");
+        boolean testResult = true;
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(KafkaImportBenchmark.class.getName(), args);
@@ -369,6 +397,14 @@ public class KafkaImportBenchmark {
         // connect to one or more servers, method loops until success
         dbconnect(config.servers, config.ratelimit);
 
+        // special case for second half of offset check test.
+        // we expect no rows, and give the import subsystem about a
+        // minute to settle
+        if (config.expected_rows == 0) {
+            testResult = verifyZero();
+            endTest(testResult);
+        }
+            
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
@@ -411,7 +447,6 @@ public class KafkaImportBenchmark {
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
-        boolean testResult = true;
 
         // some counts that might help debugging....
         log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
