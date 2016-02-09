@@ -43,6 +43,35 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         assertEquals(rowCount, result.getRowCount());
     }
 
+    static private void setUpSchema(VoltProjectBuilder project) throws IOException {
+        project.addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"));
+        project.addPartitionInfo("P1", "ID");
+        project.addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?");
+        project.addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?");
+        project.addStmtProcedure("BasicLTParam",           "select * from P1 where ID < ?");
+
+        project.addStmtProcedure("BasicUnderflowEQ",       "select * from P1 where ID = -6000000000");
+        project.addStmtProcedure("BasicUnderflowGT",       "select * from P1 where ID > -6000000000");
+        project.addStmtProcedure("BasicUnderflowLT",       "select * from P1 where ID < -6000000000");
+
+        project.addStmtProcedure("BasicOverflowEQ",        "select * from P1 where ID = 6000000000");
+        project.addStmtProcedure("BasicOverflowGT",        "select * from P1 where ID > 6000000000");
+        project.addStmtProcedure("BasicOverflowLT",        "select * from P1 where ID < 6000000000");
+
+        project.addStmtProcedure("TwoColUnderflowEQ",      "select * from P1 where ID = ? and TINY = -200");
+        project.addStmtProcedure("TwoColUnderflowGT",      "select * from P1 where ID = ? and TINY > -200");
+        project.addStmtProcedure("TwoColUnderflowLT",      "select * from P1 where ID = ? and TINY < -200");
+
+        project.addStmtProcedure("TwoColOverflowEQ",       "select * from P1 where ID = ? and TINY = 200");
+        project.addStmtProcedure("TwoColOverflowGT",       "select * from P1 where ID = ? and TINY > 200");
+        project.addStmtProcedure("TwoColOverflowLT",       "select * from P1 where ID = ? and TINY < 200");
+
+        project.addStmtProcedure("Join",                   "select * from P1, R1 where P1.ID = R1.TINY");
+        project.addStmtProcedure("JoinReverse",            "select * from P1, R1 where P1.TINY = R1.ID");
+        project.addStmtProcedure("JoinWithOrderOverflow",  "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= 200");
+        project.addStmtProcedure("JoinWithOrderUnderflow", "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= -200");
+    }
+
     public void testAll() throws IOException, ProcCallException {
         Client client = getClient();
 
@@ -94,6 +123,66 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         callWithExpectedRowCount(client, "JoinReverse", 1);
     }
 
+    public void testSearchValueExceedsVariableLengthColumn() throws Exception {
+        Client client = getClient();
+        // populate table
+        int count = 0;
+        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "aaa", "aaa", "10");
+        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abb", "abb", "11");
+        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abc", "abc", "12");
+        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abd", "abd", "13");
+        client.callProcedure("@AdHoc", "Insert into INDEXED_VL_TABLE values (99, null, null, null);");
+
+        VoltTable vt, expectedVT;
+        String sql;
+
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 < 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abb' order by id, VC1;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT.resetRowPosition();
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abbd'order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT = client.callProcedure("@AdHoc", "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abb';").getResults()[0];
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 >= 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT.resetRowPosition();
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 < 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abb' order by id, VC1;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT.resetRowPosition();
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abbd';";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abb' order by id, VC1;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 >= 'abbd' order by id, VC1;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT.resetRowPosition();
+        assertTablesAreEqual("Test for search key exceeding on variable length column exceeding it's defined length", expectedVT, vt);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -108,40 +197,21 @@ public class TestIndexOverflowSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestIndexOverflowSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?");
-        project.addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?");
-        project.addStmtProcedure("BasicLTParam",           "select * from P1 where ID < ?");
+        try {
+            project.setUseDDLSchema(true);
+            setUpSchema(project);
+            boolean success;
+            // JNI
+            config = new LocalCluster("testindexes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
+        }
+        catch (IOException excp) {
+            assertFalse(true);
+        }
 
-        project.addStmtProcedure("BasicUnderflowEQ",       "select * from P1 where ID = -6000000000");
-        project.addStmtProcedure("BasicUnderflowGT",       "select * from P1 where ID > -6000000000");
-        project.addStmtProcedure("BasicUnderflowLT",       "select * from P1 where ID < -6000000000");
 
-        project.addStmtProcedure("BasicOverflowEQ",        "select * from P1 where ID = 6000000000");
-        project.addStmtProcedure("BasicOverflowGT",        "select * from P1 where ID > 6000000000");
-        project.addStmtProcedure("BasicOverflowLT",        "select * from P1 where ID < 6000000000");
-
-        project.addStmtProcedure("TwoColUnderflowEQ",      "select * from P1 where ID = ? and TINY = -200");
-        project.addStmtProcedure("TwoColUnderflowGT",      "select * from P1 where ID = ? and TINY > -200");
-        project.addStmtProcedure("TwoColUnderflowLT",      "select * from P1 where ID = ? and TINY < -200");
-
-        project.addStmtProcedure("TwoColOverflowEQ",       "select * from P1 where ID = ? and TINY = 200");
-        project.addStmtProcedure("TwoColOverflowGT",       "select * from P1 where ID = ? and TINY > 200");
-        project.addStmtProcedure("TwoColOverflowLT",       "select * from P1 where ID = ? and TINY < 200");
-
-        project.addStmtProcedure("Join",                   "select * from P1, R1 where P1.ID = R1.TINY");
-        project.addStmtProcedure("JoinReverse",            "select * from P1, R1 where P1.TINY = R1.ID");
-        project.addStmtProcedure("JoinWithOrderOverflow",  "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= 200");
-        project.addStmtProcedure("JoinWithOrderUnderflow", "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= -200");
-
-        boolean success;
-
-        // JNI
-        config = new LocalCluster("testindexes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
 
         return builder;
     }

@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
@@ -67,6 +68,8 @@
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
+using std::cout;
+using std::endl;
 
 bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         TempTableLimits* limits)
@@ -122,8 +125,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
 
     Table* targetTable = m_node->getTargetTable();
-    //target table should be persistenttable
-    assert(static_cast<PersistentTable*>(targetTable));
+    //target table should be persistent table
+    assert(dynamic_cast<PersistentTable*>(targetTable));
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
@@ -162,6 +165,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
 
+    //cout << "name: " << targetTable->name() << " column count: " << targetTable->columnCount() << endl;
+    //cout << "table index: " << tableIndex->getName() << " table index schema: " << tableIndex->getTupleSchema()->debug() << endl;
     //
     // INLINE LIMIT
     //
@@ -195,6 +200,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
+
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
         if (candidateValue.isNull()) {
@@ -205,16 +211,20 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
 
         try {
+            //cout << "search key - index: " << ctr << " candidateValue: " << candidateValue.toString() << " activeNumOfSearchKeys: " << activeNumOfSearchKeys << endl;
+            //cout << "value size: " << m_searchKeyArray[ctr]->getValueSize() << " value type: " << m_searchKeyArray[ctr]->getValueType() << endl;
             searchKey.setNValue(ctr, candidateValue);
         }
         catch (const SQLException &e) {
-            // This next bit of logic handles underflow and overflow while
+            // This next bit of logic handles underflow, overflow and search key length
+            // exceeding variable length column size (variable lenght mismatch) when
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
+            // VarChar(3 bytes) < "abcd" or VarChar(3) > "abbd"
 
-            // re-throw if not an overflow or underflow
+            // re-throw if not an overflow, underflow or variable length mismatch
             // currently, it's expected to always be an overflow or underflow
-            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                 throw e;
             }
 
@@ -254,11 +264,67 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         localLookupType = INDEX_LOOKUP_TYPE_GT;
                     }
                 }
+                if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
+                    // Create new search key to add it search key table tuple. This is obtained
+                    // by fetching column size and shrinking the key to fit within the column size
+                    // note: for varchar the column size can be in bytes or character. So logic
+                    // takes into account whether variable length column size is in bytes or not to
+                    // calculate new length. Using this new length, new search key is obtained
+
+                    const TupleSchema::ColumnInfo *colInfo = tableIndex->getKeySchema()->getColumnInfo(ctr);
+                    uint32_t colLength = colInfo->length;
+                    bool inBytes = colInfo->inBytes;
+                    if (colInfo->getVoltType() == VALUE_TYPE_VARBINARY) {
+                        // for varbinary the size is always in bytes
+                        inBytes = true;
+                    }
+                    // get length of the original search key and storage location in memory
+                    int32_t candidateValueLength = 0;
+                    const char* candidateValueBuffPtr = ValuePeeker::peekObject_withoutNull(candidateValue, &candidateValueLength);
+                    // calculate the length for shrinked candidate key
+                    int32_t neededLength;
+                    if (inBytes) {
+                        // updated length of key will be equivalent to column length
+                        neededLength = colLength;
+                    }
+                    else {
+                        // column length is in terms of characters. Obtain the number of bytes needed for those many characters
+                        neededLength = static_cast<int32_t> (NValue::getIthCharPosition(candidateValueBuffPtr, candidateValueLength, colLength + 1) - candidateValueBuffPtr);
+                    }
+                    // obtain new, shrinked key using the length computed from the original key
+                    NValue updatedCandidateValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
+                    //cout << "updated string value: " << updatedCandidateValue.toString() << endl;
+                    //cout << colInfo->getVoltType() << "column length " << colLength << " in bytes: " << inBytes << endl;
+
+                    searchKey.setNValue(ctr, updatedCandidateValue);
+
+                    switch (localLookupType) {
+                        case INDEX_LOOKUP_TYPE_LT:
+                        case INDEX_LOOKUP_TYPE_LTE:
+                            localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                            break;
+                        case INDEX_LOOKUP_TYPE_GT:
+                        case INDEX_LOOKUP_TYPE_GTE:
+                            localLookupType = INDEX_LOOKUP_TYPE_GT;
+                            break;
+                        default:
+                            earlyReturnForSearchKeyOutOfRange = true;
+                            assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                            // TODO: should we return false instead of break?
+                            break;
+                    }
+                }
 
                 // if here, means all tuples with the previous searchkey
-                // columns need to be scaned. Note, if only one column,
+                // columns need to be scanned. Note, if only one column,
                 // then all tuples will be scanned
-                activeNumOfSearchKeys--;
+                if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
+                    // for variable length, where the search key was greater than the column length,
+                    // logic above has generated shrinked key and updated the lookup operator
+                    // that can be used for search. So don't decrement activeNumOfSearchKeys
+                    // for this case
+                    activeNumOfSearchKeys--;
+                }
                 if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
                     localSortDirection = SORT_DIRECTION_TYPE_ASC;
                 }
@@ -280,7 +346,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
+    VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
+    //cout << "\n\nSearch key after substitutions: " << searchKey.debugNoHeader().c_str() << " number of active search keys: "<< activeNumOfSearchKeys << endl;
+#if 0
+    int columnCount = searchKey.getSchema()->columnCount();
+
+
+    for (int i = 0; i < columnCount; i++) {
+        cout << "SearchKey: nvalue at " << i << " value (string): " << searchKey.getNValue(i).toString() << " debug: " << searchKey.getNValue(i).debug() << endl;
+    }
+#endif
 
     //
     // END EXPRESSION
@@ -339,16 +414,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
             tableIndex->moveToLessThanKey(&searchKey, indexCursor);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
             bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
             if (isEnd) {
                 tableIndex->moveToEnd(false, indexCursor);
-            } else {
+            }
+            else {
                 while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
                     pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
@@ -365,7 +443,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    } else {
+    }
+    else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
         tableIndex->moveToEnd(toStartActually, indexCursor);
     }
@@ -390,6 +469,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             continue;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
+        //cout << "LOOPING in indexscan: tuple: " << tuple.debug("tablename").c_str() << endl;
+
         pmp.countdownProgress();
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
