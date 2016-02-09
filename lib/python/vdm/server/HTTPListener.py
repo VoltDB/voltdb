@@ -1360,7 +1360,7 @@ class ServerAPI(MethodView):
     """Class to handle requests related to server"""
 
     @staticmethod
-    def get(server_id):
+    def get(database_id,server_id):
         """
         Gets the information of the server with specified server_id. If the server_id is
         not specified, then it returns the information of all the servers.
@@ -1369,14 +1369,24 @@ class ServerAPI(MethodView):
         Returns:
             server or list of servers.
         """
-        get_configuration()
-        if server_id is None:
-            return jsonify({'servers': [make_public_server(x) for x in Global.SERVERS]})
+
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        if len(database) == 0:
+            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
         else:
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
-            if not server:
-                abort(404)
-            return jsonify({'server': make_public_server(server[0])})
+            members = database[0]['members']
+
+        if server_id in members:
+            get_configuration()
+            if server_id is None:
+                return jsonify({'servers': [make_public_server(x) for x in Global.SERVERS]})
+            else:
+                server = [server for server in Global.SERVERS if server['id'] == server_id]
+                if not server:
+                    abort(404)
+                return jsonify({'server': make_public_server(server[0])})
+        else:
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
 
     @staticmethod
     def post(database_id):
@@ -1390,14 +1400,6 @@ class ServerAPI(MethodView):
         inputs = ServerInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
-
-        server = [server for server in Global.SERVERS if server['name'] == request.json['name'] and server['name'] != '']
-        if len(server) > 0:
-            return make_response(jsonify({'error': 'Server name already exists'}), 404)
-
-        server = [server for server in Global.SERVERS if server['hostname'] == request.json['hostname']]
-        if len(server) > 0:
-            return make_response(jsonify({'error': 'Host name already exists'}), 404)
 
         if not Global.SERVERS:
             server_id = 1
@@ -1437,7 +1439,7 @@ class ServerAPI(MethodView):
                         'members': current_database[0]['members']}), 201
 
     @staticmethod
-    def delete(server_id):
+    def delete(database_id, server_id):
         """
         Delete the server with specified server_id.
         Args:
@@ -1445,32 +1447,40 @@ class ServerAPI(MethodView):
         Returns:
             True if the server is deleted otherwise the error message.
         """
-        if not request.json or not 'dbId' in request.json:
-            abort(400)
-        database_id = request.json['dbId']
-        # delete a single server
-        server = [server for server in Global.SERVERS if server['id'] == server_id]
-        if len(server) == 0:
-            abort(404)
-        # remove the server from given database member list
-        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-        current_database[0]['members'].remove(server_id)
-        # Check if server is referenced by database
-        for database in Global.DATABASES:
-            if database["id"] == database_id:
-                continue
-            if server_id in database["members"]:
-                return jsonify({'success': "Server deleted from given member list only. "
-                                           "Server cannot be deleted completely since"
-                                           " it is referred by database."})
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        if len(database) == 0:
+            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+        else:
+            members = database[0]['members']
+        if server_id in members:
+            if not request.json or not 'dbId' in request.json:
+                abort(400)
+            database_id = request.json['dbId']
+            # delete a single server
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
+            if len(server) == 0:
+                abort(404)
+            # remove the server from given database member list
+            current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+            current_database[0]['members'].remove(server_id)
+            # Check if server is referenced by database
+            for database in Global.DATABASES:
+                if database["id"] == database_id:
+                    continue
+                if server_id in database["members"]:
+                    return jsonify({'success': "Server deleted from given member list only. "
+                                               "Server cannot be deleted completely since"
+                                               " it is referred by database."})
 
-        Global.SERVERS.remove(server[0])
-        sync_configuration()
-        write_configuration_file()
-        return jsonify({'result': True})
+            Global.SERVERS.remove(server[0])
+            sync_configuration()
+            write_configuration_file()
+            return jsonify({'result': True})
+        else:
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
 
     @staticmethod
-    def put(server_id):
+    def put(database_id, server_id):
         """
         Update the server with specified server_id.
         Args:
@@ -1480,44 +1490,52 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
 
-        inputs = ServerInputs(request)
-        if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
-        current_server = [server for server in Global.SERVERS if server['id'] == server_id]
-        if len(current_server) == 0:
-            abort(404)
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        if len(database) == 0:
+            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+        else:
+            members = database[0]['members']
+        if server_id in members:
+            inputs = ServerInputs(request)
+            if not inputs.validate():
+                return jsonify(success=False, errors=inputs.errors)
+            current_server = [server for server in Global.SERVERS if server['id'] == server_id]
+            if len(current_server) == 0:
+                abort(404)
 
-        current_server[0]['name'] = \
-            request.json.get('name', current_server[0]['name'])
-        current_server[0]['hostname'] = \
-            request.json.get('hostname', current_server[0]['hostname'])
-        current_server[0]['description'] = \
-            request.json.get('description', current_server[0]['description'])
-        current_server[0]['enabled'] = \
-            request.json.get('enabled', current_server[0]['enabled'])
-        current_server[0]['admin-listener'] = \
-            request.json.get('admin-listener', current_server[0]['admin-listener'])
-        current_server[0]['internal-listener'] = \
-            request.json.get('internal-listener', current_server[0]['internal-listener'])
-        current_server[0]['http-listener'] = \
-            request.json.get('http-listener', current_server[0]['http-listener'])
-        current_server[0]['zookeeper-listener'] = \
-            request.json.get('zookeeper-listener', current_server[0]['zookeeper-listener'])
-        current_server[0]['replication-listener'] = \
-            request.json.get('replication-listener', current_server[0]['replication-listener'])
-        current_server[0]['client-listener'] = \
-            request.json.get('client-listener', current_server[0]['client-listener'])
-        current_server[0]['internal-interface'] = \
-            request.json.get('internal-interface', current_server[0]['internal-interface'])
-        current_server[0]['external-interface'] = \
-            request.json.get('external-interface', current_server[0]['external-interface'])
-        current_server[0]['public-interface'] = \
-            request.json.get('public-interface', current_server[0]['public-interface'])
-        current_server[0]['placement-group'] = \
-            request.json.get('placement-group', current_server[0]['placement-group'])
-        sync_configuration()
-        write_configuration_file()
-        return jsonify({'server': current_server[0], 'status': 1})
+            current_server[0]['name'] = \
+                request.json.get('name', current_server[0]['name'])
+            current_server[0]['hostname'] = \
+                request.json.get('hostname', current_server[0]['hostname'])
+            current_server[0]['description'] = \
+                request.json.get('description', current_server[0]['description'])
+            current_server[0]['enabled'] = \
+                request.json.get('enabled', current_server[0]['enabled'])
+            current_server[0]['admin-listener'] = \
+                request.json.get('admin-listener', current_server[0]['admin-listener'])
+            current_server[0]['internal-listener'] = \
+                request.json.get('internal-listener', current_server[0]['internal-listener'])
+            current_server[0]['http-listener'] = \
+                request.json.get('http-listener', current_server[0]['http-listener'])
+            current_server[0]['zookeeper-listener'] = \
+                request.json.get('zookeeper-listener', current_server[0]['zookeeper-listener'])
+            current_server[0]['replication-listener'] = \
+                request.json.get('replication-listener', current_server[0]['replication-listener'])
+            current_server[0]['client-listener'] = \
+                request.json.get('client-listener', current_server[0]['client-listener'])
+            current_server[0]['internal-interface'] = \
+                request.json.get('internal-interface', current_server[0]['internal-interface'])
+            current_server[0]['external-interface'] = \
+                request.json.get('external-interface', current_server[0]['external-interface'])
+            current_server[0]['public-interface'] = \
+                request.json.get('public-interface', current_server[0]['public-interface'])
+            current_server[0]['placement-group'] = \
+                request.json.get('placement-group', current_server[0]['placement-group'])
+            sync_configuration()
+            write_configuration_file()
+            return jsonify({'server': current_server[0], 'status': 1})
+        else:
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
 
 
 class DatabaseAPI(MethodView):
@@ -1665,11 +1683,20 @@ class DatabaseMemberAPI(MethodView):
         Returns:
             List of member ids related to specified database.
         """
+        servers = []
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            abort(404)
+            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+        else:
+            members = database[0]['members']
 
-        return jsonify({'members': database[0]['members']})
+        for server_id in members:
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
+            if not server:
+                return make_response(jsonify( { 'statusstring': 'Server details not found for id: %u' % server_id } ), 404)
+            servers.append(server[0])
+
+        return jsonify({'members': servers})
 
     @staticmethod
     def put(database_id):
@@ -2352,10 +2379,8 @@ def main(runner, amodule, config_dir, server):
     STATUS_DATABASE_VIEW = StatusDatabaseAPI.as_view('status_database_api')
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
-    APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
-                     view_func=SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/servers/<int:server_id>', view_func=SERVER_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
 
     APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
@@ -2363,7 +2388,7 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
     APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/member/<int:database_id>',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/',
                      view_func=DATABASE_MEMBER_VIEW, methods=['GET', 'PUT', 'DELETE'])
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
