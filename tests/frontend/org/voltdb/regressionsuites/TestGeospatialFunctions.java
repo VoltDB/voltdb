@@ -870,6 +870,11 @@ public class TestGeospatialFunctions extends RegressionSuite {
         vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, vt2, vt1);
 
+        // distance argument is null
+        sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, NULL);";
+        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt1.getRowCount());
+
         // point-to-point
         sql = "select A.name, B.name, distance(A.loc, B.loc) as distance "
                 + "from places A, places B where DWithin(A.loc, B.loc, 100000) and A.pk <> B.pk "
@@ -933,11 +938,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // negative value used for input distance argument
         sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, -1) ;";
         expectedMsg = "Invalid input to DWITHIN function: 'Value of DISTANCE argument must be non-negative'";
-        verifyStmtFails(client, sql, expectedMsg);
-
-        sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, NULL);";
-        expectedMsg = "data type cast needed for parameter or null literal: " +
-                      "input argument distance to DWITHIN function can't be NULL literal";
         verifyStmtFails(client, sql, expectedMsg);
     }
 

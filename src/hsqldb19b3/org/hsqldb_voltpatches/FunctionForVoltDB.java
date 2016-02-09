@@ -604,10 +604,6 @@ public class FunctionForVoltDB extends FunctionSQL {
                 throw Error.error(ErrorCode.X_42565,
                         "input type DISTANCE to DWITHIN function must be non-negative numeric value");
             }
-            else if (nodes[2].dataType == null && !nodes[2].isParam) {
-                throw Error.error(ErrorCode.X_42567,
-                        "input argument distance to DWITHIN function can't be NULL literal");
-            }
             break;
 
         case FunctionId.FUNC_VOLT_ASTEXT:
