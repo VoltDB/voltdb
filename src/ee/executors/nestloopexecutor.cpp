@@ -71,71 +71,28 @@
 using namespace std;
 using namespace voltdb;
 
-static const char UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
-static const char MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
+const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
+const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
-void NestLoopExecutor::CountingPostfilter::init(const AbstractExpression * postfilter, int limit, int offset) {
-    m_postfilter = postfilter;
-    m_limit = limit;
-    m_offset = offset;
-    m_tuple_skipped = 0;
-    m_tuple_ctr = 0;
-}
-
-// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-bool NestLoopExecutor::CountingPostfilter::eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
-    if (m_postfilter == NULL || m_postfilter->eval(&outer_tuple, &inner_tuple).isTrue()) {
-        // Check if we have to skip this tuple because of offset
-        if (m_tuple_skipped < m_offset) {
-            m_tuple_skipped++;
-            return false;
-        }
-        ++m_tuple_ctr;
-        return true;
-    }
-    return false;
-}
-
-void NestLoopExecutor::outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
-    if (m_aggExec != NULL && m_aggExec->p_execute_tuple(join_tuple)) {
-        m_postfilter.setAboveLimit();
-    }
-    m_tmpOutputTable->insertTempTuple(join_tuple);
-    pmp.countdownProgress();
-}
-
-bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
-                              TempTableLimits* limits)
+bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
+                                   TempTableLimits* limits)
 {
-    VOLT_TRACE("init NestLoop Executor");
+    VOLT_TRACE("init NLJ Executor");
+    assert(limits);
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
 
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
-
-    assert(m_tmpOutputTable);
-
-    // NULL tuple for outer join
-    JoinType joinType = node->getJoinType();
-    if (joinType != JOIN_TYPE_INNER) {
-        Table* inner_table = node->getInputTable(1);
-        assert(inner_table);
-        m_null_inner_tuple.init(inner_table->schema());
-        if (joinType == JOIN_TYPE_FULL) {
-            Table* outer_table = node->getInputTable();
-            assert(outer_table);
-            m_null_outer_tuple.init(outer_table->schema());
-        }
+    // Init parent first
+    if (!AbstractJoinExecutor::p_init(abstractNode, limits)) {
+        return false;
     }
 
-    // Inline aggregation can be serial, partial or hash
-    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
+    // NULL tuples for left and full joins
+    p_init_null_tuples(node->getInputTable(1), node->getInputTable());
 
     return true;
 }
-
 
 bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
@@ -181,13 +138,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     "NULL" : wherePredicate->debug(true).c_str());
     }
 
-    // Join type
-    JoinType join_type = node->getJoinType();
-    assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT || join_type == JOIN_TYPE_FULL);
-
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
     TableTupleFilter innerTableFilter;
-    if (join_type == JOIN_TYPE_FULL) {
+    if (m_joinType == JOIN_TYPE_FULL) {
         // Prepopulate the view with all inner tuples
         innerTableFilter.init(inner_table);
     }
@@ -243,7 +196,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                     outerMatch = true;
                     // The inner tuple passed the join predicate
-                    if (join_type == JOIN_TYPE_FULL) {
+                    if (m_joinType == JOIN_TYPE_FULL) {
                         // Mark it as matched
                         innerTableFilter.updateTuple(inner_tuple, MATCHED_TUPLE);
                     }
@@ -260,7 +213,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         // Left Outer Join
         //
-        if (join_type != JOIN_TYPE_INNER && !outerMatch && m_postfilter.isUnderLimit()) {
+        if (m_joinType != JOIN_TYPE_INNER && !outerMatch && m_postfilter.isUnderLimit()) {
             // Still needs to pass the filter
             if (m_postfilter.eval(outer_tuple, null_inner_tuple)) {
                 // Matched! Complete the joined tuple with the inner column values.
@@ -273,13 +226,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     // FULL Outer Join. Iterate over the unmatched inner tuples
     //
-    if (join_type == JOIN_TYPE_FULL && m_postfilter.isUnderLimit()) {
+    if (m_joinType == JOIN_TYPE_FULL && m_postfilter.isUnderLimit()) {
         // Preset outer columns to null
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, outer_cols);
 
-        TableTupleFilter_iterator endItr = innerTableFilter.end(UNMATCHED_TUPLE);
-        for (TableTupleFilter_iterator itr = innerTableFilter.begin(UNMATCHED_TUPLE);
+        TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
+        for (TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
                 itr != endItr && m_postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
             uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);

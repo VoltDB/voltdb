@@ -58,10 +58,9 @@ namespace voltdb {
 
 class Table;
 
-template<typename Value>
+// Iterator forward declaration
+template<int8_t MARKER, typename Value>
 class TableTupleFilter_iter;
-typedef TableTupleFilter_iter<uint64_t> TableTupleFilter_iterator;
-typedef TableTupleFilter_iter<uint64_t const> TableTupleFilter_const_iterator;
 
 /**
  * A lightweight representation of a table - a contiguous array where each tuple
@@ -80,12 +79,11 @@ class TableTupleFilter {
 
     public:
 
-    static const char INACTIVE_TUPLE;
-    static const char ACTIVE_TUPLE;
-    static const char MARKED_TUPLE;
+    const static int8_t INACTIVE_TUPLE  = -1;
+    const static int8_t ACTIVE_TUPLE    =  0;
 
-    friend class TableTupleFilter_iter<uint64_t>;
-    friend class TableTupleFilter_iter<uint64_t const>;
+    template<int8_t MARKER, typename Value>
+    friend class TableTupleFilter_iter;
 
     /**
      * Default constructor
@@ -135,18 +133,23 @@ class TableTupleFilter {
         return m_lastActiveTupleIndex == INVALID_INDEX;
     }
 
-    // Iterators
-    TableTupleFilter_iterator begin(char marker);
+    // Non-const Iterators
+    template<int8_t MARKER>
+    TableTupleFilter_iter<MARKER, uint64_t> begin();
 
-    TableTupleFilter_iterator end(char marker);
+    template<int8_t MARKER>
+    TableTupleFilter_iter<MARKER, uint64_t> end();
 
-    TableTupleFilter_const_iterator begin(char marker) const;
+    // Const Iterators
+    template<int8_t MARKER>
+    TableTupleFilter_iter<MARKER, uint64_t const> begin() const;
 
-    TableTupleFilter_const_iterator end(char marker) const;
+    template<int8_t MARKER>
+    TableTupleFilter_iter<MARKER, uint64_t const> end() const;
 
     private:
 
-    static const uint64_t INVALID_INDEX;
+    const static uint64_t INVALID_INDEX;
 
     void init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBlock, uint32_t tupleLength);
 
@@ -206,13 +209,15 @@ class TableTupleFilter {
  * Iterates over the tuples that have a certain value set in
  * underline TableTupleFilter.
  *
+ * Parameter MARKER specifies the value to look for. Only tuples that have
+ * their value set to MARKER will be iterated over
  * Value is expected to be one of "uint64_t" or "const uint64_t"
  * for Non-Const and Const iterator versions
  */
-template<typename Value>
+template<int8_t MARKER, typename Value>
 class TableTupleFilter_iter
   : public boost::iterator_facade<
-        TableTupleFilter_iter<Value>
+        TableTupleFilter_iter<MARKER, Value>
       , Value
       , boost::forward_traversal_tag>
 {
@@ -220,11 +225,11 @@ class TableTupleFilter_iter
     /**
      * Default constructor
      */
-    TableTupleFilter_iter(char marker = 0)
-      : m_tableFilter(0), m_tupleIdx(), m_marker(marker)
+    TableTupleFilter_iter()
+      : m_tableFilter(0), m_tupleIdx()
     {}
 
-private:
+    private:
 
     friend class TableTupleFilter;
     friend class boost::iterator_core_access;
@@ -233,8 +238,8 @@ private:
      * Constructor. Sets the iterator position pointing to the first tuple that
      * have the TableTupleFilter value set to the MARKER
      */
-    explicit TableTupleFilter_iter(TableTupleFilter* m_tableFilter, char marker = 0)
-      : m_tableFilter(m_tableFilter), m_tupleIdx(TableTupleFilter::INVALID_INDEX), m_marker(marker)
+    explicit TableTupleFilter_iter(TableTupleFilter* m_tableFilter)
+      : m_tableFilter(m_tableFilter), m_tupleIdx(TableTupleFilter::INVALID_INDEX)
     {
         if (!m_tableFilter->empty())
         {
@@ -245,14 +250,16 @@ private:
     /**
      * Constructor. Sets the iterator position pointing to the specified position - usually the end
      */
-    explicit TableTupleFilter_iter(const TableTupleFilter* m_tableFilter, size_t tupleIdx, char marker = 0)
-        :  m_tableFilter(m_tableFilter), m_tupleIdx(tupleIdx), m_marker(marker)
+    explicit TableTupleFilter_iter(const TableTupleFilter* m_tableFilter, size_t tupleIdx)
+        :  m_tableFilter(m_tableFilter), m_tupleIdx(tupleIdx)
     {}
+
+    private:
 
     bool equal(TableTupleFilter_iter const& other) const
     {
-        // Shouldn't compare iterators from different tables and looking for different values
-        assert(m_tableFilter == other.m_tableFilter && m_marker == other.m_marker);
+        // Shouldn't compare iterators from different tables
+        assert(m_tableFilter == other.m_tableFilter);
         return m_tupleIdx == other.m_tupleIdx;
     }
 
@@ -268,40 +275,43 @@ private:
         do
         {
             ++m_tupleIdx;
-        } while(m_tupleIdx <= lastActiveTupleIndex && m_tableFilter->getTupleValue(m_tupleIdx) != m_marker);
+        } while(m_tupleIdx <= lastActiveTupleIndex && m_tableFilter->getTupleValue(m_tupleIdx) != MARKER);
     }
 
     const TableTupleFilter* m_tableFilter;
     Value m_tupleIdx;
-    char m_marker;
 };
 
+template <int8_t MARKER>
 inline
-TableTupleFilter_iterator TableTupleFilter::begin(char marker)
+TableTupleFilter_iter<MARKER, uint64_t> TableTupleFilter::begin()
 {
-    return TableTupleFilter_iterator(this, marker);
+    return TableTupleFilter_iter<MARKER, uint64_t>(this);
 }
 
+template <int8_t MARKER>
 inline
-TableTupleFilter_iterator TableTupleFilter::end(char marker)
+TableTupleFilter_iter<MARKER, uint64_t> TableTupleFilter::end()
 {
     uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableTupleFilter::INVALID_INDEX) ?
         getLastActiveTupleIndex() + 1 : TableTupleFilter::INVALID_INDEX;
-    return TableTupleFilter_iterator(this, lastActiveTupleIndex, marker);
+    return TableTupleFilter_iter<MARKER, uint64_t>(this, lastActiveTupleIndex);
 }
 
+template <int8_t MARKER>
 inline
-TableTupleFilter_const_iterator TableTupleFilter::begin(char marker) const
+TableTupleFilter_iter<MARKER, uint64_t const> TableTupleFilter::begin() const
 {
-    return TableTupleFilter_const_iterator(this, marker);
+    return TableTupleFilter_iter<MARKER, uint64_t const>(this);
 }
 
+template <int8_t MARKER>
 inline
-TableTupleFilter_const_iterator TableTupleFilter::end(char marker) const
+TableTupleFilter_iter<MARKER, uint64_t const> TableTupleFilter::end() const
 {
     uint64_t lastActiveTupleIndex = (getLastActiveTupleIndex() != TableTupleFilter::INVALID_INDEX) ?
         getLastActiveTupleIndex() + 1 : TableTupleFilter::INVALID_INDEX;
-    return TableTupleFilter_const_iterator(this, lastActiveTupleIndex, marker);
+    return TableTupleFilter_iter<MARKER, uint64_t const>(this, lastActiveTupleIndex);
 }
 
 }

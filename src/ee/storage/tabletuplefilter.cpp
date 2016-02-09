@@ -53,11 +53,8 @@
 
 namespace voltdb {
 
-const char TableTupleFilter::INACTIVE_TUPLE = -1;
-const char TableTupleFilter::ACTIVE_TUPLE = 0;
-const char TableTupleFilter::MARKED_TUPLE = 1;
-
 const uint64_t TableTupleFilter::INVALID_INDEX = std::numeric_limits<uint64_t>::max();
+
 
 TableTupleFilter::TableTupleFilter() :
     m_tuples(),

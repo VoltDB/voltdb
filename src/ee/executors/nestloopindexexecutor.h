@@ -50,7 +50,7 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractjoinexecutor.h"
 
 
 namespace voltdb {
@@ -69,11 +69,11 @@ class TableTuple;
  * This executor is faster than HashMatchJoin and MergeJoin if only one
  * of underlying tables has low selectivity.
  */
-class NestLoopIndexExecutor : public AbstractExecutor
+class NestLoopIndexExecutor : public AbstractJoinExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractJoinExecutor(engine, abstract_node)
         , m_indexNode(NULL)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
     { }
@@ -82,50 +82,15 @@ public:
 
 protected:
 
-    // Helper struct to evaluate a postfilter and count the number of tuples that
-    // successfully passed the evaluation
-    struct CountingPostfilter {
-        void init(const AbstractExpression * wherePredicate, int limit, int offset);
-
-        // Returns true is LIMIT is not reached yet
-        bool isUnderLimit() const {
-            return m_limit == -1 || m_tuple_ctr < m_limit;
-        }
-
-        void setAboveLimit() {
-            assert (m_limit != -1);
-            m_tuple_ctr = m_limit;
-        }
-
-        // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-        bool eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple);
-
-        private:
-        const AbstractExpression *m_postfilter;
-        int m_limit;
-        int m_offset;
-
-        int m_tuple_skipped;
-        int m_tuple_ctr;
-    };
-
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    // Write tuple to the output table
-    void outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
-
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
-    StandAloneTupleStorage m_null_outer_tuple;
-    StandAloneTupleStorage m_null_inner_tuple;
     StandAloneTupleStorage m_indexValues;
-    AggregateExecutorBase* m_aggExec;
-    CountingPostfilter m_postfilter;
 };
 
 }
