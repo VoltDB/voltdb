@@ -135,6 +135,9 @@ public class KafkaImportBenchmark {
         @Option(desc = "Set to true to use voltdb export instead of groovy loader to populate kafka topic(s).")
         boolean useexport = false;
 
+        @Option(desc = "Choose Kafka producer: voltdb export or client, or external groovy loader to populate topic(s) (export|client|none).")
+        String producer = "none";
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -161,8 +164,13 @@ public class KafkaImportBenchmark {
             if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (producerpause > displayinterval)
+            if (producer == "client" && producerpause > displayinterval)
                 displayinterval = producerpause;
+            if (producer == "client" || producer == "none") {
+                useexport = false;
+            } else if (producer == "export") {
+                useexport = true;
+            }
             log.info("finished validating args");
         }
     }
@@ -254,7 +262,7 @@ public class KafkaImportBenchmark {
             @Override
             public void run() {
                 long count = 0;
- 
+
                 if (!config.useexport) {
                     count = MatchChecks.getImportTableRowCount(config.alltypes, client); // imported count
                 } else {
@@ -363,10 +371,13 @@ public class KafkaImportBenchmark {
 
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
-        kafkaProducer = new Producer(config.kafkatopic, config.kafkaserverlist, config.producerrate, config.producercycletime, config.producerpause, config.expected_rows);
 
-        log.info("Starting Kafka producer");
-        kafkaProducer.start();
+        // the internal kafka producer client...
+        if (config.producer == "client") {
+            kafkaProducer = new Producer(config.kafkatopic, config.kafkaserverlist, config.producerrate, config.producercycletime, config.producerpause, config.expected_rows);
+            log.info("Starting Kafka producer");
+            kafkaProducer.start();
+        }
 
         log.info("Starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);

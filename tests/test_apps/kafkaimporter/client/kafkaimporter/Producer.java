@@ -34,15 +34,10 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import com.google_voltpatches.common.util.concurrent.RateLimiter;
 import org.voltcore.logging.VoltLogger;
 
-/**
- * Derived from
- * 		An example using the new java client Producer for Kafka 0.8.2
- *  		Cameron Gregory, http://www.bloke.com/
- */
 public class Producer extends Thread {
     static VoltLogger log = new VoltLogger("KafkaImporter.Producer");
-	KafkaProducer<String,String> m_producer;
-	String m_topic;
+    KafkaProducer<String,String> m_producer;
+    String m_topic;
     String m_servers;
     long m_rate;
     int m_cycletime;
@@ -51,7 +46,7 @@ public class Producer extends Thread {
     long m_cycles;
     boolean m_producerrunning = false;
 
-	public Producer(String topic, String servers, long rate, int cycletime, int pausetime, long rows) {
+    public Producer(String topic, String servers, long rate, int cycletime, int pausetime, long rows) {
         // TODO: add topic check/create, with appropriate replication & partitioning
         m_topic = topic;
         m_servers = servers;
@@ -69,11 +64,11 @@ public class Producer extends Thread {
 
         m_producer = new KafkaProducer<String,String>(props);
         log.info("Instantiate Producer: " + topic + ", " + servers + ", " + rate + ", " + cycletime + ", " + pausetime + ", " + rows);
-	}
+    }
 
     @Override
-	public void run() {
-    	Long rowCnt = new Long(0);
+    public void run() {
+        Long rowCnt = new Long(0);
 
         final RateLimiter rateLimiter = RateLimiter.create(m_rate);
         m_producerrunning = true;
@@ -101,7 +96,7 @@ public class Producer extends Thread {
     }
 
     void shutdown() {
-    	m_producer.close();
+        m_producer.close();
     }
 
     boolean is_ProducerRunning() {
