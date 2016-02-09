@@ -59,6 +59,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.NoConnectionsException;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -161,7 +162,7 @@ public class KafkaImportBenchmark {
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            // if 0, means we're not expecting any rows -- part of new offset checking test
+            // 0, means we're not expecting any rows -- part of new offset checking test
             // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
@@ -355,20 +356,35 @@ public class KafkaImportBenchmark {
     }
 
     public static boolean verifyZero() {
-        log.info("+++ Checking for zero rows in KAFKAIMPORTTABLE1");
-        log.info("+++ Wait for 1 minute for import to settle");
-        Thread.sleep(1 * 1000 * 60); // wait for 1 minute
-        count = MatchChecks.getImportTableRowCount(config.alltypes, client); // imported count
+        long count = -1;
+        log.info("Checking for zero rows in KAFKAIMPORTTABLE1");
+        log.info("Wait for 1 minute for import to settle");
+        try {
+			Thread.sleep(1 * 1000 * 60);  // wait for 1 minute
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        //System.out.println("alltypes: " + config.alltypes);
+        try {
+            count = MatchChecks.getImportTableRowCount(false, client); // imported count
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         if (count == 0)
-            endTest(true);
+            return true;
         else
-            endTest(false);
+            return false;
     }
 
-
     public static void endTest(boolean testResult) {
-        client.drain();
-        client.close();
+        try {
+			client.drain();
+			client.close();
+		} catch (NoConnectionsException | InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
         if (testResult == true) {
             log.info("Test passed!");
@@ -378,7 +394,6 @@ public class KafkaImportBenchmark {
             System.exit(1);
         }
     }
-
 
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
@@ -404,7 +419,7 @@ public class KafkaImportBenchmark {
             testResult = verifyZero();
             endTest(testResult);
         }
-            
+
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
