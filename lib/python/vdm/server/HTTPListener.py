@@ -1331,7 +1331,6 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 
-
 class DictClass(dict):
     pass
 
@@ -2209,10 +2208,16 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_stopped = False
         has_run = False
+        if len(result['vdm']['members']) == 0:
+            return jsonify({'status':'errorNoMembers'})
         for member in result['vdm']['members']:
             url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
                   (member['hostname'], __PORT__, database_id, member['id'])
-            response = requests.get(url)
+            try:
+                response = requests.get(url)
+            except:
+                return jsonify({'status':'error', 'hostname':member['hostname']})
+
             if response.json()['status'] == "stalled":
                 if not has_stalled:
                     has_stalled = True
@@ -2222,7 +2227,7 @@ class StatusDatabaseAPI(MethodView):
             elif response.json()['status'] == "stopped":
                 if not has_stopped:
                     has_stopped = True
-            serverDetails.append({member['hostname']: response.json()})
+        serverDetails.append({member['hostname']: response.json()})
 
         if has_stalled:
             status.append({'status': 'stalled'})
