@@ -33,6 +33,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
     \ls -1 "$YCSB_HOME"/core/lib/*.jar; \
+    \ls -1 "$YCSB_HOME"/core/target/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
