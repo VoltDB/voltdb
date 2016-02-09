@@ -165,8 +165,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
 
-    //cout << "name: " << targetTable->name() << " column count: " << targetTable->columnCount() << endl;
-    //cout << "table index: " << tableIndex->getName() << " table index schema: " << tableIndex->getTupleSchema()->debug() << endl;
     //
     // INLINE LIMIT
     //
@@ -211,8 +209,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
 
         try {
-            //cout << "search key - index: " << ctr << " candidateValue: " << candidateValue.toString() << " activeNumOfSearchKeys: " << activeNumOfSearchKeys << endl;
-            //cout << "value size: " << m_searchKeyArray[ctr]->getValueSize() << " value type: " << m_searchKeyArray[ctr]->getValueType() << endl;
             searchKey.setNValue(ctr, candidateValue);
         }
         catch (const SQLException &e) {
@@ -265,16 +261,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
-                    // Create new search key to add it search key table tuple. This is obtained
-                    // by fetching column size and shrinking the key to fit within the column size
+                    // form new search key to add it to search key table tuple from original candidate
+                    // search key. To form new key, use the search column's length in bytes from org table
+                    // by fetching column size. Shrink the candidate key to fit within the column size
                     // note: for varchar the column size can be in bytes or character. So logic
                     // takes into account whether variable length column size is in bytes or not to
-                    // calculate new length. Using this new length, new search key is obtained
+                    // calculate new length in bytes.
 
                     const TupleSchema::ColumnInfo *colInfo = tableIndex->getKeySchema()->getColumnInfo(ctr);
                     uint32_t colLength = colInfo->length;
                     bool inBytes = colInfo->inBytes;
-                    if (colInfo->getVoltType() == VALUE_TYPE_VARBINARY) {
+                    const ValueType valueType = colInfo->getVoltType();
+                    assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
+                    if (valueType == VALUE_TYPE_VARBINARY) {
                         // for varbinary the size is always in bytes
                         inBytes = true;
                     }
@@ -293,9 +292,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                     // obtain new, shrinked key using the length computed from the original key
                     NValue updatedCandidateValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
-                    //cout << "updated string value: " << updatedCandidateValue.toString() << endl;
-                    //cout << colInfo->getVoltType() << "column length " << colLength << " in bytes: " << inBytes << endl;
-
+                    // update search tuple with search key
                     searchKey.setNValue(ctr, updatedCandidateValue);
 
                     switch (localLookupType) {
@@ -310,14 +307,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         default:
                             earlyReturnForSearchKeyOutOfRange = true;
                             assert(!"IndexScanExecutor::p_execute - can't index on not equals");
-                            // TODO: should we return false instead of break?
-                            break;
+                            return false;
                     }
                 }
 
                 // if here, means all tuples with the previous searchkey
                 // columns need to be scanned. Note, if only one column,
-                // then all tuples will be scanned
+                // then all tuples will be scanned. Only exception to this
+                // case is setting of search key in search tuple was due
+                // to search key length exceeding the search column length
+                // of variable length type
                 if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
                     // for variable length, where the search key was greater than the column length,
                     // logic above has generated shrinked key and updated the lookup operator
@@ -347,15 +346,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
-    //cout << "\n\nSearch key after substitutions: " << searchKey.debugNoHeader().c_str() << " number of active search keys: "<< activeNumOfSearchKeys << endl;
-#if 0
-    int columnCount = searchKey.getSchema()->columnCount();
-
-
-    for (int i = 0; i < columnCount; i++) {
-        cout << "SearchKey: nvalue at " << i << " value (string): " << searchKey.getNValue(i).toString() << " debug: " << searchKey.getNValue(i).debug() << endl;
-    }
-#endif
 
     //
     // END EXPRESSION
@@ -469,7 +459,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             continue;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
-        //cout << "LOOPING in indexscan: tuple: " << tuple.debug("tablename").c_str() << endl;
 
         pmp.countdownProgress();
         //
