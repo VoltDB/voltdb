@@ -1236,10 +1236,11 @@ public class TestPlansJoin extends PlannerTestCase {
        failToCompile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 ON C=R3.A;",
                      "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
        // Ambiguous columns in an order by expression.
-       failToCompile("select LR.A, RR.A from R1 LR, R1 RR order by A;", "Column \"A\" is ambiguous.  It's in tables: LR, RR");
+
+
+       failToCompile("select LR.A, RR.A from R1 LR, R1 RR order by A;", "The name \"A\" in an order by expression is ambiguous.  It's in columns: LR.A, RR.A.");
        // Note that LT.A and RT.A are not considered here.
        failToCompile("select LT.A as LA, RT.A as RA from R1 as LT, R1 as RT order by A;", "Column \"A\" is ambiguous.  It's in tables: LT, RT");
-       failToCompile("select LT.A, RT.A from R1 as LT, R1 as RT order by A", "Column \"A\" is ambiguous.  It's in tables: LT, RT");
        // Two columns in the select list with the same name.  This complicates
        // checking for order by aliases.
        failToCompile("select LT.A as LA, RT.A as LA from R1 as LT, R1 as RT order by LA;", "The name \"LA\" in an order by expression is ambiguous.  It's in columns: LA(0), LA(1)");
