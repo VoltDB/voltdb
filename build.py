@@ -237,6 +237,7 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
+ abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
  executorutil.cpp

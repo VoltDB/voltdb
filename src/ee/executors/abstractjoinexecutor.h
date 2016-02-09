@@ -43,27 +43,73 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORENESTLOOPEXECUTOR_H
-#define HSTORENESTLOOPEXECUTOR_H
+#ifndef HSTOREABSTRACTJOINEXECUTOR_H
+#define HSTOREABSTRACTJOINEXECUTOR_H
 
 #include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractjoinexecutor.h"
+#include "common/tabletuple.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
 
+class AbstractExpression;
+class AbstractPlanNode;
+class AggregateExecutorBase;
+class ProgressMonitorProxy;
+class TableTuple;
+class TempTableLimits;
+class VoltDBEngine;
+
 /**
- *
+ *  Abstract base class for all join executors
  */
-class NestLoopExecutor : public AbstractJoinExecutor {
-    public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractJoinExecutor(engine, abstract_node) { }
-    private:
+class AbstractJoinExecutor : public AbstractExecutor {
+    protected:
+        // Constructor
+        AbstractJoinExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+            AbstractExecutor(engine, abstract_node) { }
 
         bool p_init(AbstractPlanNode*, TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
 
+        void p_init_null_tuples(Table* inner_table, Table* outer_table);
+
+        // Helper struct to evaluate a postfilter and count the number of tuples that
+        // successfully passed the evaluation
+        struct CountingPostfilter {
+            void init(const AbstractExpression * wherePredicate, int limit, int offset);
+
+            // Returns true is LIMIT is not reached yet
+            bool isUnderLimit() const {
+                return m_limit == -1 || m_tuple_ctr < m_limit;
+            }
+
+            void setAboveLimit() {
+                assert (m_limit != -1);
+                m_tuple_ctr = m_limit;
+            }
+
+            // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
+            bool eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple);
+
+            private:
+            const AbstractExpression *m_postfilter;
+            int m_limit;
+            int m_offset;
+
+            int m_tuple_skipped;
+            int m_tuple_ctr;
+        };
+
+        // Write tuple to the output table
+        void outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
+
+        JoinType m_joinType;
+
+        StandAloneTupleStorage m_null_outer_tuple;
+        StandAloneTupleStorage m_null_inner_tuple;
+
+        AggregateExecutorBase* m_aggExec;
+        CountingPostfilter m_postfilter;
 };
 
 }

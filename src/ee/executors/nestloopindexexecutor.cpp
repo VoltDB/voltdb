@@ -73,44 +73,19 @@
 using namespace std;
 using namespace voltdb;
 
-static const char UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
-static const char MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
-
-void NestLoopIndexExecutor::CountingPostfilter::init(const AbstractExpression * postfilter, int limit, int offset) {
-    m_postfilter = postfilter;
-    m_limit = limit;
-    m_offset = offset;
-    m_tuple_skipped = 0;
-    m_tuple_ctr = 0;
-}
-
-// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-bool NestLoopIndexExecutor::CountingPostfilter::eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
-    if (m_postfilter == NULL || m_postfilter->eval(&outer_tuple, &inner_tuple).isTrue()) {
-        // Check if we have to skip this tuple because of offset
-        if (m_tuple_skipped < m_offset) {
-            m_tuple_skipped++;
-            return false;
-        }
-        ++m_tuple_ctr;
-        return true;
-    }
-    return false;
-}
-
-void NestLoopIndexExecutor::outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
-    if (m_aggExec != NULL && m_aggExec->p_execute_tuple(join_tuple)) {
-        m_postfilter.setAboveLimit();
-    }
-    m_tmpOutputTable->insertTempTuple(join_tuple);
-    pmp.countdownProgress();
-}
+const static int8_t UNMATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE);
+const static int8_t MATCHED_TUPLE(TableTupleFilter::ACTIVE_TUPLE + 1);
 
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
                                    TempTableLimits* limits)
 {
     VOLT_TRACE("init NLIJ Executor");
     assert(limits);
+
+    // Init parent first
+    if (!AbstractJoinExecutor::p_init(abstractNode, limits)) {
+        return false;
+    }
 
     NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
     assert(node);
@@ -120,23 +95,13 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     VOLT_TRACE("<NestLoopIndexPlanNode> %s, <IndexScanPlanNode> %s",
                m_abstractNode->debug().c_str(), m_indexNode->debug().c_str());
 
-    m_joinType = node->getJoinType();
     m_lookupType = m_indexNode->getLookupType();
     m_sortDirection = m_indexNode->getSortDirection();
-
-    // Inline aggregation can be serial, partial or hash
-    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
 
     //
     // We need exactly one input table and a target table
     //
     assert(node->getInputTableCount() == 1);
-
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
-
-    // output must be a temp table
-    assert(m_tmpOutputTable);
 
     node->getOutputColumnExpressions(m_outputExpressions);
 
@@ -173,16 +138,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     // NULL tuples for left and full joins
-    if (node->getJoinType() != JOIN_TYPE_INNER) {
-        Table* inner_out_table = m_indexNode->getOutputTable();
-        assert(inner_out_table);
-        m_null_inner_tuple.init(inner_out_table->schema());
-        if (node->getJoinType() == JOIN_TYPE_FULL) {
-            Table* outer_table = node->getInputTable();
-            assert(outer_table);
-            m_null_outer_tuple.init(outer_table->schema());
-        }
-    }
+    p_init_null_tuples(m_indexNode->getOutputTable(), node->getInputTable());
 
     m_indexValues.init(index->getKeySchema());
     return true;
@@ -554,8 +510,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, num_of_outer_cols);
 
-        TableTupleFilter_iterator endItr = innerTableFilter.end(UNMATCHED_TUPLE);
-        for (TableTupleFilter_iterator itr = innerTableFilter.begin(UNMATCHED_TUPLE);
+        TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
+        for (TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
                 itr != endItr && m_postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
             uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
