@@ -104,7 +104,6 @@ public class KafkaImportBenchmark {
     static TableChangeMonitor exportMon;
     static TableChangeMonitor importMon;
     static MatchChecks matchChecks;
-    static Producer kafkaProducer;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -136,27 +135,8 @@ public class KafkaImportBenchmark {
         @Option(desc = "Set to true to use voltdb export instead of groovy loader to populate kafka topic(s).")
         boolean useexport = false;
 
-        @Option(desc = "Choose Kafka producer: voltdb export or client, or external groovy loader to populate topic(s) (export|client|none).")
-        String producer = "none";
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
-
-        // options for the Kafka producer methods
-        @Option(desc = "Kafka topic")
-        String kafkatopic = "T8_KAFKAEXPORTTABLE1";
-
-        @Option(desc = "Kafka cluster server list -- <host>:9092,....")
-        String kafkaserverlist = "localhost:9092";
-
-        @Option(desc = "Pause interval (seconds) for Kafka producer")
-        int producerpause = 30;
-
-        @Option(desc = "Cycle time (seconds) for Kafka producer")
-        int producercycletime = 60;
-
-        @Option(desc = "Rows/second rate for Kafka producer")
-        long producerrate = 10000;
 
         @Override
         public void validate() {
@@ -166,13 +146,6 @@ public class KafkaImportBenchmark {
             // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (producer == "client" && producerpause > displayinterval)
-                displayinterval = producerpause;
-            if (producer == "client" || producer == "none") {
-                useexport = false;
-            } else if (producer == "export") {
-                useexport = true;
-            }
             log.info("finished validating args");
         }
     }
@@ -360,12 +333,11 @@ public class KafkaImportBenchmark {
         log.info("Checking for zero rows in KAFKAIMPORTTABLE1");
         log.info("Wait for 1 minute for import to settle");
         try {
-			Thread.sleep(1 * 1000 * 60);  // wait for 1 minute
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        //System.out.println("alltypes: " + config.alltypes);
+            Thread.sleep(1 * 1000 * 60);  // wait for 1 minute
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         try {
             count = MatchChecks.getImportTableRowCount(false, client); // imported count
         } catch (Exception e) {
@@ -379,12 +351,11 @@ public class KafkaImportBenchmark {
 
     public static void endTest(boolean testResult) {
         try {
-			client.drain();
-			client.close();
-		} catch (NoConnectionsException | InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+            client.drain();
+            client.close();
+        } catch (NoConnectionsException | InterruptedException e) {
+            e.printStackTrace();
+        }
 
         if (testResult == true) {
             log.info("Test passed!");
@@ -423,13 +394,6 @@ public class KafkaImportBenchmark {
         // instance handles inserts to Kafka export table and its mirror DB table
         exportProc = new InsertExport(config.alltypes, client, rowsAdded);
 
-        // the internal kafka producer client...
-        if (config.producer == "client") {
-            kafkaProducer = new Producer(config.kafkatopic, config.kafkaserverlist, config.producerrate, config.producercycletime, config.producerpause, config.expected_rows);
-            log.info("Starting Kafka producer");
-            kafkaProducer.start();
-        }
-
         log.info("Starting KafkaImportBenchmark...");
         KafkaImportBenchmark benchmark = new KafkaImportBenchmark(config);
         BenchmarkRunner runner = new BenchmarkRunner(benchmark);
@@ -445,12 +409,7 @@ public class KafkaImportBenchmark {
         // check that the mirror table is empty. If not, that indicates that
         // not all the rows got to Kafka or not all the rows got imported back.
         do {
-            // no progress expected so no point checking and possibly failing the test erroneously
-            //if (!kafkaProducer.is_ProducerRunning()) {
-                //log.info("+++ waiting for producer to start up again");
-                //Thread.sleep(config.producerpause*1000);
-            //} else {
-                Thread.sleep(END_WAIT * 1000);
+            Thread.sleep(END_WAIT * 1000);
             //}
             // importProgress is an array of sampled counts of the importedcounts table, showing import progress
             // samples are recorded by the checkTimer thread
@@ -495,15 +454,6 @@ public class KafkaImportBenchmark {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
         }
 
-        client.drain();
-        client.close();
-
-        if (testResult == true) {
-            log.info("Test passed!");
-            System.exit(0);
-        } else {
-            log.info("Test failed!");
-            System.exit(1);
-        }
+        endTest(testResult);
     }
 }
