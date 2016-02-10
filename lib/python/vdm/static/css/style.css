@@ -530,6 +530,9 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	width: 50%;
 	position: relative;
 }
+
+.startSelect { width:160px; height:100px; margin:0 auto; padding:20px 0 0 0; }
+.startSelect >.form-control { height: 45px; border-radius:5px; font-weight:bold; padding:0 0 0 15px; font-size:14px; color:#000;}
 .resetpb {
 	float: right;
 	width: 50%;
