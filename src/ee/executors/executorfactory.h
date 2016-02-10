@@ -42,56 +42,17 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "abstractjoinexecutor.h"
-#include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "plannodes/abstractjoinnode.h"
-#include "storage/table.h"
 
-using namespace std;
-using namespace voltdb;
+#ifndef HSTOREEXECUTORFACTORY_H
+#define HSTOREEXECUTORFACTORY_H
 
-void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
-    if (m_aggExec != NULL) {
-        if (m_aggExec->p_execute_tuple(join_tuple)) {
-            // Aggregate has reached the limit
-            postfilter.setAboveLimit();
-        }
-        return;
-    }
-    m_tmpOutputTable->insertTempTuple(join_tuple);
-    pmp.countdownProgress();
+namespace voltdb {
+
+class AbstractExecutor;
+class AbstractPlanNode;
+class VoltDBEngine;
+
+AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 }
 
-void AbstractJoinExecutor::p_init_null_tuples(Table* inner_table, Table* outer_table) {
-    if (m_joinType != JOIN_TYPE_INNER) {
-        assert(inner_table);
-        m_null_inner_tuple.init(inner_table->schema());
-        if (m_joinType == JOIN_TYPE_FULL) {
-            assert(outer_table);
-            m_null_outer_tuple.init(outer_table->schema());
-        }
-    }
-}
-
-bool AbstractJoinExecutor::p_init(AbstractPlanNode* abstract_node,
-                              TempTableLimits* limits)
-{
-    VOLT_TRACE("Init AbstractJoinExecutor Executor");
-
-    AbstractJoinPlanNode* node = dynamic_cast<AbstractJoinPlanNode*>(abstract_node);
-    assert(node);
-
-    m_joinType = node->getJoinType();
-    assert(m_joinType == JOIN_TYPE_INNER || m_joinType == JOIN_TYPE_LEFT || m_joinType == JOIN_TYPE_FULL);
-
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
-    assert(m_tmpOutputTable);
-
-    // Inline aggregation can be serial, partial or hash
-    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
-
-    return true;
-}
+#endif
