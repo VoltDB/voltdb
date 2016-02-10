@@ -155,12 +155,12 @@ abstract public class Scheduler implements InitiatorMessageHandler
     }
 
     /**
-     * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
+     * Update last seen uniqueIds in the replay sequencer. This is used on MPI repair.
      * @param message
      */
-    public void updateLastSeenTxnIds(VoltMessage message)
+    public void updateLastSeenUniqueIds(VoltMessage message)
     {
-        long sequenceWithTxnId = Long.MIN_VALUE;
+        long sequenceWithUniqueId = Long.MIN_VALUE;
 
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
@@ -175,17 +175,17 @@ abstract public class Scheduler implements InitiatorMessageHandler
         assert(!(commandLog && dr));
 
         if (commandLog || sentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
         }
         else if (dr) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 
         if (replay) {
             // Update last seen and last polled txnId for replicas
-            m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+            m_replaySequencer.updateLastSeenUniqueId(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
-            m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+            m_replaySequencer.updateLastPolledUniqueId(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
         }
     }
