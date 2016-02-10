@@ -219,6 +219,15 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE A, INDEXED_VL_TABLE B where A.VC1 < 'abcd' AND B.VC2 > 'abbd' order by A.VC1, B.VC2;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
+
+        // result set of 'not equal' lookup with search parameter exceeding indexed column length
+        // will result in non-filtered result on that column except NULL values
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 IS NOT NULL AND VC2 IS NOT NULL order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <> 'abbd' AND VC2 <> 'abcd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, expectedVT, vt);
     }
 
     //
