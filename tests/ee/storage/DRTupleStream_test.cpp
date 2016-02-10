@@ -485,6 +485,45 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
 }
 
 /**
+ * Verify that we can roll buffers for back to back large transactions.
+ * Each large transaction fits in one large buffer, but not more than one.
+ */
+TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
+{
+    int tuples_to_fill = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
+    const StreamBlock *firstBlock = m_wrapper.m_currBlock;
+    const StreamBlock *secondBlock = NULL;
+
+    // fill one large buffer
+    for (;;) {
+        appendTuple(0, 1);
+        if (m_wrapper.m_currBlock != firstBlock) {
+            secondBlock = m_wrapper.m_currBlock;
+            EXPECT_EQ(LARGE_STREAM_BLOCK, secondBlock->type());
+            break;
+        }
+    }
+    m_wrapper.endTransaction(addPartitionId(1));
+
+    ASSERT_FALSE(m_topend.receivedDRBuffer);
+
+    // fill the first large buffer, and roll to another large buffer
+    for (int i = 1; i <= tuples_to_fill; i++) {
+        appendTuple(1, 2);
+    }
+    m_wrapper.endTransaction(addPartitionId(2));
+
+    // make sure we rolled, and the new buffer is a large buffer
+    EXPECT_NE(secondBlock, m_wrapper.m_currBlock);
+    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.m_currBlock->type());
+
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
+
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    EXPECT_EQ(2, m_topend.blocks.size());
+}
+
+/**
  * Fill a buffer with a single TXN, close it with the first tuple in
  * the next buffer, and then roll back that tuple, and verify that our
  * committed buffer is still there.
