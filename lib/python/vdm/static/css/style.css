@@ -1089,6 +1089,7 @@ table.tblPopup {
 .configurTbl tr td {
     border: none;
     padding: 5px 0;
+    vertical-align:middle;
 }
 .propertiesAlign {
     margin: 10px 0 0 0;
@@ -1145,6 +1146,19 @@ table.tblPopup {
 
 .btnDbList { cursor:pointer; padding:20px 0;}
 .btnDbList:hover{ color:#c70000;}
+.drop-down-list li:hover{background-color:#3A89FF; color:#fff;}
+.formatImport { position:relative; width:175px;  margin-bottom:0;}
+.formatImport > .input-group > .formatHeight { height:30px; border: 1px solid #ccc;width:140px;
+    padding: 0 0 0 5px;}
+
+.connectionSourceTblPopup tr td.drnote {font-size:12px; text-decoration:underline; font-style: italic; }
+.disableSelect {background-color: #eee; border-color: #ccc;}
+.form-control, .input-group-addon{border-radius:0;}
+.drop-down-list{background:#fff; border:1px solid #ccc; border-top:none;position:absolute; left:0; top:30px; width:175px; display:none;}
+.drop-down-list li{padding:3px 10px;}
+input.drop-down-input{width:125px !important;}
+.col-xs-4{padding-left:0 !important;}
+
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1327,8 +1341,7 @@ select{
     border-color: #ccc;}
 
 }
-.connectionSourceTblPopup tr td.drnote {font-size:12px; text-decoration:underline; font-style: italic; }
-.disableSelect {background-color: #eee; border-color: #ccc;}
+
 
 
 /**************Button start/Stop ends******************/
@@ -1458,4 +1471,6 @@ ul.drList {
     width: 67%;
 }
 }
+
+
 

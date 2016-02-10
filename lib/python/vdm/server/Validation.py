@@ -543,7 +543,6 @@ schema = {
                                     "module": {
                                         "id": "module",
                                         "type": "string",
-                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "enabled": {
                                         "id": "enabled",
@@ -552,7 +551,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
+                                        "enum": ["kafka", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
@@ -560,7 +559,7 @@ schema = {
                                     },
 
                                 },
-                                 "required": ["module"]
+                                 "required": ["format"]
                             }
                         ]
                     }
