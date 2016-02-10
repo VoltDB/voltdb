@@ -56,9 +56,9 @@
       <!--<a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>-->
       
        <div class="form-group startSelect">
-        <select class="form-control">
-        <option>Create New</option>
-        <option>Recover existing</option>
+        <select id="startOption" class="form-control">
+        <option value="1">Create New</option>
+        <option value="2">Recover existing</option>
        
         </select>
         </div>
@@ -92,7 +92,7 @@
     </div>
   </div>
 </div>	
-	<div id="" class="stalledFail" style="display:none;" >
+	<div id="" class="startFail" style="display:none;" >
   <div class="modal-dialog modal-dialog-center">
     <!-- Modal content-->
     <div class="modal-content">
@@ -104,6 +104,7 @@
         <p>The cluster failed to start because..............[reason]</p>
         
 		</div>
+
         <div class="btnSpelled"> 
     <button id="" type="button" class="btn">OK</button></div>
  </div>
@@ -113,6 +114,29 @@
     </div>
   </div>
 </div>
+          <div id="" class="recoverFail" style="display:none;" >
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Recover Failed</h4>
+      </div>
+      <div class="modal-body">
+        <div class="containerRecover">
+        <p>The cluster failed to start because..............[reason]</p>
+
+		</div>
+
+        <div class="btnSpelled">
+    <button id="" type="button" class="btn">OK</button></div>
+ </div>
+
+
+
+    </div>
+  </div>
+</div>
+
         <div id="" class="connectionFail" style="display:none;" >
   <div class="modal-dialog modal-dialog-center">
     <!-- Modal content-->
