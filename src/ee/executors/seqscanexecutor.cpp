@@ -49,6 +49,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
@@ -108,8 +109,6 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
@@ -182,25 +181,24 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         if (limit_node) {
             limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
-
-        int tuple_ctr = 0;
-        int tuple_skipped = 0;
-        TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
+        // Initialize the postfilter
+        CountingPostfilter postfilter(predicate, limit, offset);
 
         ProgressMonitorProxy pmp(m_engine, this);
         TableTuple temp_tuple;
+        assert(m_tmpOutputTable);
         if (m_aggExec != NULL) {
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
             temp_tuple = m_aggExec->p_execute_init(params, &pmp,
-                    inputSchema, output_temp_table);
+                    inputSchema, m_tmpOutputTable);
         } else {
-            temp_tuple = output_temp_table->tempTuple();
+            temp_tuple = m_tmpOutputTable->tempTuple();
         }
 
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+        while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
@@ -208,17 +206,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             pmp.countdownProgress();
 
             //
-            // For each tuple we need to evaluate it against our predicate
+            // For each tuple we need to evaluate it against our predicate and limit/offset
             //
-            if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
+            if (postfilter.eval(&tuple, NULL))
             {
-                // Check if we have to skip this tuple because of offset
-                if (tuple_skipped < offset) {
-                    tuple_skipped++;
-                    continue;
-                }
-                ++tuple_ctr;
-
                 //
                 // Nested Projection
                 // Project (or replace) values from input tuple
@@ -230,27 +221,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-
-                    if (m_aggExec != NULL) {
-                        if (m_aggExec->p_execute_tuple(temp_tuple)) {
-                            break;
-                        }
-                    } else {
-                        output_temp_table->insertTupleNonVirtual(temp_tuple);
-                    }
+                    outputTuple(postfilter, temp_tuple);
                 }
                 else
                 {
-                    if (m_aggExec != NULL) {
-                        if (m_aggExec->p_execute_tuple(tuple)) {
-                            break;
-                        }
-                    } else {
-                        //
-                        // Insert the tuple into our output table
-                        //
-                        output_temp_table->insertTupleNonVirtual(tuple);
-                    }
+                    outputTuple(postfilter, tuple);
                 }
                 pmp.countdownProgress();
             }
@@ -263,8 +238,23 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
-    VOLT_TRACE("\n%s\n", output_table->debug().c_str());
+    VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 
     return true;
+}
+
+void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+    if (m_aggExec != NULL) {
+        if (m_aggExec->p_execute_tuple(tuple)) {
+            // Aggregate has reached the limit
+            postfilter.setAboveLimit();
+        }
+        return;
+    }
+    //
+    // Insert the tuple into our output table
+    //
+    assert(m_tmpOutputTable);
+    m_tmpOutputTable->insertTupleNonVirtual(tuple);
 }

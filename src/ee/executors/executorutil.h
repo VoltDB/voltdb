@@ -46,16 +46,39 @@
 #ifndef HSTOREEXECUTORUTIL_H
 #define HSTOREEXECUTORUTIL_H
 
-#include "executors/abstractexecutor.h"
-#include "plannodes/abstractplannode.h"
+#include <cassert>
 
 namespace voltdb {
 
-class AbstractExecutor;
-class AbstractPlanNode;
-class VoltDBEngine;
+class AbstractExpression;
+class TableTuple;
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+// Helper struct to evaluate a postfilter and count the number of tuples that
+// successfully passed the evaluation
+struct CountingPostfilter {
+    CountingPostfilter(const AbstractExpression * wherePredicate, int limit, int offset);
+
+    // Returns true is LIMIT is not reached yet
+    bool isUnderLimit() const {
+        return m_limit == -1 || m_tuple_ctr < m_limit;
+    }
+
+    void setAboveLimit() {
+        assert (m_limit != -1);
+        m_tuple_ctr = m_limit;
+    }
+
+    // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
+    bool eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple);
+
+    private:
+    const AbstractExpression *m_postfilter;
+    int m_limit;
+    int m_offset;
+
+    int m_tuple_skipped;
+    int m_tuple_ctr;
+};
 
 }
 

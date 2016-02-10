@@ -51,6 +51,7 @@
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
@@ -410,17 +411,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         tableIndex->moveToEnd(toStartActually, indexCursor);
     }
 
-    int tuple_ctr = 0;
-    int tuples_skipped = 0;     // for offset
     int limit = -1;
     int offset = -1;
     if (limit_node != NULL) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
+    // Initialize the postfilter
+    CountingPostfilter postfilter(post_expression, limit, offset);
+
     //
     // We have to different nextValue() methods for different lookup types
     //
+<<<<<<< 5f01c9c4625370a148d7b7c4a5c7e60e4df45f20
     while ((limit == -1 || tuple_ctr < limit) &&
            getNextTuple(localLookupType,
                         &tuple,
@@ -428,6 +431,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         &indexCursor,
                         activeNumOfSearchKeys)) {
 
+=======
+    while (postfilter.isUnderLimit() &&
+            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+                    !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
+                    ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
+                            !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
+>>>>>>> Code review comments implementation
         if (tuple.isPendingDelete()) {
             continue;
         }
@@ -453,43 +463,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
         //
-        // Then apply our post-predicate to do further filtering
+        // Then apply our post-predicate and LIMIT/OFFSET to do further filtering
         //
-        if (post_expression == NULL || post_expression->eval(&tuple, NULL).isTrue()) {
-            //
-            // INLINE OFFSET
-            //
-            if (tuples_skipped < offset)
-            {
-                tuples_skipped++;
-                continue;
-            }
-            tuple_ctr++;
+        if (postfilter.eval(&tuple, NULL)) {
 
             if (m_projector.numSteps() > 0) {
-
                 m_projector.exec(temp_tuple, tuple);
-
-                if (m_aggExec != NULL) {
-                    if (m_aggExec->p_execute_tuple(temp_tuple)) {
-                        break;
-                    }
-                } else {
-                    m_outputTable->insertTupleNonVirtual(temp_tuple);
-                }
+                outputTuple(postfilter, temp_tuple);
             }
-            else
-            {
-                if (m_aggExec != NULL) {
-                    if (m_aggExec->p_execute_tuple(tuple)) {
-                        break;
-                    }
-                } else {
-                    //
-                    // Straight Insert
-                    //
-                    m_outputTable->insertTupleNonVirtual(tuple);
-                }
+            else {
+                outputTuple(postfilter, temp_tuple);
             }
             pmp.countdownProgress();
         }
@@ -502,6 +485,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
+}
+
+void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+    if (m_aggExec != NULL) {
+        if (m_aggExec->p_execute_tuple(tuple)) {
+            // Aggregate has reached the limit
+            postfilter.setAboveLimit();
+        }
+        return;
+    }
+    //
+    // Insert the tuple into our output table
+    //
+    assert(m_tmpOutputTable);
+    m_outputTable->insertTupleNonVirtual(tuple);
 }
 
 IndexScanExecutor::~IndexScanExecutor() {

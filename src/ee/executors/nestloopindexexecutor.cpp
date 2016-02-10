@@ -43,18 +43,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-#include <string>
-#include <stack>
 #include "nestloopindexexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 
 #include "execution/VoltDBEngine.h"
-#include "executors/aggregateexecutor.h"
-#include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
@@ -70,6 +68,10 @@
 #include "storage/tableiterator.h"
 
 #include "indexes/tableindex.h"
+
+#include <vector>
+#include <string>
+#include <stack>
 
 using namespace std;
 using namespace voltdb;
@@ -223,7 +225,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    m_postfilter.init(where_expression, limit, offset);
+    // Init the postfilter
+    CountingPostfilter postfilter(where_expression, limit, offset);
 
     //
     // OUTER TABLE ITERATION
@@ -277,7 +280,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     }
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (m_postfilter.isUnderLimit() && outer_iterator.next(outer_tuple)) {
+    while (postfilter.isUnderLimit() && outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         pmp.countdownProgress();
@@ -509,7 +512,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             innerTableFilter.updateTuple(inner_tuple, MATCHED_TUPLE);
                         }
                         // Still need to pass where filtering
-                        if (m_postfilter.eval(outer_tuple, inner_tuple)) {
+                        if (postfilter.eval(&outer_tuple, &inner_tuple)) {
                             //
                             // Try to put the tuple into our output table
                             // Append the inner values to the end of our join tuple
@@ -524,7 +527,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                        join_tuple.debug(m_tmpOutputTable->name()).c_str());
                             VOLT_TRACE("MATCH: %s",
                                    join_tuple.debug(m_tmpOutputTable->name()).c_str());
-                            outputTuple(join_tuple, pmp);
+                            outputTuple(postfilter, join_tuple, pmp);
                         }
                     }
                 } // END INNER WHILE LOOP
@@ -534,10 +537,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         //
         // Left/Full Outer Join
         //
-        if (m_joinType != JOIN_TYPE_INNER && !outerMatch && m_postfilter.isUnderLimit())
+        if (m_joinType != JOIN_TYPE_INNER && !outerMatch && postfilter.isUnderLimit())
         {
             // Still needs to pass the filter
-            if (m_postfilter.eval(outer_tuple, null_inner_tuple)) {
+            if (postfilter.eval(&outer_tuple, &null_inner_tuple)) {
                 // Matched! Complete the joined tuple with null inner column values.
                 for (int col_ctr = num_of_outer_cols;
                      col_ctr < join_tuple.sizeInValues();
@@ -553,20 +556,20 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     //
     // FULL Outer Join. Iterate over the unmatched inner tuples
     //
-    if (m_joinType == JOIN_TYPE_FULL && m_postfilter.isUnderLimit()) {
+    if (m_joinType == JOIN_TYPE_FULL && postfilter.isUnderLimit()) {
         // Preset outer columns to null
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, num_of_outer_cols);
 
-        TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
-        for (TableTupleFilter_iter<UNMATCHED_TUPLE, uint64_t> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
-                itr != endItr && m_postfilter.isUnderLimit(); ++itr) {
+        TableTupleFilter_iter<UNMATCHED_TUPLE> endItr = innerTableFilter.end<UNMATCHED_TUPLE>();
+        for (TableTupleFilter_iter<UNMATCHED_TUPLE> itr = innerTableFilter.begin<UNMATCHED_TUPLE>();
+                itr != endItr && postfilter.isUnderLimit(); ++itr) {
             // Restore the tuple value
             uint64_t tupleAddr = innerTableFilter.getTupleAddress(*itr);
             inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
             assert(inner_tuple.isActive());
-            if (m_postfilter.eval(null_outer_tuple, inner_tuple)) {
+            if (postfilter.eval(&null_outer_tuple, &inner_tuple)) {
                 // Passed! Complete the joined tuple with the inner column values.
                 for (int col_ctr = num_of_outer_cols;
                      col_ctr < join_tuple.sizeInValues();
@@ -574,7 +577,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     join_tuple.setNValue(col_ctr,
                             m_outputExpressions[col_ctr]->eval(&null_outer_tuple, &inner_tuple));
                 }
-                outputTuple(join_tuple, pmp);
+                outputTuple(postfilter, join_tuple, pmp);
             }
         }
    }
