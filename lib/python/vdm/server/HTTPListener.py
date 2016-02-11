@@ -2259,7 +2259,7 @@ class StatusDatabaseAPI(MethodView):
             elif response.json()['status'] == "stopped":
                 if not has_stopped:
                     has_stopped = True
-        serverDetails.append({server[0]['hostname']: response.json()})
+            serverDetails.append({server[0]['hostname']: response.json()})
 
         if has_stalled:
             status.append({'status': 'stalled'})
@@ -2270,14 +2270,8 @@ class StatusDatabaseAPI(MethodView):
         elif has_stopped and not has_stalled and not has_run:
             status.append({'status': 'stopped'})
 
-        error = ''
-        try:
-            error = Log.get_error_log()
-        except:
-            pass
 
-
-        return jsonify({'status':status, 'serverDetails': serverDetails, 'error': error})
+        return jsonify({'status':status, 'serverDetails': serverDetails})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -2294,10 +2288,17 @@ class StatusDatabaseServerAPI(MethodView):
             return jsonify({'status': "running"})
         except:
             voltProcess = voltdbserver.VoltDatabase(database_id)
+
+            error = ''
+            try:
+                error = Log.get_error_log()
+            except:
+                pass
+
             if voltProcess.Get_Voltdb_Process().isProcessRunning:
-                return jsonify({'status': "stalled"})
+                return jsonify({'status': "stalled", "details": error})
             else:
-                return jsonify({'status': "stopped"})
+                return jsonify({'status': "stopped", "details": error})
 
 
 def main(runner, amodule, config_dir, server):

@@ -182,7 +182,7 @@ class VoltDatabase:
         if (retcode == 0):
             return create_response('Success', 200)
         else:
-            return create_response('Error', Log.get_error_log())
+            return create_response(Log.get_error_log(), 200)
             # return create_response('Error starting server', 500)
     
     def is_voltserver_running(self):
