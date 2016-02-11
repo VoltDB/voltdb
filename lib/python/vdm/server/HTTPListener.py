@@ -46,6 +46,7 @@ import DeploymentConfig
 import voltdbserver
 import glob
 import psutil
+import Log
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
@@ -1895,7 +1896,8 @@ class StartDatabaseAPI(MethodView):
 
         try:
             database = voltdbserver.VoltDatabase(database_id)
-            return database.start_database()
+            response = database.start_database()
+            return response
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2268,7 +2270,14 @@ class StatusDatabaseAPI(MethodView):
         elif has_stopped and not has_stalled and not has_run:
             status.append({'status': 'stopped'})
 
-        return jsonify({'status':status, 'serverDetails': serverDetails})
+        error = ''
+        try:
+            error = Log.get_error_log()
+        except:
+            pass
+
+
+        return jsonify({'status':status, 'serverDetails': serverDetails, 'error': error})
 
 
 class StatusDatabaseServerAPI(MethodView):

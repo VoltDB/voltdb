@@ -39,7 +39,7 @@ import signal
 import subprocess
 import time
 import traceback
-
+import Log
 
 class G:
     """
@@ -51,6 +51,8 @@ class G:
 
     OUTFILE_TIME = str(time.time())
     OUTFILE_COUNTER = 0
+    LOG_FILE_NAME = ''
+
 
 
 def ignore_signals():
@@ -134,7 +136,7 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status), 500)
+            return create_response('There were errors starting servers: ' + str(server_status), 200)
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
 
@@ -180,7 +182,8 @@ class VoltDatabase:
         if (retcode == 0):
             return create_response('Success', 200)
         else:
-            return create_response('Error starting server', 500)
+            return create_response('Error', Log.get_error_log())
+            # return create_response('Error starting server', 500)
     
     def is_voltserver_running(self):
         """
@@ -245,13 +248,14 @@ class VoltDatabase:
             time.sleep(0.5)
             voltserver.poll()
             initialized = 'Server completed initialization' in rfile.readline()
-    
+
         rfile.close()
         if (voltserver.returncode is None):
             return 0
         else:
             return 1
-    
+
+
     def run_voltserver_process(self, voltdb_cmd, outfilename):
         """
         Utility method to start voltdb process given the cmd details
