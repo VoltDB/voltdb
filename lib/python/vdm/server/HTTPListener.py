@@ -495,7 +495,7 @@ def get_volt_jar_dir():
 
 def get_configuration():
     deployment_json = {
-        'vdm': {
+        'voltdeploy': {
             'databases': Global.DATABASES,
             'members': Global.SERVERS,
             'deployments': Global.DEPLOYMENT,
@@ -509,7 +509,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(Global.PATH, 'vdm.xml')
+        path = os.path.join(Global.PATH, 'voltdeploy.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
@@ -519,7 +519,7 @@ def write_configuration_file():
 
 
 def make_configuration_file():
-    main_header = Element('vdm')
+    main_header = Element('voltdeploy')
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
@@ -581,7 +581,7 @@ def make_configuration_file():
 
 def sync_configuration():
     headers = {'content-type': 'application/json'}
-    url = 'http://' + __IP__ + ':' + str(__PORT__) + '/api/1.0/vdm/configuration/'
+    url = 'http://' + __IP__ + ':' + str(__PORT__) + '/api/1.0/voltdeploy/configuration/'
     response = requests.post(url, headers=headers)
     return response
 
@@ -591,24 +591,24 @@ def convert_xml_to_json(config_path):
         xml = f.read()
     o = XML(xml)
     xml_final = json.loads(json.dumps(etree_to_dict(o)))
-    if type(xml_final['vdm']['members']['member']) is dict:
-        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
+    if type(xml_final['voltdeploy']['members']['member']) is dict:
+        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'dict')
     else:
-        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'list')
+        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'list')
 
-    if type(xml_final['vdm']['databases']['database']) is dict:
-        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'dict')
+    if type(xml_final['voltdeploy']['databases']['database']) is dict:
+        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'dict')
     else:
-        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'list')
+        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'list')
 
-    if type(xml_final['vdm']['deployments']['deployment']) is dict:
-        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
+        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
     else:
-        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
-    if type(xml_final['vdm']['deployments']['deployment']) is dict:
-        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
+    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
+        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
     else:
-        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
+        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
 
     Global.DATABASES = db_json
 
@@ -2065,9 +2065,9 @@ class VdmStatus(MethodView):
     @staticmethod
     def get():
         if request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
-            return str(request.args['jsonp']) + '(' + '{\'vdm\': {"running": "true"}}' + ')'
+            return str(request.args['jsonp']) + '(' + '{\'voltdeploy\': {"running": "true"}}' + ')'
         else:
-            return jsonify({'vdm': {"running": "true"}})
+            return jsonify({'voltdeploy': {"running": "true"}})
 
 
 class SyncVdmConfiguration(MethodView):
@@ -2080,10 +2080,10 @@ class SyncVdmConfiguration(MethodView):
         try:
             result = request.json
 
-            databases = result['vdm']['databases']
-            servers = result['vdm']['members']
-            deployments = result['vdm']['deployments']
-            deployment_users = result['vdm']['deployment_users']
+            databases = result['voltdeploy']['databases']
+            servers = result['voltdeploy']['members']
+            deployments = result['voltdeploy']['deployments']
+            deployment_users = result['voltdeploy']['deployment_users']
 
         except Exception, errs:
             print traceback.format_exc()
@@ -2104,17 +2104,17 @@ class VdmConfiguration(MethodView):
 
     @staticmethod
     def get():
-        return get_configuration()
+        return jsonify(get_configuration())
 
     @staticmethod
     def post():
 
         result = get_configuration()
 
-        for member in result['vdm']['members']:
+        for member in result['voltdeploy']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://' + member['hostname'] + ':' + str(__PORT__) + '/api/1.0/vdm/sync_configuration/'
+                url = 'http://' + member['hostname'] + ':' + str(__PORT__) + '/api/1.0/voltdeploy/sync_configuration/'
                 data = result
                 response = requests.post(url, data=json.dumps(data), headers=headers)
             except Exception, errs:
@@ -2309,8 +2309,7 @@ def main(runner, amodule, config_dir, server):
     global __IP__
     global __PORT__
 
-    # config_path = config_dir + '/' + 'vdm.xml'
-    config_path = os.path.join(config_dir, 'vdm.xml')
+    config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
     arrServer = {}
     bindIp = "0.0.0.0"
@@ -2421,14 +2420,14 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'POST', 'DELETE'])
-    APP.add_url_rule('/api/1.0/vdm/status/',
+    APP.add_url_rule('/api/1.0/voltdeploy/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/vdm/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
     APP.run(threaded=True, host=bindIp, port=__PORT__)
