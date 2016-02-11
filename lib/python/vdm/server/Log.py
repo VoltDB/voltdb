@@ -1,10 +1,8 @@
 import HTTPListener
 import os
 
+
 def get_error_log():
-    # if G.LOG_FILE_NAME is not '':
-    #     outfilename = os.path.join(HTTPListener.Global.PATH,
-    #         ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
 
     outfilename = os.path.join(HTTPListener.Global.PATH, get_most_recent_log())
     try:
@@ -15,7 +13,8 @@ def get_error_log():
             if "ERROR:" in line:
                 myLine = line
                 break
-
+        if myLine == "":
+            myLine = "error"
         return myLine
     except:
         return "error"

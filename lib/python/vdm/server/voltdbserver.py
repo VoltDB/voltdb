@@ -41,6 +41,7 @@ import time
 import traceback
 import Log
 
+
 class G:
     """
     Global variables used by voltdbserver
@@ -51,8 +52,6 @@ class G:
 
     OUTFILE_TIME = str(time.time())
     OUTFILE_COUNTER = 0
-    LOG_FILE_NAME = ''
-
 
 
 def ignore_signals():
