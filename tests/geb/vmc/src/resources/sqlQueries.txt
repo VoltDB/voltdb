@@ -24,7 +24,7 @@
 # type_null_varchar128      VARCHAR(128)
 # type_not_null_varchar128  VARCHAR(128)    NOT NULL
 # type_null_varchar1024     VARCHAR(1024)
-# type_not_null_varchar1024 VARCHAR(1024  ) NOT NULL
+# type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
 # type_null_point           GEOGRAPHY_POINT
 # type_not_null_point       GEOGRAPHY_POINT NOT NULL
 # type_null_polygon         GEOGRAPHY
@@ -74,9 +74,15 @@
                          "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
                          "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                          "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
-# Note: we have to run a query of some kind, so here is a simple one:
+# Note: we have to run a query of some kind, so here is a simple one, confirming that partitioned_table starts out empty:
    "sqlCmd":"SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":[],"rowid_group":[],"type_null_tinyint":[],"type_not_null_tinyint":[],"type_null_smallint":[],"type_not_null_smallint":[],"type_null_integer":[],"type_not_null_integer":[],"type_null_bigint":[],"type_not_null_bigint":[],"type_null_timestamp":[],"type_not_null_timestamp":[],"type_null_float":[],"type_not_null_float":[],"type_null_decimal":[],"type_not_null_decimal":[],"type_null_varchar25":[],"type_not_null_varchar25":[],"type_null_varchar128":[],"type_not_null_varchar128":[],"type_null_varchar1024":[],"type_not_null_varchar1024":[],"type_null_point":[],"type_not_null_point":[],"type_null_polygon":[],"type_not_null_polygon":[]},
+ "response":{"result":{"rowid":[],"rowid_group":[],"type_null_tinyint":[],"type_not_null_tinyint":[],"type_null_smallint":[],"type_not_null_smallint":[],
+                       "type_null_integer":[],"type_not_null_integer":[],"type_null_bigint":[],"type_not_null_bigint":[],
+                       "type_null_timestamp":[],"type_not_null_timestamp":[],
+                       "type_null_float":[],"type_not_null_float":[],"type_null_decimal":[],"type_not_null_decimal":[],
+                       "type_null_varchar25":[],"type_not_null_varchar25":[],"type_null_varchar128":[],"type_not_null_varchar128":[],
+                       "type_null_varchar1024":[],"type_not_null_varchar1024":[],
+                       "type_null_point":[],"type_not_null_point":[],"type_null_polygon":[],"type_not_null_polygon":[]},
              "status":"SUCCESS"}}
 
 
@@ -161,7 +167,7 @@
 
 
 #
-# SELECTS -- Test clears tables after each query. You must insert data prior to SELECT, in the same "sqlCmd"
+# SELECTS -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to SELECT, in the same "sqlCmd"
 #
 {"testName":"SelectAll",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
@@ -172,6 +178,12 @@
    "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              SELECT rowid,rowid_group,type_null_smallint,type_null_varchar128 FROM partitioned_table",
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_smallint":["5"],"type_null_varchar128":["c"]},
+             "status":"SUCCESS"}}
+{"testName":"SelectGeoColumns",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
+             SELECT rowid,type_null_point,type_null_polygon,type_not_null_point,type_not_null_polygon FROM partitioned_table",
+ "response":{"result":{"rowid":["1"],"type_null_point":["POINT (-23.0 23.0)"],"type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],
+                       "type_not_null_point":["POINT (24.0 -24.0)"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"SelectInsertedEmptyVarchar",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 15, 16, '', 'b', 'c', 'd', 'e', 'f',\n  __standard_geo_values);\n
@@ -222,16 +234,21 @@
                        "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
+
+
+#
+# INVALID SELECTS
+#
 {"testName":"SelectBadColumn",
-   "sqlCmd":"SELECT badColumn FROM partitioned_table",
- "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BADCOLUMN"}}
+   "sqlCmd":"SELECT bad_column FROM partitioned_table",
+ "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BAD_COLUMN"}}
 {"testName":"SelectBadTable",
    "sqlCmd":"SELECT * FROM bad_table",
  "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BAD_TABLE"}}
 
 
 #
-# UPDATES -- Test clears tables after each query. You must insert data prior to UPDATE, in the same "sqlCmd"
+# UPDATES -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to UPDATE, in the same "sqlCmd"
 #
 {"testName":"UpdateAll",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01 00:00:00.000000', '2000-01-01 00:00:00.000000',\n
@@ -268,7 +285,7 @@
 
 
 #
-# VALID UPSERTS -- Test clears tables after each query. You must insert (and/or "upsert") data prior to SELECT, in the same "sqlCmd"
+# VALID UPSERTS -- tables are cleared (DELETE FROM) after each test, so you must insert (and/or "upsert") data prior to SELECT, in the same "sqlCmd"
 #
 {"testName":"UpsertBigInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, __standard_non_int_values)",
@@ -352,7 +369,7 @@
 
 
 #
-# INSERT INTO SELECT -- Test clears tables after each query. You must insert data prior to SELECT, in the same line
+# INSERT INTO SELECT -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to INSERT INTO SELECT, in the same "sqlCmd"
 #
 {"testName":"InsertIntoSelectRepl2Repl",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
@@ -394,7 +411,7 @@
 
 
 #
-# UPSERT INTO SELECT -- Test clears tables after each query. You must insert data prior to SELECT, in the same line
+# UPSERT INTO SELECT -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to UPSERT INTO SELECT, in the same "sqlCmd"
 #
 {"testName":"UpsertIntoSelectRepl2Repl",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
