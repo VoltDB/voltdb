@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
@@ -39,6 +40,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -165,6 +167,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private final PartitionDRGateway m_drGateway;
     private final PartitionDRGateway m_mpDrGateway;
+
+    /*
+     * Track the last producer-cluster unique IDs and drIds associated with an
+     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
+     *  ReplicaDRGateway on repair
+     */
+    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition;
 
     // Current topology
     int m_partitionId;
@@ -393,6 +402,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
         }
+
+        @Override
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId, DRConsumerDrIdTracker tracker)
+        {
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
+            if (clusterSources == null) {
+                clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
+                clusterSources.put(producerPartitionId, tracker);
+            }
+            else {
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
+                if (targetTracker == null) {
+                    clusterSources.put(producerPartitionId, tracker);
+                }
+                else {
+                    targetTracker.appendTracker(tracker);
+                }
+            }
+        }
+
+        @Override
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
+        {
+            return m_maxSeenDrLogsBySrcPartition;
+        }
+
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {

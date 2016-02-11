@@ -49,11 +49,11 @@ public class ExtensibleSnapshotDigestData {
      * termination path so it can publish it to ZK where it is extracted by rejoining
      * nodes
      */
-    private Map<Integer, Map<Integer, DRLogSegmentId>> m_remoteDCLastIds;
+    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_remoteDCLastIds;
 
     public ExtensibleSnapshotDigestData(Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
+            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> remoteDCLastIds) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_remoteDCLastIds = remoteDCLastIds;
@@ -200,15 +200,24 @@ public class ExtensibleSnapshotDigestData {
         try {
             stringer.key("remoteDCLastIds");
             stringer.object();
-            for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> e : m_remoteDCLastIds.entrySet()) {
+            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : m_remoteDCLastIds.entrySet()) {
+                // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
+                // from the local cluster's partition count (which is not tracked here)
                 stringer.key(e.getKey().toString());
                 stringer.object();
-                for (Map.Entry<Integer, DRLogSegmentId> e2 : e.getValue().entrySet()) {
+                for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
                     stringer.key(e2.getKey().toString());
                     stringer.object();
-                    stringer.key("drId").value(e2.getValue().drId);
-                    stringer.key("spUniqueId").value(e2.getValue().spUniqueId);
-                    stringer.key("mpUniqueId").value(e2.getValue().mpUniqueId);
+                    stringer.key("lastAckedDrId").value(e2.getValue().getLastAckedDrId());
+                    stringer.key("spUniqueId").value(e2.getValue().getLastSpUniqueId());
+                    stringer.key("mpUniqueId").value(e2.getValue().getLastMpUniqueId());
+                    stringer.key("drIdRanges").array();
+                    for (Map.Entry<Long, Long> sequenceRange : e2.getValue().getDrIdRanges().entrySet()) {
+                        stringer.object();
+                        stringer.key(sequenceRange.getKey().toString()).value(sequenceRange.getValue());
+                        stringer.endObject();
+                    }
+                    stringer.endArray();
                     stringer.endObject();
                 }
                 stringer.endObject();
@@ -235,7 +244,7 @@ public class ExtensibleSnapshotDigestData {
             jsonObj.put("remoteDCLastIds", dcIdMap);
         }
 
-        for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> dcEntry : m_remoteDCLastIds.entrySet()) {
+        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> dcEntry : m_remoteDCLastIds.entrySet()) {
             //Last seen ids for a specific data center
             JSONObject lastSeenIds;
             final String dcKeyString = dcEntry.getKey().toString();
@@ -246,21 +255,18 @@ public class ExtensibleSnapshotDigestData {
                 dcIdMap.put(dcKeyString, lastSeenIds);
             }
 
-            for (Map.Entry<Integer, DRLogSegmentId> partitionEntry : dcEntry.getValue().entrySet()) {
+            for (Map.Entry<Integer, DRConsumerDrIdTracker> partitionEntry : dcEntry.getValue().entrySet()) {
                 final String partitionIdString = partitionEntry.getKey().toString();
-                final Long lastSeenDRIdLong = partitionEntry.getValue().drId;
-                final Long lastSeenSpUniqueIdLong = partitionEntry.getValue().spUniqueId;
-                final Long lastSeenMpUniqueIdLong = partitionEntry.getValue().mpUniqueId;
-                long existingDRId = Long.MIN_VALUE;
-                if (lastSeenIds.has(partitionIdString)) {
-                    existingDRId = lastSeenIds.getJSONObject(partitionIdString).getLong("drId");
-                }
-                if (lastSeenDRIdLong > existingDRId) {
+                if (!lastSeenIds.has(partitionIdString)) {
                     JSONObject ids = new JSONObject();
-                    ids.put("drId", lastSeenDRIdLong);
-                    ids.put("spUniqueId", lastSeenSpUniqueIdLong);
-                    ids.put("mpUniqueId", lastSeenMpUniqueIdLong);
-                    lastSeenIds.put(partitionIdString, ids);
+                    ids.put("lastAckedDrId", partitionEntry.getValue().getLastAckedDrId());
+                    ids.put("spUniqueId", partitionEntry.getValue().getLastSpUniqueId());
+                    ids.put("mpUniqueId", partitionEntry.getValue().getLastMpUniqueId());
+                    JSONObject drIdRanges = new JSONObject();
+                    for (Map.Entry<Long, Long> sequenceRange : partitionEntry.getValue().getDrIdRanges().entrySet()) {
+                        drIdRanges.put(sequenceRange.getKey().toString(), sequenceRange.getValue());
+                    }
+                    ids.put("drIdRanges", drIdRanges);
                 }
             }
         }

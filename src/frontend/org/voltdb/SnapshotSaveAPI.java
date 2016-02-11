@@ -159,7 +159,7 @@ public class SnapshotSaveAPI
                     m_snapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            VoltDB.instance().getConsumerDRGateway().getLastReceivedBinaryLogIds());
+                            context.getDrAppliedTxns());
                     createSetupIv2(
                             file_path,
                             file_nonce,
