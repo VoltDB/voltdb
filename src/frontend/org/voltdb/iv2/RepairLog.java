@@ -24,10 +24,12 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
@@ -56,15 +58,11 @@ public class RepairLog
     long m_lastMpHandle = Long.MAX_VALUE;
 
     /*
-     * Track the last master-cluster unique ID associated with an
+     * Track the last producer-cluster unique IDs and drIds associated with an
      *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
      */
-    private long m_maxSeenSpBinaryLogSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenSpBinaryLogMpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenMpBinaryLogMpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenSpBinaryLogDRId = Long.MIN_VALUE;
-    private long m_maxSeenMpBinaryLogDRId = Long.MIN_VALUE;
+    private Map<Integer, DRConsumerDrIdTracker> m_maxSeenDrLogsBySrcPartition;
     private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
     private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
@@ -170,6 +168,8 @@ public class RepairLog
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
                     // params[2] is the end sequence number from the original cluster
                     Object[] params = spi.getParams().toArray();
+                    ?? how do we find the src partition for run everywhere mp transactions
+
                     m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenSpBinaryLogSpUniqueId = Math.max(m_maxSeenSpBinaryLogSpUniqueId, ((Number)params[3]).longValue());
                     m_maxSeenSpBinaryLogMpUniqueId = Math.max(m_maxSeenSpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
