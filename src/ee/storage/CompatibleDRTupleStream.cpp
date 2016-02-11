@@ -456,7 +456,7 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     return false;
 }
 
-int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partitionId, char *outBytes) {
+int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyNValue, int32_t partitionId, char *outBytes) {
     CompatibleDRTupleStream stream;
     stream.configure(partitionId);
 
@@ -478,7 +478,7 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
     // update the primary key column
-    tuple.setNValue(0, ValueFactory::getIntegerValue(primaryKeyNValue));
+    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyNValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
