@@ -516,7 +516,7 @@ public class ParserDML extends ParserDQL {
         resolveUpdateExpressions(table, rangeVariables, columnMap,
                                  updateExpressions, outerRanges);
 
-        if (table != baseTable) {
+        if (baseTable != null && table != baseTable) {
             QuerySpecification select =
                 ((TableDerived) table).getQueryExpression().getMainSelect();
 
@@ -541,7 +541,7 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
-        if (table != baseTable) {
+        if (baseTable != null && table != baseTable) {
             int[] baseColumnMap = table.getBaseTableColumnMap();
             int[] newColumnMap  = new int[columnMap.length];
 
