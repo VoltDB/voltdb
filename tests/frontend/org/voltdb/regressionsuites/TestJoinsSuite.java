@@ -873,6 +873,8 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestDistributedTableFullJoin(client);
         clearSeqTables(client);
         subtestNonEqualityFullJoin(client);
+        clearSeqTables(client);
+        subtestLimitOffsetFullNLJoin(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -958,20 +960,6 @@ public class TestJoinsSuite extends RegressionSuite {
                 {4, 4, MINVAL, MINVAL}
                 });
 
-            // case 3: equality join on two columns with limit and offset
-            // offset starts at outer row and limit is reached at the non-matched inner rows
-            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                    "R1.A = R2.A AND R1.D = R2.C OFFSET 2 LIMIT 5";
-            VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            assertEquals(5, vt.getRowCount());
-
-            // case 4: equality join on two columns with limit and offset
-            // offset starts at outer row and limit is reached at the non-matched inner rows
-            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                    "R1.A = R2.A AND R1.D = R2.C OFFSET 6 LIMIT 1";
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            assertEquals(1, vt.getRowCount());
-
             // case 5: equality join on single column
             sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
                     "R1.A = R2.A ORDER BY R1.A, R1.D, R2.A, R2.C";
@@ -1023,6 +1011,114 @@ public class TestJoinsSuite extends RegressionSuite {
                     {4, 4, MINVAL, MINVAL}
                     });
 
+    }
+
+    private void subtestLimitOffsetFullNLJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 3, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 4, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 5, 4);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 4);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 6);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(3, 4);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(5, 6);");
+
+        // NLJ SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON R1.A = R2.A
+        //  1,1,1,1             outer-inner match
+        //  1,2,1,1             outer-inner match
+        //  2,3,2,2             outer-inner match
+        //  2,3,2,3             outer-inner match
+        //  3,4,3,4             outer-inner match
+        //  4,5,NULL,NULL       outer no match
+        //  NULL,NULL,5,5       inner no match
+        //  NULL,NULL,5,6       inner no match
+
+        sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A LIMIT 2 OFFSET 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {2, 3, 2, 3},
+            {3, 4, 3, 4}
+        });
+
+        sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A LIMIT 2 OFFSET 4";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {3, 4, 3, 4L},
+            {4,5,MINVAL,MINVAL}
+        });
+
+        sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A LIMIT 3 OFFSET 4";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {3, 4, 3, 4L},
+            {4,5,MINVAL,MINVAL},
+            {MINVAL,MINVAL, 5, 5}
+        });
+
+        sql = "SELECT MAX(R1.C), R1.A, R2.A FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A GROUP BY R1.A, R2.A LIMIT 2 OFFSET 2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+
+        // NLIJ SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON R1.A = R3.A
+        //  1,1,1,1             outer-inner match
+        //  1,2,1,1             outer-inner match
+        //  2,3,2,2             outer-inner match
+        //  2,3,2,3             outer-inner match
+        //  3,4,3,4             outer-inner match
+        //  4,5,NULL,NULL       outer no match
+        //  NULL,NULL,5,5       inner no match
+        //  NULL,NULL,5,6       inner no match
+
+        sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
+                "R1.A = R3.A  LIMIT 2 OFFSET 3";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {2, 3, 2, 3},
+            {3, 4, 3, 4}
+        });
+
+        sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
+                "R1.A = R3.A LIMIT 2 OFFSET 4";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {3, 4, 3, 4L},
+            {4,5,MINVAL,MINVAL}
+        });
+
+        sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
+                "R1.A = R3.A LIMIT 3 OFFSET 4";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+            {3, 4, 3, 4L},
+            {4,5,MINVAL,MINVAL},
+            {MINVAL,MINVAL, 5, 5}
+        });
+
+        sql = "SELECT MAX(R1.C), R1.A, R3.A FROM R1 FULL JOIN R3 ON " +
+                "R1.A = R3.A GROUP BY R1.A, R3.A LIMIT 2 OFFSET 2";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
     }
 
     private void subtestDistributedTableFullJoin(Client client)
