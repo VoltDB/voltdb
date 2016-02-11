@@ -20,9 +20,6 @@ package org.voltdb;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
-import java.util.Map;
-
-import org.voltcore.utils.Pair;
 
 /**
  * Defines the interface between a site and the snapshot
@@ -34,9 +31,7 @@ public interface SiteSnapshotConnection
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds);
+            ExtensibleSnapshotDigestData extraSnapshotData);
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
