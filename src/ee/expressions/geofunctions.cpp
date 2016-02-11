@@ -93,6 +93,15 @@ static void throwInvalidPolygonLongitude(const std::string& input)
                        oss.str().c_str());
 }
 
+static void throwInvalidDistanceDWithin(const std::string& msg)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to DWITHIN function: '" << msg << "'.";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+
 static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
                                   const std::string& input,
                            const std::string& val)
@@ -113,6 +122,20 @@ static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
     return coord;
 }
 
+
+// function computes distance between two non-null points
+// function computes distance using Haversine formula
+static double getDistance(const GeographyPointValue &point1,
+                          const GeographyPointValue &point2)
+{
+    assert(!point1.isNull());
+    assert(!point2.isNull());
+
+    const S2LatLng latLng1 = S2LatLng(point1.toS2Point()).Normalized();
+    const S2LatLng latLng2 = S2LatLng(point2.toS2Point()).Normalized();
+    S1Angle distance = latLng1.GetDistance(latLng2);
+    return distance.radians() * SPHERICAL_EARTH_MEAN_RADIUS_M;
+}
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
 {
     if (isNull()) {
@@ -444,16 +467,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
 
-    // compute distance using Haversine formula
-    // alternate to this is just obtain 2 s2points and compute S1Angle between them
-    // and use that as distance.
-    // S2 test uses S2LatLng for computing distances
-    const S2LatLng latLng1 = S2LatLng(arguments[0].getGeographyPointValue().toS2Point()).Normalized();
-    const S2LatLng latLng2 = S2LatLng(arguments[1].getGeographyPointValue().toS2Point()).Normalized();
-    S1Angle distance = latLng1.GetDistance(latLng2);
     NValue retVal(VALUE_TYPE_DOUBLE);
-    // distance is in radians, so convert it to meters
-    retVal.getDouble() = distance.radians() * SPHERICAL_EARTH_MEAN_RADIUS_M;
+    retVal.getDouble() = getDistance(arguments[0].getGeographyPointValue(), arguments[1].getGeographyPointValue());
     return retVal;
 }
 
@@ -543,4 +558,42 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     return getTempStringValue(res.c_str(),res.length());
 }
 
+template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    assert(isNumeric(arguments[2].getValueType()));
+
+    if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(arguments[0].getGeographyValue());
+    GeographyPointValue point = arguments[1].getGeographyPointValue();
+    double withinDistanceOf = arguments[2].castAsDoubleAndGetValue();
+    if (withinDistanceOf < 0) {
+        throwInvalidDistanceDWithin("Value of DISTANCE argument must be non-negative");
+    }
+
+    double polygonToPointDistance = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
+    return ValueFactory::getBooleanValue(polygonToPointDistance <= withinDistanceOf);
+}
+
+template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POINT_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    assert(isNumeric(arguments[2].getValueType()));
+
+    if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+
+    double withinDistanceOf = arguments[2].castAsDoubleAndGetValue();
+    if (withinDistanceOf < 0) {
+        throwInvalidDistanceDWithin("Value of DISTANCE argument must be non-negative");
+    }
+
+    double pointToPointDistance = getDistance(arguments[0].getGeographyPointValue(), arguments[1].getGeographyPointValue());
+    return ValueFactory::getBooleanValue(pointToPointDistance <= withinDistanceOf);
+}
 } // end namespace voltdb
