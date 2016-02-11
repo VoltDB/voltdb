@@ -69,6 +69,16 @@ def get_voltdb_dir():
     return os.path.realpath(os.path.join(HTTPListener.Global.MODULE_PATH, '../../../..', 'bin'))
 
 
+def check_snapshot_folder():
+    outfilename = os.path.join(HTTPListener.Global.PATH, "voltdbroot/snapshots")
+
+    if os.path.isdir(outfilename):
+        freshStart = False
+    else:
+        freshStart = True
+    return freshStart
+
+
 def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
@@ -427,4 +437,6 @@ class VoltDatabase:
                 return create_response('process not found', 200)
         except Exception, err:
             return create_response(str(err), 500)
+
+
 

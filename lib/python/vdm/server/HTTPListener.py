@@ -2270,8 +2270,9 @@ class StatusDatabaseAPI(MethodView):
         elif has_stopped and not has_stalled and not has_run:
             status.append({'status': 'stopped'})
 
+        isFreshStart = voltdbserver.check_snapshot_folder()
 
-        return jsonify({'status':status, 'serverDetails': serverDetails})
+        return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
 
 
 class StatusDatabaseServerAPI(MethodView):
