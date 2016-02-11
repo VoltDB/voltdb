@@ -530,21 +530,17 @@
                   <div class="drAdminHeaderLeft">Database Replication (DR)</div>
                   <div class="drAdminHeaderRight">
                     <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
-                      <span class="editIcon"></span></a>
+                      <!--<span class="editIcon"></span></a>-->
+                      <div id="onOffIcon" class="icheckbox_square-blue hover active onIconDR"> <span class="onOffDR" id="chkDrOnOffVal"width="10%"> </span> </div>
+                    </a>
                   </div>
                   <div class="clear"></div>
                 </h1>
               </div>
               <div class="drContent">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl connectionSourceTbl">
-                  <tr id="row-DrConfig" class="rowDr">
-                    <td class="configLabel" width="62%">DR Enabled</td>
-                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
-                    <td align="right" width="13%"><div id="onOffIcon"></div></td>
-                    <td class="onOff" id="chkDrOnOffVal"width="10%"> On</td>
-                  </tr>
                   <tr id="row-DrId" class="rowDr clsDrType">
-                    <td class="configLabel" width="62%">Id</td>
+                    <td class="configLabel" width="62%">ID</td>
                     <td>&nbsp;</td>
                     <td align="right" id="lblDrId"></td>
                     <td>&nbsp;</td>
@@ -555,14 +551,8 @@
                     <td align="right" id="lblDrPort"></td>
                     <td>&nbsp;</td>
                   </tr>
-                  <tr class="rowDr clsDrEnabled clsDrType" >
+                  <tr id="trConnectionSource" class="rowDr clsDrEnabled clsDrType" >
                     <td class="configLabel" width="62%">Connection Source</td>
-                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
-                    <td align="right" width="13%"><div id="onOffConnectionIcon"></div></td>
-                    <td class="onOff" id="chkDrOnOffConnectionVal" width="10%"> On</td>
-                  </tr>
-                  <tr class="rowDr subLabelRow clsDrEnabled" style="display:none" id="row-master-cluster">
-                    <td class="configLabel label-master-cluster">Source</td>
                     <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
                      <td>&nbsp;</td>
                   </tr>
@@ -1166,18 +1156,10 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       </div>
       <div class="modal-body">
         <form id="frmDatabaseReplication" method="get" action="" novalidate style="overflow:auto;">
-          <div id="" class="configWrapper-modal">
+          <div class="configWrapper-modal">
               <table width="100%" cellpadding="0" cellspacing="0" class="connectionSourceTblPopup">
-                <tr>
-                  <td width="5%">DR Enabled</td>
-                   <td width="10%">
-                     <span><input id="chkDrOnOffStatus" tabindex="6" type="checkbox" checked></span>
-                     <span id="chkDrOnOffValue" class="onOffDr" id="chkDrOnOffValue1">On</span>
-                   </td>
-
-                </tr>
                 <tr class="showHideDrConfig">
-                  <td>Id</td>
+                  <td width="5%">ID<span class="redC">*</span></td>
                   <td id="trDrId" width="10%" align="">
                     <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
@@ -1192,26 +1174,20 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
                 </tr>
                 <tr class="showHideDrConfig">
                   <td><h4>Connection Source</h4></td>
-                  <td width="10%">
-                     <span><input id="chkConnectionSourceOnOff" tabindex="6" type="checkbox" checked></span>
-                     <span id="chkConnectionSourceOnOffValue" class="onOffDr">On</span>
-                   </td>
+                  <td width="10%" class="connSource">
+                     <span id="addConnectionSource" class="plusIconDR"></span>
+                  </td>
                 </tr>
                 <tr class="trConnectionSource showHideDrConfig">
                   <td>Source</td>
                   <td>
                     <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                    <span id="deleteConnectionSource" class="deleteDR"></span>
                     <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
+
+
                   </td>
                 </tr>
-                <!--<tr id="trServerList" class="trConnectionSource showHideDrConfig">-->
-                  <!--<td>Servers</td>-->
-                  <!--<td id="trDrId1" width="10%" align="">-->
-                    <!--<input id="txtServers" name="txtServers" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">-->
-                    <!--<label id="errorServers" for="txtServers" class="error ccErrorMsg" style="display: none;"></label>-->
-                  <!--</td>-->
-                <!--</tr>-->
-
                 <tr class="showHideDrConfig" style="border-bottom:none;" >
                   <td></td>
                   <td colspan="3">
