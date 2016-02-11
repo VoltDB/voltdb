@@ -147,7 +147,7 @@ label.ccErrorMsg {
   height: auto!important;
 
 }
-.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon, .secCrossIcon, .popDelete, .onIcon, .offIcon,.editIcon, .offIconSecurity, .deleteDiskLimit {
+.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon,.plusIconDR, .secCrossIcon, .popDelete, .onIcon, .offIcon, .onIconDR, .offIconDR, .editIcon, .offIconSecurity, .deleteDiskLimit, .deleteDR {
 	background-image: url(../images/icons.png);
 	background-repeat: no-repeat;
 }
@@ -238,6 +238,17 @@ label.ccErrorMsg {
 	cursor:pointer;
 }
 
+.deleteDR {
+    width: 38px;
+    height: 25px;
+    background-position: 0 -95px;
+    display: inline-block;
+	position: relative;
+	top: 9px;
+	cursor:pointer;
+}
+
+
 .clusterName {
 	position: relative;
 	top: 8px;
@@ -290,6 +301,14 @@ label.ccErrorMsg {
 	cursor: pointer;
 }
 
+.plusIconDR {
+	width: 120px;
+	padding: 4px 0 7px 40px;
+	background-position: -8px -202px;
+	font-size: 16px;
+	cursor: pointer;
+}
+
 .onIcon {
 	width: 31px;
     height: 17px;
@@ -299,6 +318,16 @@ label.ccErrorMsg {
     top: 6px;
 }
 
+.onIconDR {
+	width: 37px;
+    height: 17px;
+	background-position: -5px -576px;
+	cursor: pointer;
+	margin-right:65px!important;
+}
+
+
+
 .offIcon {
 	width: 31px;
     height: 17px;
@@ -307,6 +336,18 @@ label.ccErrorMsg {
 	position: relative;
     top: 6px;
 }
+
+.offIconDR {
+	width: 37px;
+    height: 17px;
+	background-position: -5px -530px;
+	cursor: pointer;
+	position: relative;
+    top: 6px;
+    margin-right:43px;
+}
+
+
 .offIconSecurity {
 	width: 31px;
 	height: 17px;
@@ -835,9 +876,11 @@ ul.addServerList li:nth-child(1) {
 	position: relative;
 	top: 3px;
 }
-.onOffDr {
+
+.onOffDR {
     position: relative;
-	top: 0px;
+    left: 30px;
+    font-size: 13px;
 }
 .userName {
 	float: left;
@@ -1162,6 +1205,7 @@ table.tblPopup {
 input.drop-down-input{width:125px !important;}
 .col-xs-4{padding-left:0 !important;}
 
+.connSource { }
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
