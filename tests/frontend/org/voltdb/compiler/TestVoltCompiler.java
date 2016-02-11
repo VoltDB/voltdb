@@ -2925,6 +2925,14 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains function 'CONTAINS..', " +
                                   "which is not supported.*", ddl);
 
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create index geoindex_within100000 ON geogs (DWITHIN(region1, point1, 100000) );\n";
+        // error msg: Cannot create index "GEOINDEX_WITHIN100000" because it contains function 'DWITHIN(), which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains function 'DWITHIN..', " +
+                                  "which is not supported.*", ddl);
+
         // indexing on comparison expression not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +

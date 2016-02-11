@@ -35,19 +35,16 @@ from flask.views import MethodView
 import json
 import os
 import os.path
-import psutil
 import requests
-import signal
 import socket
-import subprocess
 import sys
-import time
 import traceback
 import urllib
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import DeploymentConfig
+import voltdbserver
 import glob
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
@@ -484,239 +481,8 @@ def map_deployment_users(request, user):
 
     return deployment_user[0]
 
-
-def ignore_signals():
-    signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-def check_and_start_local_server(database_id, recover=False):
-    if is_voltserver_running():
-        return make_response(jsonify({'statusstring': 'A VoltDB Server process is already running'}), 500)
-
-    retcode = start_local_server(database_id, recover)
-    if (retcode == 0):
-        return make_response(jsonify({'statusstring': 'Success'}), 200)
-    else:
-        return make_response(jsonify({'statusstring': 'Error starting server'}), 500)
-
-def is_voltserver_running():
-    for proc in psutil.process_iter():
-        try:
-            cmd = proc.cmdline()
-            if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                return True
-        except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
-            #print traceback.format_exc()
-            pass
-
-    return False
-
-def start_local_server(database_id, recover=False):
-    deploymentcontents = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-    primary = get_first_hostname(database_id)
-    filename = os.path.join(PATH, 'deployment.xml')
-    deploymentfile = open(filename, 'w')
-    deploymentfile.write(deploymentcontents)
-    deploymentfile.close()
-    voltdb_dir = get_voltdb_dir()
-    verb = 'create'
-    if recover:
-        verb = 'recover'
-    voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
-
-    Global.OUTFILE_COUNTER = Global.OUTFILE_COUNTER + 1
-    outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (Global.OUTFILE_TIME, Global.OUTFILE_COUNTER))
-    voltserver = run_voltserver_process(voltdb_cmd, outfilename)
-
-    initialized = False
-    rfile = open(outfilename, 'r')
-    # Wait till server is ready or process exited due to error.
-    # Wait for a couple of seconds to see if the server errors out
-    endtime = time.time() + 2
-    while ((endtime-time.time()>0) and
-           (voltserver.returncode is None) and (not initialized)):
-        time.sleep(0.5)
-        voltserver.poll()
-        initialized = 'Server completed initialization' in rfile.readline()
-
-    rfile.close()
-    if (voltserver.returncode is None):
-        return 0
-    else:
-        return 1
-
-def run_voltserver_process(voltdb_cmd, outfilename):
-    outfile = open(outfilename, 'w')
-
-    # Start server in a separate process
-    oldwd = os.getcwd()
-    os.chdir(PATH)
-    try:
-        my_env = os.environ.copy()
-        my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
-        return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
-                                      env=my_env, preexec_fn=ignore_signals, close_fds=True)
-    finally:
-        os.chdir(oldwd)
-
-def get_voltdb_dir():
-    return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
-
-
 def get_volt_jar_dir():
-    return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'voltdb'))
-
-
-def is_security_enabled(database_id):
-    security_config = Global.DEPLOYMENT[database_id-1]['security']
-    if not security_config:
-        return False
-
-    return security_config['enabled']
-
-
-def get_admin_user(database_id):
-    
-    users_outer = Global.DEPLOYMENT[database_id-1]['users']
-    if not users_outer:
-        return None
-
-    users = users_outer['user']
-    if not users:
-        return None
-
-    admins = [auser for auser in users if auser['roles'] == 'Administrator']
-    if not admins:
-        return None
-    else:
-        return admins[0]
-
-
-def stop_server(database_id, server_id):
-    members = []
-    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-    if not current_database:
-        abort(404)
-    else:
-        members = current_database[0]['members']
-    if not members:
-        return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
-                                             500)
-
-    server = [server for server in Global.SERVERS if server['id'] == server_id]
-    if not server:
-        return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
-                                         404)
-
-    args = [ '-H', server[0]['hostname'], server[0]['name'] ]
-    return run_voltdb_cmd('voltadmin', 'stop', args, database_id)
-
-
-def run_voltdb_cmd(cmd, verb, args, database_id):
-    user_options = []
-    if is_security_enabled(database_id):
-        admin = get_admin_user(database_id)
-        if admin is None:
-            raise Exception('No admin users found')
-        user_options = [ '-u', admin['name'], '-p', admin['password'] ]
-
-    voltdb_dir = get_voltdb_dir()
-    voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
-
-    shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-    (output, error) = shutdown_proc.communicate()
-    exit_code = shutdown_proc.wait()
-    return output + error
-
-
-def start_database(database_id, recover=False):
-    # sync deployment file first
-    sync_configuration() 
-
-    members = []
-    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-    if not current_database:
-        abort(404)
-    else:
-        members = current_database[0]['members']
-    if not members:
-        return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
-                                             500)
-
-    # Check if there are valid servers configured for all ids
-    for server_id in members:
-        server = [server for server in Global.SERVERS if server['id'] == server_id]
-        if not server:
-            return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
-                                             500)
-    # Now start each server
-    failed = False
-    server_status = {}
-    action = 'start'
-    if recover:
-        action = 'recover'
-    for server_id in members:
-        server = [server for server in Global.SERVERS if server['id'] == server_id]
-        curr = server[0]
-        try:
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s') % \
-                              (curr['hostname'], __PORT__, database_id, server_id, action)
-            response = requests.put(url)
-            if (response.status_code != requests.codes.ok):
-                failed = True
-            server_status[curr['hostname']] = json.loads(response.text)['statusstring']
-        except Exception, err:
-            failed = True
-            print traceback.format_exc()
-            server_status[curr['hostname']] = str(err)
-
-    if failed:
-        return make_response(jsonify({'statusstring':
-                                      'There were errors starting servers: ' + str(server_status)}),
-                                 500)
-    else:
-        return make_response(jsonify({'statusstring':
-                                      'Start request sent successfully to servers: ' + str(server_status)}),
-                                 200)
-
-
-def stop_database(database_id):
-    members = []
-    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-    if not current_database:
-        abort(404)
-    else:
-        members = current_database[0]['members']
-    if not members:
-        return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
-                                             500)
-
-    server_id = members[0]
-    server = [server for server in Global.SERVERS if server['id'] == server_id]
-    if not server:
-        return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
-                                         404)
-
-    args = [ '-H', server[0]['hostname'] ]
-    return run_voltdb_cmd('voltadmin', 'shutdown', args, database_id)
-
-
-def get_first_hostname(database_id):
-    """
-    Gets the first hostname configured in the deployment file for a given database
-    """
-
-    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-    if not current_database:
-        abort(404)
-
-    server_id = current_database[0]['members'][0]
-    server = [server for server in Global.SERVERS if server['id'] == server_id]
-    if not server:
-        abort(404)
-
-    return server[0]['hostname']
-
+    return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
 
 def get_configuration():
     deployment_json = {
@@ -735,7 +501,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(PATH, 'vdm.xml')
+        path = os.path.join(Global.PATH, 'vdm.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
@@ -1348,8 +1114,8 @@ class Global:
     DATABASES = []
     DEPLOYMENT = []
     DEPLOYMENT_USERS = []
-    OUTFILE_TIME = str(time.time())
-    OUTFILE_COUNTER = 0
+    PATH = ''
+    MODULE_PATH = ''
 
 
 class ServerAPI(MethodView):
@@ -1845,7 +1611,13 @@ class StartDatabaseAPI(MethodView):
             Status string indicating if the database start requesst was sent successfully
         """
 
-        return start_database(database_id)
+        try:
+            database = voltdbserver.VoltDatabase(database_id)
+            return database.start_database()
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
 
 
 class RecoverDatabaseAPI(MethodView):
@@ -1861,8 +1633,13 @@ class RecoverDatabaseAPI(MethodView):
             Status string indicating if the database start request was sent successfully
         """
 
-        return start_database(database_id, True)
-
+        try:
+            database = voltdbserver.VoltDatabase(database_id)
+            return database.start_database(True)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
 
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
@@ -1878,9 +1655,10 @@ class StopDatabaseAPI(MethodView):
         """
 
         try:
-            response = stop_database(database_id)
-	    # Don't use the response in the json we send back
-	    # because voltadmin shutdown gives 'Connection broken' output
+            server = voltdbserver.VoltDatabase(database_id)
+            response = server.stop_database()
+            # Don't use the response in the json we send back
+            # because voltadmin shutdown gives 'Connection broken' output
             return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
         except Exception, err:
             print traceback.format_exc()
@@ -1889,7 +1667,7 @@ class StopDatabaseAPI(MethodView):
 
 
 class StartServerAPI(MethodView):
-    """Class to handle request to start a server."""
+    """Class to handle request to start a server for this database."""
 
     @staticmethod
     def put(database_id, server_id):
@@ -1899,11 +1677,33 @@ class StartServerAPI(MethodView):
             database_id (int): The id of the database that should be started
             server_id (int): The id of the server node that is to be started
         Returns:
-            Status string indicating if the server node was started successfully
+            Status string indicating if the server node start request was sent successfully
         """
 
         try:
-            return check_and_start_local_server(database_id)
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.start_server(server_id)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
+
+class StartLocalServerAPI(MethodView):
+    """Class to handle request to start local server for this database."""
+
+    @staticmethod
+    def put(database_id):
+        """
+        Starts VoltDB database server on this local machine
+        Args:
+            database_id (int): The id of the database that should be started
+        Returns:
+            Status string indicating if the server start request was sent successfully
+        """
+
+        try:
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.check_and_start_local_server()
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1911,21 +1711,21 @@ class StartServerAPI(MethodView):
 
 
 class RecoverServerAPI(MethodView):
-    """Class to handle request to issue recover cmd on a server."""
+    """Class to handle request to issue recover cmd on this local server."""
 
     @staticmethod
-    def put(database_id, server_id):
+    def put(database_id):
         """
-        Issues recover cmd on the specified server
+        Issues recover cmd on this local server
         Args:
             database_id (int): The id of the database that should be started
-            server_id (int): The id of the server node that is to be started
         Returns:
-            Status string indicating if the server node was started successfully
+            Status string indicating if the request was sent successfully
         """
 
         try:
-            return check_and_start_local_server(database_id, True)
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.check_and_start_local_server(True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1947,7 +1747,8 @@ class StopServerAPI(MethodView):
         """
 
         try:
-            response = stop_server(database_id, server_id)
+            server = voltdbserver.VoltDatabase(database_id)
+            response = server.stop_server(server_id)
             return make_response(jsonify({'statusstring': response}), 200)
         except Exception, err:
             print traceback.format_exc()
@@ -2051,13 +1852,11 @@ def main(runner, amodule, config_dir, server):
         APP.config.update(DEBUG=True)
 
     path = os.path.dirname(amodule.__file__)
-    global MODULE_PATH
-    MODULE_PATH = path
+    Global.MODULE_PATH = path
     depjson = os.path.join(path, "deployment.json")
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
-    global PATH
-    PATH = config_dir
+    Global.PATH = config_dir
     global __IP__
     global __PORT__
 
@@ -2115,6 +1914,7 @@ def main(runner, amodule, config_dir, server):
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
+    START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
     RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
     STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
     START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
@@ -2144,7 +1944,9 @@ def main(runner, amodule, config_dir, server):
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])

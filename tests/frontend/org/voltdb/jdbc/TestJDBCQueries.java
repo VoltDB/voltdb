@@ -202,6 +202,16 @@ public class TestJDBCQueries {
                         GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
                 true),
         new GetNumberData(
+                new String[] {"-1", "-1", "-1", "-1", "-1", "-1", "-1"},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {"0", "0", "0", "0", "0", "0", "0"},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
                 new String[] {"1", "1", "1", Long.toString(Long.MAX_VALUE), "1", "1", "1"},
                 new GetType[] {GetType.BYTE, GetType.BYTE, GetType.BYTE,
                         GetType.BYTE, GetType.BYTE, GetType.BYTE, GetType.BYTE},

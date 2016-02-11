@@ -237,16 +237,12 @@ public class MpScheduler extends Scheduler
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
             }
-        }
-
-        if (message.isForReplay()) {
-            mpTxnId = message.getTxnId();
-            setMaxSeenTxnId(mpTxnId);
-        } else {
-            TxnEgo ego = advanceTxnEgo();
-            mpTxnId = ego.getTxnId();
+        } else  {
             timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
+
+        TxnEgo ego = advanceTxnEgo();
+        mpTxnId = ego.getTxnId();
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
