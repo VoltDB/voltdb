@@ -2291,7 +2291,7 @@ class StatusDatabaseServerAPI(MethodView):
 
             error = ''
             try:
-                error = Log.get_error_log()
+                error = Log.get_error_log_details()
             except:
                 pass
 
@@ -2392,6 +2392,7 @@ def main(runner, amodule, config_dir, server):
     STATUS_DATABASE_VIEW = StatusDatabaseAPI.as_view('status_database_api')
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
+
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
