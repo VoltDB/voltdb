@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -228,7 +228,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         new Column("A_FLOAT", VoltType.FLOAT, true,
                    VoltType.NULL_FLOAT,
                    5.1,
-                   Double.MIN_VALUE, // NULL is -1.7E308.
+                   Math.nextAfter(VoltType.NULL_FLOAT, 0), // NULL is -1.7E308.
                    new Double(14.5),
                    Double.MAX_VALUE),
         new Column("A_TIMESTAMP", VoltType.TIMESTAMP, false,

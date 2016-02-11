@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * ImporterConfig implementation to hold configuration for Log4j socket handler importer.
@@ -75,6 +76,12 @@ public class Log4jSocketImporterConfig implements ImporterConfig
     public URI getResourceID()
     {
         return m_resourceID;
+    }
+
+    @Override
+    public AbstractFormatterFactory getFormatterFactory()
+    {
+        return null;
     }
 
     public int getPort()

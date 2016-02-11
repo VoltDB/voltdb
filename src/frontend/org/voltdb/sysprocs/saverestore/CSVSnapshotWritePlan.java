@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,9 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.CSVSnapshotFilter;
-import org.voltdb.DRLogSegmentId;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SimpleFileSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
@@ -71,11 +70,9 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            ExtensibleSnapshotDigestData extraSnapshotData,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -162,8 +159,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, config.tables, txnId, partitionTransactionIds,
-                remoteDCLastIds, context,
-                exportSequenceNumbers, drTupleStreamInfo, timestamp, numTables, snapshotRecord,
+                context, extraSnapshotData, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
 
@@ -172,10 +168,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final Table[] tables,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
-                                                  final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
-                                                  final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                  final Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                                  final ExtensibleSnapshotDigestData extraSnapshotData,
                                                   final long timestamp,
                                                   final AtomicInteger numTables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
@@ -187,7 +181,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             public Boolean call() throws Exception
             {
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, remoteDCLastIds, context, exportSequenceNumbers, drTupleStreamInfo, null, timestamp,
+                        txnId, partitionTransactionIds, context, extraSnapshotData, null, timestamp,
                         context.getNumberOfPartitions(), tables);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {

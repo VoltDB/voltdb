@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -199,8 +199,7 @@ public:
         for (int i = 0; i < cols; ++i) {
             const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
             voltdb::ValueType columnType = columnInfo->getVoltType();
-            if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
-                !columnInfo->inlined) {
+            if (isVariableLengthType(columnType) && !columnInfo->inlined) {
                 bytes += getNValue(i).getAllocationSizeForObject();
             }
         }
@@ -438,18 +437,18 @@ private:
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
     }
 
-    inline void serializeColumnToExport(ExportSerializeOutput &io, int colOffset, int colIndex, uint8_t *nullArray) const {
+    inline void serializeColumnToExport(ExportSerializeOutput &io, int offset, const NValue &value, uint8_t *nullArray) const {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the null array.
-        if (isNull(colIndex)) {
-            // turn on colIndex'th bit of nullArray
-            int byte = (colOffset + colIndex) >> 3;
-            int bit = (colOffset + colIndex) % 8;
+        if (value.isNull()) {
+            // turn on offset'th bit of nullArray
+            int byte = offset >> 3;
+            int bit = offset % 8;
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
         } else {
-            getNValue(colIndex).serializeToExport_withoutNull(io);
+            value.serializeToExport_withoutNull(io);
         }
     }
 
@@ -476,34 +475,37 @@ private:
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
-        case VALUE_TYPE_TINYINT:
-            return sizeof (int8_t);
-        case VALUE_TYPE_SMALLINT:
-            return sizeof (int16_t);
-        case VALUE_TYPE_INTEGER:
-            return sizeof (int32_t);
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_DOUBLE:
-            return sizeof (int64_t);
-        case VALUE_TYPE_DECIMAL:
-            //1-byte scale, 1-byte precision, 16 bytes all the time right now
-            return 18;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
+          case VALUE_TYPE_TINYINT:
+              return sizeof (int8_t);
+          case VALUE_TYPE_SMALLINT:
+              return sizeof (int16_t);
+          case VALUE_TYPE_INTEGER:
+              return sizeof (int32_t);
+          case VALUE_TYPE_BIGINT:
+          case VALUE_TYPE_TIMESTAMP:
+          case VALUE_TYPE_DOUBLE:
+              return sizeof (int64_t);
+          case VALUE_TYPE_DECIMAL:
+              //1-byte scale, 1-byte precision, 16 bytes all the time right now
+              return 18;
+          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARBINARY:
+          case VALUE_TYPE_GEOGRAPHY:
         {
             bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
             if (isNullCol) {
                 return (size_t)0;
-            }
-            // 32 bit length preceding value and
-            // actual character data without null string terminator.
-            const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+              }
+              // 32 bit length preceding value and
+              // actual character data without null string terminator.
+                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
             int32_t length;
             ValuePeeker::peekObject_withoutNull(value, &length);
             return sizeof(int32_t) + length;
-        }
-        default:
+              }
+          case VALUE_TYPE_POINT:
+              return sizeof (GeographyPointValue);
+          default:
             // let caller handle this error
             throwDynamicSQLException(
                     "Unknown ValueType %s found during Export serialization.",
@@ -516,10 +518,9 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR || columnType == VALUE_TYPE_VARBINARY) {
+        if (isVariableLengthType(columnType)) {
             // Null variable length value doesn't take any bytes in
-            // export table, so here needs a special handle for VARCHAR
-            // and VARBINARY
+            // export table.
             if (isNull(colIndex)) {
                 return sizeof(int32_t);
             }
@@ -928,7 +929,7 @@ inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
 {
     int columnCount = sizeInValues();
     for (int i = 0; i < columnCount; i++) {
-        serializeColumnToExport(io, colOffset, i, nullArray);
+        serializeColumnToExport(io, colOffset + i, getNValue(i), nullArray);
     }
 }
 
@@ -939,9 +940,11 @@ inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
         serializeToExport(io, colOffset, nullArray);
         serializeHiddenColumnsToDR(io);
     } else {
+        // relative index in the interesting column vector, used to find the correct bit in the null array
+        int colIndex = 0;
         std::vector<int> cols = *interestingColumns;
-        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
-            serializeColumnToExport(io, colOffset, *cit, nullArray);
+        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit, ++colIndex) {
+            serializeColumnToExport(io, colOffset + colIndex, getNValue(*cit), nullArray);
         }
         serializeHiddenColumnsToDR(io);
     }

@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -150,12 +150,10 @@ def test_ntp(output):
 
 def test_java_version(output):
     javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java \|openjdk '", stdout=subprocess.PIPE, shell=True).stdout.read()
-    javacVersion = subprocess.Popen("javac -version 2>&1", stdout=subprocess.PIPE, shell=True).stdout.read()
-    if '1.7.' in javaVersion or '1.8.' in javaVersion:
-        if '1.7.' in javacVersion or '1.8.' in javacVersion:
-            output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
-        else:
-            output['Java'] = ["FAIL", "Unsupported Javac version detected, " + javacVersion]
+    if '1.8.' in javaVersion:
+        output['Java'] = ["PASS", javaVersion.strip()]
+    elif len(javaVersion) > 0:
+        output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly."]
     else:
         output['Java'] = ["FAIL", "Please check if Java has been installed properly."]
 

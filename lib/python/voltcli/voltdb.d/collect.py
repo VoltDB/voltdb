@@ -1,7 +1,7 @@
 import sys, os, subprocess
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -31,7 +31,7 @@ import sys, os, subprocess
     options = (
         VOLT.StringOption (None, '--prefix', 'prefix',
                            'file name prefix for uniquely identifying collection',
-                           default = 'voltdb_logs'),
+                           default = ''),
         VOLT.StringOption (None, '--upload', 'host',
                            'upload resulting collection to HOST via SFTP',
                            default = ''),
@@ -49,10 +49,10 @@ import sys, os, subprocess
                            default = False),
         VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
-                           default = False),
+                           default = True),
         VOLT.IntegerOption(None, '--days', 'days',
                            'number of days of files to collect (files included are log, crash files), Current day value is 1',
-                           default = 14)
+                           default = 7)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True)

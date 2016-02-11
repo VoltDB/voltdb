@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -237,16 +237,12 @@ public class MpScheduler extends Scheduler
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
             }
-        }
-
-        if (message.isForReplay()) {
-            mpTxnId = message.getTxnId();
-            setMaxSeenTxnId(mpTxnId);
-        } else {
-            TxnEgo ego = advanceTxnEgo();
-            mpTxnId = ego.getTxnId();
+        } else  {
             timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
+
+        TxnEgo ego = advanceTxnEgo();
+        mpTxnId = ego.getTxnId();
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);

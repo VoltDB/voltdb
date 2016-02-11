@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,14 +27,15 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 public class Scan extends VoltProcedure {
+
     public final SQLStmt getBddStmt = new SQLStmt("SELECT value FROM Store WHERE keyspace = ? AND key >= ? LIMIT ?");
     public final SQLStmt getUnbddStmt = new SQLStmt("SELECT value FROM Store WHERE keyspace = ? LIMIT ?");
 
-    public VoltTable[] run(byte[] keyspace, String partKey, byte[] rangeMin, int count)
+    public VoltTable[] run(byte[] keyspace, String partKey, byte[] rangeMin, int count) throws Exception
     {
         if (rangeMin != null)
         {
-            voltQueueSQL(getBddStmt, keyspace, rangeMin, count);
+            voltQueueSQL(getBddStmt, keyspace, new String(rangeMin, "UTF-8"), count);
         }
         else
         {

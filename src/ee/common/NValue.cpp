@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -175,6 +175,12 @@ std::string NValue::debug() const {
     }
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
+        break;
+    case VALUE_TYPE_POINT:
+        buffer << getGeographyPointValue().toString();
+        break;
+    case VALUE_TYPE_GEOGRAPHY:
+        buffer << getGeographyValue().toString();
         break;
     default:
         buffer << "(no details)";

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,8 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.CSVInvocation;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Importer that listens on a server socket for data. Data is expected in CSV format currently,
@@ -107,11 +108,12 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
+                Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
                 while (shouldRun()) {
                     String line = in.readLine();
                     //You should convert your data to params here.
                     if (line == null) continue;
-                    CSVInvocation invocation = new CSVInvocation(m_procedure, line, m_config.getSeparator());
+                    Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
                     if (!callProcedure(invocation)) {
                         rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                     }

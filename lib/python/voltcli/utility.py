@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -856,6 +856,28 @@ def get_java_version():
             return ""
     except (OSError):
         return ""
+
+#===============================================================================
+def is_pro_version(voltdb_jar):
+#===============================================================================
+    """
+    Assumes caller has already run "find_in_path(jar)" so we know it can be checked.
+    The jar is already validated as present before this is called.
+    """
+    try:
+        zf = zipfile.ZipFile(voltdb_jar, 'r')
+    except (IOError, OSError), e:
+        print 'Error reading zip file "%s".' % voltdb_jar, e
+        return False
+    try:
+        for ze in zf.infolist():
+            if "org/voltdb/CommandLogImpl.class" == ze.filename:
+                return True
+        return False
+    except (OSError):
+        return False
+    finally:
+        zf.close()
 
 #===============================================================================
 def kwargs_merge_list(kwargs, name, *args):

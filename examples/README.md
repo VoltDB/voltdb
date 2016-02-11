@@ -6,6 +6,12 @@ Example Projects
 
 The following projects are included in the examples directory:
 
+### geospatial ###
+  This example demonstrates geospatial functionality that was added
+  to VoltDB in version 6.0.  The problem space for this demo is
+  serving ads to many mobile device users based on their location
+  in real time.
+
 ### json-sessions ####
   This example shows how to use flexible schema and JSON within
   a VoltDB application.
@@ -34,7 +40,6 @@ The following projects are included in the examples directory:
   V5 feature that lets users define how to age out old tuples using
   a special constraint on the table definition.  This example has no
   Java stored procedures.
-
 Getting Started
 --------------------------
 

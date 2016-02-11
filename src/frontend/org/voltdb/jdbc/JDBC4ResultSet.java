@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -651,7 +651,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
 
             if (table.wasNull()) {
                 doubleValue = new Double(0);
-            } else if (doubleValue > new Double(Float.MAX_VALUE) || doubleValue < new Double(Float.MIN_VALUE)) {
+            } else if (Math.abs(doubleValue) > new Double(Float.MAX_VALUE)) {
                 throw new SQLException("Value out of float range");
             }
             return doubleValue.floatValue();

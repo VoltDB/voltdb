@@ -1,0 +1,95 @@
+{
+    "databaseid": 1,
+    "cluster": {
+        "hostcount": 1,
+        "sitesperhost": 8,
+        "kfactor": 0,
+        "elastic": "enabled",
+        "schema": "ddl"
+    },
+    "paths": {
+        "voltdbroot": {
+            "path": "voltdbroot"
+        },
+        "snapshots": {
+            "path": "snapshots"
+        },
+        "exportoverflow":
+                {
+                    "path": "export_overflow"
+                },
+        "droverflow": {
+            "path": "dr_overflow"
+        },
+        "commandlog": {
+            "path": "command_log"
+        }
+        ,
+        "commandlogsnapshot": {
+            "path": "command_log_snapshot"
+        }
+    },
+    "partition-detection": {
+        "snapshot": {
+            "prefix":
+                    "voltdb_partition_detection"
+        },
+        "enabled": true
+    },
+    "admin-mode": {
+        "port": 21211,
+        "adminstartup": false
+    },
+    "heartbeat": {
+        "timeout": 90
+    },
+    "httpd": {
+        "jsonapi": {
+            "enabled": true
+        },
+        "port": 8080,
+        "enabled": true
+    },
+    "snapshot": {
+        "frequency": "24h",
+        "retain": 2,
+        "prefix": "AUTOSNAP",
+        "enabled": false
+    },
+    "export": null,
+    "users": null,
+    "commandlog": {
+        "frequency": {
+            "time": 200,
+            "transactions": 2147483647
+        },
+        "synchronous": false,
+        "enabled": false,
+        "logsize": 1024
+    },
+    "systemsettings": {
+        "temptables": {
+            "maxsize": 100
+        },
+        "snapshot": {
+            "priority": 6
+        },
+        "elastic": {
+            "duration": 50,
+            "throughput": 2
+        },
+        "query": {
+            "timeout": 10000
+        },
+        "resourcemonitor":{
+            "memorylimit":{"size":"80%"},
+            "disklimit":null
+        }
+    },
+    "security": {
+        "enabled": false,
+        "provider": "hash"
+    },
+    "dr": null,
+    "import":null
+}

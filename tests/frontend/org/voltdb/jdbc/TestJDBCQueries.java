@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -198,6 +198,16 @@ public class TestJDBCQueries {
                 true),
         new GetNumberData(
                 new String[] {null, null, null, null, null, null, null},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {"-1", "-1", "-1", "-1", "-1", "-1", "-1"},
+                new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
+                        GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
+                true),
+        new GetNumberData(
+                new String[] {"0", "0", "0", "0", "0", "0", "0"},
                 new GetType[] {GetType.BYTE, GetType.SHORT, GetType.INT,
                         GetType.LONG, GetType.FLOAT, GetType.DOUBLE, GetType.BIGDECIMAL},
                 true),

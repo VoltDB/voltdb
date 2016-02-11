@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -406,8 +406,8 @@ public:
         // bit patterns representing the same value (positive/negative
         // zero, and [de-]normalized numbers).  This is also enforced
         // in the front end.
-        assert(ValuePeeker::peekValueType(val) != VALUE_TYPE_VARCHAR
-               && ValuePeeker::peekValueType(val) != VALUE_TYPE_VARBINARY
+        assert((! isVariableLengthType(ValuePeeker::peekValueType(val)))
+               && ValuePeeker::peekValueType(val) != VALUE_TYPE_POINT
                && ValuePeeker::peekValueType(val) != VALUE_TYPE_DOUBLE);
 
         int32_t valLength = 0;

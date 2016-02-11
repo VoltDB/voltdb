@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,8 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-import org.voltdb.DRLogSegmentId;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SnapshotDataFilter;
@@ -70,11 +69,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            ExtensibleSnapshotDigestData extraSnapshotData,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -109,10 +106,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
-                                           remoteDCLastIds,
                                            context, result,
-                                           exportSequenceNumbers,
-                                           drTupleStreamInfo,tracker,
+                                           extraSnapshotData,
+                                           tracker,
                                            hashinatorData,
                                            timestamp,
                                            newPartitionCount);
@@ -240,11 +236,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     // NativeSnapshotWritePlan to include all tables.
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
-                                                             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
-                                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                             Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                                             ExtensibleSnapshotDigestData extraSnapshotData,
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,
@@ -252,9 +246,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, remoteDCLastIds,
-                        null, context, result, exportSequenceNumbers, drTupleStreamInfo,
-                        tracker, hashinatorData, timestamp, newPartitionCount);
+                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, null, context,
+                        result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {

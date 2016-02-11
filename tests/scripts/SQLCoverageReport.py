@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -67,7 +67,14 @@ def generate_table_str(res, key):
     tablestr = "<br />".join(result)
     return tablestr
 
-def generate_detail(name, item, output_dir, cmpdb):
+def generate_modified_query(cmpdb, sql, modified_sql):
+    result = ''
+    mod_sql = modified_sql.get(sql, None)
+    if mod_sql:
+        result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
+    return result
+
+def generate_detail(name, item, output_dir, cmpdb, modified_sql):
     if output_dir == None:
         return
 
@@ -82,6 +89,7 @@ td {width: 50%%}
 
 <body>
 <h2>%s</h2>
+%s
 <table cellpadding=3 cellspacing=1 border=1>
 <tr>
 <th>VoltDB Response</th>
@@ -105,13 +113,14 @@ td {width: 50%%}
 </html>
 """ % (cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
        cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
+       generate_modified_query(cmpdb, cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'), modified_sql),
        cmpdb,
        highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
        highlight(item["cmp"]["Status"], "Status" == item.get("highlight")),
        item["jni"].get("Info") or "",
        item["cmp"].get("Info") or "",
        generate_table_str(item, "jni"),
-       generate_table_str(item, "cmp"))
+       generate_table_str(item, "cmp") )
 
     filename = "%s.html" % (item["id"])
     fd = open(os.path.join(output_dir, filename), "w")
@@ -124,7 +133,7 @@ def safe_print(s):
     if not __quiet:
         print s
 
-def print_section(name, mismatches, output_dir, cmpdb):
+def print_section(name, mismatches, output_dir, cmpdb, modified_sql):
     result = """
 <h2>%s: %d</h2>
 <table cellpadding=3 cellspacing=1 border=1>
@@ -139,7 +148,7 @@ def print_section(name, mismatches, output_dir, cmpdb):
     temp = []
     for i in mismatches:
         safe_print(i["SQL"])
-        detail_page = generate_detail(name, i, output_dir, cmpdb)
+        detail_page = generate_detail(name, i, output_dir, cmpdb, modified_sql)
         jniStatus = i["jni"]["Status"]
         if jniStatus < 0:
             jniStatus = "Error: " + `jniStatus`
@@ -271,16 +280,22 @@ contain the SQL statements which caused different responses on both backends.
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                           output_dir, report_all, extra_stats='', cmpdb='HSqlDB',
-                          cntonly=False):
+                          modified_sql_path=None, cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     statements_file = open(statements_path, "rb")
     cmpdb_file = open(cmpdb_path, "rb")
     jni_file = open(jni_path, "rb")
+    if modified_sql_path:
+        modified_sql_file = open(modified_sql_path, "rb")
+    else:
+        modified_sql_file = None
+    modified_sql = {}
     failures = 0
     count = 0
     mismatches = []
+    crashed = []
     voltdb_npes = []
     cmpdb_npes  = []
     all_results = []
@@ -293,8 +308,19 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             except EOFError:
                 break
 
-            jni = cPickle.load(jni_file)
-            cdb = cPickle.load(cmpdb_file)
+            notFound = False
+            try:
+                jni = cPickle.load(jni_file)
+            except EOFError as e:
+                notFound = True
+                jni = {'Status': -99, 'Exception': 'None', 'Result': None,
+                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a VoltDB crash!</p>'}
+            try:
+                cdb = cPickle.load(cmpdb_file)
+            except EOFError as e:
+                notFound = True
+                cdb = {'Status': -98, 'Exception': 'None', 'Result': None,
+                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a ' + cmpdb + ' backend crash!</p>'}
 
             count += 1
             if int(jni["Status"]) != 1:
@@ -302,7 +328,9 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
             statement["jni"] = jni
             statement["cmp"] = cdb
-            if is_different(statement, cntonly):
+            if notFound:
+                crashed.append(statement)
+            elif is_different(statement, cntonly):
                 mismatches.append(statement)
             if ('NullPointerException' in str(jni)):
                 voltdb_npes.append(statement)
@@ -317,6 +345,21 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     statements_file.close()
     cmpdb_file.close()
     jni_file.close()
+
+    if modified_sql_file:
+        try:
+            while True:
+                try:
+                    orig_sql = modified_sql_file.readline().rstrip('\n').replace('original SQL: ', '')
+                    mod_sql  = modified_sql_file.readline().rstrip('\n').replace('modified SQL: ', '')
+                    if orig_sql and mod_sql:
+                        modified_sql[orig_sql] = mod_sql
+                    else:
+                        break
+                except EOFError as e:
+                    break
+        except Error as e:
+            raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
 
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
@@ -348,18 +391,22 @@ h2 {text-transform: uppercase}
         return int(x["id"])
     if(len(mismatches) > 0):
         sorted(mismatches, cmp=cmp, key=key)
-        report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb)
+        report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb, modified_sql)
+
+    if(len(crashed) > 0):
+        sorted(crashed, cmp=cmp, key=key)
+        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)", crashed, output_dir, cmpdb, modified_sql)
 
     if(len(voltdb_npes) > 0):
         sorted(voltdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB", voltdb_npes, output_dir, cmpdb)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB", voltdb_npes, output_dir, cmpdb, modified_sql)
 
     if(len(cmpdb_npes) > 0):
         sorted(cmpdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb, modified_sql)
 
     if report_all:
-        report += print_section("Total Statements", all_results, output_dir, cmpdb)
+        report += print_section("Total Statements", all_results, output_dir, cmpdb, modified_sql)
 
     report += """
 </body>

@@ -58,7 +58,7 @@ function cleanall() {
 # compile the source code for the client into a jarfile
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
+    javac -classpath $APPCLASSPATH client/voltkv/*.java
     # build client jar
     jar cf voltkv-client.jar -C client voltkv
     # remove compiled .class files

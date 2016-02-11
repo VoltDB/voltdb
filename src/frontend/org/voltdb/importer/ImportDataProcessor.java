@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.util.Properties;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
  * Interface ImportDataProcessor imposes on processors.
@@ -30,8 +31,8 @@ import org.voltdb.CatalogContext;
 public interface ImportDataProcessor  {
 
     public static final String IMPORT_MODULE = "__IMPORT_MODULE__";
+    public static final String IMPORT_FORMATTER = "__IMPORT_FORMATTER__";
     public static final String IMPORT_PROCEDURE = "procedure";
-    public static final String IMPORT_FORMATTER = "formatter";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";
     /**
@@ -51,6 +52,6 @@ public interface ImportDataProcessor  {
      * @param context current catalog context
      * @param config an instance of {@linkplain Properties}
      */
-    public void setProcessorConfig(CatalogContext context, Map<String, Properties> config);
+    public void setProcessorConfig(CatalogContext context, Map<String, ImportConfiguration> config);
 
 }

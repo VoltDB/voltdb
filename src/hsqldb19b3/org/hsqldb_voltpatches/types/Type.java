@@ -33,17 +33,16 @@ package org.hsqldb_voltpatches.types;
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
-import org.hsqldb_voltpatches.HsqlNameManager;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.SchemaObject;
 import org.hsqldb_voltpatches.Session;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
+import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.lib.HashSet;
 
 /**
  * Base class for type objects.<p>
@@ -73,6 +72,7 @@ public abstract class Type implements SchemaObject, Cloneable {
     }
 
     // interface specific methods
+    @Override
     public final int getType() {
 
         if (userTypeModifier == null) {
@@ -82,6 +82,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getType();
     }
 
+    @Override
     public final HsqlName getName() {
 
         if (userTypeModifier == null) {
@@ -91,6 +92,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getName();
     }
 
+    @Override
     public final HsqlName getCatalogName() {
 
         if (userTypeModifier == null) {
@@ -100,6 +102,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName().schema;
     }
 
+    @Override
     public final HsqlName getSchemaName() {
 
         if (userTypeModifier == null) {
@@ -109,6 +112,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getSchemaName();
     }
 
+    @Override
     public final Grantee getOwner() {
 
         if (userTypeModifier == null) {
@@ -118,6 +122,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getOwner();
     }
 
+    @Override
     public final OrderedHashSet getReferences() {
 
         if (userTypeModifier == null) {
@@ -127,6 +132,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getReferences();
     }
 
+    @Override
     public final OrderedHashSet getComponents() {
 
         if (userTypeModifier == null) {
@@ -136,6 +142,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return userTypeModifier.getComponents();
     }
 
+    @Override
     public final void compile(Session session) {
 
         if (userTypeModifier == null) {
@@ -152,6 +159,7 @@ public abstract class Type implements SchemaObject, Cloneable {
      * @return the SQL character sequence required to (re)create the
      *  trigger
      */
+    @Override
     public String getSQL() {
 
         if (userTypeModifier == null) {
@@ -349,6 +357,14 @@ public abstract class Type implements SchemaObject, Cloneable {
         return false;
     }
 
+    public boolean isGeographyPointType() {
+        return false;
+    }
+
+    public boolean isGeographyType() {
+        return false;
+    }
+
     public boolean acceptsPrecision() {
         return false;
     }
@@ -422,6 +438,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         throw Error.runtimeError(ErrorCode.U_S0500, "Type");
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -438,6 +455,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return typeCode + (int) precision << 8 + scale << 16;
     }
@@ -636,6 +654,9 @@ public abstract class Type implements SchemaObject, Cloneable {
         IntervalType.newIntervalType(Types.SQL_INTERVAL_SECOND,
                                      DTIType.maxIntervalPrecision,
                                      DTIType.maxFractionPrecision);
+
+    public static final VoltGeographyPointType VOLT_GEOGRAPHY_POINT = new VoltGeographyPointType();
+    public static final VoltGeographyType VOLT_GEOGRAPHY = new VoltGeographyType();
 
     public static Type getDefaultType(int type) {
 
@@ -838,7 +859,7 @@ public abstract class Type implements SchemaObject, Cloneable {
     /**
      * Enforces precision and scale limits on type
      */
-    public static Type getType(int type, int collation, long precision,
+    public static Type  getType(int type, int collation, long precision,
                                int scale) {
 
         switch (type) {
@@ -920,6 +941,12 @@ public abstract class Type implements SchemaObject, Cloneable {
             case Types.SQL_INTERVAL_SECOND :
                 return IntervalType.getIntervalType(type, precision, scale);
 
+            case Types.VOLT_GEOGRAPHY_POINT :
+                return VOLT_GEOGRAPHY_POINT;
+
+            case Types.VOLT_GEOGRAPHY :
+                return new VoltGeographyType(precision);
+
             case Types.OTHER :
                 return OTHER;
 
@@ -958,6 +985,9 @@ public abstract class Type implements SchemaObject, Cloneable {
         typeNames.put("VARCHAR", Types.SQL_VARCHAR);
         typeNames.put("TIMESTAMP", Types.SQL_TIMESTAMP);
         typeNames.put("VARBINARY", Types.SQL_VARBINARY);
+
+        typeNames.put("GEOGRAPHY_POINT", Types.VOLT_GEOGRAPHY_POINT);
+        typeNames.put("GEOGRAPHY", Types.VOLT_GEOGRAPHY);
 
         typeAliases = new IntValueHashMap(64);
 

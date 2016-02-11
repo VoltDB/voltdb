@@ -5,7 +5,7 @@ from fabric.api import run, cd, local, get, settings, lcd
 from fabric_ssh_config import getSSHInfoForHost
 
 verifydir = "/tmp/" + os.getenv('USER') + "/verifytemp"
-version = "5.9"
+version = "6.1"
 
 ################################################
 # SETUP A DIST & TOOLS IN A TEMP DIR
@@ -44,18 +44,18 @@ def runTests():
         run("%s/kit_tools/voltkv.exp \"%s\" || exit 1" % (verifydir, buildString))
 
 # get ssh config
-volt5f = getSSHInfoForHost("volt5f")
-voltmini = getSSHInfoForHost("voltmini")
+linuxbuild = getSSHInfoForHost("volt15a")
+macbuild = getSSHInfoForHost("voltmini")
 
 # test kits on 5f
-with settings(host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
+with settings(host_string=linuxbuild[1],disable_known_hosts=True,key_filename=linuxbuild[0]):
     setupVerifyDir("LINUX", "voltdb-%s" % version)
     runTests()
     setupVerifyDir("LINUX", "voltdb-ent-%s" % version)
     runTests()
 
 # test kits on mini
-with settings(host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
+with settings(host_string=macbuild[1],disable_known_hosts=True,key_filename=macbuild[0]):
     setupVerifyDir("MAC", "voltdb-%s" % version)
     runTests()
     setupVerifyDir("MAC", "voltdb-ent-%s" % version)

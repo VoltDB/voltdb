@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,6 +28,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 @ProcInfo(
     partitionInfo = "backed.rowid_group:1",
@@ -73,6 +74,7 @@ public class UpdateKey extends VoltProcedure {
         return key.getBytes();
     }
 
+    @SuppressWarnings("deprecation")
     public long run(long rowid, long rowid_group, byte[] payload)
     {
         DB db = m_site.getLevelDBInstance();
@@ -111,13 +113,13 @@ public class UpdateKey extends VoltProcedure {
                                         rowid_group + "_" + rowid, false, null);
             }
             // System.out.println("\tMigrating key: " + rowid_group + "_" + rowid);
-            voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), rowid_group, rowid, this.getVoltPrivateRealTransactionIdDontUseMe(), oldpayload);
+            voltQueueSQL(insert, EXPECT_SCALAR_MATCH(1), rowid_group, rowid, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this), oldpayload);
             voltExecuteSQL();
         }
 
         // perform in the in-memory update
         // System.out.println("Updating atime on key: " + rowid_group + "_" + rowid);
-        voltQueueSQL(update, EXPECT_SCALAR_MATCH(1), this.getVoltPrivateRealTransactionIdDontUseMe(), payload, rowid_group, rowid);
+        voltQueueSQL(update, EXPECT_SCALAR_MATCH(1), DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this), payload, rowid_group, rowid);
         return 0;
     }
 }

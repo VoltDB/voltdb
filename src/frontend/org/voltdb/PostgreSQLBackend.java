@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -41,13 +43,17 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
-    // TODO: these will need to match the values used on our Jenkins machines,
-    // once a PostgreSQL server is set up.
-    private static final String m_default_username = "postgres";
-    private static final String m_default_password = "voltdb";
-    private static final String m_permanent_database_name = "postgres";
-    private static final String m_database_name = "sqlcoveragetest";
-    private static PostgreSQLBackend m_permanent_db_backend = null;
+    protected static final String m_default_username = "postgres";
+    protected static final String m_default_password = "voltdb";
+    protected static final String m_permanent_database_name = "postgres";
+    protected static final String m_database_name = "sqlcoveragetest";
+    protected static PostgreSQLBackend m_permanent_db_backend = null;
+    // Used to specify when queries should only be modified when they apply
+    // to columns of certain types, so this only includes column types that
+    // need special treatment for PostgreSQL
+    protected enum ColumnType {
+        INTEGER, GEO
+    }
     // PostgreSQL column type names that are not found in VoltDB or HSQL,
     // mapped to their VoltDB/HSQL equivalents
     private static final Map<String,String> m_PostgreSQLTypeNames;
@@ -115,6 +121,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     private static final boolean DEBUG = false;
+    protected static boolean DEBUG_TRANSFORM_SQL = false;
+    protected static FileWriter TRANSFORM_SQL_FILE_WRITER = null;
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -154,6 +162,22 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         super("PostgreSQL", "org.postgresql.Driver",
                 "jdbc:postgresql:" + databaseName,
                 username, password);
+        // If '-Dsqlcoverage.transform.sql.file=...' was specified on the
+        // command line, print debug info when transforming SQL statements
+        // into a format that PostgreSQL can understand
+        String transformSqlOutputFile = System.getProperty("sqlcoverage.transform.sql.file", null);
+        if (transformSqlOutputFile == null) {
+            DEBUG_TRANSFORM_SQL = false;
+            TRANSFORM_SQL_FILE_WRITER = null;
+        } else {
+            DEBUG_TRANSFORM_SQL = true;
+            try {
+                TRANSFORM_SQL_FILE_WRITER = new FileWriter(transformSqlOutputFile, true);
+            } catch (IOException e) {
+                System.out.println("Caught IOException:\n    " + e
+                        + "\nSQL transform debug output will go to stdout.");
+            }
+        }
     }
 
     /** Constructor specifying a username and password, with default (PostgreSQL) 'database'. */
@@ -172,7 +196,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     }
 
     /** Creates a new PostgreSQLBackend wrapping dbconn. This is (was?) used for testing only. */
-    private PostgreSQLBackend(Connection dbconn) {
+    protected PostgreSQLBackend(Connection dbconn) {
         super(dbconn);
     }
 
@@ -206,6 +230,20 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 columnNameUpper.equals("V_G1") || columnNameUpper.equals("V_CNT") ||
                 columnNameUpper.equals("V_G2") || columnNameUpper.equals("V_SUM_AGE") ||
                 columnNameUpper.equals("V_SUM_RENT");
+    }
+
+    /** Returns true if the <i>columnName</i> is a Geography Point or a
+     *  Geography (polygon) column; false otherwise. */
+    static private boolean isGeoColumn(String columnName, String... tableNames) {
+        // TODO: Temporary method, which will mostly work, for now:
+        if (DEBUG) {
+            System.out.println("In PostgreSQLBackend.isGeoColumn, with columnName: '" + columnName + "'");
+        }
+        if (columnName == null) {
+            return false;
+        }
+        String columnNameUpper = columnName.trim().toUpperCase();
+        return columnNameUpper.startsWith("PT") || columnNameUpper.startsWith("POLY");
     }
 
     /** Returns true if the <i>columnName</i> is an integer constant or column; false otherwise. */
@@ -284,8 +322,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
      * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
      * they will be applied to each group.
-     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
-     * modified if the group is an integer-valued column.
+     * @param columnType - when specified, the <i>query</i> will only be modified
+     * if the group is a column of the specified type; may be <b>null</b>, in
+     * which case a matching query is always modified, regardless of column type.
      * @param multiplier - a value to be multiplied by the (int-valued) group,
      * in the transformed query (e.g. 8.0, to convert from bytes to bits); may
      * be <b>null</b>, in which case it is ignored.
@@ -300,9 +339,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
     @SuppressWarnings("unused")
-    static private String transformQuery(String query, Pattern queryPattern, String initText,
+    // TODO: improve this method (& overloaded versions), and its large,
+    // confusing argument list, probably using the builder pattern
+    static protected String transformQuery(String query, Pattern queryPattern, String initText,
             String prefix, String suffix, String altEnding, String altText,
-            boolean useWhole, boolean intOnly, Double multiplier, Integer minimum,
+            boolean useWhole, ColumnType columnType, Double multiplier, Integer minimum,
             String ... groups) {
         StringBuffer modified_query = new StringBuffer();
         Matcher matcher = queryPattern.matcher(query);
@@ -322,8 +363,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     System.out.println("  queryPattern: " + queryPattern);
                     System.out.println("  initText, prefix, suffix, altEnding, altText:\n    '"
                             + initText + "', '" + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altText
-                            + "'\n  useWhole, intOnly, multiplier, minimum; groups:\n    '"
-                            + useWhole + ", " + intOnly + ", " + multiplier + ", " + minimum + "\n" + groups);
+                            + "'\n  useWhole, columnType, multiplier, minimum; groups:\n    '"
+                            + useWhole + ", " + columnType + ", " + multiplier + ", " + minimum + "\n" + groups);
                     System.out.println("  wholeMatch: " + wholeMatch);
                     System.out.println("  group     : " + group);
                 }
@@ -344,7 +385,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 }
             }
             if (useWhole) {
-                if (intOnly && !isIntegerColumn(group)) {
+                if (columnType != null && (
+                           (columnType == ColumnType.INTEGER && !isIntegerColumn(group))
+                        || (columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
                     // Make no changes to query
                     replaceText.append(wholeMatch);
                 } else {
@@ -393,8 +436,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
      * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
      * they will be applied to each group.
-     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
-     * modified if the group is an integer-valued column.
+     * @param columnType - when specified, the <i>query</i> will only be modified
+     * if the group is a column of the specified type; may be <b>null</b>, in
+     * which case a matching query is always modified, regardless of column type.
      * @param groups - zero or more groups found within the <i>queryPattern</i>
      * (e.g. "column").
      * @return the <i>query</i>, transformed in the specified ways (possibly
@@ -402,12 +446,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
-    static private String transformQuery(String query, Pattern queryPattern,
+    static protected String transformQuery(String query, Pattern queryPattern,
             String initText, String prefix, String suffix, String altText,
-            boolean useWhole, boolean intOnly, String ... groups) {
+            boolean useWhole, ColumnType columnType, String ... groups) {
         return transformQuery(query, queryPattern, initText,
                 prefix, suffix, null, altText,
-                useWhole, intOnly, null, null,
+                useWhole, columnType, null, null,
                 groups);
     }
 
@@ -448,13 +492,13 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
-    static private String transformQuery(String query, Pattern queryPattern,
+    static protected String transformQuery(String query, Pattern queryPattern,
             String initText, String prefix, String suffix,
             boolean useWhole, Double multiplier, Integer minimum,
             String ... groups) {
         return transformQuery(query, queryPattern,
                 initText, prefix, suffix, null, null,
-                useWhole, false, multiplier, minimum,
+                useWhole, null, multiplier, minimum,
                 groups);
     }
 
@@ -463,7 +507,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  NULLS FIRST or (after "DESC") NULLS LAST. */
     static private String transformOrderByQuery(String dml) {
         return transformQuery(dml, orderByQuery, "ORDER BY",
-                "", " NULLS FIRST", "DESC", " NULLS LAST", false, false, null, null,
+                "", " NULLS FIRST", "DESC", " NULLS LAST", false, null, null, null,
                 "column1", "column2", "column3", "column4", "column5", "column6");
     }
 
@@ -475,7 +519,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  as 7, etc.) */
     static private String transformDayOfWeekQuery(String dml) {
         return transformQuery(dml, dayOfWeekQuery, "EXTRACT ( ",
-                "DOW FROM", ")+1", null, false, false, "column");
+                "DOW FROM", ")+1", null, false, null, "column");
     }
 
     /** Modify a query containing an EXTRACT(DAY_OF_YEAR FROM ...) function,
@@ -484,7 +528,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  does support. */
     static private String transformDayOfYearQuery(String dml) {
         return transformQuery(dml, dayOfYearQuery, "EXTRACT ( ",
-                "DOY FROM", ")", null, false, false, "column");
+                "DOY FROM", ")", null, false, null, "column");
     }
 
     /** Modify a query containing an AVG(columnName), where <i>columnName</i>
@@ -493,7 +537,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  so change it to: TRUNC ( AVG(columnName) ). */
     static private String transformAvgOfIntegerQuery(String dml) {
         return transformQuery(dml, avgQuery, "",
-                "TRUNC ( ", " )", null, true, true, "column");
+                "TRUNC ( ", " )", null, true, ColumnType.INTEGER, "column");
     }
 
     /** Modify a query containing a CEILING(columnName) or FLOOR(columnName),
@@ -503,7 +547,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  or CAST ( FLOOR(columnName) as INTEGER ), respectively. */
     static private String transformCeilingOrFloorOfIntegerQuery(String dml) {
         return transformQuery(dml, ceilingOrFloorQuery, "",
-                "CAST ( ", " as INTEGER )", null, true, true, "column");
+                "CAST ( ", " as INTEGER )", null, true, ColumnType.INTEGER, "column");
     }
 
     /** Modify a query containing 'FOO' + ..., which PostgreSQL does not
@@ -511,7 +555,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  that PostgreSQL does support. */
     static private String transformStringConcatQuery(String dml) {
         return transformQuery(dml, stringConcatQuery, "",
-                "", "", "||", true, false, "plus");
+                "", "", "||", true, null, "plus");
     }
 
     /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
@@ -531,8 +575,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 "BIT VARYING(", ")", false, 8.0, 8, "numBytes");
     }
 
-    /** For a SQL DDL statement, replace keywords not supported by PostgreSQL
-     *  with other, similar terms. */
+    /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
+     *  PostgreSQL with other, similar terms. */
     static public String transformDDL(String ddl) {
         return transformVarcharOfBytes(transformVarbinary(ddl))
                 .replace("TINYINT", "SMALLINT")
@@ -551,12 +595,44 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                                 transformOrderByQuery(dml) )))));
     }
 
+    /** Optionally (only if both the DEBUG_TRANSFORM_SQL constant and the
+     *  <i>print</i> argument are true), prints the original and modified
+     *  SQL statements, to a "Transform SQL" output file, for the current
+     *  SQLCoverage test suite (if any). */
+    static protected void debugPrintTransformSql(String originalSql, String modifiedSql, boolean print) {
+        if (DEBUG_TRANSFORM_SQL && print) {
+            try {
+                if (TRANSFORM_SQL_FILE_WRITER != null) {
+                    TRANSFORM_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
+                    TRANSFORM_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
+                } else {
+                    System.out.println("original SQL: " + originalSql);
+                    System.out.println("modified SQL: " + modifiedSql);
+                }
+            } catch (IOException e) {
+                System.out.println("Caught IOException:\n    " + e);
+                System.out.println("original SQL: " + originalSql);
+                System.out.println("modified SQL: " + modifiedSql);
+            }
+        }
+    }
+
+    /** Optionally, modifies DDL statements in such a way that PostgreSQL
+     *  results will match VoltDB results; and then passes the remaining
+     *  work to the base class version. */
+    protected void runDDL(String ddl, boolean transformDdl) {
+        String modifiedDdl = (transformDdl ? transformDDL(ddl) : ddl);
+        debugPrintTransformSql(ddl, modifiedDdl, transformDdl
+                && ddl != null && !ddl.equals(modifiedDdl));
+        super.runDDL(modifiedDdl);
+    }
+
     /** Modifies DDL statements in such a way that PostgreSQL results will
      *  match VoltDB results, and then passes the remaining work to the base
      *  class version. */
     @Override
     public void runDDL(String ddl) {
-        super.runDDL(transformDDL(ddl));
+        runDDL(ddl, true);
     }
 
     /**
@@ -572,14 +648,24 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return super.getColumnInfo(equivalentTypeName, colName);
     }
 
+    /** Optionally, modifies queries in such a way that PostgreSQL results will
+     *  match VoltDB results; and then passes the remaining work to the base
+     *  class version. */
+    protected VoltTable runDML(String dml, boolean transformDml) {
+        String modifiedDml = (transformDml ? transformDML(dml) : dml);
+        debugPrintTransformSql(dml, modifiedDml, transformDml
+                && dml != null && !dml.equals(modifiedDml));
+        return super.runDML(modifiedDml);
+    }
+
     /** Modifies queries in such a way that PostgreSQL results will match VoltDB
      *  results, and then passes the remaining work to the base class version. */
     @Override
     public VoltTable runDML(String dml) {
-        return super.runDML(transformDML(dml));
+        return runDML(dml, true);
     }
 
-    private Connection getConnection() {
+    protected Connection getConnection() {
         return dbconn;
     }
 
@@ -595,6 +681,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } catch (SQLException ex) {
                 System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
                 ex.printStackTrace();
+            }
+            if (TRANSFORM_SQL_FILE_WRITER != null) {
+                TRANSFORM_SQL_FILE_WRITER.close();
+                TRANSFORM_SQL_FILE_WRITER = null;
             }
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);

@@ -535,6 +535,19 @@
            }
         });
 
+        goog.math.Long.prototype.numberOfLeadingZeros = function () {
+            var n = 1;
+            var x = this.high_;
+            if (x == 0) { n += 32; x = this.low_; }
+            if (x >>> 16 == 0) { n += 16; x <<= 16; }
+            if (x >>> 24 == 0) { n +=  8; x <<=  8; }
+            if (x >>> 28 == 0) { n +=  4; x <<=  4; }
+            if (x >>> 30 == 0) { n +=  2; x <<=  2; }
+            n -= x >>> 31;
+            return n;
+        };
+
+
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
             this.highestTrackableValue = highestTrackableValue;
@@ -551,7 +564,10 @@
             this.subBucketHalfCountMagnitude = ((subBucketCountMagnitude > 1) ? subBucketCountMagnitude : 1) - 1;
             this.subBucketCount = Math.pow(2, (this.subBucketHalfCountMagnitude + 1));
             this.subBucketHalfCount = this.subBucketCount / 2;
-            this.subBucketMask = (this.subBucketCount - 1) << this.unitMagnitude;
+            var subBucketMask = goog.math.Long.fromInt(this.subBucketCount - 1);
+            this.subBucketMask = subBucketMask.shiftLeft(this.unitMagnitude);
+            // Establish leadingZeroCountBase, used in getBucketIndex() fast path:
+            this.leadingZeroCountBase = 64 - this.unitMagnitude - this.subBucketHalfCountMagnitude - 1;
             var trackableValue = (this.subBucketCount - 1) << this.unitMagnitude;
             var bucketsNeeded = 1;
             while (trackableValue < this.highestTrackableValue) {
@@ -578,23 +594,92 @@
             return this.count[countIndex];
         };
 
-        Histogram.prototype.valueFromIndex = function (bucketIndex, subBucketIndex) {
+        Histogram.prototype.normalizeIndex = function (index, normalizingIndexOffset, arrayLength) {
+            if (normalizingIndexOffset == 0) {
+                // Fastpath out of normalization. Keeps integer value histograms fast while allowing
+                // others (like DoubleHistogram) to use normalization at a cost...
+                return index;
+            }
+            if ((index > arrayLength) || (index < 0)) {
+                throw new ArrayIndexOutOfBoundsException("index out of covered value range");
+            }
+            var normalizedIndex = index - normalizingIndexOffset;
+            // The following is the same as an unsigned remainder operation, as long as no double wrapping happens
+            // (which shouldn't happen, as normalization is never supposed to wrap, since it would have overflowed
+            // or underflowed before it did). This (the + and - tests) seems to be faster than a % op with a
+            // correcting if < 0...:
+            if (normalizedIndex < 0) {
+                normalizedIndex += arrayLength;
+            } else if (normalizedIndex >= arrayLength) {
+                normalizedIndex -= arrayLength;
+            }
+            return normalizedIndex;
+        };
+
+        Histogram.prototype.getCountAtIndex = function (index) {
+            return this.count[this.normalizeIndex(index, 0, this.countsArrayLength)];
+        };
+
+        Histogram.prototype.valueFromIndex2 = function (bucketIndex, subBucketIndex) {
             return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
         };
 
+        Histogram.prototype.valueFromIndex = function (index) {
+            var bucketIndex = (index >> this.subBucketHalfCountMagnitude) - 1;
+            var subBucketIndex = (index & (this.subBucketHalfCount - 1)) + this.subBucketHalfCount;
+            if (bucketIndex < 0) {
+                subBucketIndex -= this.subBucketHalfCount;
+                bucketIndex = 0;
+            }
+            return this.valueFromIndex2(bucketIndex, subBucketIndex);
+        };
+
+        Histogram.prototype.lowestEquivalentValue = function (value) {
+            var bucketIndex = this.getBucketIndex(value);
+            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
+            var thisValueBaseLevel = this.valueFromIndex2(bucketIndex, subBucketIndex);
+            return thisValueBaseLevel;
+        };
+
+        Histogram.prototype.highestEquivalentValue = function (value) {
+            return this.nextNonEquivalentValue(value) - 1;
+        };
+
+        Histogram.prototype.highestEquivalentValue = function (value) {
+            return this.lowestEquivalentValue(value) + this.sizeOfEquivalentValueRange(value);
+        };
+
+        Histogram.prototype.sizeOfEquivalentValueRange = function (value) {
+            var bucketIndex = this.getBucketIndex(value);
+            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
+            var distanceToNextValue =
+                (1 << ( this.unitMagnitude + ((subBucketIndex >= this.subBucketCount) ? (bucketIndex + 1) : bucketIndex)));
+            return distanceToNextValue;
+        };
+
+        Histogram.prototype.getBucketIndex = function (value) {
+            return this.leadingZeroCountBase - (goog.math.Long.fromNumber(value).or(this.subBucketMask)).numberOfLeadingZeros();
+        };
+
+        Histogram.prototype.getSubBucketIndex = function (value, bucketIndex) {
+            return  (value >>> (bucketIndex + this.unitMagnitude));
+        };
+
         Histogram.prototype.getValueAtPercentile = function (percentile) {
-            var totalToCurrentIJ = 0;
+            var requestedPercentile = Math.min(percentile, 100.0); // Truncate down to 100%
             var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
-            for (var i = 0; i < this.bucketCount; i++) {
-                var j = (i == 0) ? 0 : (this.subBucketCount / 2);
-                for (; j < this.subBucketCount; j++) {
-                    totalToCurrentIJ += this.getCountAt(i, j);
-                    if (totalToCurrentIJ >= countAtPercentile) {
-                        var valueAtIndex = this.valueFromIndex(i, j);
-                        return valueAtIndex / 1000.0;
-                    }
+            countAtPercentile = Math.max(countAtPercentile, 1); // Make sure we at least reach the first recorded entry
+            var totalToCurrentIndex = 0;
+            for (var i = 0; i < this.countsArrayLength; i++) {
+                totalToCurrentIndex += this.getCountAtIndex(i);
+                if (totalToCurrentIndex >= countAtPercentile) {
+                    var valueAtIndex = this.valueFromIndex(i);
+                    return (percentile == 0.0) ?
+                        this.lowestEquivalentValue(valueAtIndex)/1000.0 :
+                        this.highestEquivalentValue(valueAtIndex)/1000.0;
                 }
             }
+            return 0;
         };
 
         function read32(str) {

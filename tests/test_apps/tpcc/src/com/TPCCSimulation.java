@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,7 +78,7 @@ public class TPCCSimulation
         public void callOrderStatus(String proc, Object... paramlist) throws IOException;
         public void callDelivery(short w_id, int carrier, TimestampType date) throws IOException;
         public void callPaymentByName(short w_id, byte d_id, double h_amount,
-                short c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException;
+                short c_w_id, byte c_d_id, String c_last, TimestampType now) throws IOException;
         public void callPaymentById(short w_id, byte d_id, double h_amount,
                 short c_w_id, byte c_d_id, int c_id, TimestampType now)
         throws IOException;
@@ -156,7 +156,7 @@ public class TPCCSimulation
             String cLast = generator
                     .makeRandomLastName(parameters.customersPerDistrict);
             client.callOrderStatus(Constants.ORDER_STATUS_BY_NAME,
-                                   generateWarehouseId(), generateDistrict(), cLast.getBytes("UTF-8"));
+                                   generateWarehouseId(), generateDistrict(), cLast);
 
         } else {
             // 40%: order status by id
@@ -205,7 +205,7 @@ public class TPCCSimulation
             // 60%: payment by last name
             String c_last = generator
                     .makeRandomLastName(parameters.customersPerDistrict);
-            client.callPaymentByName(w_id, d_id, h_amount, c_w_id, c_d_id, c_last.getBytes("UTF-8"), now);
+            client.callPaymentByName(w_id, d_id, h_amount, c_w_id, c_d_id, c_last, now);
         } else {
             // 40%: payment by id
             assert y > 60;

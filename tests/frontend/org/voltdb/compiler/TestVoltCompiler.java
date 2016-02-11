@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -60,10 +58,13 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -2511,6 +2512,20 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        // comparison expression not supported in group by clause
+        errorMsg = "Materialized view \"MY_VIEW\" with comparison expression '=' in GROUP BY clause not supported.";
+        ddl = "create table t(id integer not null, num integer not null);\n" +
+                "create view my_view as select (id = num) as idNumber, count(*) from t group by (id = num);" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        // count(*) is needed in ddl
+        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view as select id, wage from t group by id, wage;" +
+                "partition table my_view on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
     }
 
     public void testDDLCompilerTableLimit()
@@ -2748,6 +2763,245 @@ public class TestVoltCompiler extends TestCase {
 
         // See also regression testing that ensures EE picks up catalog changes
         // in TestSQLFeaturesNewSuite
+    }
+
+    public void testCreateTableWithGeographyPointValue() throws Exception {
+        String ddl =
+                "create table points ("
+                + "  id integer,"
+                + "  pt geography_point"
+                + ");";
+        Database db = goodDDLAgainstSimpleSchema(ddl);
+        assertNotNull(db);
+
+        Table pointTable = db.getTables().getIgnoreCase("points");
+        assertNotNull(pointTable);
+
+        Column pointCol = pointTable.getColumns().getIgnoreCase("pt");
+        assertEquals(VoltType.GEOGRAPHY_POINT.getValue(), pointCol.getType());
+    }
+
+    public void testGeographyPointValueNegative() throws Exception {
+
+        // POINT cannot be a partition column
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+                "create table pts ("
+                + "  pt geography_point not null"
+                + ");"
+                + "partition table pts on column pt;"
+                );
+
+        // POINT columns cannot yet be indexed
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt geography_point not null"
+                + ");  "
+                + "create index ptidx on pts(pt);"
+                );
+
+        // POINT columns cannot use unique/pk constraints which
+        // are implemented as indexes.
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt geography_point primary key"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt geography_point, "
+                + "  primary key (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt geography_point, "
+                + "  constraint uniq_pt unique (pt)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
+                "create table pts ("
+                + "  pt geography_point unique, "
+                + ");  "
+                );
+
+        // Default values are not yet supported
+        badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
+                "create table pts ("
+                + "  pt geography_point default 'point(3.0 9.0)', "
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*unexpected token.*",
+                "create table pts ("
+                + "  pt geography_point default pointfromtext('point(3.0 9.0)'), "
+                + ");  "
+                );
+    }
+
+    public void testCreateTableWithGeographyType() throws Exception {
+        String ddl =
+                "create table polygons ("
+                + "  id integer,"
+                + "  poly geography, "
+                + "  sized_poly0 geography(1066), "
+                + "  sized_poly1 geography(155), "    // min allowed length
+                + "  sized_poly2 geography(1048576) " // max allowed length
+                + ");";
+        Database db = goodDDLAgainstSimpleSchema(ddl);
+        assertNotNull(db);
+
+        Table polygonsTable = db.getTables().getIgnoreCase("polygons");
+        assertNotNull(polygonsTable);
+
+        Column geographyCol = polygonsTable.getColumns().getIgnoreCase("poly");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(GeographyValue.DEFAULT_LENGTH, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly0");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(1066, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly1");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(155, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly2");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(1048576, geographyCol.getSize());
+    }
+
+    public void testGeographyNegative() throws Exception {
+
+        String ddl = "create table geogs ( geog geography not null );\n" +
+                     "partition table geogs on column geog;\n";
+
+        // GEOGRAPHY cannot be a partition column
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*", ddl);
+
+        ddl = "create table geogs ( geog geography(0) not null );";
+        badDDLAgainstSimpleSchema(".*precision or scale out of range.*", ddl);
+
+        // Minimum length for a GEOGRAPHY column is 155.
+        ddl = "create table geogs ( geog geography(154) not null );";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY column GEOG in table GEOGS "
+                + "has length of 154 which is shorter than "
+                + "155, the minimum allowed length for the type.*",
+                ddl
+                );
+
+        ddl = "create table geogs ( geog geography(1048577) not null );";
+        badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*", ddl);
+
+        // GEOGRAPHY columns cannot yet be indexed
+        ddl = "create table geogs ( geog geography not null );\n" +
+              "create index geogidx on geogs( geog );\n";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+
+        // GEOGRAPHY columns cannot use unique/pk constraints which
+        // are implemented as indexes.
+        ddl = "create table geogs ( geog GEOGRAPHY primary key );\n";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+
+        ddl = "create table geogs ( geog geography, " +
+                                  " primary key (geog) );\n";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+
+        ddl = "create table geogs ( geog geography, " +
+                                  " constraint uniq_geog unique (geog) );\n";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+
+        ddl = "create table geogs (geog GEOGRAPHY unique);";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+
+        // index on boolean functions is not supported
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create index geoindex_contains ON geogs (contains(region1, point1) );\n";
+        // error msg: Cannot create index "GEOINDEX_CONTAINS" because it contains function 'CONTAINS(), which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains function 'CONTAINS..', " +
+                                  "which is not supported.*", ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create index geoindex_within100000 ON geogs (DWITHIN(region1, point1, 100000) );\n";
+        // error msg: Cannot create index "GEOINDEX_WITHIN100000" because it contains function 'DWITHIN(), which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains function 'DWITHIN..', " +
+                                  "which is not supported.*", ddl);
+
+        // indexing on comparison expression not supported
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL);\n " +
+              "create index geoindex_nonzero_distance ON geogs ( distance(region1, point1) = 0 );\n";
+        //error msg: Cannot create index "GEOINDEX_NONZERO_DISTANCE" because it contains comparison expression '=', which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_NONZERO_DISTANCE\" because it contains " +
+                                  "comparison expression '=', which is not supported.*", ddl);
+
+        // Default values are not yet supported
+        ddl = "create table geogs ( geog geography default 'polygon((3.0 9.0, 3.0 0.0, 0.0 9.0, 3.0 9.0)');\n";
+        badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*", ddl);
+
+        ddl = "create table geogs ( geog geography default polygonfromtext('polygon((3.0 9.0, 3.0 0.0, 0.0 9.0, 3.0 9.0)') );\n";
+        badDDLAgainstSimpleSchema(".*unexpected token.*", ddl);
+
+        // Materialized Views
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select count(*), sum(id), sum(distance(region1, point1)) from geogs;\n";
+        checkDDLAgainstSimpleSchema(null, ddl);
+
+        // geography type is not supported in group by clause of materialized view
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select region1, count(*) from geogs group by region1;\n";
+        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY in GROUP BY clause not supported.
+        badDDLAgainstSimpleSchema(
+                "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY in GROUP BY clause not supported.",
+                ddl);
+
+        // geography point type is not supported in group by clause of materialized view
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select point1, count(*) from geogs group by point1;\n";
+        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.
+        badDDLAgainstSimpleSchema(
+                "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.",
+                ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select isValid(Region1), count(*) from geogs group by isValid(Region1);\n";
+        // error msg: Materialized view "GEO_VIEW" with function ISVALID() in GROUP BY clause not supported.
+        badDDLAgainstSimpleSchema(
+                "Materialized view \"GEO_VIEW\" with function 'ISVALID..' in GROUP BY clause not supported.",
+                ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select Contains(Region1, POINT1), count(*) from geogs group by Contains(Region1, POINT1);\n";
+        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
+        badDDLAgainstSimpleSchema(
+                "Materialized view \"GEO_VIEW\" with function 'CONTAINS..' in GROUP BY clause not supported.",
+                ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "create view geo_view as select Centroid(Region1), count(*) from geogs group by Centroid(Region1);\n";
+        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
+        badDDLAgainstSimpleSchema(
+                "Materialized view \"GEO_VIEW\" with function 'CENTROID..' in GROUP BY clause not supported.",
+                ddl);
     }
 
     public void testPartitionOnBadType() {
@@ -3857,12 +4111,22 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLPartialIndex()
     {
-        final String s =
+        String ddl =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_idnum on t(id) where id > 4;\n";
 
-        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        VoltCompiler c = compileForDDLTest(getPathForSchema(ddl), true);
         assertFalse(c.hasErrors());
+        assertFalse(c.hasErrorsOrWarnings());
+
+        // partial index with BOOLEAN function, NOT operator and AND expression in where clause.
+        ddl =
+                "create table t (id integer not null, region1 geography not null, point1 geography_point not null);\n" +
+                "create unique index partial_index on t(distance(region1, point1)) where (NOT Contains(region1, point1) AND isValid(region1));\n";
+        c = compileForDDLTest(getPathForSchema(ddl), true);
+        assertFalse(c.hasErrors());
+        assertFalse(c.hasErrorsOrWarnings());
+
     }
 
     public void testInvalidPartialIndex()
@@ -3949,6 +4213,18 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
                 );
+
+        String ddl = "create table geogs ( id integer primary key, " +
+                                         " region1 geography NOT NULL);\n" +
+                     "export table geogs;\n";
+        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
+                                  ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " point1 geography_point NOT NULL );\n" +
+              "export table geogs to stream geog_stream;\n";
+        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
+                                  ddl);
     }
 
     public void testGoodDRTable() throws Exception {
@@ -3987,6 +4263,22 @@ public class TestVoltCompiler extends TestCase {
                 "dr table e2;"
                 );
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        schema = "create table geogs ( id integer NOT NULL, " +
+                                    " region1 geography NOT NULL, " +
+                                    " point1 geography_point NOT NULL, " +
+                                    " point2 geography_point NOT NULL);\n" +
+                 "partition table geogs on column id;\n";
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;");
+        assertTrue(db.getTables().getIgnoreCase("geogs").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;",
+                "dr table geogs disable;");
+        assertFalse(db.getTables().getIgnoreCase("geogs").getIsdred());
     }
 
     public void testBadDRTable() throws Exception {
@@ -4147,7 +4439,8 @@ public class TestVoltCompiler extends TestCase {
                                    ddl,
                                    "create index faulty on alpha(id, 100 + sum(id));");
         // Test for subqueries.
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" with subquery sources is not supported\\.",
+        checkDDLAgainstGivenSchema(".*Cannot create index \"FAULTY\" because it contains comparison expression '=', " +
+                                   "which is not supported.*",
                                    ddl,
                                    "create index faulty on alpha(id = (select id + id from alpha));");
     }

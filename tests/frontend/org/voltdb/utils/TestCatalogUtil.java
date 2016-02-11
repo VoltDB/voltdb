@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -453,7 +453,7 @@ public class TestCatalogUtil extends TestCase {
         String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
         assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(0, sysset.getQuerytimeout());
+        assertEquals(10000, sysset.getQuerytimeout());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
@@ -894,12 +894,14 @@ public class TestCatalogUtil extends TestCase {
     public void testImportSettings() throws Exception {
         if (!MiscUtils.isPro()) { return; } // not supported in community
 
+        File formatjar = CatalogUtil.createTemporaryEmptyCatalogJarFile();
         final String withBadImport1 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration type=\"custom\" module=\"///\" >"
+                + "        <configuration type=\"custom\" module=\"///\" "
+                + "format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -911,7 +913,8 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration type=\"custom\" module=\"file:/tmp/foobar.jar\" >"
+                + "        <configuration type=\"custom\" module=\"file:/tmp/foobar.jar\" "
+                + "format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -925,12 +928,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString()
+                + "\" format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:/" + catjar.toString()
+                + "\" format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -942,12 +947,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString()
+                + "\" format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString()
+                + "\" format=\"file:" + formatjar.toString() + "/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -959,7 +966,20 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <import>"
-                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" >"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString()
+                + "\" format=\"file:" + formatjar.toString() + "/csv\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </import>"
+                + "</deployment>";
+        final String withBadFormatter1 =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <import>"
+                + "        <configuration type=\"custom\" module=\"file:" + catjar.toString() + "\" format=\"badformatter.jar/csv\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -982,7 +1002,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        assertTrue("compilation should have failed", msg.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
+        assertTrue(msg, msg.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
         //import with bad bundlename
         final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
@@ -1027,6 +1047,17 @@ public class TestCatalogUtil extends TestCase {
 
         String msg5 = CatalogUtil.compileDeployment(cat5, good_deployment1, false);
         assertNull(msg5);
+
+        //formatter with invalid jar
+        final File tmpBad5 = VoltProjectBuilder.writeStringToTempFile(withBadFormatter1);
+        DeploymentType bad_deployment5 = CatalogUtil.getDeployment(new FileInputStream(tmpBad5));
+
+        VoltCompiler compiler6 = new VoltCompiler();
+        String x6[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat6 = compiler6.compileCatalogFromDDL(x6);
+
+        String msg6 = CatalogUtil.compileDeployment(cat6, bad_deployment5, false);
+        assertTrue("compilation should have failed", msg6.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
         System.out.println("Import deployment tests done.");
     }
 

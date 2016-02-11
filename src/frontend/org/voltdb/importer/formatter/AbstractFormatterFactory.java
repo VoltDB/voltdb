@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,13 @@ import org.osgi.framework.BundleContext;
  * should implement a create method to construct the class that implements Formatter.
  */
 public abstract class AbstractFormatterFactory implements BundleActivator {
+    protected String m_formatName;
+    protected Properties m_formatProps;
+
+    public final void configureFormatterFactory(String formatName, Properties formatProps) {
+        m_formatName = formatName;
+        m_formatProps = formatProps;
+    }
 
     /**
      * Registers this as an OSGi service. At startup, the server will look
@@ -51,5 +58,5 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      * @param prop - formatter properties
      * @return formatter instance created with the given name and properties
      */
-    public abstract Formatter<?> create(String name, Properties prop);
+    public abstract Formatter<?> create();
 }

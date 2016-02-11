@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,7 +60,7 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.DRLogSegmentId;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
@@ -96,7 +96,7 @@ public class SnapshotUtil {
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
-    public static final String JSON_CHECK_CLUSTER_ID = "checkClusterId";
+    public static final String JSON_IS_RECOVER = "isRecover";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -133,7 +133,7 @@ public class SnapshotUtil {
      * @param nonce   nonce used to distinguish this snapshot
      * @param tables   List of tables present in this snapshot
      * @param hostId   Host ID where this is happening
-     * @param exportSequenceNumbers  ???
+     * @param extraSnapshotData persisted export, DR, etc state
      * @throws IOException
      */
     public static Runnable writeSnapshotDigest(
@@ -143,10 +143,8 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        Map<Integer, DRLogSegmentId> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
-        Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+        ExtensibleSnapshotDigestData extraSnapshotData,
         InstanceId instanceId,
         long timestamp,
         long clusterCreateTime,
@@ -178,25 +176,6 @@ public class SnapshotUtil {
                     stringer.value(tables.get(ii).getTypeName());
                 }
                 stringer.endArray();
-                stringer.key("exportSequenceNumbers").array();
-                for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
-                    stringer.object();
-
-                    stringer.key("exportTableName").value(entry.getKey());
-
-                    stringer.key("sequenceNumberPerPartition").array();
-                    for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
-                        stringer.object();
-                        stringer.key("partition").value(sequenceNumber.getKey());
-                        //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                        stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
-                        stringer.endObject();
-                    }
-                    stringer.endArray();
-
-                    stringer.endObject();
-                }
-                stringer.endArray();
 
                 stringer.key("partitionTransactionIds").object();
                 for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
@@ -208,33 +187,7 @@ public class SnapshotUtil {
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.key("clusterCreateTime").value(clusterCreateTime);
 
-                stringer.key("remoteDCLastIds");
-                stringer.object();
-                for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> e : remoteDCLastIds.entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.object();
-                    for (Map.Entry<Integer, DRLogSegmentId> e2 : e.getValue().entrySet()) {
-                        stringer.key(e2.getKey().toString());
-                        stringer.object();
-                        stringer.key("drId").value(e2.getValue().drId);
-                        stringer.key("spUniqueId").value(e2.getValue().spUniqueId);
-                        stringer.key("mpUniqueId").value(e2.getValue().mpUniqueId);
-                        stringer.endObject();
-                    }
-                    stringer.endObject();
-                }
-                stringer.endObject();
-                stringer.key("drTupleStreamStateInfo");
-                stringer.object();
-                for (Map.Entry<Integer, DRLogSegmentId> e : drTupleStreamInfo.entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.object();
-                    stringer.key("sequenceNumber").value(e.getValue().drId);
-                    stringer.key("spUniqueId").value(e.getValue().spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().mpUniqueId);
-                    stringer.endObject();
-                }
-                stringer.endObject();
+                extraSnapshotData.writeToSnapshotDigest(stringer);
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);

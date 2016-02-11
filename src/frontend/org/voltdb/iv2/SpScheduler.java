@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -443,8 +443,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * update the txnid to match the one from the CL
              */
             if (message.isForReplay()) {
-                newSpHandle = message.getTxnId();
-                setMaxSeenTxnId(newSpHandle);
+                TxnEgo ego = advanceTxnEgo();
+                newSpHandle = ego.getTxnId();
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
