@@ -652,13 +652,19 @@ def runTests(CTX):
                 process = Popen(executable="valgrind", args=["valgrind", "--leak-check=full", "--show-reachable=yes", "--error-exitcode=-1", targetpath], stderr=PIPE, bufsize=-1)
                 #out = process.stdout.readlines()
                 allHeapBlocksFreed = False
+                otherValgrindError = True
                 out_err = process.stderr.readlines()
                 retval = process.wait()
                 for str in out_err:
                     if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
                         allHeapBlocksFreed = True
+                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
+                        otherValgrindError = False
                 if not allHeapBlocksFreed:
-                    print "Not all heap blocks were freed"
+                    print "Not all heap blocks were freed..."
+                    retval = -1
+                elif otherValgrindError:
+                    print "Valgrind reported errors..."
                     retval = -1
                 if retval == -1:
                     for str in out_err:
