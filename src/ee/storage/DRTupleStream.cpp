@@ -447,19 +447,12 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength >= (m_defaultCapacity - m_headerSpace)) {
-            switch (sb->type()) {
-                case voltdb::NORMAL_STREAM_BLOCK:
-                {
-                    blockSize = m_secondaryCapacity;
-                    break;
-                }
-                case voltdb::LARGE_STREAM_BLOCK:
-                {
-                    blockSize = 0;
-                    break;
-                }
-            }
+        size_t spaceNeeded = m_headerSpace + partialTxnLength + minLength;
+        if (spaceNeeded > m_secondaryCapacity) {
+            // txn larger than the max buffer size, set blockSize to 0 so that caller will abort
+            blockSize = 0;
+        } else if (spaceNeeded > m_defaultCapacity) {
+            blockSize = m_secondaryCapacity;
         }
         if (blockSize != 0) {
             uso -= partialTxnLength;
