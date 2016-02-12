@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -133,6 +133,17 @@ class CompactingHashMultiMapIndex : public TableIndex
         cursor.m_match.move(const_cast<void*>(mapIter.value()));
         return true;
     }
+
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findTuple(*persistentTuple);
+        if (mapIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+        return true;
+   }
 
     TableTuple nextValueAtKey(IndexCursor& cursor) const {
         if (cursor.m_match.isNullTuple()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,16 +43,20 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -60,17 +64,12 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.utils.DBBPool;
-import org.voltdb.catalog.Column;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
  *
  */
-public class ExportGeneration {
-
+public class ExportGeneration implements Generation {
     /**
      * Processors also log using this facility.
      */
@@ -88,8 +87,12 @@ public class ExportGeneration {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final HashMap<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
-            = new HashMap<Integer, Map<String, ExportDataSource>>();
+    private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
+            =        new HashMap<Integer, Map<String, ExportDataSource>>();
+    @Override
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        return m_dataSourcesByPartition;
+    }
 
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
@@ -364,7 +367,7 @@ public class ExportGeneration {
         String leader = Collections.min(children);
         String part = m_partitionLeaderZKName.get(partition);
         if (part == null) {
-            exportLog.error("Unable to start exporting for partition: " + partition);
+            exportLog.warn("Unable to start exporting for partition (not master of): " + partition);
             return;
         }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {

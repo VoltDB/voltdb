@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,7 +70,11 @@ public class DRLogSegmentId implements Serializable {
     }
 
     public static boolean isEmptyDRId (long drId) {
-        return (drId >>> 63) == (long)1;
+        return (drId >>> 63) == 1L;
+    }
+
+    public static boolean seqIsBeforeZero(long drId) {
+        return (getSequenceNumberFromDRId(-1L) == getSequenceNumberFromDRId(drId));
     }
 
     public static int getClusterIdFromDRId(long drId) {
@@ -92,8 +96,14 @@ public class DRLogSegmentId implements Serializable {
 
         public MutableBinaryLogInfo() {
             drId = Long.MIN_VALUE;
-            spUniqueId = Long.MIN_VALUE;
-            mpUniqueId = Long.MIN_VALUE;
+            spUniqueId = 0;
+            mpUniqueId = 0;
+        }
+
+        public void reset() {
+            drId = Long.MIN_VALUE;
+            spUniqueId = 0;
+            mpUniqueId = 0;
         }
 
         public DRLogSegmentId toImmutable() {

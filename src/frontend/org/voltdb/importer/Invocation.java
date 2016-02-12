@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,23 @@
 
 package org.voltdb.importer;
 
-import java.io.IOException;
-
 /**
  *
  * @author akhanzode
  */
-public interface Invocation {
-    public String getProcedure();
-    public Object [] getParams() throws IOException;
+public class Invocation {
+    private final String m_proc;
+    private final Object[] m_params;
+
+    public Invocation(String proc, Object[] params) {
+        m_proc = proc;
+        m_params = params;
+    }
+
+    public String getProcedure() {
+        return m_proc;
+    }
+    public Object [] getParams() {
+        return m_params;
+    }
 }

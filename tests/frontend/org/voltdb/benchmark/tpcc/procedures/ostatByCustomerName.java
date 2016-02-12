@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,7 +49,12 @@
  */
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
 //Notes on Stored Procedure:
 //return VoltTables has 2 elements:
@@ -93,7 +98,7 @@ public class ostatByCustomerName extends VoltProcedure {
         return new VoltTable[]{customer, order, orderLines};
     }
 
-    public VoltTable[] run(short w_id, byte d_id, byte[] c_last) {
+    public VoltTable[] run(short w_id, byte d_id, String c_last) {
         voltQueueSQL(getCustomersByLastName, w_id, d_id, c_last);
         VoltTable customers = voltExecuteSQL()[0];
 

@@ -1,0 +1,8 @@
+Improperly formatted WKT for polygon: expected WKT to start with POLYGON
+Improperly formatted WKT for polygon: missing opening parenthesis
+Improperly formatted WKT for polygon: missing latitude in long lat pair
+Improperly formatted WKT for polygon: missing comma between long lat pairs
+Improperly formatted WKT for polygon: premature end of input
+Improperly formatted WKT for polygon: missing closing parenthesis
+Improperly formatted WKT for polygon: a polygon must contain at least one ring (with each ring at least 4 points, including repeated closing vertex)
+Improperly formatted WKT for polygon: a polygon ring must contain at least 4 points (including repeated closing vertex)

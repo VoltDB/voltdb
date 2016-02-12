@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -91,6 +91,13 @@ public:
                                                        "", 0, NULL, NULL, 0);
         m_executorContext.reset(newExec);
         return m_executorContext.get();
+    }
+
+    static std::string peekStringCopy_withoutNull(const NValue& value) {
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
+        std::string result(buf, length);
+        return result;
     }
 
 };
@@ -888,31 +895,31 @@ TEST_F(NValueTest, TestCastToString) {
 
 
     NValue bigIntCastToString = ValueFactory::castAsString(bigInt);
-    std::string bigIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(bigIntCastToString);
+    std::string bigIntPeekedString = peekStringCopy_withoutNull(bigIntCastToString);
     EXPECT_EQ(strcmp(bigIntPeekedString.c_str(), "-64"), 0);
 
     NValue integerCastToString = ValueFactory::castAsString(integer);
-    std::string integerPeekedString = ValuePeeker::peekStringCopy_withoutNull(integerCastToString);
+    std::string integerPeekedString = peekStringCopy_withoutNull(integerCastToString);
     EXPECT_EQ(strcmp(integerPeekedString.c_str(), "120"), 0);
 
     NValue smallIntCastToString = ValueFactory::castAsString(smallInt);
-    std::string smallIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(smallIntCastToString);
+    std::string smallIntPeekedString = peekStringCopy_withoutNull(smallIntCastToString);
     EXPECT_EQ(strcmp(smallIntPeekedString.c_str(), "120"), 0);
 
     NValue tinyIntCastToString = ValueFactory::castAsString(tinyInt);
-    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(tinyIntCastToString);
+    std::string tinyIntPeekedString = peekStringCopy_withoutNull(tinyIntCastToString);
     EXPECT_EQ(strcmp(tinyIntPeekedString.c_str(), "120"), 0);
 
     NValue doubleCastToString = ValueFactory::castAsString(doubleValue);
-    std::string doublePeekedString = ValuePeeker::peekStringCopy_withoutNull(doubleCastToString);
+    std::string doublePeekedString = peekStringCopy_withoutNull(doubleCastToString);
     EXPECT_EQ(strcmp(doublePeekedString.c_str(), "-3.2E1"), 0);
 
     NValue decimalCastToString = ValueFactory::castAsString(decimalValue);
-    std::string decimalPeekedString = ValuePeeker::peekStringCopy_withoutNull(decimalCastToString);
+    std::string decimalPeekedString = peekStringCopy_withoutNull(decimalCastToString);
     EXPECT_EQ(strcmp(decimalPeekedString.c_str(), "10.220000000000"), 0);
 
     NValue stringCastToString = ValueFactory::castAsString(stringValue);
-    std::string stringPeekedString = ValuePeeker::peekStringCopy_withoutNull(stringCastToString);
+    std::string stringPeekedString = peekStringCopy_withoutNull(stringCastToString);
     EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
@@ -983,6 +990,38 @@ TEST_F(NValueTest, TestCastToDecimal) {
         caught = true;
     }
     EXPECT_TRUE(caught);
+}
+
+TEST_F(NValueTest, TestToString) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    getExecutorContextForTest(testPool);
+
+    NValue tinyInt = ValueFactory::getTinyIntValue(120);
+    NValue smallInt = ValueFactory::getSmallIntValue(120);
+    NValue integer = ValueFactory::getIntegerValue(120);
+    NValue bigInt = ValueFactory::getBigIntValue(-64);
+    NValue doubleValue = ValueFactory::getDoubleValue(-32);
+    NValue stringValue = ValueFactory::getStringValue("数据库");
+    NValue binaryValue = ValueFactory::getBinaryValue("aa");
+    NValue decimalValue = ValueFactory::getDecimalValueFromString("10.22");
+    NValue timestamp = ValueFactory::getTimestampValue(99999999);
+    NValue nullValue = ValueFactory::getNullValue();
+
+    EXPECT_EQ(strcmp(bigInt.toString().c_str(), "-64"), 0);
+    EXPECT_EQ(strcmp(integer.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(smallInt.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(tinyInt.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(doubleValue.toString().c_str(), "-3.2E1"), 0);
+    EXPECT_EQ(strcmp(decimalValue.toString().c_str(), "10.220000000000"), 0);
+    EXPECT_EQ(strcmp(stringValue.toString().c_str(), "数据库"), 0);
+    EXPECT_EQ(strcmp(binaryValue.toString().c_str(), "aa"), 0);
+    EXPECT_EQ(strcmp(timestamp.toString().c_str(), "1970-01-01 00:01:39.999999"), 0);
+    EXPECT_EQ(strcmp(nullValue.toString().c_str(), "null"), 0);
+
+    // Make valgrind happy
+    stringValue.free();
+    binaryValue.free();
 }
 
 //
@@ -2213,10 +2252,18 @@ TEST_F(NValueTest, TestSubstring)
                 EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
                 EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
 
-                std::string leftString = ValuePeeker::peekStringCopy_withoutNull(leftStringValue);
-                std::string midString = ValuePeeker::peekStringCopy_withoutNull(midStringValue);
-                std::string rightString = ValuePeeker::peekStringCopy_withoutNull(rightExactStringValue);
+                std::string leftString = peekStringCopy_withoutNull(leftStringValue);
+                std::string midString = peekStringCopy_withoutNull(midStringValue);
+                std::string rightString = peekStringCopy_withoutNull(rightExactStringValue);
                 std::string recombined = leftString + midString + rightString;
+                if ( ! (testDatum.compare(recombined) == 0)) {
+                    std::cout << "DEBUG: mismatched recombine: "
+                              << "[(" << leftString.size() << ")" << leftString << "]"
+                              << " + [(" << midString.size() << ")" << midString << "]"
+                              << " + [(" << rightString.size() << ")" << rightString << "]"
+                              << " == [(" << recombined.size() << ")" << recombined << "]"
+                              << " != [(" << testDatum.size() << ")" << testDatum << "]" << std::endl;
+                }
                 EXPECT_TRUE(testDatum.compare(recombined) == 0);
 
                 if (midString.length() > 0) {
@@ -2952,7 +2999,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     try {
         NValue ts = ValueFactory::getTimestampValue(base);
         NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-        peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+        peekString = peekStringCopy_withoutNull(str);
         long roundtrip = NValue::parseTimestampString(peekString.c_str());
         EXPECT_EQ(base, roundtrip);
         if (base != roundtrip) {
@@ -3083,7 +3130,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         try {
             NValue ts = ValueFactory::getTimestampValue(jj);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             long roundtrip = NValue::parseTimestampString(peekString.c_str());
             EXPECT_EQ(jj, roundtrip);
             if (jj != roundtrip) {
@@ -3119,7 +3166,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3175,7 +3222,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3196,7 +3243,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3218,7 +3265,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3239,7 +3286,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3261,7 +3308,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3282,7 +3329,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3294,6 +3341,240 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
         cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
         EXPECT_FALSE(true);
     }
+}
+
+TEST_F(NValueTest, TestDateadd) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    getExecutorContextForTest(testPool);
+
+    NValue result;
+    NValue interval = ValueFactory::getBigIntValue(1);
+    // 2001-09-09 01:46.40.000000
+    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
+
+    std::vector<NValue> args;
+    args.push_back(interval);
+    args.push_back(midSeptember);
+
+    int EXPECTED_YEAR = 2002;
+    result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    result = result.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    int EXPECTED_QUARTER = 12;
+    result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    result = result.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_QUARTER)));
+
+    int EXPECTED_MONTH = 10;
+    result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    result = result.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_MONTH)));
+
+    int EXPECTED_DAY = 10;
+    result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    result = result.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_DAY)));
+
+    int EXPECTED_HOUR = 2;
+    result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    result = result.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_HOUR)));
+
+    int EXPECTED_MINUTE = 47;
+    result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    result = result.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_MINUTE)));
+
+    int EXPECTED_SECOND = 41;
+    result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    result = result.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_SECOND)));
+
+    // Test illegal arguments
+    const std::string expectedMsg = std::string("interval is too large for DATEADD function");
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_YEAR_INTERVAL+1);
+    bool caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_QUARTER_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MONTH_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_DAY_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_HOUR_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MINUTE_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_SECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MILLISECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MICROSECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_YEAR_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_QUARTER_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MONTH_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_DAY_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_HOUR_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MINUTE_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_SECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MILLISECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MICROSECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
 }
 
 int main() {

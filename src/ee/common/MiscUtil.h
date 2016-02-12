@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "boost/functional/hash.hpp"
+
 namespace voltdb
 {
 
@@ -41,6 +43,27 @@ class MiscUtil
      * Split string on delimiter into two sub-strings.
      */
     static std::vector<std::string> splitToTwoString(const std::string &str, char delimiter);
+
+    /**
+     * A hashCombine function that can deal with the quirks of floating point math
+     * on the various platforms that we support.
+     */
+    static void hashCombineFloatingPoint(std::size_t &seed, double value) {
+        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
+        // for identical inputs, so the conditional was added,
+        // mutated from the one in boost/type_traits/intrinsics.hpp,
+        // and the broken overload for "double" was by-passed in favor of the more reliable
+        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
+        // This conditional can be dropped when Centos 5 support is dropped.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
+        boost::hash_combine( seed, value);
+#else
+        {
+            const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(&value);
+            boost::hash_combine( seed, proxyForDouble);
+        }
+#endif
+    }
 };
 
 } // namespace voltdb

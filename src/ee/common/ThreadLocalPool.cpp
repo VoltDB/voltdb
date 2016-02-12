@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,10 +16,12 @@
  */
 #include "common/ThreadLocalPool.h"
 
-#include "common/CompactingStringStorage.h"
 #include "common/FatalException.hpp"
 #include "common/SQLException.h"
 
+#include "structures/CompactingPool.h"
+
+#include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
 #include <iostream>
@@ -58,6 +60,8 @@ typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSiz
 
 typedef std::pair<int, PoolsByObjectSize* > PairType;
 typedef PairType* PairTypePtr;
+
+typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
@@ -100,126 +104,136 @@ ThreadLocalPool::~ThreadLocalPool() {
     }
 }
 
-std::size_t
-ThreadLocalPool::getAllocationSizeForObject(std::size_t length) {
-    if (length <= 2) {
-        return 2;
-    } else if (length <= 4) {
-        return 4;
-    } else if (length <= 4 + 2) {
-        return 4 + 2;
-    } else if (length <= 8) {
-        return 8;
-    } else if (length <= 8 + 4) {
-        return 8 + 4;
-    } else if (length <= 16) {
-        return 16;
-    } else if (length <= 16 + 8) {
-        return 16 + 8;
-    } else if (length <= 32) {
-        return 32;
-    } else if (length <= 32 + 16) {
-        return 32 + 16;
-    } else if (length <= 64) {
-        return 64;
-    } else if (length <= 64 + 32) {
-        return 64 + 32;
-    } else if (length <= 128) {
-        return 128;
-    } else if (length < 128 + 64) {
-        return 128 + 64;
-    } else if (length <= 256) {
-        return 256;
-    } else if (length <= 256 + 128) {
-        return 256 + 128;
-    } else if (length <= 512) {
-        return 512;
-    } else if (length <= 512 + 256) {
-        return 512 + 256;
-    } else if (length <= 1024) {
-        return 1024;
-    } else if (length <= 1024 + 512) {
-        return 1024 + 512;
-    } else if (length <= 2048) {
-        return 2048;
-    } else if (length <= 2048 + 1024) {
-        return 2048 + 1024;
-    } else if (length <= 4096) {
-        return 4096;
-    } else if (length < 4096 + 2048) {
-        return 4096 + 2048;
-    } else if (length <= 8192) {
-        return 8192;
-    } else if (length < 8192 + 4096) {
-        return 8192 + 4096;
-    } else if (length <= 16384) {
-        return 16384;
-    } else if (length <= 16384 + 8192) {
-        return 16384 + 8192;
-    } else if (length <= 32768) {
-        return 32768;
-    } else if (length <= 32768 + 16384) {
-        return 32768 + 16384;
-    } else if (length <= 65536) {
-        return 65536;
-    } else if (length <= 65536 + 32768) {
-        return 65536 + 32768;
-    } else if (length <= 131072) {
-        return 131072;
-    } else if (length <= 131072 + 65536) {
-        return 131072 + 65536;
-    } else if (length <= 262144) {
-        return 262144;
-    } else if (length <= 262144 + 131072) {
-        return 262144 + 131072;
-    } else if (length <= 524288) {
-        return 524288;
-    } else if (length <= 524288 + 262144) {
-        return 524288 + 262144;
-        //Need space for a length prefix and a backpointer
-    } else if (length <= POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*)) {
-        return POOLED_MAX_VALUE_LENGTH + sizeof(int32_t) + sizeof(void*);
-    } else {
-        // Do this so that we can use this method to compute allocation sizes.
-        // Expect callers to check for 0 and throw a FatalException for
-        // illegal size.
-        return 0;
+static int32_t getAllocationSizeForObject(int length)
+{
+    static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
+    static const int32_t MAX_ALLOCATION = ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
+        NVALUE_LONG_OBJECT_LENGTHLENGTH +
+        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+
+    int length_to_fit = length +
+        NVALUE_LONG_OBJECT_LENGTHLENGTH +
+        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+
+    // The -1 and repeated shifting and + 1 are part of the rounding algorithm
+    // that produces the nearest power of 2 greater than or equal to the value.
+    int target = length_to_fit - 1;
+    target |= target >> 1;
+    target |= target >> 2;
+    target |= target >> 4;
+    target |= target >> 8;
+    target |= target >> 16;
+    target++;
+    // Try to shrink the target to "midway" down to the previous power of 2,
+    // if the length fits.
+    // Strictly speaking, a geometric mean (dividing the even power by sqrt(2))
+    // would give a more consistently proportional over-allocation for values
+    // at slightly different scales, but the arithmetic mean (3/4 of the power)
+    // is fast to calculate and close enough for our purposes.
+    int threeQuartersTarget = target - (target>>2);
+    if (length_to_fit < threeQuartersTarget) {
+        target = threeQuartersTarget;
     }
+    if (target <= MAX_ALLOCATION) {
+        return target;
+    }
+    if (length_to_fit <= MAX_ALLOCATION) {
+        return MAX_ALLOCATION;
+    }
+    throwFatalException("Attempted to allocate an object larger than the 1 MB limit. Requested size was %d",
+                        length);
 }
+
+int TestOnlyAllocationSizeForObject(int length)
+{
+    return getAllocationSizeForObject(length);
+}
+
 
 #ifdef MEMCHECK
 /// Persistent string pools with their compaction are completely bypassed for
 /// the memcheck build. It just does standard C++ heap allocations and
 /// deallocations.
-char* ThreadLocalPool::allocateRelocatable(std::size_t sz)
-{ return new char[sz]; }
+ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer_ignored, int32_t sz)
+{
+    return new (new char[sizeof(Sized) + sz]) Sized(sz);
+}
 
-void ThreadLocalPool::freeRelocatable(std::size_t sz, char* string)
-{ delete [] string; }
+int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
+{
+    return static_cast<int32_t>(data->m_size + sizeof(Sized));
+}
+
+void ThreadLocalPool::freeRelocatable(Sized* data)
+{ delete [] reinterpret_cast<char*>(data); }
 
 #else // not MEMCHECK
-// TODO: CompactingStringStorage is an odd packaging of functionality:
-// - pool management which is similar to code below that handles exact
-//   size allocations and could be similarly inlined below
-// - critical aspects of a compacting pool that are better bundled into
-//   the CompactingPool class.
-// - interfacing with the StringRef class to implement other critical
-//   aspects of a compacting pool that should ALSO be abstracted into
-//   CompactingPool, greatly simplifying StringRef.
-// CompactingStringStorage is just getting in the way and needs to be dropped.
+
 static CompactingStringStorage& getStringPoolMap()
 {
     return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
 }
 
-char* ThreadLocalPool::allocateRelocatable(std::size_t sz)
+ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
 {
-    return reinterpret_cast<char*>(getStringPoolMap().get(sz)->malloc());
+    // The size provided to this function determines the
+    // approximate-size-specific pool selection. It gets
+    // reflected (after rounding and padding) in the size
+    // prefix padded into each allocation. The size prefix is somewhat
+    // redundant with the "object length" that NValue will eventually
+    // encode into the first 1-3 bytes of the buffer being returned here.
+    // So, in theory, this code could avoid adding the overhead of a
+    // "Sized" allocation by trusting the NValue code and decoding
+    // (and rounding up) the object length out of the first few bytes
+    // of the "user data" whenever it gets passed back into
+    // getAllocationSizeForRelocatable and freeRelocatable.
+    // For now, to keep the allocator simple and abstract,
+    // NValue and the allocator each keep their own accounting.
+    int32_t alloc_size = getAllocationSizeForObject(sz);
+    CompactingStringStorage& poolMap = getStringPoolMap();
+    CompactingStringStorage::iterator iter = poolMap.find(alloc_size);
+    void* allocation;
+    if (iter == poolMap.end()) {
+        // There is no pool yet for objects of this size, so create one.
+        // Compute num_elements to be the largest multiple of alloc_size
+        // to fit in a 2MB buffer.
+        int32_t num_elements = ((2 * 1024 * 1024 - 1) / alloc_size) + 1;
+        boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size, num_elements));
+        poolMap.insert(std::pair<int32_t, boost::shared_ptr<CompactingPool> >(alloc_size, pool));
+        allocation = pool->malloc(referrer);
+    }
+    else {
+        allocation = iter->second->malloc(referrer);
+    }
+
+    // Convert from the raw allocation to the initialized size header.
+    Sized* sized = new (allocation) Sized(sz);
+    return sized;
 }
 
-void ThreadLocalPool::freeRelocatable(std::size_t sz, char* string)
+int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* sized)
 {
-    getStringPoolMap().get(sz)->free(string);
+    // Convert from the caller data to the size-prefixed allocation to
+    // extract its size field.
+    return getAllocationSizeForObject(sized->m_size);
+}
+
+void ThreadLocalPool::freeRelocatable(Sized* sized)
+{
+    // use the cached size to find the right pool.
+    int32_t alloc_size = getAllocationSizeForObject(sized->m_size);
+    CompactingStringStorage& poolMap = getStringPoolMap();
+    CompactingStringStorage::iterator iter = poolMap.find(alloc_size);
+    if (iter == poolMap.end()) {
+        // If the pool can not be found, there could not have been a prior
+        // allocation for any object of this size, so either the caller
+        // passed a bogus data pointer that was never allocated here OR
+        // the data pointer's size header has been corrupted.
+        throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
+                            alloc_size);
+    }
+    // Free the raw allocation from the found pool.
+    iter->second->free(sized);
 }
 
 #endif
@@ -244,12 +258,13 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
      * of 2MB blocks for small allocation sizes. For larger allocations
      * (not a typical case, possibly not a useful case), fall back to
      * allocating two of these huge things at a time.
-     * The goal of this bounding is make the amount of unused but allocated
+     * The goal of this bounding is to make the amount of unused but allocated
      * memory relatively small so that the counting done by the volt allocator
      * accurately represents the effect on RSS. Left to its own algorithms,
      * boost will purposely allocate pages that increase in size until they
-     * are too large to ever overflow, regardless of absolute scale -- so
-     * likely containing lots of unused space (for safety). VoltDB prefers
+     * are too large to ever overflow, regardless of absolute scale.
+     * That makes it likely that they will contain lots of unused space
+     * (for safety against repeated allocations). VoltDB prefers
      * to risk lots of separate smaller allocations (~2MB each) at larger
      * scale rather than risk fewer, larger, but mostly unused buffers.
      * Also, for larger allocation requests (not typical -- not used? -- in
@@ -287,7 +302,16 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
     size_t bytes_allocated =
         *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
-    bytes_allocated += (static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey)))->getPoolAllocationSize();
+    // For relocatable objects, each object-size-specific pool
+    // -- or actually, its ContiguousAllocator -- tracks its own memory
+    // allocation, so sum them, here.
+    CompactingStringStorage* poolMap =
+        static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    for (CompactingStringStorage::iterator iter = poolMap->begin();
+         iter != poolMap->end();
+         ++iter) {
+        bytes_allocated += iter->second->getBytesAllocated();
+    }
     return bytes_allocated;
 }
 

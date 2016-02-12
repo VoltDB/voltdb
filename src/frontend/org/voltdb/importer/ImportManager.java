@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,8 +28,10 @@ import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
+import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
@@ -38,7 +40,9 @@ import org.voltdb.CatalogContext;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
@@ -60,7 +64,8 @@ public class ImportManager implements ChannelChangeCallback {
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
+    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
+    private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
@@ -104,18 +109,24 @@ public class ImportManager implements ChannelChangeCallback {
             throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
         }
 
+        /*
+         * Note for developers: please keep list in alpha-numerical order
+         */
         List<String> packages = ImmutableList.<String>builder()
-                .add("org.voltcore.network")
-                .add("org.voltdb.importer")
-                .add("org.apache.log4j")
-                .add("org.voltdb.client")
-                .add("org.slf4j")
-                .add("org.voltcore.utils")
                 .add("com.google_voltpatches.common.base")
                 .add("com.google_voltpatches.common.collect")
-                .add("com.google_voltpatches.common.net")
                 .add("com.google_voltpatches.common.io")
+                .add("com.google_voltpatches.common.net")
                 .add("com.google_voltpatches.common.util.concurrent")
+                .add("jsr166y")
+                .add("org.apache.log4j")
+                .add("org.slf4j")
+                .add("org.voltcore.network")
+                .add("org.voltcore.logging")
+                .add("org.voltcore.utils")
+                .add("org.voltdb.client")
+                .add("org.voltdb.importer")
+                .add("org.voltdb.importer.formatter")
                 .build();
 
         String systemPackagesSpec = FluentIterable.from(packages).transform(appendVersion).join(COMMA_JOINER);
@@ -176,6 +187,32 @@ public class ImportManager implements ChannelChangeCallback {
 
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
+            m_formatterFactories.clear();
+
+            for (ImportConfiguration config : m_processorConfig.values()) {
+                Properties prop = config.getformatterProperties();
+                String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+                try {
+                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                    if (formatterFactory == null) {
+                        Bundle bundle = m_framework.getBundleContext().installBundle(module);
+                        bundle.start();
+                        ServiceReference<?> refs[] = bundle.getRegisteredServices();
+                        //Must have one service only.
+                        ServiceReference<?> reference = refs[0];
+                        if (reference == null) {
+                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                        }
+                        formatterFactory = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
+                        m_formatterFactories.put(module, formatterFactory);
+                    }
+                    formatterFactory.configureFormatterFactory(config.getFormatName(), prop);
+                    config.setFormatterFactory(formatterFactory);
+                } catch(Throwable t) {
+                    VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+                }
+            }
+
             newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
         } catch (final Exception e) {
@@ -195,7 +232,9 @@ public class ImportManager implements ChannelChangeCallback {
         if (m_processor.get() == null) {
             return;
         }
-        m_processor.get().shutdown();
+        if (m_serverStarted) {
+            m_processor.get().shutdown();
+        }
         //Unset until it gets started.
         m_processor.set(null);
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -99,7 +99,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
+                                     null, 0, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -118,7 +118,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         }
         m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
+                                     adminPort, adminOnStartup, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 

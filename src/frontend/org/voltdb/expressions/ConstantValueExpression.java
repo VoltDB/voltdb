@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -309,8 +309,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (neededType == VoltType.TIMESTAMP) {
             if (m_valueType == VoltType.STRING) {
                 try {
-                    // Convert date value in whatever format is supported by TimeStampType
-                    // into VoltDB native microsecond count.
+                    // Convert date value in whatever format is supported by
+                    // TimeStampType into VoltDB native microsecond count.
+                    // TODO: Should datetime string be supported as the new
+                    // canonical internal format for timestamp constants?
+                    // Historically, the long micros value made sense because
+                    // it was initially the only way and later the most
+                    // direct way to initialize timestamp values in the EE.
+                    // But now that long value can not be used to "explain"
+                    // an expression as a valid SQL timestamp value for DDL
+                    // round trips, forcing a reverse conversion back through
+                    // TimeStampType to a datetime string.
                     TimestampType ts = new TimestampType(m_value);
                     m_value = String.valueOf(ts.getTime());
                 }
@@ -463,6 +472,24 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
         if (m_valueType == VoltType.STRING) {
             return "'" + m_value + "'";
+        }
+        if (m_valueType == VoltType.TIMESTAMP) {
+            try {
+                // Convert the datetime value in its canonical internal form,
+                // currently a count of epoch microseconds,
+                // through TimeStampType into a timestamp string.
+                long micros = Long.valueOf(m_value);
+                TimestampType ts = new TimestampType(micros);
+                return "'" + ts.toString() + "'";
+            }
+            // It couldn't be converted to timestamp.
+            catch (IllegalArgumentException e) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") has an invalid format for a constant " +
+                                                 VoltType.TIMESTAMP.toSQLString() + " value");
+
+            }
+
         }
         return m_value;
     }

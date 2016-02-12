@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -255,9 +255,11 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     delete tuple4;
 }
 
+static int VERBOSE = 0;
+
 // create three types of index and test their performace of delete
 TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
-    std::cout<<std::endl;
+    std::cout << std::endl;
     prepareForPerformanceDifference();
 
 #define PLACES 16
@@ -267,20 +269,29 @@ TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
         EXPECT_NE(data, NULL);
 
         std::clock_t c1 = insertTuplesIntoIndex(m_index, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         std::clock_t c2 = insertTuplesIntoIndex(m_indexWithoutPointer1, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         std::clock_t c3 = insertTuplesIntoIndex(m_indexWithoutPointer2, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        if (VERBOSE || c1 > c3) {
+            if (c1 > c3) {
+                std::cout << "Possible insert overhead anomaly:\n";
+            }
+            std::cout << "insert 2**" << places << " IntsPointerKey<1> : " <<  c1  << std::endl;
+            std::cout << "insert 2**" << places << " IntsKey<1> : " <<  c2  << std::endl;
+            std::cout << "insert 2**" << places << " IntsKey<2> : " <<  c3  << std::endl;
+        }
 
         c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
-
-        delete data;
+        if (VERBOSE || c1 > c3) {
+            if (c1 > c3) {
+                std::cout << "Possible delete performance overhead anomaly:\n";
+            }
+            std::cout << "delete 2**" << places << " IntsPointerKey<1> : " <<  c1  << std::endl;
+            std::cout << "delete 2**" << places << " IntsKey<1> : " <<  c2  << std::endl;
+            std::cout << "delete 2**" << places << " IntsKey<2> : " <<  c3  << std::endl;
+        }
+        delete [] data;
         freeSchemaAndIndexForPerformanceDifference();
     }
 
@@ -290,20 +301,29 @@ TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
         EXPECT_NE(data, NULL);
 
         std::clock_t c1 = insertTuplesIntoIndex2(m_index, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         std::clock_t c2 = insertTuplesIntoIndex2(m_indexWithoutPointer1, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         std::clock_t c3 = insertTuplesIntoIndex2(m_indexWithoutPointer2, m_schema, data, places);
-        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        if (VERBOSE || c1 > c3) {
+            if (c1 > c3) {
+                std::cout << "Possible insert overhead anomaly:\n";
+            }
+            std::cout << "insert 2**" << places <<  " IntsPointerKey<1> : " <<  c1  << std::endl;
+            std::cout << "insert 2**" << places <<  " IntsKey<1> : " <<  c2  << std::endl;
+            std::cout << "insert 2**" << places <<  " IntsKey<2> : " <<  c3  << std::endl;
+        }
 
         c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
-        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
-
-        delete data;
+        if (VERBOSE || c1 > c3) {
+            if (c1 > c3) {
+                std::cout << "Possible delete peformance overhead anomaly:\n";
+            }
+            std::cout << "delete 2**" << places << " IntsPointerKey<1> : " <<  c1  << std::endl;
+            std::cout << "delete 2**" << places << " IntsKey<1> : " <<  c2  << std::endl;
+            std::cout << "delete 2**" << places << " IntsKey<2> : " <<  c3  << std::endl;
+        }
+        delete [] data;
         freeSchemaAndIndexForPerformanceDifference();
     }
 }

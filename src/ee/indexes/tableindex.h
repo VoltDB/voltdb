@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -265,6 +265,12 @@ public:
      * @return true if the value is found. false if not.
      */
     virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
+
+    /**
+      * A slightly different to the previous function, this function requires
+      * full tuple instead of just key as the search parameter.
+      */
+     virtual bool moveToKeyByTuple(const TableTuple* searchTuple, IndexCursor &cursor) const = 0;
 
     /**
      * This method moves to the first tuple equal or greater than

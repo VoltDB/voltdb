@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1279,12 +1279,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{100}});
+
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104) " +
                     "order by ID;";
-            /* enable for debug */ dumpQueryPlans(client, sql);
+            //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
@@ -1294,6 +1295,38 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try single-column-based expressions as row columns.
+            sql =   "select ID from R1 " +
+                    "where (abs(ID), 2*DEPT-DEPT) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
+            // Try a hard-coded constant as a row column.
+            // This currently works only in the cases like this where the
+            // IN rewrites as an EXISTS.
+            sql =   "select ID from R1 " +
+                    "where (ID, 2) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
+            // Try a multi-column expression as a row column.
+            // This currently works only in the cases like this where the
+            // IN rewrites as an EXISTS.
+            sql =   "select ID from R1 " +
+                    "where (ID, ID+DEPT-ID) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
         }
 
         // IN should evaluate to NULL
@@ -1333,6 +1366,84 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try single-column-based expressions as row columns in a
+            // NOT IN query that will not get rewritten as an EXISTS query.
+            sql =   "select ID from R1 " +
+                    "where (abs(WAGE), 2+DEPT-2) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try non-working cases of a constant-valued row column.
+            // NOT IN does not rewrite as EXISTS, so the constant row column is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, 2) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting constant row column to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "use of a constant value";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+            // A subquery with a limit does not rewrite as EXISTS,
+            // so the constant row column is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, 2) IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104 limit 1) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting constant row column to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "use of a constant value";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+
+            // Try non-working cases of a multi-column-expression in a row column.
+            // NOT IN does not rewrite as EXISTS, so the multi-column-based
+            // row column expression is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, ID+DEPT-ID) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting multi-column expression to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "combination of column values";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+            // A subquery with a limit does not rewrite as EXISTS,
+            // so the multi-column-based row column expression
+            // is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, ID+DEPT-ID) IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104 limit 1) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting multi-column expression to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "combination of column values";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
         }
     }
 
@@ -2194,7 +2305,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // Test subqueries on partitioned table cases not yet supported
-    public void notestSubSelects_from_partitioned() throws Exception
+    public void testSubSelects_from_partitioned() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -3093,6 +3204,34 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       having MAX(WAGE) > 9 offset 2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
+    }
+
+    public void testAmbiguousColumns() throws Exception {
+        Client client = getClient();
+        Object [][] R1Contents = {
+                { 101, 100, 10, "2013-07-18 02:00:00.123457" },
+                { 102, 101, 10, "2013-07-18 02:00:00.123457" },
+                { 103, 104, 10, "2013-07-18 02:00:00.123457" }
+        };
+        Object [][] R2Contents = {
+                { 201, 100 + 101, 21, "2013-07-18 02:00:00.123457"},
+                { 202, 102 + 101, 22, "2013-07-18 02:00:00.123457"},
+                { 203, 103 + 104, 23, "2013-07-18 02:00:00.123457"}
+        };
+        for (Object[] row : R1Contents) {
+            client.callProcedure("R1.insert", row);
+        }
+        for (Object[] row : R2Contents) {
+            client.callProcedure("R2.insert", row);
+        }
+        // DEPT should be from R2.  WAGE should be from S1 and R2 both.
+        String sql = "select DEPT, WAGE from (select ID + WAGE as WAGE from R1) AS S1 join R2 using(WAGE) order by DEPT;";
+        long[][] expected = {
+                {21, 100 + 101},
+                {22, 102 + 101},
+                {23, 103 + 104}
+        };
+        validateTableOfLongs(client, sql, expected);
     }
 
     public void testEng8394SubqueryWithUnionAndCorrelation() throws Exception {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -89,7 +89,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.client.SyncCallback;
@@ -160,6 +160,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
     public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
+    public static final long EXECUTE_TASK_CID            = Long.MIN_VALUE + 6;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -179,6 +180,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter;
     private final InternalConnectionHandler m_internalConnectionHandler;
+    private final SimpleClientResponseAdapter m_executeTaskAdpater;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -273,7 +275,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
-    private final boolean m_isConfiguredForHSQL;
+    private final boolean m_isConfiguredForNonVoltDBBackend;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -632,11 +634,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             message.flip();
             int aversion = message.get(); //Get version
-            ClientAuthHashScheme hashScheme = ClientAuthHashScheme.HASH_SHA1;
+            ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
             if (aversion > 0) {
                 try {
-                    hashScheme = ClientAuthHashScheme.get(message.get());
+                    hashScheme = ClientAuthScheme.get(message.get());
                 } catch (IllegalArgumentException ex) {
                     authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
                     //Send negative response
@@ -649,7 +651,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
             final String username = fds.readString();
-            final int digestLen = ClientAuthHashScheme.getDigestLength(hashScheme);
+            final int digestLen = ClientAuthScheme.getDigestLength(hashScheme);
             final byte password[] = new byte[digestLen];
             //We should be left with SHA bytes only which varies based on scheme.
             if (message.remaining() != digestLen) {
@@ -1213,11 +1215,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
-        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+        BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
+        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGIS_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
         m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
+
+        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
+        bindAdapter(m_executeTaskAdpater, null);
     }
 
     public InternalConnectionHandler getInternalConnectionHandler() {
@@ -1842,6 +1850,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (task.procName.equals("@Ping")) {
                 return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
             }
+            // ExecuteTask is an internal procedure, not for public use.
+            else if (task.procName.equals("@ExecuteTask")) {
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE, new VoltTable[0],
+                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
+            }
             else if (task.procName.equals("@GetPartitionKeys")) {
                 return dispatchGetPartitionKeys(task);
             }
@@ -1894,9 +1907,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
-            }
-            else if (task.procName.equals("@ResetDR")) {
-                return dispatchResetDR(task);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -1962,7 +1972,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         SyncCallback cb = new SyncCallback();
                         getInternalConnectionHandler().callProcedure(
-                                new ClientInterfaceConnectionContext(), null, 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                                new ClientInterfaceConnectionContext(), null, cb, user, "@UpdateApplicationCatalog", catalog, dep);
                         cb.waitForResponse();
 
                         m_catalogContext.set(VoltDB.instance().getCatalogContext());
@@ -2233,15 +2243,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    private ClientResponseImpl dispatchResetDR(StoredProcedureInvocation task) {
-        if (VoltDB.instance().getNodeDRGateway() != null) {
-            VoltDB.instance().getNodeDRGateway().resetDRProducer();
-        }
-        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(VoltSystemProcedure.STATUS_OK);
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] {t}, "SUCCESS", task.clientHandle);
-    }
-
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
             throws VoltTypeException
     {
@@ -2262,8 +2263,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
+        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
+        // -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
         int partition = -1;
 
         if (isSinglePartition) {
@@ -3089,4 +3091,59 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return clientResponse;
     }
 
+    /**
+     * Call @ExecuteTask to generate a MP transaction.
+     *
+     * @param timeoutMS  timeout in milliseconds
+     * @param params  actual parameter(s) for sub task to run
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public ClientResponse callExecuteTask(long timeoutMS, byte[] params ) throws IOException, InterruptedException {
+        final String procedureName = "@ExecuteTask";
+        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+        Procedure proc = procedureConfig.asCatalogProcedure();
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName(procedureName);
+        spi.setParams(params);
+        SimpleClientResponseAdapter.SyncCallback syncCb = new SimpleClientResponseAdapter.SyncCallback();
+        spi.setClientHandle(m_executeTaskAdpater.registerCallback(syncCb));
+        if (spi.getSerializedParams() == null) {
+            spi = MiscUtils.roundTripForCL(spi);
+        }
+        createTransaction(m_executeTaskAdpater.connectionId(), spi,
+                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
+                0 /* Can provide anything for multi-part */,
+                spi.getSerializedSize(), System.nanoTime());
+
+        return syncCb.getResponse(timeoutMS);
+    }
+
+    /**
+     * Asynchronous version, call @ExecuteTask to generate a MP transaction.
+     *
+     * @param cb  maximum timeout in milliseconds
+     * @param params  actual parameter(s) for sub task to run
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void callExecuteTaskAsync(SimpleClientResponseAdapter.Callback cb, byte[] params) throws IOException {
+        final String procedureName = "@ExecuteTask";
+        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+        Procedure proc = procedureConfig.asCatalogProcedure();
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName(procedureName);
+        spi.setParams(params);
+        spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+        if (spi.getSerializedParams() == null) {
+            spi = MiscUtils.roundTripForCL(spi);
+        }
+        createTransaction(m_executeTaskAdpater.connectionId(), spi,
+                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
+                0 /* Can provide anything for multi-part */,
+                spi.getSerializedSize(), System.nanoTime());
+
+    }
 }

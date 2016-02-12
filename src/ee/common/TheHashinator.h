@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,8 +63,9 @@ class TheHashinator {
         case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
         {
-            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(value)),
-                    ValuePeeker::peekObjectLength_withoutNull(value));
+            int32_t length;
+            const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
+            return hashinate(buf, length);
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
@@ -72,6 +73,12 @@ class TheHashinator {
             break;
         }
     }
+
+    /*
+     * Given a previously calculated hash value pick the partition to store the data in
+     */
+    virtual int32_t partitionForToken(int32_t hashCode) const = 0;
+
     virtual ~TheHashinator() {}
 
   protected:

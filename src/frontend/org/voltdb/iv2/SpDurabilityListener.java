@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -27,6 +28,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
  * This class is not thread-safe. Most of its usage is on the Site thread.
  */
 public class SpDurabilityListener implements DurabilityListener {
+    private static final VoltLogger log = new VoltLogger("LOGGING");
 
     // No command logging
     class NoCompletionChecks implements CommandLog.CompletionChecks {
@@ -40,20 +42,21 @@ public class SpDurabilityListener implements DurabilityListener {
         public void addTask(TransactionTask task) {}
 
         @Override
+        public void setLastDurableUniqueId(long uniqueId) {}
+
+        @Override
         public int getTaskListSize() {
             return 0;
         }
 
         @Override
         public void processChecks() {}
-
-        @Override
-        public void checkForSyncLoggedSysProcs() {}
-    };
+    }
 
     class AsyncCompletionChecks implements CommandLog.CompletionChecks {
         protected long m_lastSpUniqueId;
         protected long m_lastMpUniqueId;
+        protected boolean m_changed = false;
 
         AsyncCompletionChecks(long lastSpUniqueId, long lastMpUniqueId) {
             m_lastSpUniqueId = lastSpUniqueId;
@@ -67,12 +70,20 @@ public class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void addTask(TransactionTask task) {
-            if (UniqueIdGenerator.getPartitionIdFromUniqueId(task.m_txnState.uniqueId) == MpInitiator.MP_INIT_PID) {
-                m_lastMpUniqueId = task.m_txnState.uniqueId;
+            setLastDurableUniqueId(task.m_txnState.uniqueId);
+        }
+
+        @Override
+        public void setLastDurableUniqueId(long uniqueId) {
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == MpInitiator.MP_INIT_PID) {
+                assert m_lastMpUniqueId <= uniqueId;
+                m_lastMpUniqueId = uniqueId;
             }
             else {
-                m_lastSpUniqueId = task.m_txnState.uniqueId;
+                assert m_lastSpUniqueId <= uniqueId;
+                m_lastSpUniqueId = uniqueId;
             }
+            m_changed = true;
         }
 
         @Override
@@ -82,14 +93,17 @@ public class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void processChecks() {
-            // Notify the SP UniqueId listeners
-            for (DurableUniqueIdListener listener : m_uniqueIdListeners) {
-                listener.lastUniqueIdsMadeDurable(m_lastSpUniqueId, m_lastMpUniqueId);
+            if (m_changed) {
+                if (log.isTraceEnabled()) {
+                    log.trace("Notifying of last made durable: SP " + UniqueIdGenerator.toShortString(m_lastSpUniqueId) +
+                              ", MP " + UniqueIdGenerator.toShortString(m_lastMpUniqueId));
+                }
+                // Notify the SP UniqueId listeners
+                for (DurableUniqueIdListener listener : m_uniqueIdListeners) {
+                    listener.lastUniqueIdsMadeDurable(m_lastSpUniqueId, m_lastMpUniqueId);
+                }
             }
         }
-
-        @Override
-        public void checkForSyncLoggedSysProcs() {}
     };
 
     class SyncCompletionChecks extends AsyncCompletionChecks {
@@ -132,12 +146,6 @@ public class SpDurabilityListener implements DurabilityListener {
             queuePendingTasks();
             super.processChecks();
         }
-
-        @Override
-        public void checkForSyncLoggedSysProcs() {
-            queuePendingTasks();
-        }
-
     }
 
     private CommandLog.CompletionChecks m_currentCompletionChecks = null;
@@ -165,6 +173,11 @@ public class SpDurabilityListener implements DurabilityListener {
     @Override
     public void addTransaction(TransactionTask pendingTask) {
         m_currentCompletionChecks.addTask(pendingTask);
+    }
+
+    @Override
+    public void initializeLastDurableUniqueId(long uniqueId) {
+        m_currentCompletionChecks.setLastDurableUniqueId(uniqueId);
     }
 
     @Override
@@ -206,11 +219,6 @@ public class SpDurabilityListener implements DurabilityListener {
     @Override
     public void processDurabilityChecks(CommandLog.CompletionChecks completionChecks) {
         m_spScheduler.processDurabilityChecks(completionChecks);
-    }
-
-    @Override
-    public void checkForSyncLoggedSysProcs(CommandLog.CompletionChecks completionChecks) {
-        m_spScheduler.checkForSyncLoggedSysProcs(completionChecks);
     }
 
 }

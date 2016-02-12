@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -636,8 +636,12 @@ public abstract class ExpressionUtil {
             }
         } else if (ExpressionType.OPERATOR_NOT == expr.getExpressionType()) {
             AbstractExpression leftExpr = expr.getLeft();
-            if (VoltType.BOOLEAN == leftExpr.getValueType()) {
-                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+            // function expressions can also return boolean. So the left child expression
+            // can be expression which are not constant value expressions, so don't
+            // evaluate every left child expr as constant value expression
+            if ((VoltType.BOOLEAN == leftExpr.getValueType()) &&
+                    (leftExpr instanceof ConstantValueExpression)) {
+                if (ConstantValueExpression.isBooleanTrue(leftExpr)) {
                     return ConstantValueExpression.getFalse();
                 } else {
                     return ConstantValueExpression.getTrue();

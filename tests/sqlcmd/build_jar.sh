@@ -4,7 +4,7 @@
 # (which is used to test the LOAD CLASSES and REMOVE CLASSES commands).
 
 # compile java source
-javac -target 1.7 -source 1.7 -classpath ../../obj/release/prod procedures/sqlcmdtest/*.java
+javac -classpath ../../obj/release/prod procedures/sqlcmdtest/*.java
 
 # build the jar file
 jar cf sqlcmdtest-procs.jar -C procedures sqlcmdtest

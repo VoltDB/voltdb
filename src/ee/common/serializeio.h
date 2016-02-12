@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,6 +68,8 @@ namespace voltdb {
 
 #ifdef __DARWIN_OSSwapInt64 // for darwin/macosx
 
+#undef htonll
+#undef ntohll
 #define htonll(x) __DARWIN_OSSwapInt64(x)
 #define ntohll(x) __DARWIN_OSSwapInt64(x)
 
@@ -80,11 +82,15 @@ namespace voltdb {
 
 #ifdef __bswap_64 // recent linux
 
+#undef htonll
+#undef ntohll
 #define htonll(x) static_cast<uint64_t>(__bswap_constant_64(x))
 #define ntohll(x) static_cast<uint64_t>(__bswap_constant_64(x))
 
 #else // unix in general again
 
+#undef htonll
+#undef ntohll
 #define htonll(x) (((int64_t)(ntohl((int32_t)((x << 32) >> 32))) << 32) | (uint32_t)ntohl(((int32_t)(x >> 32))))
 #define ntohll(x) (((int64_t)(ntohl((int32_t)((x << 32) >> 32))) << 32) | (uint32_t)ntohl(((int32_t)(x >> 32))))
 

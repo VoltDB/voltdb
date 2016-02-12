@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -65,7 +65,7 @@ public class Reporter implements Runnable {
                 //  SELECT SUM(sum_values) / SUM(count_values)
                 //  FROM agg_by_second
                 //  WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
-                ClientResponse cr = app.client.callProcedure("Average", seconds);
+                ClientResponse cr = app.client.callProcedure("Average", -seconds);
                 VoltTable result = cr.getResults()[0];
                 long average = result.asScalarLong();
                 if (! result.wasNull()) {

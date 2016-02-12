@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -171,6 +171,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             if (m_snapshotCompletionMonitor.isDone()) {
                 try {
                     SnapshotCompletionEvent event = m_snapshotCompletionMonitor.get();
+                    siteConnection.setDRProtocolVersion(event.drVersion);
                     assert(event != null);
                     JOINLOG.debug("P" + m_partitionId + " noticed data transfer completion");
                     m_completionAction.setSnapshotTxnId(event.multipartTxnId);

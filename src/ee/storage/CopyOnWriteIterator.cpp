@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,8 @@
 namespace voltdb {
 CopyOnWriteIterator::CopyOnWriteIterator(
         PersistentTable *table,
-        PersistentTableSurgeon *surgeon,
-        TBMap blocks) :
-        m_table(table), m_surgeon(surgeon), m_blocks(blocks),
+        PersistentTableSurgeon *surgeon) :
+        m_table(table), m_surgeon(surgeon), m_blocks(m_surgeon->getData()),
         m_blockIterator(m_blocks.begin()), m_end(m_blocks.end()),
         m_tupleLength(table->getTupleLength()),
         m_location(NULL),
@@ -33,12 +32,48 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_skippedInactiveRows(0) {
     //Prime the pump
     if (m_blockIterator != m_end) {
-        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
         m_location = m_blockIterator.key();
-        m_currentBlock = m_blockIterator.value();
+        m_currentBlock = m_blockIterator.data();
         m_blockIterator++;
     }
     m_blockOffset = 0;
+}
+
+/**
+ * When a tuple is "dirty" it is still active, but will never be a "found" tuple
+ * since it is skipped. The tuple may be dirty because it was deleted (this is why it is always skipped). In that
+ * case the CopyOnWriteContext calls this to ensure that the iteration finds the correct number of tuples
+ * in the used portion of the table blocks and doesn't overrun to the uninitialized block memory because
+ * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
+ */
+bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
+    /**
+     * Find out which block the address is contained in. Lower bound returns the first entry
+     * in the index >= the address. Unless the address happens to be equal then the block
+     * we are looking for is probably the previous entry. Then check if the address fits
+     * in the previous entry. If it doesn't then the block is something new.
+     */
+    TBPtr block = PersistentTable::findBlock(tupleAddress, m_blocks, m_table->getTableAllocationSize());
+    if (block.get() == NULL) {
+        // tuple not in snapshot region, don't care about this tuple
+        return false;
+    }
+
+    /**
+     * Now check where this is relative to the COWIterator.
+     */
+    const char *blockAddress = block->address();
+    if (blockAddress > m_currentBlock->address()) {
+        return true;
+    }
+
+    assert(blockAddress == m_currentBlock->address());
+    if (tupleAddress >= m_location) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /**
@@ -55,12 +90,12 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }
-            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
 
             char *finishedBlock = m_currentBlock->address();
 
             m_location = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.value();
+            m_currentBlock = m_blockIterator.data();
             assert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
@@ -69,9 +104,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             //
             // This invalidates the iterators, so we have to get new iterators
             // using the current block's start address. m_blockIterator has to
-            // point to the next block, hence the upperBound() call.
+            // point to the next block, hence the upper_bound() call.
             m_blocks.erase(finishedBlock);
-            m_blockIterator = m_blocks.upperBound(m_currentBlock->address());
+            m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
             m_end = m_blocks.end();
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
@@ -115,7 +150,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
                 break;
             }
             location = blockIterator.key();
-            currentBlock = blockIterator.value();
+            currentBlock = blockIterator.data();
             assert(currentBlock->address() == location);
             blockOffset = 0;
             blockIterator++;

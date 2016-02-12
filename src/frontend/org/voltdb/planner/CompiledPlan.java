@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -96,6 +96,16 @@ public class CompiledPlan {
      */
     private boolean m_statementIsOrderDeterministic = false;
 
+    /**
+     * This string describes the reason a plan is not content deterministic.
+     * This is non-null iff the statement has some calculation which is in
+     * itself content non-deterministic. The most typical example is an
+     * aggregate of a column whose type is floating point. The floating point
+     * arithmetic may be slightly different with different plans or different
+     * row orders.
+     */
+    private String m_contentDeterminismDetail = null;
+
     /** Which extracted param is the partitioning object (assuming parameterized plans) */
     public int partitioningKeyIndex = -1;
 
@@ -129,12 +139,17 @@ public class CompiledPlan {
     }
 
     /**
-     * Mark the level of result determinism imposed by the statement,
-     * which can save us from a difficult determination based on the plan graph.
+     * Mark the level of result determinism imposed by the statement, which can
+     * save us from a difficult determination based on the plan graph.
      */
-    public void statementGuaranteesDeterminism(boolean hasLimitOrOffset, boolean order) {
+    public void statementGuaranteesDeterminism(boolean hasLimitOrOffset,
+                                               boolean order,
+                                               String contentDeterminismDetail) {
         m_statementHasLimitOrOffset = hasLimitOrOffset;
         m_statementIsOrderDeterministic = order;
+        if (contentDeterminismDetail != null) {
+            m_contentDeterminismDetail = contentDeterminismDetail;
+        }
     }
 
     /**
@@ -149,13 +164,20 @@ public class CompiledPlan {
         return rootPlanGraph.isOrderDeterministic();
     }
 
+    public boolean isContentDeterministic() {
+        return m_contentDeterminismDetail == null;
+    }
+
     /**
-     * Accessor for flag marking the original statement as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * Accessor for flag marking the original statement as guaranteeing an
+     * identical result/effect when "replayed" against the same database state,
+     * such as during replication or CL recovery. If
+     * m_statementIsContentDeterministic is false we want to check this. This is
+     * the one area in which content and limit-order determinism interact.
      */
     public boolean hasDeterministicStatement()
     {
-        return m_statementIsOrderDeterministic;
+        return m_statementIsOrderDeterministic && isContentDeterministic();
     }
 
     /**
@@ -168,10 +190,15 @@ public class CompiledPlan {
     }
 
     /**
-     * Accessor for description of plan non-determinism.
+     * Accessor for description of plan non-determinism. Note that we prefer the
+     * content determinism message to the rootPlanGraph's message.
+     *
      * @return the corresponding value from the first fragment
      */
     public String nondeterminismDetail() {
+        if (!isContentDeterministic()) {
+            return m_contentDeterminismDetail;
+        }
         return rootPlanGraph.nondeterminismDetail();
     }
 
@@ -321,5 +348,9 @@ public class CompiledPlan {
         else {
             return "CompiledPlan: [null plan graph]";
         }
+    }
+
+    public void setNondeterminismDetail(String contentDeterminismMessage) {
+        m_contentDeterminismDetail = contentDeterminismMessage;
     }
 }

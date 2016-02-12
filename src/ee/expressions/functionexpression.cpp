@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 
 #include "expressions/functionexpression.h"
+#include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
 
 namespace voltdb {
@@ -32,9 +33,9 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
              throw SQLException(SQLException::dynamic_sql_error,
                                 "Must not ask  for object length on sql null object.");
         }
-        const int32_t valueLength = getObjectLength_withoutNull();
-        const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
@@ -76,9 +77,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLength_withoutNull();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = strValue.getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
@@ -201,6 +202,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
+            break;
+        case FUNC_PI:
+            ret = new ConstantFunctionExpression<FUNC_PI>();
             break;
         default:
             return NULL;
@@ -336,11 +340,47 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BIN:
             ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
             break;
+        case FUNC_VOLT_POINTFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINTFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGONFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGONFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_POINTS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_POINTS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LATITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LATITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LONGITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LONGITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_CENTROID:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_CENTROID>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_AREA:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_AREA>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
         case FUNC_LN:
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_VALIDATE_POLYGON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_INVALID_REASON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
             break;
         default:
             return NULL;
@@ -409,11 +449,41 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BIT_SHIFT_RIGHT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
             break;
+        case FUNC_VOLT_DATEADD_YEAR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_YEAR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_QUARTER:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_QUARTER>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MONTH:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MONTH>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_DAY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_DAY>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_HOUR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_HOUR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MINUTE:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MINUTE>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_SECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_SECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MILLISECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MILLISECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MICROSECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MICROSECOND>(*arguments);
+            break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
             break;
         case FUNC_VOLT_FORMAT_CURRENCY:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
+            break;
+        case FUNC_VOLT_REGEXP_POSITION:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_REGEXP_POSITION>(*arguments);
             break;
         case FUNC_VOLT_SET_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
@@ -423,6 +493,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_CONTAINS:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POINT_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POINT>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POLYGON_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POLYGON_POINT>(*arguments);
             break;
         default:
             return NULL;

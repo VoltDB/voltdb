@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,6 +54,7 @@ class TableTuple;
 struct tableutil {
 
     static bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
+    static bool getLastTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
     static void setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
     static bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
     static bool addDuplicateRandomTuples(voltdb::Table* table, int num_of_tuples);

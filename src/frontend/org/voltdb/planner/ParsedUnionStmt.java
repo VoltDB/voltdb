@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -411,4 +411,24 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             orderCol.expression = expr;
         }
     }
+
+    /**
+     * Here we search all the children, finding if each is content
+     * deterministic. If it is we return right away.
+     */
+    @Override
+    public String calculateContentDeterminismMessage() {
+        String ans = null;
+        for (AbstractParsedStmt child : m_children) {
+            ans = child.getContentDeterminismMessage();
+            if (ans != null) {
+                return ans;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isDML() { return false; }
+
 }

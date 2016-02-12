@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -78,6 +78,9 @@ public:
 
     /** Send committed data to the top end. */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
+
+    /** time interval between flushing partially filled buffers */
+    int64_t m_flushInterval;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;

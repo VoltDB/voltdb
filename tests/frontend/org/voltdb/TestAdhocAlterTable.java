@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -880,8 +880,15 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             startSystem(config);
 
             try {
+                // Partial indexes were found to be fragile to schema changes that
+                // should have had zero effect on them. Add one here before trying
+                // an alter table that should be completely harmless to it.
+                m_client.callProcedure("@AdHoc",
+                        "create index partial on FOO (VAL) where VAL is NOT NULL;");
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add column NEWCOL varchar(50) not null;");
+                m_client.callProcedure("@AdHoc",
+                        "drop index partial;");
             }
             catch (ProcCallException pce) {
                 fail(pce.getLocalizedMessage());

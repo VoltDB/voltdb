@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -236,8 +236,8 @@ void MaterializedViewMetadata::allocateMinMaxSearchKeyTuple()
         // Because there might be a lot of indexes, find the largest space they may consume
         // so that they can all share one space and use different schemas. (ENG-8512)
         if ( minMaxIndexIncludesAggCol(index) &&
-                index->getKeySchema()->tupleLength() + 1 > minMaxSearchKeyBackingStoreSize) {
-             minMaxSearchKeyBackingStoreSize = index->getKeySchema()->tupleLength() + 1;
+                index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE > minMaxSearchKeyBackingStoreSize) {
+             minMaxSearchKeyBackingStoreSize = index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE;
         }
     }
     if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {
@@ -262,21 +262,21 @@ void MaterializedViewMetadata::allocateBackedTuples()
     }
     else {
         m_searchKeyTuple = TableTuple(m_index->getKeySchema());
-        m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
-        memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
+        m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE];
+        memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE);
         m_searchKeyTuple.move(m_searchKeyBackingStore);
     }
 
     m_existingTuple = TableTuple(m_target->schema());
 
     m_updatedTuple = TableTuple(m_target->schema());
-    m_updatedTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    m_updatedTupleBackingStore = new char[m_target->getTupleLength()];
+    memset(m_updatedTupleBackingStore, 0, m_target->getTupleLength());
     m_updatedTuple.move(m_updatedTupleBackingStore);
 
     m_emptyTuple = TableTuple(m_target->schema());
-    m_emptyTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
-    memset(m_emptyTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    m_emptyTupleBackingStore = new char[m_target->getTupleLength()];
+    memset(m_emptyTupleBackingStore, 0, m_target->getTupleLength());
     m_emptyTuple.move(m_emptyTupleBackingStore);
 }
 
@@ -587,7 +587,7 @@ NValue MaterializedViewMetadata::findFallbackValueUsingPlan(const TableTuple& ol
 void MaterializedViewMetadata::initializeTupleHavingNoGroupBy()
 {
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    memset(m_updatedTupleBackingStore, 0, m_target->getTupleLength());
     // COUNT(*) column will be zero.
     m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
     int aggOffset = (int)m_groupByColumnCount + 1;
@@ -618,7 +618,7 @@ void MaterializedViewMetadata::processTupleInsert(const TableTuple &newTuple, bo
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    memset(m_updatedTupleBackingStore, 0, m_target->getTupleLength());
 
     // set up the first n columns, based on group-by columns
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
@@ -714,7 +714,7 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    memset(m_updatedTupleBackingStore, 0, m_target->getTupleLength());
 
     // set up the first column, which is a count
     NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();

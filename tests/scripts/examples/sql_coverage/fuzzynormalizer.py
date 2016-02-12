@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -181,6 +181,9 @@ def normalize(table, sql):
 
     return table
 
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
-    return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all, extra_stats)
+def compare_results(suite, seed, statements_path, hsql_path, jni_path,
+                    output_dir, report_all, extra_stats, comparison_database,
+                    modified_sql_path):
+    return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
+                                 output_dir, report_all, extra_stats, comparison_database,
+                                 modified_sql_path)

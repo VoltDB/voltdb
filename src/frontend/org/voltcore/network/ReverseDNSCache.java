@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,15 +17,16 @@
 
 package org.voltcore.network;
 
-import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.cache.Cache;
-import com.google_voltpatches.common.cache.CacheBuilder;
-import org.voltcore.utils.CoreUtils;
-
 import java.net.InetAddress;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import org.voltcore.utils.CoreUtils;
+
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
 
 /**
  * A configurable cache mapping from InetAddress to the hostnames of InetAddresses.
@@ -34,7 +35,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ReverseDNSCache {
     public static final ThreadPoolExecutor m_es =
-        new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
+        new ThreadPoolExecutor(1, 16, 1, TimeUnit.SECONDS,
                                new SynchronousQueue<Runnable>(),
                                CoreUtils.getThreadFactory("Reverse DNS lookups"));
 

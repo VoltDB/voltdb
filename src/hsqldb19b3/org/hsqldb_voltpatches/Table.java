@@ -287,13 +287,15 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
+    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
 
     /**
-     *  Returns the HsqlName object fo the table
+     *  Returns the HsqlName object for the table
      */
+    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -301,6 +303,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
+    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -308,14 +311,17 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
+    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
+    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -331,6 +337,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -347,6 +354,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -422,6 +430,7 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -532,6 +541,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
+    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -1043,6 +1053,7 @@ public class Table extends TableBase implements SchemaObject {
             // A VoltDB extension to support indexed expressions and assume unique attribute
             Expression[] exprArr = idx.getExpressions();
             boolean assumeUnique = idx.isAssumeUnique();
+            Expression predicate = idx.getPredicate();
             // End of VoltDB extension
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
@@ -1053,8 +1064,8 @@ public class Table extends TableBase implements SchemaObject {
             if (exprArr != null) {
                 idx = idx.withExpressions(adjustExprs(exprArr, colIndex, adjust));
             }
-            if (idx.getPredicate() != null) {
-                idx = idx.withPredicate(idx.getPredicate());
+            if (predicate != null) {
+                idx = idx.withPredicate(adjustExpr(predicate, colIndex, adjust));
             }
             idx = idx.setAssumeUnique(assumeUnique);
             // End of VoltDB extension
@@ -1960,7 +1971,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 for (int j = 0; j < constraints.length; j++) {
                     constraints[j].checkCheckConstraint(session, this,
-                                                        (Object) data[i]);
+                                                        data[i]);
                 }
             }
 
@@ -2253,7 +2264,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav   = result.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2302,7 +2313,7 @@ public class Table extends TableBase implements SchemaObject {
         int             count = 0;
 
         while (nav.hasNext()) {
-            insertSys(store, (Object[]) nav.getNext());
+            insertSys(store, nav.getNext());
 
             count++;
         }
@@ -2319,7 +2330,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav = ins.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2606,6 +2617,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2615,6 +2627,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);
@@ -2648,6 +2661,16 @@ public class Table extends TableBase implements SchemaObject {
      */
     private Expression[] adjustExprs(Expression[] exprArr, int colIndex, int adjust) {
         return exprArr;
+    }
+
+    /** Index expressions as exported to VoltDB are "column name based" not "column index based",
+     *  so they are not thrown off by column re-numbering.
+     *  VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
+     *  This stubbed pass-through method is here in case that someday changes in a way that would require
+     *  processing of the expression trees.
+     */
+    private Expression adjustExpr(Expression expr, int colIndex, int adjust) {
+        return expr;
     }
 
     /**

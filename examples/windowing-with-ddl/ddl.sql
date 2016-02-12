@@ -23,7 +23,7 @@ CREATE TABLE timedata
   CONSTRAINT row_limit LIMIT PARTITION ROWS 82500
     EXECUTE (DELETE FROM timedata
              WHERE update_ts
-                   < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
+                   < dateadd(second, -30, now)
              ORDER BY update_ts, uuid LIMIT 1500)
 );
 
@@ -61,7 +61,7 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
 CREATE PROCEDURE Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
-    WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
+    WHERE second_ts >= dateadd(second, CAST(? as INTEGER), NOW); 
 
 -- Find the maximum value across all rows and partitions.
 CREATE PROCEDURE MaxValue AS

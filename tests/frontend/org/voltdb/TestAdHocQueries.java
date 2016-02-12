@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -430,6 +430,33 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
+
+            // test wasNull asScalarLong
+            long value;
+            boolean wasNull;
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as tinyInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_TINYINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as smallInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_SMALLINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as integer) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_INTEGER, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as bigint) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_BIGINT, value);
+            assertEquals(true, wasNull);
         }
         finally {
             env.tearDown();

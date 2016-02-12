@@ -1,5 +1,3 @@
-
-
 (function (window, unused) {
 
     var iVoltDbCore = (function () {
@@ -40,7 +38,7 @@
                 return param;
             };
 
-            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest) {
+            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails, isPostRequest, isSqlQuery, timeoutTime) {
                 var s = [];
                 if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
                     if (!this.procedures.hasOwnProperty(procedure)) {
@@ -67,6 +65,10 @@
                         for (i = 0; i < localParameters.length; i++) {
                             if (i > 0) {
                                 params += ',';
+                            }
+                            if (localParameters[i] === null) {
+                                params += "null";
+                                continue;
                             }
                             switch (signature[i]) {
                                 case 'tinyint':
@@ -112,6 +114,9 @@
                 } else {
                     paramSet = s.join('&');
                 }
+
+                if(isSqlQuery && timeoutTime != undefined)
+                    paramSet +=   '&Querytimeout=' + timeoutTime;
 
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
@@ -166,7 +171,7 @@
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
 
-            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
+            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime) {
                 var uri;
                 if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
@@ -197,8 +202,7 @@
                     }
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
-
-                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true);
+                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true, isSqlQuery, timeoutTime);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                             var ah = null;
@@ -207,7 +211,7 @@
                             } else {
                                 VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                             }
-                            jQuery.postJSON(uri, params, callback, ah);
+                            jQuery.postJSON(uri, params, callback, ah, isSqlQuery);
                         }
                     } else if (callback != null)
                         callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
@@ -229,9 +233,9 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput) {
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isLongOutput, timeoutTime) {
                 var isHighTimeout = (procedure == "@SnapshotRestore" || isLongOutput === true);
-                this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
+                this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails, timeoutTime);
             };
 
             var iQueue = function (connection) {
@@ -251,8 +255,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery) {
-                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails, isSqlQuery, timeoutTime]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -290,7 +294,7 @@
                             })(this, item), isHighTimeout)).Callback;
 
                         if ((shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration) || item[4] === true) {
-                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4]);
+                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4], item[5]);
                         } else {
                             Connection.CallExecute(item[0], item[1], callback, item[3]);
                         }
@@ -617,7 +621,6 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization, isSqlQuery) {
-
         if (isSqlQuery == false) {
             if (VoltDBCore.hostIP == "") {
                 jQuery.ajax({

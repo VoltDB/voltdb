@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -78,6 +78,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // true if the failure is already reported to the SnapshotSiteProcessor, prevent throwing
     // the same exception multiple times.
     private boolean m_failureReported = false;
+
+    private volatile IOException m_reportedSerializationFailure = null;
 
     // number of sent, but un-acked buffers
     final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
@@ -219,6 +221,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     public static class StreamSnapshotTimeoutException extends IOException {
         public StreamSnapshotTimeoutException(String message) {
+            super(message);
+        }
+    }
+
+    public static class SnapshotSerializationException extends IOException {
+        public SnapshotSerializationException(String message) {
             super(message);
         }
     }
@@ -496,6 +504,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
+    public void reportSerializationFailure(IOException ex) {
+        m_reportedSerializationFailure = ex;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         // Streamed snapshot targets always need to be closed by the last site
@@ -504,8 +517,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     @Override
     public void close() throws IOException, InterruptedException {
-        boolean hadFailureBeforeClose = m_writeFailed.get() != null;
-
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -538,9 +549,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             closeHandle.run();
         }
 
+        if (m_reportedSerializationFailure != null) {
+            // There was an error reported by the EE during serialization
+            throw m_reportedSerializationFailure;
+        }
         // If there was an error during close(), throw it so that the snapshot
         // can be marked as failed.
-        if (!hadFailureBeforeClose && m_writeFailed.get() != null) {
+        if (m_writeFailed.get() != null) {
             throw m_writeFailed.get();
         }
     }

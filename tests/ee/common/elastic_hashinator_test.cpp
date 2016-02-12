@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@ class ElasticHashinatorTest : public Test {
 
 TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 {
-    boost::scoped_ptr<char> config(new char[4 + (12 * 3)]);
+    boost::scoped_array<char> config(new char[4 + (12 * 3)]);
     ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
 
     output.writeInt(3);

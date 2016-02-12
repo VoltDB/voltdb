@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.SnapshotSerializationException;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -95,6 +96,7 @@ public class TableStreamer {
      * @return A future for all writes to data targets, and a boolean indicating if there's more left in the table.
      * The future could be null if nothing is serialized. If row count is specified it sets the number of rows that
      * is to stream
+     * @throws SnapshotSerializationException
      */
     @SuppressWarnings("rawtypes")
     public Pair<ListenableFuture, Boolean> streamMore(SystemProcedureExecutionContext context,
@@ -107,7 +109,15 @@ public class TableStreamer {
 
         Pair<Long, int[]> serializeResult = context.tableStreamSerializeMore(m_tableId, m_type, outputBuffers);
         if (serializeResult.getFirst() == SERIALIZATION_ERROR) {
-            VoltDB.crashLocalVoltDB("Failure while serializing data from table " + m_tableId, false, null);
+            // Cancel the snapshot here
+            for (DBBPool.BBContainer container : outputBuffers) {
+                container.discard();
+            }
+            SnapshotSerializationException ex = new SnapshotSerializationException("Snapshot of table " + m_tableId + " failed to complete.");
+            for (SnapshotTableTask task : m_tableTasks) {
+                task.m_target.reportSerializationFailure(ex);
+            }
+            return Pair.of(null, false);
         }
 
         if (serializeResult.getSecond()[0] > 0) {

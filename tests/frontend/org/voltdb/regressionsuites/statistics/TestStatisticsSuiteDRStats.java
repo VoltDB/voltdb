@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites.statistics;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import static junit.framework.Assert.assertEquals;
 
 import junit.framework.Test;
 
@@ -65,10 +64,10 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         //
         // DRNODE
         //
-        results = client.callProcedure("@Statistics", "DRNODE", 0).getResults();
+        results = client.callProcedure("@Statistics", "DRPRODUCERNODE", 0).getResults();
         // one aggregate tables returned
         assertEquals(1, results.length);
-        System.out.println("Test DRNODE table: " + results[0].toString());
+        System.out.println("Test DRPRODUCERNODE table: " + results[0].toString());
         validateSchema(results[0], expectedTable2);
         // One row per host for DRNODE stats
         results[0].advanceRow();
@@ -79,10 +78,10 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
 
     public void testDRPartitionStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
-            System.out.println("SKIPPING DRPARTITION STATS TESTS FOR COMMUNITY VERSION");
+            System.out.println("SKIPPING DRPRODUCERPARTITION STATS TESTS FOR COMMUNITY VERSION");
             return;
         }
-        System.out.println("\n\nTESTING DRPARTITION STATS\n\n\n");
+        System.out.println("\n\nTESTING DRPRODUCERPARTITION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
@@ -106,7 +105,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         //
         // DRPARTITION
         //
-        results = client.callProcedure("@Statistics", "DRPARTITION", 0).getResults();
+        results = client.callProcedure("@Statistics", "DRPRODUCERPARTITION", 0).getResults();
         // one aggregate tables returned
         assertEquals(1, results.length);
         System.out.println("Test DR table: " + results[0].toString());

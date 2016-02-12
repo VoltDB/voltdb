@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,8 +36,8 @@ class ContiguousAllocator {
     };
 
     int64_t m_count;
-    const int32_t m_allocSize;
-    const int32_t m_chunkSize;
+    int32_t m_allocSize;
+    int32_t m_chunkSize;
     Buffer *m_tail;
     int32_t m_blockCount;
 
@@ -52,8 +52,9 @@ public:
     void *alloc();
     void *last() const;
     void trim();
-    void clear();
     int64_t count() const { return m_count; }
+
+    int32_t allocationSize() const { return m_allocSize; }
 
     size_t bytesAllocated() const;
 };

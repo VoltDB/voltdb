@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,10 +37,11 @@ public interface SiteProcedureConnection {
     public long getLatestUndoToken();
 
     /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
+     * Get the non-VoltDB backend, if any, such as an HSQL or PostgreSQL
+     * backend used for comparison testing. Returns null if we're not
+     * configured to use it.
      */
-    public HsqlBackend getHsqlBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
@@ -56,6 +57,11 @@ public interface SiteProcedureConnection {
      * Get the catalog host id for the corresponding SiteProcedureConnection
      */
     public int getCorrespondingHostId();
+
+    /**
+     * Get the catalog cluster id for the corresponding SiteProcedureConnection
+     */
+    public int getCorrespondingClusterId();
 
     /**
      * Log settings changed. Signal EE to update log level.
@@ -196,5 +202,6 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public void setDRProtocolVersion(int drVersion);
 }

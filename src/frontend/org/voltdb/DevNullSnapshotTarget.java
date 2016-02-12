@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     Runnable m_onClose = null;
+    volatile IOException m_reportedSerializationFailure = null;
 
     @Override
     public int getHeaderSize() {
@@ -49,6 +50,11 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public void reportSerializationFailure(IOException ex) {
+        m_reportedSerializationFailure = ex;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return true;
@@ -58,6 +64,11 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     public void close() throws IOException, InterruptedException {
         if (m_onClose != null) {
             m_onClose.run();
+        }
+
+        if (m_reportedSerializationFailure != null) {
+            // There was an error reported by the EE during serialization
+            throw m_reportedSerializationFailure;
         }
     }
 

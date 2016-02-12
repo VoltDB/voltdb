@@ -2,7 +2,7 @@
 
 {_subqueryform |= "(select * from _table)"}
 {_subqueryform |= "(select     _variable[#numone float],                  _variable[#arg numeric],             _variable[#string string]             from _table[#self] order by __[#string], __[#arg], __[#numone] limit 1 offset 1)"}
-{_subqueryform |= "(select   X._variable[#numone float]  __[#numone],   X._variable[#arg numeric]  __[#arg], X._variable[#string string] __[#string] from _table[#self] X _jointype join __[#self] Y on X.DESC = Y.DESC where Y._numericcolumnpredicate)"}
+{_subqueryform |= "(select   X._variable[#numone float]  __[#numone],   X._variable[#arg numeric]  __[#arg], X._variable[#string string] __[#string] from _table[#self] X _jointype join __[#self] Y on X.VCHAR = Y.VCHAR where Y._numericcolumnpredicate)"}
 {_subqueryform |= "(select max(_variable[#numone float]) __[#numone], sum(_variable[#arg numeric]) __[#arg],   _variable[#string string]             from _table[#self] group by __[#string])"}
 {_subqueryform |= "(select max(_variable[#numone float]) __[#numone], sum(_variable[#arg numeric]) __[#arg],   _variable[#string string]             from _table[#self] group by __[#string] order by __[#string] limit 1 offset 1)"}
 
@@ -11,8 +11,8 @@
 -- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
 {@aftermath = " _math _value[int:1,3]"} 
 {@agg = "_numagg"}
---- DESC is a varchar partition column
-{@columnpredicate = "A._variable[#string string] = B.DESC"}
+--- VCHAR is a varchar partition column
+{@columnpredicate = "A._variable[#string string] = B.VCHAR"}
 {@columntype = "numeric"}
 {@comparableconstant = "44"}
 {@comparabletype = "numeric"}

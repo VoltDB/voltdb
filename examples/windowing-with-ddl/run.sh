@@ -58,7 +58,7 @@ function cleanall() {
 # compile the source code for the client into a jarfile
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/ddlwindowing/*.java
+    javac -classpath $CLIENTCLASSPATH client/ddlwindowing/*.java
     # build procedure and client jars
     jar cf ddlwindowing-client.jar -C client ddlwindowing
     # remove compiled .class files

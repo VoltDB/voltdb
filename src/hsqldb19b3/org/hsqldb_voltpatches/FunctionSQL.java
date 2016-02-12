@@ -1309,18 +1309,13 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CHAR_LENGTH :
-                if (!nodes[0].dataType.isCharacterType()) {
-                    throw Error.error(ErrorCode.X_42565);
-                }
-
-            // $FALL-THROUGH$
             case FUNC_OCTET_LENGTH : {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
-
-                if (!nodes[0].dataType.isCharacterType()
-                        && !nodes[0].dataType.isBinaryType()) {
+                else if (!nodes[0].dataType.isCharacterType() &&
+                             ((funcType == FUNC_CHAR_LENGTH) ||
+                              (!nodes[0].dataType.isBinaryType() && (funcType == FUNC_OCTET_LENGTH)))) {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
@@ -2420,6 +2415,94 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE :
+            Type leftChildType = nodes[0].dataType;
+            Type rightChildType = nodes[1].dataType;
+
+            // in here the only cases needed to be handled are distance between polygon-to-point
+            // and point-to-point.
+            assert(leftChildType.isGeographyType() || leftChildType.isGeographyPointType());
+            assert(rightChildType.isGeographyPointType());
+
+            if (leftChildType.isGeographyType()) {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT));
+            }
+            else {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT));
+
+            }
+            return exp;
+
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT:
+            // only valid types for asText are geography and geography-point
+            // resolveTypes in FunctionForVoltDB will block any other types
+            // as unsupported types
+            assert(nodes[0].dataType.isGeographyPointType() || nodes[0].dataType.isGeographyType());
+
+            if (nodes[0].dataType.isGeographyPointType()) {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT));
+            }
+            else {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT_GEOGRAPHY));
+            }
+            return exp;
+
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD :
+            implied_argument = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int dateadd_func = -1;
+            switch (keywordConstant) {
+            case Tokens.YEAR :
+                implied_argument = "YEAR";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_YEAR;
+                break;
+            case Tokens.QUARTER :
+                implied_argument = "QUARTER";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_QUARTER;
+                break;
+            case Tokens.MONTH :
+                implied_argument = "MONTH";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MONTH;
+                break;
+            case Tokens.DAY :
+                implied_argument = "DAY";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_DAY;
+                break;
+            case Tokens.HOUR :
+                implied_argument = "HOUR";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_HOUR;
+                break;
+            case Tokens.MINUTE :
+                implied_argument = "MINUTE";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MINUTE;
+                break;
+            case Tokens.SECOND :
+                implied_argument = "SECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_SECOND;
+                break;
+            case Tokens.MILLIS:
+            case Tokens.MILLISECOND :
+                implied_argument = "MILLISECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MILLISECOND;
+                break;
+            case Tokens.MICROS:
+            case Tokens.MICROSECOND :
+                implied_argument = "MICROSECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            assert(implied_argument != null);
+            assert(-1 != dateadd_func);
+            exp.attributes.put("function_id", String.valueOf(dateadd_func));
+            exp.attributes.put("implied_argument", implied_argument);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+            
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);

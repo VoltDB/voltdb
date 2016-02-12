@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,6 +43,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -371,10 +372,10 @@ public class ProcedureRunner {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
                     m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
-                    if (getHsqlBackendIfExists() != null) {
-                        // HSQL handling
+                    if (getNonVoltDBBackendIfExists() != null) {
+                        // Backend handling, such as HSQL or PostgreSQL
                         VoltTable table =
-                            getHsqlBackendIfExists().runSQLWithSubstitutions(
+                            getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
                                 m_cachedSingleStmt.stmt,
                                 m_cachedSingleStmt.params,
                                 m_cachedSingleStmt.stmt.statementParamJavaTypes);
@@ -523,10 +524,11 @@ public class ProcedureRunner {
     }
 
     /**
-     * If returns non-null, then using hsql backend
+     * If this returns non-null, then we're using a non-VoltDB backend, such
+     * as HSQL or PostgreSQL.
      */
-    public HsqlBackend getHsqlBackendIfExists() {
-        return m_site.getHsqlBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists() {
+        return m_site.getNonVoltDBBackendIfExists();
     }
 
     public void setAppStatusCode(byte statusCode) {
@@ -568,6 +570,13 @@ public class ProcedureRunner {
         } else {
             return m_txnState.uniqueId;
         }
+    }
+
+    /*
+     * Cluster id is immutable and be persisted during the snapshot
+     */
+    public int getClusterId() {
+        return m_site.getCorrespondingClusterId();
     }
 
     private void updateCRC(QueuedSQL queuedSQL) {
@@ -771,12 +780,13 @@ public class ProcedureRunner {
             return new VoltTable[] {};
         }
 
-        // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
-        if (getHsqlBackendIfExists() != null) {
+        // If this is a non-VoltDB backend, run the queries directly in that
+        // database (e.g. HSQL or PostgreSQL)
+        if (getNonVoltDBBackendIfExists() != null) {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
-                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
+                results[i++] = getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
                         qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
             }
         }
@@ -862,6 +872,10 @@ public class ProcedureRunner {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
             } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
+            } else if (type == VoltType.GEOGRAPHY_POINT) {
+                args[ii] = VoltType.NULL_POINT;
+            } else if (type == VoltType.GEOGRAPHY) {
+                args[ii] = VoltType.NULL_GEOGRAPHY;
             } else {
                 throw new VoltAbortException("Unknown type " + type +
                         " can not be converted to NULL representation for arg " + ii +
@@ -1096,7 +1110,12 @@ public class ProcedureRunner {
            msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           msg.append("HSQL-BACKEND ERROR\n");
+           String backendType = "HSQL";
+           if (getNonVoltDBBackendIfExists() instanceof PostgreSQLBackend) {
+               backendType = "PostgreSQL";
+           }
+           msg.append(backendType);
+           msg.append("-BACKEND ERROR\n");
            if (e.getCause() != null) {
                e = e.getCause();
            }
@@ -1120,6 +1139,22 @@ public class ProcedureRunner {
        // ensure the message is returned if we're not going to hit the verbose condition below
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
+           if (e instanceof org.voltdb.exceptions.InterruptException && m_isReadOnly) {
+               int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
+               int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
+               if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                   msg.append(" query-specific timeout period.");
+                   msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
+               }
+               else {
+                   msg.append(" default query timeout period.");
+               }
+               if (originalTimeout > 0 ) {
+                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file.");
+               } else if (originalTimeout == 0) {
+                   msg.append(" The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file.");
+               }
+           }
        }
 
        // Rarely hide the stack trace.

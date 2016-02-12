@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class AggregatePlanNode extends AbstractPlanNode {
 
@@ -562,4 +563,64 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return collected;
     }
 
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        if (getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        } else {
+            // the order for Serial and Partial aggregates is determined by the order
+            // of the keys from the child node
+            assert(getChildCount() == 1);
+            AbstractPlanNode child = getChild(0);
+            return child.isOutputOrdered(sortExpressions, sortDirections);
+        }
+    }
+
+    /**
+     * Convert HashAggregate into a Serialized Aggregate
+     *
+     * @param hashAggregateNode HashAggregatePlanNode
+     * @return AggregatePlanNode
+     */
+    public static AggregatePlanNode convertToSerialAggregatePlanNode(HashAggregatePlanNode hashAggregateNode) {
+        AggregatePlanNode serialAggr = new AggregatePlanNode();
+        return setAggregatePlanNode(hashAggregateNode, serialAggr);
+    }
+
+    /**
+     * Convert HashAggregate into a Partial Aggregate
+     *
+     * @param hashAggregateNode HashAggregatePlanNode
+     * @param aggrColumnIdxs partial aggregate column indexes
+     * @return AggregatePlanNode
+     */
+    public static AggregatePlanNode convertToPartialAggregatePlanNode(HashAggregatePlanNode hashAggregateNode,
+            List<Integer> aggrColumnIdxs) {
+        AggregatePlanNode partialAggr = new PartialAggregatePlanNode();
+        partialAggr = setAggregatePlanNode(hashAggregateNode, partialAggr);
+        partialAggr.m_partialGroupByColumns = aggrColumnIdxs;
+        return partialAggr;
+    }
+
+    private static AggregatePlanNode setAggregatePlanNode(AggregatePlanNode origin, AggregatePlanNode destination) {
+        destination.m_isCoordinatingAggregator = origin.m_isCoordinatingAggregator;
+        destination.m_prePredicate = origin.m_prePredicate;
+        destination.m_postPredicate = origin.m_postPredicate;
+        for (AbstractExpression expr : origin.m_groupByExpressions) {
+            destination.addGroupByExpression(expr);
+        }
+
+        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
+        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
+        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
+        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
+        for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
+            destination.addAggregate(aggregateTypes.get(i),
+                    aggregateDistinct.get(i) == 1 ? true : false,
+                    aggregateOutputColumns.get(i),
+                    aggregateExpressions.get(i));
+        }
+        destination.setOutputSchema(origin.getOutputSchema());
+        return destination;
+    }
 }

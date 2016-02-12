@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 
 #include "common/NValue.hpp"
+#include "boost/math/constants/constants.hpp"
 
 namespace voltdb {
 
@@ -263,5 +264,13 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
 
     return getBigIntValue(result);
 }
+
+/*
+ * implement the SQL PI function
+ */
+template<> inline NValue NValue::callConstant<FUNC_PI>() {
+    return getDoubleValue(boost::math::constants::pi<double>());
+}
+
 
 }

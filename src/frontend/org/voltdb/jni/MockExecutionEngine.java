@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -161,7 +161,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
     @Override
@@ -176,7 +175,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
-
     }
 
     @Override
@@ -215,14 +213,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config)
-    {
-
+    public void updateHashinator(TheHashinator.HashinatorConfig config) {
     }
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken) throws EEException
+                               int remoteClusterId, long undoToken) throws EEException
     {
         throw new UnsupportedOperationException();
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -162,7 +162,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     const TableTuple& null_inner_tuple = m_null_inner_tuple.tuple();
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
-    ProgressMonitorProxy pmp(m_engine, this, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this);
     // Init the postfilter
     CountingPostfilter postfilter(wherePredicate, limit, offset);
 

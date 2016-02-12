@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,12 +29,11 @@
 
 namespace voltdb {
 
-const int64_t HIDDEN_VALUE_TIMESTAMP_MASK = (1LL << 49) - 1LL;
+extern const int64_t VOLT_EPOCH;
 
 class AbstractExecutor;
-class DRTupleStream;
+class AbstractDRTupleStream;
 class VoltDBEngine;
-
 
 /*
  * EE site global data required by executors at runtime.
@@ -58,8 +57,8 @@ class ExecutorContext {
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream,
-                    DRTupleStream *drReplicatedStream,
+                    AbstractDRTupleStream *drTupleStream,
+                    AbstractDRTupleStream *drReplicatedStream,
                     CatalogId drClusterId);
 
     ~ExecutorContext();
@@ -70,11 +69,6 @@ class ExecutorContext {
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
         m_partitionId = partitionId;
-    }
-
-    // not always known at initial construction
-    void setEpoch(int64_t epoch) {
-        m_epoch = epoch;
     }
 
     // helper to configure the context for a new jni call
@@ -88,8 +82,8 @@ class ExecutorContext {
         m_spHandle = spHandle;
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
@@ -127,7 +121,11 @@ class ExecutorContext {
 
     static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK;
+        // Convert this into a microsecond-resolution timestamp; treat the time
+        // portion as the time in milliseconds, and the sequence number as if
+        // it is a time in microseconds
+        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
+        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
     }
 
     static int8_t getClusterIdFromHiddenNValue(NValue &value) {
@@ -226,11 +224,14 @@ class ExecutorContext {
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
-    DRTupleStream* drStream() {
+    void setDrStream(AbstractDRTupleStream *drStream);
+    void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
+
+    AbstractDRTupleStream* drStream() {
         return m_drStream;
     }
 
-    DRTupleStream* drReplicatedStream() {
+    AbstractDRTupleStream* drReplicatedStream() {
         return m_drReplicatedStream;
     }
 
@@ -241,10 +242,6 @@ class ExecutorContext {
         assert(singleton != NULL);
         assert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
-    }
-
-    void setDrStreamForTest(DRTupleStream *drStream) {
-        m_drStream = drStream;
     }
 
     bool allOutputTempTablesAreEmpty() const;
@@ -261,8 +258,8 @@ class ExecutorContext {
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
-    DRTupleStream *m_drStream;
-    DRTupleStream *m_drReplicatedStream;
+    AbstractDRTupleStream *m_drStream;
+    AbstractDRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;
@@ -276,9 +273,6 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
-
-    /** local epoch for voltdb, somtime around 2008, pulled from catalog */
-    int64_t m_epoch;
 };
 
 }

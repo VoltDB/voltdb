@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,67 +18,69 @@
 #ifndef STRINGREF_H
 #define STRINGREF_H
 
-#include <cstddef>
+#include <stdint.h>
 
 namespace voltdb
 {
-    class Pool;
+class Pool;
 
-    /// An object to use in lieu of raw char* pointers for strings
-    /// which are not inlined into tuple storage.  This provides a
-    /// constant value to live in tuple storage while allowing the memory
-    /// containing the actual string to be moved around as the result of
-    /// compaction.
-    class StringRef
-    {
-    public:
-        /// Utility method to compute the amount of memory that will
-        /// be used by non-inline storage of a string/varbinary of the
-        /// given length.  Includes the size of pooled StringRef object,
-        /// backpointer, and excess memory allocated in the compacting
-        /// string pool.
-        static std::size_t computeStringMemoryUsed(std::size_t length);
+/// An object to use in lieu of raw char* pointers for strings
+/// which are not inlined into tuple storage.  This provides a
+/// constant pointer value to be stored in tuple storage while
+/// allowing the memory containing the actual string to be moved
+/// around as the result of compaction.
+class StringRef
+{
+public:
+    /// Utility method to extract the amount of memory that was
+    /// used by non-inline storage for this string/varbinary.
+    /// Includes the size of the pooled StringRef object,
+    /// backpointer, and excess memory allocated in the compacting
+    /// string pool.
+    int32_t getAllocatedSize() const;
 
-        friend class CompactingStringPool;
-        /// Create and return a new StringRef object which points to an
-        /// allocated memory block of the requested size.  The caller
-        /// may provide an optional Pool from which the memory (and
-        /// the memory for the StringRef object itself) will be
-        /// allocated, intended for temporary strings.  If no Pool
-        /// object is provided, the StringRef and the string memory will be
-        /// allocated out of the ThreadLocalPool.
-        static StringRef* create(std::size_t size, Pool* dataPool);
+    /// Create and return a new StringRef object which points to an
+    /// allocated memory block of the requested size.  The caller
+    /// may provide an optional Pool from which the memory (and
+    /// the memory for the StringRef object itself) will be
+    /// allocated, intended for temporary strings.  If no Pool
+    /// object is provided, the StringRef and the string memory will be
+    /// allocated out of the ThreadLocalPool's persistent storage.
+    static StringRef* create(int32_t size, const char* bytes, Pool* tempPool);
 
-        /// Destroy the given StringRef object and free any memory
-        /// allocated from persistet pools to store the object.
-        /// sref must have been allocated and returned by a call to
-        /// StringRef::create() and is a no-op for strings created in
-        /// a temporary Pool -- they simply leak their allocations
-        /// until the Pool is purged or destroyed.
-        static void destroy(StringRef* sref);
+    /// Destroy the given StringRef object and free any memory
+    /// allocated from persistent pools to store the object.
+    /// sref must have been allocated and returned by a call to
+    /// StringRef::create().
+    /// This is a no-op for strings created in a temporary Pool
+    /// -- temporary pools pool their allocations
+    /// until the pool itself is purged or destroyed.
+    /// Currently, the StringRefs for persistent strings are permanently
+    /// allocated into a memory pool which is reserved for future reuse
+    /// specifically as persistent StringRef memory.
+    static void destroy(StringRef* sref);
 
-        char* get();
-        const char* get() const;
+    char* getObjectValue();
+    const char* getObjectValue() const;
 
-    private:
-        StringRef(std::size_t size);
-        StringRef(std::size_t size, Pool* dataPool);
-        // Only called from destroy and only for persistent strings.
-        ~StringRef();
+    int32_t getObjectLength() const;
 
-        // Only called from destroy and only for persistent strings.
-        void operator delete(void* object);
+    const char* getObject(int32_t* lengthOut) const;
 
-        /// Callback used via the back-pointer in order to update the
-        /// pointer to the memory backing this string reference
-        void updateStringLocation(void* location);
+private:
+    // Signature used internally for persistent strings
+    StringRef(int32_t size);
+    // Signature used internally for temporary strings
+    StringRef(Pool* tempPool, int32_t size);
+    // Only called from destroy and only for persistent strings.
+    ~StringRef();
 
-        void setBackPtr();
+    // Only called from destroy and only for persistent strings.
+    void operator delete(void* object);
 
-        std::size_t m_size;
-        bool m_tempPool;
-        char* m_stringPtr;
-    };
-}
+    char* m_stringPtr;
+};
+
+} // namespace voltdb
 
 #endif // STRINGREF_H

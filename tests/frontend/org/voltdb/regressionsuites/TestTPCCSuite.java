@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -448,7 +448,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long c_d_id
         final double paymentAmount = 500.25;
         VoltTable[] results = client.callProcedure("paymentByCustomerName", W_ID,
-                D_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType()).getResults();
+                D_ID, paymentAmount, W_ID, D_ID, "Customer", new TimestampType()).getResults();
         assertEquals(3, results.length);
         // check that the middle "Customer" was returned
         assertEquals(C_ID + 1, results[2].fetchRow(0).getLong("c_id"));
@@ -586,7 +586,7 @@ public class TestTPCCSuite extends RegressionSuite {
         // long c_d_id
         // w_id =Warehouse2 but c_w_id=warehouse1 !
         VoltTable[] results = client.callProcedure("paymentByCustomerName", W2_ID,
-                D2_ID, paymentAmount, W_ID, D_ID, "Customer".getBytes("UTF-8"), new TimestampType()).getResults();
+                D2_ID, paymentAmount, W_ID, D_ID, "Customer", new TimestampType()).getResults();
         assertEquals(3, results.length);
         assertTrue(results[0].getRowCount() > 0);
         // only customer2 should be returned as this is a query on warehouse1
@@ -688,7 +688,7 @@ public class TestTPCCSuite extends RegressionSuite {
         TPCDataPrinter.printAllData(client);
 
         VoltTable[] results = client.callProcedure("ostatByCustomerName", (byte)3, (byte)7,
-                "Customer".getBytes("UTF-8")).getResults();
+                "Customer").getResults();
         assertEquals(3, results.length);
 
         results = client.callProcedure("ostatByCustomerId", (byte)3, (byte)7, 5).getResults();

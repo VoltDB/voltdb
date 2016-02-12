@@ -79,11 +79,11 @@ import javax.annotation_voltpatches.Nullable;
  * does not automatically remove zeros.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/NewCollectionTypesExplained#Multiset">
+ * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#multiset">
  * {@code Multiset}</a>.
  *
  * @author Kevin Bourrillion
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
 public interface Multiset<E> extends Collection<E> {
@@ -229,7 +229,7 @@ public interface Multiset<E> extends Collection<E> {
    * snapshots. Note that this type is unrelated to the similarly-named type
    * {@code Map.Entry}.
    *
-   * @since 2.0 (imported from Google Collections Library)
+   * @since 2.0
    */
   interface Entry<E> {
 
@@ -380,6 +380,9 @@ public interface Multiset<E> extends Collection<E> {
    * always increment the count of the element, and the overall size of the
    * collection, by one.
    *
+   * <p>To both add the element and obtain the previous count of that element,
+   * use {@link #add(E, int) add}{@code (element, 1)} instead.
+   *
    * @param element the element to add one occurrence of; may be null only if
    *     explicitly allowed by the implementation
    * @return {@code true} always, since this call is required to modify the
@@ -399,6 +402,9 @@ public interface Multiset<E> extends Collection<E> {
    * <p>This method refines {@link Collection#remove} to further specify that it
    * <b>may not</b> throw an exception in response to {@code element} being null
    * or of the wrong type.
+   *
+   * <p>To both remove the element and obtain the previous count of that element,
+   * use {@link #remove(E, int) remove}{@code (element, 1)} instead.
    *
    * @param element the element to remove one occurrence of
    * @return {@code true} if an occurrence was found and removed

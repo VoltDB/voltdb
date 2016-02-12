@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -47,22 +47,63 @@ public class TestVoltDecimalHelper extends TestCase {
         assertEquals(bd2, null);
     }
 
-    public void testSerializatinRoundTrip() throws Exception {
-        BigDecimal bd = new BigDecimal("7654321");
-        ByteBuffer buf = ByteBuffer.allocate(100);
+    public void testSerializationRoundTrip() throws Exception {
+        BigDecimal bd;
+        ByteBuffer buf;
+        BigDecimal bd2;
+        int cmp;
+        byte[] bytes;
+
+        bd = new BigDecimal("7654321");
+        buf = ByteBuffer.allocate(100);
 
         VoltDecimalHelper.serializeBigDecimal(bd, buf);
         buf.flip();
-        BigDecimal bd2  = VoltDecimalHelper.deserializeBigDecimal(buf);
+        bd2  = VoltDecimalHelper.deserializeBigDecimal(buf);
 
-        System.out.println(bd.toString());
-        System.out.println(bd2.toString());
+        //*enable to debug */ System.out.println(bd.toString());
+        //*enable to debug */ System.out.println(bd2.toString());
 
-        int cmp = bd.compareTo(bd2);
+        cmp = bd.compareTo(bd2);
         assertEquals(0, cmp);
+
+        // Test max number of digits after decimal
+        bd = new BigDecimal("3.210987654321");
+        bytes = VoltDecimalHelper.serializeBigDecimal(bd);
+        buf = ByteBuffer.wrap(bytes);
+        bd2 = VoltDecimalHelper.deserializeBigDecimal(buf);
+        cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
+
+        // Test max number of total digits
+        bd = new BigDecimal("65432109876543210987654321.210987654321");
+        bytes = VoltDecimalHelper.serializeBigDecimal(bd);
+        buf = ByteBuffer.wrap(bytes);
+        bd2 = VoltDecimalHelper.deserializeBigDecimal(buf);
+        cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
+
+        // ENG-9630 -- problems with multiples of 10 initialized via string.
+
+        bd = new BigDecimal("3.98336E7");
+        bytes = VoltDecimalHelper.serializeBigDecimal(bd);
+        buf = ByteBuffer.wrap(bytes);
+        bd2 = VoltDecimalHelper.deserializeBigDecimal(buf);
+        cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
+        bd = new BigDecimal("9E25");
+        bytes = VoltDecimalHelper.serializeBigDecimal(bd);
+        buf = ByteBuffer.wrap(bytes);
+        bd2 = VoltDecimalHelper.deserializeBigDecimal(buf);
+        cmp = bd.compareTo(bd2);
+        assertEquals(0, cmp);
+
     }
 
-    public void testSerializatinRoundTripNegative() throws Exception {
+    public void testSerializationRoundTripNegative() throws Exception {
         BigDecimal bd = new BigDecimal("-23325.23425");
         ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -70,8 +111,8 @@ public class TestVoltDecimalHelper extends TestCase {
         buf.flip();
         BigDecimal bd2  = VoltDecimalHelper.deserializeBigDecimal(buf);
 
-        System.out.println(bd.toString());
-        System.out.println(bd2.toString());
+        //*enable to debug */ System.out.println(bd.toString());
+        //*enable to debug */ System.out.println(bd2.toString());
 
         int cmp = bd.compareTo(bd2);
         assertEquals(0, cmp);

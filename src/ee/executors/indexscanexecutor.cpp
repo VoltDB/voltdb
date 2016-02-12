@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -169,7 +169,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     TableTuple temp_tuple;
-    ProgressMonitorProxy pmp(m_engine, this, targetTable);
+    ProgressMonitorProxy pmp(m_engine, this);
     if (m_aggExec != NULL) {
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {

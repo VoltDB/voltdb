@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,57 +18,28 @@
 #ifndef DRTUPLESTREAM_H_
 #define DRTUPLESTREAM_H_
 
-#include "common/ids.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "storage/TupleStreamBase.h"
-#include <deque>
-#include <cassert>
+#include "storage/AbstractDRTupleStream.h"
 
 namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
-// Use this to indicate uninitialized DR mark
-const size_t INVALID_DR_MARK = SIZE_MAX;
-
-// Extra space to write a StoredProcedureInvocation wrapper in Java without copying
-const int MAGIC_DR_TRANSACTION_PADDING = 78;
-const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
-
-struct DRCommittedInfo{
-    int64_t seqNum;
-    int64_t spUniqueId;
-    int64_t mpUniqueId;
-
-    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
-};
-
-class DRTupleStream : public voltdb::TupleStreamBase {
+class DRTupleStream : public voltdb::AbstractDRTupleStream {
 public:
     //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), drId(8), checksum(4)
-    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
+    //Version(1), type(1), drId(8), partitionHash(8), checksum(4)
+    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
-    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 2;
+    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 8 + 4;
+
+    // Also update DRProducerProtocol.java if version changes
+    static const uint8_t PROTOCOL_VERSION = 4;
 
     DRTupleStream();
 
     virtual ~DRTupleStream() {
     }
-
-    void configure(CatalogId partitionId) {
-        m_partitionId = partitionId;
-    }
-
-    // for test purpose
-    virtual void setSecondaryCapacity(size_t capacity);
-
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
-
-    virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
     /**
      * write an insert or delete record to the stream
@@ -76,6 +47,7 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -89,6 +61,7 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -103,19 +76,16 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
-    void endTransaction(int64_t uniqueId);
+    virtual void endTransaction(int64_t uniqueId);
 
-    bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
+    virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+    virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
-    void setLastCommittedSequenceNumber(int64_t sequenceNumber);
-
-    bool m_enabled;
 
     static int32_t getTestDRBuffer(char *out);
 private:
@@ -134,12 +104,8 @@ private:
             size_t &rowHeaderSz,
             size_t &rowMetadataSz,
             const std::vector<int> *&interestingColumns);
+    void updateTxnHash(TableTuple &tuple, int partitionColumn);
 
-    CatalogId m_partitionId;
-    size_t m_secondaryCapacity;
-    bool m_opened;
-    int64_t m_rowTarget;
-    size_t m_txnRowCount;
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
 };
@@ -149,6 +115,7 @@ public:
     MockDRTupleStream() : DRTupleStream() {}
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
+                           int partitionColumn,
                            int64_t txnId,
                            int64_t spHandle,
                            int64_t uniqueId,
@@ -170,43 +137,6 @@ public:
                        int64_t uniqueId) {
         return 0;
     }
-};
-
-class DRTupleStreamDisableGuard {
-public:
-    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream, bool ignore) :
-            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
-    {
-        if (!ignore) {
-            setGuard();
-        }
-    }
-    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream) :
-            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
-    {
-        setGuard();
-    }
-    ~DRTupleStreamDisableGuard() {
-        m_drStream->m_enabled = m_drStreamOldValue;
-        if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = m_drReplicatedStreamOldValue;
-        }
-    }
-
-private:
-    inline void setGuard() {
-        m_drStream->m_enabled = false;
-        if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = false;
-        }
-    }
-
-    DRTupleStream *m_drStream;
-    DRTupleStream *m_drReplicatedStream;
-    const bool m_drStreamOldValue;
-    const bool m_drReplicatedStreamOldValue;
 };
 
 }

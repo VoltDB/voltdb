@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,11 @@
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
+#include "storage/AbstractDRTupleStream.h"
 
 #include "boost/foreach.hpp"
+
+#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
 
 #include <pthread.h>
 #ifdef LINUX
@@ -29,6 +32,8 @@
 using namespace std;
 
 namespace voltdb {
+
+const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -76,8 +81,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 VoltDBEngine* engine,
                 std::string hostname,
                 CatalogId hostId,
-                DRTupleStream *drStream,
-                DRTupleStream *drReplicatedStream,
+                AbstractDRTupleStream *drStream,
+                AbstractDRTupleStream *drReplicatedStream,
                 CatalogId drClusterId) :
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
@@ -94,8 +99,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
-    m_drClusterId(drClusterId),
-    m_epoch(0) // set later
+    m_drClusterId(drClusterId)
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
@@ -104,8 +108,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 ExecutorContext::~ExecutorContext() {
     // currently does not own any of its pointers
 
-    // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == this);
     // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
@@ -114,8 +116,6 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::bindToThread()
 {
-    // There can be only one (per thread).
-    assert(pthread_getspecific(static_key) == NULL);
     pthread_setspecific(static_key, this);
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
@@ -222,24 +222,36 @@ void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
     typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-
-    // if we're recovering from an error, the executors map may never
-    // have been initialized.
-    if (m_executorsMap == NULL) {
-        // if there's no executors, there's no temp tables to check,
-        // so return true.
-        return true;
-    }
-
     BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
         BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
-            assert(executor != NULL);
             if (! executor->outputTempTableIsEmpty()) {
                 return false;
             }
         }
     }
     return true;
+}
+
+void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
+    assert (m_drStream != NULL);
+    assert (drStream != NULL);
+    assert (m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
+    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drStream->m_openSpHandle);
+    m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
+    int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
+    m_drStream = drStream;
+    m_drStream->setLastCommittedSequenceNumber(oldSeqNum);
+}
+
+void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream) {
+    assert (m_drReplicatedStream != NULL);
+    assert (drReplicatedStream != NULL);
+    assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
+    int64_t lastCommittedSpHandle = std::max(m_lastCommittedSpHandle, drReplicatedStream->m_openSpHandle);
+    m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
+    int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
+    m_drReplicatedStream = drReplicatedStream;
+    m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
 }
 
 } // end namespace voltdb

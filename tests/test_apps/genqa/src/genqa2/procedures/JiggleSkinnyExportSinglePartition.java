@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@ package genqa2.procedures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
     public final SQLStmt export = new SQLStmt(
@@ -32,7 +33,7 @@ public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
 
     public long run(long rowid, int reversed) {
         @SuppressWarnings("deprecation")
-        long txnid = getVoltPrivateRealTransactionIdDontUseMe();
+        long txnid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         voltQueueSQL(export, rowid, txnid);
 

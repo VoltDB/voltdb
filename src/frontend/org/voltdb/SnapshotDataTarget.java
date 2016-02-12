@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,12 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public interface SnapshotDataTarget {
     public final static int ROW_COUNT_UNSUPPORTED = -1;
@@ -41,6 +41,11 @@ public interface SnapshotDataTarget {
      * @param tableId   The catalog tableId
      */
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId);
+
+    /**
+     * Site reported failures (like streaming failures
+     */
+    public void reportSerializationFailure(IOException ex);
 
     /**
      * Does this target need to be closed by the last site to finish snapshotting?

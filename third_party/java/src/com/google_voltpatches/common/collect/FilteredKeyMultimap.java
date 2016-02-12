@@ -19,6 +19,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkPositionInde
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.j2objc.annotations.WeakOuter;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -180,6 +181,7 @@ class FilteredKeyMultimap<K, V> extends AbstractMultimap<K, V> implements Filter
     return new Entries();
   }
 
+  @WeakOuter
   class Entries extends ForwardingCollection<Entry<K, V>> {
     @Override
     protected Collection<Entry<K, V>> delegate() {

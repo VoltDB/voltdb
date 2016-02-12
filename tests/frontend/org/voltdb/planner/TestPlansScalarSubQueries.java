@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -287,7 +287,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingScalar() {
-        failToCompile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);",
+        failToCompile("select max(r2.c) from r2 group by r2.c having count(c) = (select a from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
@@ -302,7 +302,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingRow() {
-        failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);",
+        failToCompile("select max(r2.c) from r2 group by r2.c having (count(c), max(r2.c)) = (select a,c from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");

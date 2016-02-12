@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,7 +58,37 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
+    /*
+     * We set this to non-null iff the expression has a non-deterministic
+     * operation. The most common kind of non-deterministic operation is an
+     * aggregate function applied to a floating point expression.
+     */
+    private String m_contentDeterminismMessage = null;
 
+    /**
+     * Note that this expression is inherently non-deterministic. This may be
+     * called if the expression is already known to be non-deterministic, even
+     * if the value is false, because we are careful to never go from true to
+     * false here. Perhaps we should concatenate the messages. But since we only
+     * have one now it would result in unnecessary duplication.
+     *
+     * @param value
+     */
+    public void updateContentDeterminismMessage(String value) {
+        if (m_contentDeterminismMessage == null) {
+            m_contentDeterminismMessage = value;
+        }
+    }
+
+    /**
+     * Get the inherent non-determinism state of this expression. This is not
+     * valid before finalizeValueTypes is called.
+     *
+     * @return The state.
+     */
+    public String getContentDeterminismMessage() {
+        return m_contentDeterminismMessage;
+    }
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
     protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
@@ -299,7 +329,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String nodeName = getExpressionNodeNameForToString();
         String header = getExpressionNodeNameForToString() + "[" + getExpressionType().toString() + "] : ";
         if (m_valueType != null) {
             header += m_valueType.toSQLString();
@@ -643,6 +672,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return result;
     }
 
+    public static void fromJSONArrayString(String jsontext, StmtTableScan tableScan, List<AbstractExpression> result) throws JSONException
+    {
+        result.addAll(fromJSONArrayString(jsontext, tableScan));
+    }
+
     public static AbstractExpression fromJSONString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONObject jobject = new JSONObject(jsontext);
@@ -701,8 +735,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
             }
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
-            if (hasAnySubexpressionOfClass(AggregateExpression.class))
+            if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
                 tve.setHasAggregate(true);
+            }
 
             return tve;
         }
@@ -1079,15 +1114,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public abstract void finalizeValueTypes();
 
-    /** Do the recursive part of finalizeValueTypes as requested. */
+    /**
+     * Do the recursive part of finalizeValueTypes as requested. Note that this
+     * updates the content non-determinism state.
+     */
     protected final void finalizeChildValueTypes() {
-        if (m_left != null)
+        if (m_left != null) {
             m_left.finalizeValueTypes();
-        if (m_right != null)
+            updateContentDeterminismMessage(m_left.getContentDeterminismMessage());
+        }
+        if (m_right != null) {
             m_right.finalizeValueTypes();
+            updateContentDeterminismMessage(m_right.getContentDeterminismMessage());
+        }
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
+                updateContentDeterminismMessage(argument.getContentDeterminismMessage());
             }
         }
     }
@@ -1141,15 +1184,16 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Return true iff the given expression usable as part of an index expression.
-     * If false, put the tail of an error message in the string buffer.  The
+     * Return true if the given expression usable as part of an index or MV's
+     * group by and where clause expression.
+     * If false, put the tail of an error message in the string buffer. The
      * string buffer will be initialized with the name of the index.
      *
      * @param expr The expression to check
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    private boolean isIndexableExpression(StringBuffer msg) {
+    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
@@ -1168,18 +1212,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Return true iff the all of the expressions in the list can be part
-     * of an index expression.  As with isIndexableExpression, the StringBuffer
-     * parameter, msg, contains the name of the index.  Error messages
-     * should be appended to it.
+     * Return true if the all of the expressions in the list can be part of
+     * an index expression or in group by and where clause of MV.  As with
+     * validateExprForIndexesAndMVs for individual expression, the StringBuffer
+     * parameter, msg, contains the name of the index.  Error messages should
+     * be appended to it.
      *
      * @param checkList
      * @param msg
      * @return
      */
-    public static boolean areIndexableExpressions(List<AbstractExpression> checkList, StringBuffer msg) {
+    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
         for (AbstractExpression expr : checkList) {
-            if (!expr.isIndexableExpression(msg)) {
+            if (!expr.validateExprForIndexesAndMVs(msg)) {
                 return false;
             }
         }
@@ -1208,5 +1253,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return false;
+    }
+
+
+    /**
+     * Servicer function for expression which returns true if the expression return
+     * is indexable else false. If expression is not indexable, expression information
+     * gets populated in msg string buffer passed in.
+     * @param msg
+     * @return
+     */
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        if(!m_valueType.isIndexable()) {
+            msg.append("expression of type " + getValueType().getName());
+            return false;
+        }
+        return true;
     }
 }

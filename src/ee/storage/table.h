@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,6 +45,9 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
+#ifndef BTREE_DEBUG
+#define BTREE_DEBUG
+#endif
 #include <string>
 #include <vector>
 #include <set>
@@ -442,4 +445,4 @@ protected:
 };
 
 }
-#endif // HSTORETABLE_H
+#endif

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -84,8 +84,8 @@ struct FunctionTest : public Test {
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,
-                                  (DRTupleStream *)0,
-                                  (DRTupleStream *)0,
+                                  (AbstractDRTupleStream *)0,
+                                  (AbstractDRTupleStream *)0,
                                   0) {}
         /**
          * A template for calling unary function call expressions.  For any C++
@@ -102,6 +102,13 @@ struct FunctionTest : public Test {
          */
         template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
         int testBinary(int operation, LEFT_INPUT_TYPE left_input, RIGHT_INPUT_TYPE right_input, OUTPUT_TYPE output, bool expect_null = false);
+
+        /**
+         * A template for calling ternary functions.  This follows the pattern
+         * of testUnary and testBinary.
+         */
+        template <typename LEFT_INPUT_TYPE, typename MIDDLE_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
+        int testTernary(int operation, LEFT_INPUT_TYPE left_input, MIDDLE_INPUT_TYPE middle_input, RIGHT_INPUT_TYPE right_input, OUTPUT_TYPE output, bool expect_null = false);
 
         static const int64_t BIGINT_SIZE = int64_t(sizeof(int64_t) * CHAR_BIT);
 private:
@@ -128,6 +135,11 @@ static NValue getSomeValue(const int64_t val)
  */
 template <typename INPUT_TYPE, typename OUTPUT_TYPE>
 int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output, bool expect_null) {
+    if (staticVerboseFlag) {
+        std::cout << "operation:     " << operation << std::endl;
+        std::cout << "Operand:       " << input << std::endl;
+        std::cout << "Expected out:  " << output << std::endl;
+    }
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(getSomeValue(input));
     argument->push_back(const_val_exp);
@@ -152,7 +164,7 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
         std::cout << "input: " << std::hex << input
                   << ", answer: \"" << answer.debug() << "\""
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
-                  << ", comp:     " << std::dec << cmpout << "\n";
+                  << ", comp:     " << std::dec << cmpout << std::endl;
     }
     delete bin_exp;
     expected.free();
@@ -167,6 +179,12 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
  */
 template <typename LEFT_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
 int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_TYPE rinput, OUTPUT_TYPE output, bool expect_null) {
+    if (staticVerboseFlag) {
+        std::cout << "operation:     " << operation << std::endl;
+        std::cout << "Left:          " << linput << std::endl;
+        std::cout << "Right:         " << rinput << std::endl;
+        std::cout << "Expected out:  " << output << std::endl;
+    }
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
     ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
     ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
@@ -194,10 +212,62 @@ int FunctionTest::testBinary(int operation, LEFT_INPUT_TYPE linput, RIGHT_INPUT_
         std::cout << std::hex << "input: test(" << linput << ", " << rinput << ")"
                   << ", answer: \"" << answer.debug() << "\""
                   << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
-                  << ", comp:     " << std::dec << cmpout << "\n";
+                  << ", comp:     " << std::dec << cmpout << std::endl;
     }
     expected.free();
     delete bin_exp;
+    return cmpout;
+}
+
+/**
+ * Test a ternary function call expression.
+ * @returns: -1 if the result of the function evaluation is less than the expected result.
+ *            0 if the result of the function evaluation is as expected.
+ *            1 if the result of the function evaluation is greater than the expected result.
+ * Note that this function may throw an exception from the call to AbstractExpression::eval().
+ */
+template <typename LEFT_INPUT_TYPE, typename MIDDLE_INPUT_TYPE, typename RIGHT_INPUT_TYPE, typename OUTPUT_TYPE>
+int FunctionTest::testTernary(int operation, LEFT_INPUT_TYPE linput, MIDDLE_INPUT_TYPE minput, RIGHT_INPUT_TYPE rinput, OUTPUT_TYPE output, bool expect_null) {
+    if (staticVerboseFlag) {
+        std::cout << "operation:     " << operation << std::endl;
+        std::cout << "Left:          " << linput << std::endl;
+        std::cout << "Middle:        " << minput << std::endl;
+        std::cout << "Right:         " << rinput << std::endl;
+        std::cout << "Expected out:  " << output << std::endl;
+    }
+    std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
+    ConstantValueExpression *lhsexp = new ConstantValueExpression(getSomeValue(linput));
+    ConstantValueExpression *mdlexp = new ConstantValueExpression(getSomeValue(minput));
+    ConstantValueExpression *rhsexp = new ConstantValueExpression(getSomeValue(rinput));
+    argument->push_back(lhsexp);
+    argument->push_back(mdlexp);
+    argument->push_back(rhsexp);
+
+    NValue expected = getSomeValue(output);
+    AbstractExpression *ternary_exp = ExpressionUtil::functionFactory(operation, argument);
+    int cmpout;
+    NValue answer;
+    try {
+        answer = ternary_exp->eval();
+        if (expect_null) {
+            // An unexpected non-null can return any non-0. Arbitrarily return 1 as if (answer > expected).
+            cmpout = answer.isNull() ? 0 : 1;
+        } else {
+            cmpout = answer.compare(expected);
+        }
+    } catch (SQLException &ex) {
+        expected.free();
+        delete ternary_exp;
+        throw;
+    }
+    if (staticVerboseFlag) {
+        std::cout << std::hex << "input: test(" << linput << ", " << minput << ", " << rinput << ")"
+                  << ", answer: \"" << answer.debug() << "\""
+                  << ", expected: \"" << (expect_null ? "<NULL>" : expected.debug()) << "\""
+                  << ", comp:     " << std::dec << cmpout << std::endl;
+    }
+    expected.free();
+    delete ternary_exp;
     return cmpout;
 }
 
@@ -391,6 +461,63 @@ TEST_F(FunctionTest, RepeatTooBig) {
     ASSERT_TRUE(sawexception);
 }
 
-int main() {
+TEST_F(FunctionTest, RegularExpressionMatch) {
+    bool sawexception = false;
+    std::string testString("TEST reGexp_poSiTion123456Test");
+    std::string testUTF8String("vVoltDBBB贾贾贾");
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testString, std::string("TEST"), 1), 0);
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testString, std::string("[a-z](\\d+)[a-z]"), 0), 0);
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testString, std::string("[a-z](\\d+)[A-Z]"), 20), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testString, std::string("[a-z](\\d+)[a-z]"), "i", 20), 0);
+
+    // Test an illegal pattern.
+    sawexception = false;
+    try {
+        ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testString, std::string("[a-z](a]"), 0), 0);
+    } catch (voltdb::SQLException &ex) {
+        sawexception = true;
+    }
+    ASSERT_TRUE(sawexception);
+
+    // Test an illegal option character.
+    sawexception = false;
+    try {
+        ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testString, "[a-z](\\d+)[A-Z]", "k", 0), 0);
+    } catch (voltdb::SQLException &ex) {
+        sawexception = true;
+    }
+    ASSERT_TRUE(sawexception);
+
+#if 0
+    const char *NULL_STRING = 0;
+    // I'm not sure how to represent null strings here.  These are tested in
+    // the junit tests, though.
+    //
+    // Test a null pattern.
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testString, NULL_STRING, 0, true), 1);
+
+    // Test a null subject.
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, NULL_STRING, "TEST", 0, true), 1);
+#endif /* 0 */
+
+     // Test utf-8 strings.
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[A-Z]贾", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[A-Z]贾", "c", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[A-Z]贾", "ic", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[A-Z]贾", "ccciiiic", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[a-z]贾", "i", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[a-z]贾", "ci", 9), 0);
+    ASSERT_EQ(testTernary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[a-z]贾", "iiccii", 9), 0);
+    ASSERT_EQ(testBinary(FUNC_VOLT_REGEXP_POSITION, testUTF8String, "[a-z]家", 0), 0);
+}
+
+int main(int argc, char **argv) {
+    for (argv++; *argv; argv++) {
+        if (strcmp(*argv, "--verbose")) {
+            staticVerboseFlag = true;
+        } else {
+            std::cerr << "Unknown command line parameter: " << *argv << std::endl;
+        }
+    }
      return TestSuite::globalInstance()->runAll();
 }

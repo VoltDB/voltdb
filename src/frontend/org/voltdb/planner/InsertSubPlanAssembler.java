@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,7 +61,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
         targetTable.getTypeName();
-        StmtSubqueryScan subquery = insertStmt.getSubqueryScans().get(0);
+        StmtSubqueryScan subquery = insertStmt.getSubqueryScan();
         boolean subqueryIsMultiFragment = subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND);
 
         if (targetTable.getIsreplicated()) {
