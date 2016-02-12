@@ -42,7 +42,7 @@ public class TestPlansIn extends PlannerTestCase {
         compile("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
         // IN LISTs once interacted badly with joins and indexes, especially with compound indexes,
         // so exercise the planner with the possible combinations of using potentially indexable components
-        // in IN LISTs and join clauses.
+        // in IN LISTs and join clauses. See ENG-9626.
         // Note: the index is on NEW_ORDERS (NO_D_ID, NO_W_ID, NO_O_ID).
         compile("select warehouse.w_id from warehouse, new_order where no_d_id in (5, 7) and no_w_id = w_id;");
         compile("select district.d_id from district, new_order where no_d_id = d_id and no_w_id in (5, 7);");
