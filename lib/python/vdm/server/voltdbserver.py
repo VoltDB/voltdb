@@ -278,6 +278,7 @@ class VoltDatabase:
         try:
             my_env = os.environ.copy()
             my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
+            print "VOLTDB_OPTS: " + my_env['VOLTDB_OPTS']
             return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                           env=my_env, preexec_fn=ignore_signals, close_fds=True)
         finally:
