@@ -1328,6 +1328,26 @@ def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
 
 
+def is_pro_version(deployment):
+    ##############################################
+    file_path = ''
+    try:
+        volt_jar = glob.glob(os.path.join(get_volt_jar_dir(), 'voltdb-*.jar'))
+        if len(volt_jar) > 0:
+            file_path = volt_jar[0]
+        else:
+            print 'No voltdb jar file found.'
+    except Exception, err:
+        print err
+    if file_path != '':
+        is_pro = utility.is_pro_version(file_path)
+        if is_pro:
+            if 'commandlog' in deployment and 'enabled' in deployment['commandlog'] and not \
+            deployment['commandlog']['enabled']:
+                deployment['commandlog']['enabled'] = True
+    ###############################################
+
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
@@ -1599,7 +1619,7 @@ class DatabaseAPI(MethodView):
         with open(os.path.join(app_root, "deployment.json")) as json_file:
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
-
+            is_pro_version(deployment)
         Global.DEPLOYMENT.append(deployment)
 
         sync_configuration()
@@ -2343,23 +2363,7 @@ def main(runner, amodule, config_dir, server):
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
-        ##############################################
-        file_path = ''
-        try:
-            volt_jar = glob.glob(os.path.join(get_volt_jar_dir(), 'voltdb-*.jar'))
-            if len(volt_jar) > 0:
-                file_path = volt_jar[0]
-            else:
-                print 'No voltdb jar file found.'
-        except Exception, err:
-            print err
-        if file_path != '':
-            is_pro = utility.is_pro_version(file_path)
-            if is_pro:
-                if 'commandlog' in deployment and 'enabled' in deployment['commandlog'] and not \
-                deployment['commandlog']['enabled']:
-                    deployment['commandlog']['enabled'] = True
-        ###############################################
+        is_pro_version(deployment)
 
         Global.DEPLOYMENT.append(deployment)
 
