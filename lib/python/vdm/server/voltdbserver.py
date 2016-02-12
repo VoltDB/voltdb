@@ -423,9 +423,9 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status) ,500)
+            return create_response('There were errors stopping servers: ' + str(server_status) ,500)
         else:
-            return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Stop request sent successfully to servers: ' + str(server_status), 200)
 
     def kill_server(self, server_id):
         try:
