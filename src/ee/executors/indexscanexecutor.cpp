@@ -472,7 +472,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 outputTuple(postfilter, temp_tuple);
             }
             else {
-                outputTuple(postfilter, temp_tuple);
+                outputTuple(postfilter, tuple);
             }
             pmp.countdownProgress();
         }
