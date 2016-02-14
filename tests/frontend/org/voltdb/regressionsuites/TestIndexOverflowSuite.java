@@ -127,105 +127,122 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         Client client = getClient();
         // populate table
         int count = 0;
-        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "aaa", "aaa", "10");
-        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abb", "abb", "11");
-        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abc", "abc", "12");
-        client.callProcedure("INDEXED_VL_TABLE.Insert", count++, "abd", "abd", "13");
-        client.callProcedure("@AdHoc", "Insert into INDEXED_VL_TABLE values (99, null, null, null);");
+        client.callProcedure("INDEXED_VL_TABLE1.Insert", count++, "aaa", "aaa", "10");
+        client.callProcedure("INDEXED_VL_TABLE1.Insert", count++, "abb", "abb", "11");
+        client.callProcedure("INDEXED_VL_TABLE1.Insert", count++, "abc", "abc", "12");
+        client.callProcedure("INDEXED_VL_TABLE1.Insert", count++, "abd", "abd", "13");
+        client.callProcedure("@AdHoc", "Insert into INDEXED_VL_TABLE1 values (99, null, null, null);");
+
+        count = 0;
+        client.callProcedure("INDEXED_VL_TABLE2.Insert", count++, "aaaa", "aaaa", "10");
+        client.callProcedure("INDEXED_VL_TABLE2.Insert", count++, "abbb", "abbb", "11");
+        client.callProcedure("INDEXED_VL_TABLE2.Insert", count++, "abcc", "abcc", "12");
+        client.callProcedure("INDEXED_VL_TABLE2.Insert", count++, "abdd", "abdd", "13");
+        client.callProcedure("@AdHoc", "Insert into INDEXED_VL_TABLE2 values (99, null, null, null);");
 
         VoltTable vt, expectedVT;
         String sql;
         String prefix = "Assertion failed for Index Test with one search key exceeding defined variable length column";
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 < 'abbd' order by id;";
+        sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abb' order by id;";
+        sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 <= 'abbd' order by id;";
+        sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 <= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abbd'order by id;";
+        sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 > 'abbd'order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expectedVT = client.callProcedure("@AdHoc", "Select VC1 from INDEXED_VL_TABLE where VC1 > 'abb';").getResults()[0];
+        expectedVT = client.callProcedure("@AdHoc", "Select VC1 from INDEXED_VL_TABLE1 where VC1 > 'abb';").getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1 from INDEXED_VL_TABLE where VC1 >= 'abbd' order by id;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expectedVT.resetRowPosition();
-        assertTablesAreEqual(prefix, expectedVT, vt);
-
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 < 'abbd' order by id;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abb' order by id;";
-        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertTablesAreEqual(prefix, expectedVT, vt);
-
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 <= 'abbd' order by id;";
+        sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abbd';";
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 > 'abb' order by id;";
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC2 from INDEXED_VL_TABLE where VC2 >= 'abbd' order by id;";
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 <= 'abbd' order by id;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        expectedVT.resetRowPosition();
+        assertTablesAreEqual(prefix, expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 > 'abbd';";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 > 'abb' order by id;";
+        expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, expectedVT, vt);
+
+        sql = "Select VC2 from INDEXED_VL_TABLE1 where VC2 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expectedVT.resetRowPosition();
         assertTablesAreEqual(prefix, expectedVT, vt);
 
         prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column";
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abc' OR VC2 > 'abb' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 > 'abc' OR VC2 > 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 >= 'abcd' OR VC2 >= 'abbd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 >= 'abcd' OR VC2 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abc' AND VC2 > 'abb' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 > 'abc' AND VC2 > 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 > 'abcd' AND VC2 > 'abbd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 > 'abcd' AND VC2 > 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abc' OR VC2 <= 'abb' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 <= 'abc' OR VC2 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abcd' OR VC2 <= 'abbd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 <= 'abcd' OR VC2 <= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <= 'abc' AND VC2 <= 'abb' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 <= 'abc' AND VC2 <= 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 < 'abcd' AND VC2 < 'abbd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 < 'abcd' AND VC2 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
         prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column involving Join";
-        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE A, INDEXED_VL_TABLE B where A.VC1 <= 'abc' AND B.VC2 > 'abb' order by A.VC1, B.VC2;";
+        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE1 B where A.VC1 <= 'abc' AND B.VC2 > 'abb' order by A.VC1, B.VC2;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE A, INDEXED_VL_TABLE B where A.VC1 < 'abcd' AND B.VC2 > 'abbd' order by A.VC1, B.VC2;";
+        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE1 B where A.VC1 < 'abcd' AND B.VC2 > 'abbd' order by A.VC1, B.VC2;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
+        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where B.VC1 < A.VC1 order by A.VC1, B.VC2;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{"abb","aaaa"},
+                                             {"abc", "aaaa"},
+                                             {"abc", "abbb"},
+                                             {"abd", "aaaa"},
+                                             {"abd", "abbb"},
+                                             {"abd", "abcc"}},
+                             vt);
+
         // result set of 'not equal' lookup with search parameter exceeding indexed column length
         // will result in non-filtered result on that column except NULL values
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 IS NOT NULL AND VC2 IS NOT NULL order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 IS NOT NULL AND VC2 IS NOT NULL order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE where VC1 <> 'abbd' AND VC2 <> 'abcd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 <> 'abbd' AND VC2 <> 'abcd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
     }
