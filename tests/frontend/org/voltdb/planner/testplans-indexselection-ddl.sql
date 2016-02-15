@@ -63,3 +63,7 @@ CREATE INDEX partial_idx_4 ON c (a, b) where 0 < f;
 CREATE INDEX partial_idx_5 ON c (b) where d > f;
 CREATE INDEX partial_idx_6 ON c (g) where g < 0;
 CREATE INDEX partial_idx_7 ON c (g) where g is not null;
+
+CREATE TABLE polypoints ( poly geography(1024), point geography_point );
+CREATE INDEX polypointspoly ON polypoints ( poly );
+

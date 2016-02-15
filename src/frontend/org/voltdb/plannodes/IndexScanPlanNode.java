@@ -805,6 +805,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                     usageInfo = "\n" + indent + " scan matches for " + start;
                 }
             }
+            else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+                usageInfo = "\n" + indent + " scan for " + start;
+            }
             else {
                 usageInfo = "\n" + indent;
                 if (isReverseScan()) {

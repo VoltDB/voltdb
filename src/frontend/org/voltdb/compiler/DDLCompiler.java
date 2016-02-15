@@ -2554,7 +2554,7 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-                if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
+                if (! SubPlanAssembler.isPartialIndexPredicateCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
                     // partial index does not match MatView where clause, give up this index
                     continue;
                 }

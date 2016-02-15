@@ -800,7 +800,6 @@ public enum VoltType {
     public boolean isIndexable() {
         switch(this) {
         case GEOGRAPHY_POINT:
-        case GEOGRAPHY:
         case BOOLEAN:
             return false;
         default:

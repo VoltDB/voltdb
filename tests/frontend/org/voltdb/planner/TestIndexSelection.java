@@ -50,6 +50,50 @@ public class TestIndexSelection extends PlannerTestCase {
                     planForSinglePartitionFalse);
     }
 
+    public void testGeoIndex()
+    {
+        AbstractPlanNode pn;
+        IndexScanPlanNode indexScan;
+        String jsonicIdxScan;
+        pn = compile(
+                "select polys.point " +
+                "from polypoints polys " +
+                "where contains(polys.poly, ?);");
+        pn = pn.getChild(0);
+        /* enable to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof IndexScanPlanNode);
+        indexScan = (IndexScanPlanNode)pn;
+        assertEquals(IndexLookupType.GEO_CONTAINS, indexScan.getLookupType());
+        jsonicIdxScan = indexScan.toJSONString();
+        /* enable to debug */ System.out.println("DEBUG: " + jsonicIdxScan);
+        assertTrue(jsonicIdxScan.contains("\"TARGET_INDEX_NAME\":\"POLYPOINTSPOLY\""));
+        // Expecting one index search key expression
+        // that is a parameter (31) of type GEOGRAPHY_POINT (26).
+        assertEquals(1, indexScan.getSearchKeyExpressions().size());
+        assertTrue(jsonicIdxScan.contains(
+                "\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":31,\"VALUE_TYPE\":26"));
+
+        pn = compile(
+                "select polys.poly, points.point " +
+                "from polypoints polys, polypoints points " +
+                "where contains(polys.poly, points.point);");
+        pn = pn.getChild(0);
+        pn = pn.getChild(0);
+        /* enable to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GEO_CONTAINS, indexScan.getLookupType());
+        jsonicIdxScan = indexScan.toJSONString();
+        assertTrue(jsonicIdxScan.contains("\"TARGET_INDEX_NAME\":\"POLYPOINTSPOLY\""));
+        // Expecting one index search key expression
+        // that is a TVE (32) of type GEOGRAPHY_POINT (26).
+        assertEquals(1, indexScan.getSearchKeyExpressions().size());
+        assertTrue(jsonicIdxScan.contains(
+                "\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":32,\"VALUE_TYPE\":26"));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+    }
+
     // This tests recognition of a complex expression value
     // -- an addition -- used as an indexable join key's search key value.
     // Some time ago, this would throw a casting error in the planner.

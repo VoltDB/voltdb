@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
@@ -154,7 +155,7 @@ public abstract class SubPlanAssembler {
                     // For optimization purposes, keep track of the covering (query) expressions that exactly match the
                     // covered index sub-expression. They can be eliminated from the post-filter expressions.
                     List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
+                    if (isPartialIndexPredicateCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
                         filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
                     } else {
                         path = null;
@@ -164,7 +165,7 @@ public abstract class SubPlanAssembler {
                 // Partial index can be used solely to eliminate a post-filter
                 // even when the indexed columns are irrelevant
                 List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                if (isPartialIndexPredicateIsCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
+                if (isPartialIndexPredicateCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
                     path = getRelevantNaivePath(allJoinExprs, filterExprs);
                     filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
                     path.index = index;
@@ -202,8 +203,9 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * A utility class for returning the results of a match between an indexed expression and a query filter
-     * expression that uses it in some form in some useful fashion.
+     * A utility class for returning the results of a match between an indexed
+     * expression and a query filter expression that uses it in some form in
+     * some useful fashion.
      * The "form" may be an exact match for the expression or some allowed parameterized variant.
      * The "fashion" may be in an equality or range comparison opposite something that can be
      * treated as a (sub)scan-time constant.
@@ -256,7 +258,7 @@ public abstract class SubPlanAssembler {
      *        index predicate expression(s)
      * @return TRUE if the index predicate is completely covered by the query expressions.
      */
-    public static boolean isPartialIndexPredicateIsCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, Index index, List<AbstractExpression> exactMatchCoveringExprs) {
+    public static boolean isPartialIndexPredicateCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, Index index, List<AbstractExpression> exactMatchCoveringExprs) {
         assert(index != null);
         String predicatejson = index.getPredicatejson();
         if (predicatejson.isEmpty()) {
@@ -320,10 +322,11 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // we copy the expressions to a new list because that we will remove expression from the list
+        // Copy the expressions to a new working list that can be culled as filters are processed.
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
         filtersToCover.addAll(exprs);
 
+        boolean indexIsGeographical;
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.
         List<AbstractExpression> indexedExprs = null;
@@ -342,6 +345,7 @@ public abstract class SubPlanAssembler {
             for (ColumnRef cr : indexedColRefs) {
                 indexedColIds[ii++] = cr.getColumn().getIndex();
             }
+            indexIsGeographical = isAGeoColumnIndex(indexedColRefs);
         } else {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
@@ -353,12 +357,28 @@ public abstract class SubPlanAssembler {
                 assert(false);
                 return null;
             }
+            indexIsGeographical = isAGeoExpressionIndex(indexedExprs);
+        }
+
+        AccessPath retval = new AccessPath();
+        retval.index = index;
+
+        // An index on a single geography column is handled up front
+        // as a special case with very specific matching criteria.
+        // TODO: if/when we want to support multi-component hybrid indexes
+        // containing one (trailing) Geography component, the filter
+        // matching and AccessPath configuration for geo columns would
+        // would have to be broken out of this self-contained code path and
+        // integrated into the iterative component-by-component processing below.
+        // OR maybe it would be more effective to keep geo indexes as single column
+        // and instead implement bitmap indexing that would allow use of a geo index
+        // in tandem with other indexes within one more powerful indexscan.
+        if (indexIsGeographical) {
+            return getRelevantAccessPathForGeoIndex(retval, tableScan, indexedExprs, indexedColRefs, filtersToCover);
         }
 
         // Hope for the best -- full coverage with equality matches on every expression in the index.
-        AccessPath retval = new AccessPath();
         retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;
-        retval.index = index;
 
         // Try to use the index scan's inherent ordering to implement the ORDER BY clause.
         // The effects of determineIndexOrdering are reflected in
@@ -765,6 +785,99 @@ public abstract class SubPlanAssembler {
             retval.bindings.addAll(bindingsForOrder);
         }
         return retval;
+    }
+
+    private AccessPath getRelevantAccessPathForGeoIndex(AccessPath retval, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
+            List<AbstractExpression> filtersToCover) {
+        assert indexedExprs == null; // geo expressions not yet supported
+        assert indexedColRefs != null; // for now a geo COLUMN is required.
+        assert isAGeoColumnIndex(indexedColRefs);
+        Column geoCol = indexedColRefs.get(0).getColumn();
+        // Match only the table's column that has the coveringColId
+        // Handle a simple indexed column identified by its column id.
+        int coveringColId = geoCol.getIndex();
+        String tableAlias = tableScan.getTableAlias();
+        // Iterate over the query filters looking for a matching CONTAINS-like predicate.
+        // These are identified by their unique function type signature
+        // -- safe for now, until we happen to add an
+        // unrelated function with the same signature.
+        // The alternative would be to import the specific function id for CONTAINS
+        // from FunctionForVoltDB to match on that, and then probably expand that to
+        // include APPROX_CONTAINS if/when we decide to explicitly support APPROX_CONTAINS
+        // as a filter that COMPLETELY eliminates post-filtering on an indexed geography
+        // column OR to export an additional optional "is geo indexable" attribute to the
+        // VoltXML that sets up FunctionExpressions. Maybe we can revisit this if/when
+        // we change FunctionForVoltDB to support APPROX_CONTAINS.
+        for (AbstractExpression filter : filtersToCover) {
+            if (filter.getExpressionType() != ExpressionType.FUNCTION) {
+                continue;
+            }
+            if (filter.getValueType() != VoltType.BOOLEAN) {
+                continue;
+            }
+            List<AbstractExpression> args = filter.getArgs();
+            if (args.size() != 2) {
+                continue;
+            }
+            //FunctionExpression fn = (FunctionExpression) filter;
+            //if ( ! fn.???) { //XXX: need to define a test for CONTAINS (?or APPROX_CONTAINS?)
+            //    continue;
+            //}
+
+            AbstractExpression indexableArg = args.get(0);
+            assert indexableArg instanceof TupleValueExpression;
+            assert indexableArg.getValueType() == VoltType.GEOGRAPHY;
+            TupleValueExpression geoTve = (TupleValueExpression) indexableArg;
+            if (! tableAlias.equals(geoTve.getTableAlias())) {
+                continue;
+            }
+            if (coveringColId != geoTve.getColumnIndex()) {
+                continue;
+            }
+
+            AbstractExpression searchKeyArg = args.get(1);
+            assert searchKeyArg.getValueType() == VoltType.GEOGRAPHY_POINT;
+            // Search key operand must not be from the same table,
+            // e.g. contains(t.a, t.b) is not indexable.
+            if (isOperandDependentOnTable(searchKeyArg, tableScan)) {
+                continue;
+            }
+
+            retval.lookupType = IndexLookupType.GEO_CONTAINS;
+            filtersToCover.remove(searchKeyArg);
+            retval.indexExprs.add(searchKeyArg);
+            retval.otherExprs.addAll(filtersToCover);
+            // It's unlikely but possible that the query has more than one
+            // CONTAINS filter that uses the same geography column, e.g.
+            //  "WHERE CONTAINS(place, point) AND CONTAINS(place, ?)"
+            //
+            // Since the search stops here on finding the first such filter,
+            // any others will be treated strictly as post-filters.
+            // At this point, there exists no reasonable criteria to prefer
+            // one similar filter over another.
+            // This is analogous to the handling of other toss-ups like
+            //  "WHERE int_key > 30 AND int_key > ?".
+            return retval;
+        }
+        return null;
+    }
+
+    private static boolean isAGeoColumnIndex(List<ColumnRef> indexedColRefs) {
+        // Initially, geographical indexing only supports a single indexed column of type geography.
+        if (indexedColRefs.size() != 1) {
+            return false;
+        }
+        Column geoCol = indexedColRefs.get(0).getColumn();
+        return geoCol.getType() == VoltType.GEOGRAPHY.getValue();
+    }
+
+    private static boolean isAGeoExpressionIndex(List<AbstractExpression> indexedExprs) {
+        // Currently, geo indexes are strictly column-based,
+        // never expression/function based.
+        // This could change profoundly in the future if we use pseudo-function
+        // expression syntax to configure each index.
+        return false;
     }
 
     /**
@@ -1377,8 +1490,7 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * Get a index scan access plan for a table. For multi-site plans/tables,
-     * scans at all partitions and sends to one partition.
+     * Get an index scan access plan for a table.
      *
      * @param tableAliasIndex The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
@@ -1391,11 +1503,17 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
         AbstractPlanNode resultNode = scanNode;
-        // set sortDirection here becase it might be used for IN list
+        // set sortDirection here because it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
         // Build the list of search-keys for the index in question
-        // They are the rhs expressions of the normalized indexExpr comparisons.
+        // They are the rhs expressions of normalized indexExpr comparisons
+        // except for geo indexes. For geo indexes, the search key is directly
+        // the one element of indexExprs.
         for (AbstractExpression expr : path.indexExprs) {
+            if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
+                scanNode.addSearchKeyExpression(expr);
+                continue;
+            }
             AbstractExpression expr2 = expr.getRight();
             assert(expr2 != null);
             if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
