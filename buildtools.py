@@ -656,7 +656,7 @@ def runTests(CTX):
                 out_err = process.stderr.readlines()
                 retval = process.wait()
                 for str in out_err:
-                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
+                    if str.find("All heap blocks were freed") != -1:
                         allHeapBlocksFreed = True
                     if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
                         otherValgrindError = False
