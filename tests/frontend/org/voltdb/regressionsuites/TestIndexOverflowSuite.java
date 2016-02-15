@@ -227,7 +227,7 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where B.VC1 < A.VC1 order by A.VC1, B.VC2;";
+        sql = "Select A.VC1, B.VC1 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where A.VC1 > B.VC1 order by A.VC1, B.VC1;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {{"abb","aaaa"},
                                              {"abc", "aaaa"},
@@ -235,6 +235,20 @@ public class TestIndexOverflowSuite extends RegressionSuite {
                                              {"abd", "aaaa"},
                                              {"abd", "abbb"},
                                              {"abd", "abcc"}},
+                             vt);
+
+        sql = "Select A.VC2, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where A.VC2 < B.VC2 order by A.VC2, B.VC2;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{"aaa", "aaaa"},
+                                             {"aaa", "abbb"},
+                                             {"aaa", "abcc"},
+                                             {"aaa", "abdd"},
+                                             {"abb", "abbb"},
+                                             {"abb", "abcc"},
+                                             {"abb", "abdd"},
+                                             {"abc", "abcc"},
+                                             {"abc", "abdd"},
+                                             {"abd", "abdd"}},
                              vt);
 
         // result set of 'not equal' lookup with search parameter exceeding indexed column length
