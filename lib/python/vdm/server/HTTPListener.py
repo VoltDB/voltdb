@@ -1921,7 +1921,7 @@ class StartDatabaseAPI(MethodView):
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
+                                 200)
 
 
 class RecoverDatabaseAPI(MethodView):
