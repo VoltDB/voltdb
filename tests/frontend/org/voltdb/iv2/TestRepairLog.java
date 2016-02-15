@@ -252,8 +252,6 @@ public class TestRepairLog
                 }
             } else {
                 assertTrue(imsg.hasHashinatorConfig());
-                assertEquals(binaryLogSpUniqueId, imsg.getBinaryLogInfo().spUniqueId);
-                assertEquals(binaryLogMpUniqueId, imsg.getBinaryLogInfo().mpUniqueId);
             }
         }
     }

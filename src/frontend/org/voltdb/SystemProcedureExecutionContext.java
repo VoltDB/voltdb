@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
@@ -82,6 +83,8 @@ public interface SystemProcedureExecutionContext {
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
+
+    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns();
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

@@ -39,6 +39,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -165,6 +166,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private final PartitionDRGateway m_drGateway;
     private final PartitionDRGateway m_mpDrGateway;
+
+    /*
+     * Track the last producer-cluster unique IDs and drIds associated with an
+     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
+     *  ReplicaDRGateway on repair
+     */
+    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition;
+    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // Current topology
     int m_partitionId;
@@ -392,6 +402,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
+        }
+
+        @Override
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
+        {
+            return m_maxSeenDrLogsBySrcPartition;
         }
 
         @Override
