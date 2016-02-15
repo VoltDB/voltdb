@@ -224,7 +224,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
     // the block that contains mark.
-    if (!(m_currBlock->uso() >= mark)) {
+    if (m_currBlock != NULL && !(m_currBlock->uso() >= mark)) {
         m_currBlock->truncateTo(mark);
     }
     else {
@@ -259,8 +259,10 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
  * be handed off
  */
 void TupleStreamBase::discardBlock(StreamBlock *sb) {
-    delete [] sb->rawPtr();
-    delete sb;
+    if (sb != NULL) {
+        delete [] sb->rawPtr();
+        delete sb;
+    }
 }
 
 /*
@@ -292,6 +294,10 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     size_t blockSize = m_defaultCapacity;
     bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
+    if (blockSize == 0) {
+        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
+
     char *buffer = new char[blockSize];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
@@ -299,11 +305,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     m_currBlock = new StreamBlock(buffer, m_headerSpace, blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
-    }
-
-    if (blockSize == 0) {
-        rollbackTo(uso, SIZE_MAX);
-        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
     }
 
     if (openTransaction) {
