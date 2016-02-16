@@ -23,7 +23,7 @@ import java.util.TreeMap;
 
 public class DRConsumerDrIdTracker {
 
-    private final TreeMap<Long, Long> m_map = new TreeMap<Long, Long>();
+    private TreeMap<Long, Long> m_map = new TreeMap<Long, Long>();
     private long m_lastAckedDrId;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
@@ -75,6 +75,7 @@ public class DRConsumerDrIdTracker {
         assert(startDrId <= endDrId && startDrId > m_lastAckedDrId);
         assert(m_map.size() == 0 || m_map.lastEntry().getValue() < startDrId);
 
+        // Note that any given range or tracker could have either sp or mp sentinel values
         m_lastSpUniqueId = Math.max(m_lastSpUniqueId, spUniqueId);
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, mpUniqueId);
         Map.Entry<Long, Long> prevEntry = m_map.lowerEntry(startDrId);
@@ -84,6 +85,31 @@ public class DRConsumerDrIdTracker {
         }
         else {
             m_map.put(startDrId, endDrId);
+        }
+    }
+
+    public void appendTracker(DRConsumerDrIdTracker tracker) {
+        assert(m_lastAckedDrId <= tracker.m_lastAckedDrId);
+
+        // Note that any given range or tracker could have either sp or mp sentinel values
+        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
+        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
+
+        assert (tracker.size() > 0);
+        if (m_map.isEmpty()) {
+            m_map = tracker.m_map;
+        }
+        else {
+            Map.Entry<Long, Long> firstNewEntry = tracker.m_map.firstEntry();
+            Map.Entry<Long, Long> lastOldEntry = m_map.lastEntry();
+            // There should never be keys past the append point
+            assert(lastOldEntry.getValue() < firstNewEntry.getKey());
+            if (lastOldEntry.getValue()+1 == firstNewEntry.getKey()) {
+                // consolidate the two ranges
+                tracker.m_map.remove(firstNewEntry.getKey());
+                m_map.put(lastOldEntry.getKey(), firstNewEntry.getValue());
+            }
+            m_map.putAll(tracker.m_map);
         }
     }
 
@@ -131,7 +157,7 @@ public class DRConsumerDrIdTracker {
         m_lastAckedDrId = newTruncationPoint;
     }
 
-    public void merge(DRConsumerDrIdTracker tracker) {
+    public void mergeTracker(DRConsumerDrIdTracker tracker) {
         if (tracker.m_lastAckedDrId > m_lastAckedDrId) {
             truncate(tracker.m_lastAckedDrId);
         }
