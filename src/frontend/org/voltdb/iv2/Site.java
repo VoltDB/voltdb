@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
@@ -173,8 +174,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      *  ReplicaDRGateway on repair
      */
     private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition;
-    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // Current topology
     int m_partitionId;
@@ -405,10 +404,30 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public void appendApplyBinaryLogTxns(int srcClusterId, int srcPartitionId, DRConsumerDrIdTracker tracker)
+        {
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(srcClusterId);
+            if (clusterSources == null) {
+                clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
+                clusterSources.put(srcPartitionId, tracker);
+            }
+            else {
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(srcPartitionId);
+                if (targetTracker == null) {
+                    clusterSources.put(srcPartitionId, tracker);
+                }
+                else {
+                    targetTracker.appendTracker(tracker);
+                }
+            }
+        }
+
+        @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
         {
             return m_maxSeenDrLogsBySrcPartition;
         }
+
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
