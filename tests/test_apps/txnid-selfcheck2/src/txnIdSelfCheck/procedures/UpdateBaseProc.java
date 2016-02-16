@@ -62,6 +62,12 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_upsertExViewShadowData = new SQLStmt(
             "UPSERT INTO ex_partview_shadow VALUES(?, ?, ?, ?, ?);");
 
+    public final SQLStmt p_deleteExViewData = new SQLStmt(
+            "DELETE FROM ex_partview WHERE cid=?;");
+
+    public final SQLStmt p_deleteExViewShadowData = new SQLStmt(
+            "DELETE FROM ex_partview_shadow WHERE cid=?;");
+
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
 
@@ -70,7 +76,7 @@ public class UpdateBaseProc extends VoltProcedure {
     }
 
     protected VoltTable[] doWork(SQLStmt getCIDData, SQLStmt cleanUp, SQLStmt insert, SQLStmt export, SQLStmt getAdHocData, SQLStmt getViewData,
-                                 byte cid, long rid, byte[] value, byte shouldRollback, boolean usestreamviews)
+            byte cid, long rid, byte[] value, byte shouldRollback, boolean usestreamviews)
     {
         voltQueueSQL(getCIDData, cid);
         voltQueueSQL(getAdHocData);
@@ -115,7 +121,6 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        // System.out.println(export.getText() + ": " + cnt);
         voltQueueSQL(insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQL(export, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQL(cleanUp, cid, cnt - 10);
@@ -123,28 +128,46 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(getViewData, cid);
         assert dim.getRowCount() == 1;
         VoltTable[] retval = voltExecuteSQL();
+        // Is this comment below now obsolete and can be removed?
         // Verify that our update happened.  The client is reporting data errors on this validation
         // not seen by the server, hopefully this will bisect where they're occurring.
         data = retval[3];
         view = retval[4];
-        validateCIDData(data, view, getClass().getName());
-
-        if (usestreamviews)    {
-            voltQueueSQL(p_getExViewData, cid);
-            voltQueueSQL(p_getExViewShadowData, cid);
-            VoltTable[] streamresults = voltExecuteSQL();
-            validateStreamData(streamresults[0], streamresults[1], cid, cnt);
-        }
 
         VoltTableRow row = data.fetchRow(0);
         if (row.getVarbinary("value").length == 0)
             throw new VoltAbortException("Value column contained no data in UpdateBaseProc");
+
+        validateCIDData(data, view, getClass().getName());
+
+        // insert to export table done, check corresponding materialized view
+        if (usestreamviews) {
+            validateView(cid, cnt, "insert");
+        }
+
+        // delete from export materialized view & validate
+        if (usestreamviews) {
+            voltQueueSQL(p_deleteExViewData, cid);
+            voltQueueSQL(p_deleteExViewShadowData, cid);
+            voltExecuteSQL();
+            validateView(cid, cnt, "delete");
+        }
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");
         }
 
         return retval;
+    }
+
+    protected void validateView(byte cid, long cnt, String type) {
+        // we've inserted a row in the export (streaming) table.
+        // now pull derived data from the materialized view for
+        // checking that it's been updated
+        voltQueueSQL(p_getExViewData, cid);
+        voltQueueSQL(p_getExViewShadowData, cid);
+        VoltTable[] streamresults = voltExecuteSQL();
+        validateStreamData(type, streamresults[0], streamresults[1], cid, cnt);
     }
 
     @SuppressWarnings("deprecation")
@@ -274,7 +297,15 @@ public class UpdateBaseProc extends VoltProcedure {
         }
     }
 
-    private void validateStreamData(VoltTable exview, VoltTable shadowview, byte cid, long cnt) {
+    private void validateStreamData(String type, VoltTable exview, VoltTable shadowview, byte cid, long cnt) {
+        if (type == "delete") {
+            if (exview.getRowCount() == 0) {
+                return;      // success
+            } else {
+                throw new VoltAbortException("Export view has "+exview.getRowCount()+" rows for this id. Zero expected after delete");
+            }
+        }
+
         if (exview.getRowCount() != 1)
             throw new VoltAbortException("Export view has "+exview.getRowCount()+" entries of the same cid, that should not happen.");
         VoltTableRow row0 = exview.fetchRow(0);
@@ -298,19 +329,19 @@ public class UpdateBaseProc extends VoltProcedure {
 
             if (v_entries != shadow_entries)
                 throw new VoltAbortException("View entries:" + v_entries +
-                    " materialized view aggregation does not match the number of shadow entries:" + shadow_entries + " for cid:" + cid);
+                        " materialized view aggregation does not match the number of shadow entries:" + shadow_entries + " for cid:" + cid);
 
             if (v_max != shadow_max)
                 throw new VoltAbortException("View v_max:" + v_max +
-                    " materialized view aggregation does not match the shadow max:" + shadow_max + " for cid:" + cid);
+                        " materialized view aggregation does not match the shadow max:" + shadow_max + " for cid:" + cid);
 
             if (v_min != shadow_min)
                 throw new VoltAbortException("View v_min:" + v_min +
-                    " materialized view aggregation does not match the shadow min:" + shadow_min + " for cid:" + cid);
+                        " materialized view aggregation does not match the shadow min:" + shadow_min + " for cid:" + cid);
 
             if (v_sum != shadow_sum)
                 throw new VoltAbortException("View v_sum:" + v_sum +
-                    " materialized view aggregation does not match the shadow sum:" + shadow_sum + " for cid:" + cid);
+                        " materialized view aggregation does not match the shadow sum:" + shadow_sum + " for cid:" + cid);
 
             voltQueueSQL(p_upsertExViewShadowData, cid, shadow_entries, shadow_max, shadow_min, shadow_sum);
         } else {
@@ -320,5 +351,5 @@ public class UpdateBaseProc extends VoltProcedure {
         // update the shadow table with the new matching values and return
         voltExecuteSQL();
         return;
-     }
+    }
 }

@@ -77,7 +77,7 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    benchmark
+    async-benchmark
 }
 
 # Asynchronous benchmark sample
@@ -92,9 +92,9 @@ function async-benchmark() {
     java -ea -classpath txnid.jar:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=20 \
+        --duration=100 \
         --servers=localhost \
-        --threads=1 \
+        --threads=20 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
@@ -104,8 +104,8 @@ function async-benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=20 \
         --usecompression=false \
-        --allowinprocadhoc=false \
-        --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
+        --allowinprocadhoc=false
+        # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
