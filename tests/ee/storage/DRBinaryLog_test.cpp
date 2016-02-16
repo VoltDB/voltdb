@@ -48,6 +48,9 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 6;
 
+const int BUFFER_SIZE = 4096;
+const int LARGE_BUFFER_SIZE = 32768;
+
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
 }
@@ -59,6 +62,9 @@ public:
       , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
             NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0))
     {
+        m_drStream.setDefaultCapacity(BUFFER_SIZE);
+        m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
+
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
@@ -187,6 +193,13 @@ public:
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
         table->insertTuple(temp_tuple);
         TableTuple tuple = table->lookupTupleByValues(temp_tuple);
+        assert(!tuple.isNullTuple());
+        return tuple;
+    }
+
+    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple) {
+        table->updateTuple(oldTuple, newTuple);
+        TableTuple tuple = table->lookupTupleByValues(newTuple);
         assert(!tuple.isNullTuple());
         return tuple;
     }
@@ -691,6 +704,121 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNoninlineVarchar) {
     m_tableReplica->addIndex(replicaIndex);
 
     simpleDeleteTest();
+}
+
+TEST_F(DRBinaryLogTest, InsertOverBufferLimit) {
+    createIndexes();
+    const int total = 400;
+    int spHandle = 1;
+
+    beginTxn(spHandle, spHandle, spHandle-1, spHandle);
+    try {
+        for (int i = 1; i <= total; i++) {
+            insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        }
+    } catch (SerializableEEException e) {
+        endTxn(false);
+        spHandle++;
+
+        for (int i = 1; i <= total; i++, spHandle++) {
+            beginTxn(spHandle, spHandle, spHandle-1, spHandle);
+            insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            endTxn(true);
+        }
+
+        return;
+    }
+
+    ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, UpdateOverBufferLimit) {
+    createIndexes();
+    const int total = 150;
+
+    beginTxn(99, 99, 98, 70);
+    for (int i = 0; i < total; i++) {
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+    }
+    endTxn(true);
+
+    flushAndApply(99);
+
+    // Update all tuples
+    beginTxn(100, 100, 99, 71);
+    try {
+        // Update all rows to new values and update them back to the original
+        // values. It would overflow the DR buffer limit and cause the txn to
+        // roll back.
+        for (int i = 0; i < total; i++) {
+            TableTuple newTuple = prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i);
+            TableTuple oldTuple = m_table->lookupTupleByValues(newTuple);
+            newTuple.setNValue(1, ValueFactory::getBigIntValue(i+total));
+            updateTuple(m_table, oldTuple, newTuple);
+        }
+        for (int i = 0; i < total; i++) {
+            TableTuple newTuple = prepareTempTuple(m_table, 42, i+total, "349508345.34583", "a thing", "a totally different thing altogether", i);
+            TableTuple oldTuple = m_table->lookupTupleByValues(newTuple);
+            newTuple.setNValue(1, ValueFactory::getBigIntValue(i));
+            updateTuple(m_table, oldTuple, newTuple);
+        }
+    } catch (SerializableEEException e) {
+        endTxn(false);
+
+        // Make sure all changes rolled back
+        for (int i = 0; i < total; i++) {
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_FALSE(tuple.isNullTuple());
+
+            TableTuple tuple2 = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i+total, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_TRUE(tuple2.isNullTuple());
+        }
+
+        return;
+    }
+    ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
+    createIndexes();
+    const int total = 2000;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(true);
+    }
+
+    flushAndApply(spHandle - 1);
+
+    // Update all tuples
+    beginTxn(spHandle, spHandle, spHandle-1, spHandle);
+    try {
+        // Delete all rows. It would overflow the DR buffer limit and cause the
+        // txn to roll back.
+        for (int i = 1; i <= total; i++) {
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            deleteTuple(m_table, tuple);
+        }
+    } catch (SerializableEEException e) {
+        endTxn(false);
+        spHandle++;
+
+        // Make sure all changes rolled back, try to delete each tuple in single
+        // txn to make sure indexes are also correct
+        for (int i = 1; i <= total; i++, spHandle++) {
+            beginTxn(spHandle, spHandle, spHandle-1, spHandle);
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_FALSE(tuple.isNullTuple());
+
+            deleteTuple(m_table, tuple);
+            endTxn(true);
+        }
+
+        return;
+    }
+    ASSERT_TRUE(false);
 }
 
 int main() {

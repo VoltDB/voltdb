@@ -440,6 +440,23 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
 
     }
 
+    // Write to DR stream before everything else to ensure nothing gets left in
+    // the index if the append fails.
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target);
+    }
+
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         increaseStringMemCount(target.getNonInlinedMemorySize());
     }
@@ -460,23 +477,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     if (!tryInsertOnAllIndexes(&target)) {
+        // Roll the DR stream back because the undo action is not registered
+        m_surgeon.DRRollback(drMark);
         throw ConstraintFailureException(this, source, TableTuple(),
                 CONSTRAINT_TYPE_UNIQUE);
-    }
-
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, target);
-
-    DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
-    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -575,6 +579,25 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
+    // Write to the DR stream before doing anything else to ensure we don't
+    // leave a half updated tuple behind in case this throws.
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
+    }
+
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
+    }
+
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
@@ -605,23 +628,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
-    }
-
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn())
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues);
-
-    DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = 0;
-    if (drStream && !m_isMaterialized && m_drEnabled) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -761,14 +767,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // The tempTuple is forever!
     assert(&target != &m_tempTuple);
 
-    // Just like insert, we want to remove this tuple from all of our indexes
-    deleteFromAllIndexes(&target);
-
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target, fallible);
-    }
-
+    // Write to the DR stream before doing anything else to ensure nothing will
+    // be left forgotten in case this throws.
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = 0;
@@ -779,6 +779,14 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
         drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
+    }
+
+    // Just like insert, we want to remove this tuple from all of our indexes
+    deleteFromAllIndexes(&target);
+
+    // handle any materialized views
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleDelete(target, fallible);
     }
 
     if (fallible) {
