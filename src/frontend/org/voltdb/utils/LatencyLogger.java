@@ -105,21 +105,23 @@ public class LatencyLogger {
                     }
                     Date now = new Date(table.getLong(0));
                     Histogram newHistogram = AbstractHistogram.fromCompressedBytes(table.getVarbinary(4), CompressionStrategySnappy.INSTANCE);
-                    if (m_histogramData != null) {
-                        newHistogram.subtract(m_histogramData);
-                    }
+                    Histogram diffHistogram;
+                    if (m_histogramData == null)
+                         diffHistogram = newHistogram;
+                     else
+                         diffHistogram = Histogram.diff(newHistogram, m_histogramData);
 
-                    long totalCount = newHistogram.getTotalCount();
+                    long totalCount = diffHistogram.getTotalCount();
                     if (totalCount > 0)
                         System.out.printf("%12s, %10d, %10d, %8.2fms, %8.2fms, %8.2fms, %8.2fms, %8.2fms\n",
                                           sdf.format(now),
                                           totalCount,
                                           (totalCount / duration),
-                                          (newHistogram.getValueAtPercentile(95.0D) / 1000.0D),
-                                          (newHistogram.getValueAtPercentile(99) / 1000.0D),
-                                          (newHistogram.getValueAtPercentile(99.9) / 1000.0D),
-                                          (newHistogram.getValueAtPercentile(99.99) / 1000.0D),
-                                          (newHistogram.getValueAtPercentile(99.999) / 1000.0D));
+                                          (diffHistogram.getValueAtPercentile(95.0D) / 1000.0D),
+                                          (diffHistogram.getValueAtPercentile(99) / 1000.0D),
+                                          (diffHistogram.getValueAtPercentile(99.9) / 1000.0D),
+                                          (diffHistogram.getValueAtPercentile(99.99) / 1000.0D),
+                                          (diffHistogram.getValueAtPercentile(99.999) / 1000.0D));
                     else
                         System.out.printf("%12s, %10d, %10d, %8.2fms, %8.2fms, %8.2fms, %8.2fms, %8.2fms\n",
                                           sdf.format(now),
