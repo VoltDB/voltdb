@@ -41,6 +41,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
@@ -94,9 +95,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -782,12 +783,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
-        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
-                                        exportSequenceNumbers, drTupleStreamInfo,
-                                        remoteDCLastIds);
+            ExtensibleSnapshotDigestData extraSnapshotData) {
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId, extraSnapshotData);
     }
 
     /*
