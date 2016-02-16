@@ -136,7 +136,7 @@ class VoltDatabase:
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
                                   (curr['hostname'], HTTPListener.__PORT__, self.database_id, action)
                 response = requests.put(url)
-                if (response.status_code != requests.codes.ok):
+                if response.status_code != requests.codes.ok:
                     failed = True
                 server_status[curr['hostname']] = json.loads(response.text)['statusstring']
             except Exception, err:
@@ -145,7 +145,10 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status), 200)
+            url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
+                  (curr['hostname'], HTTPListener.__PORT__, self.database_id)
+            response = requests.get(url)
+            return create_response(response.text, 200)
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
 
@@ -278,7 +281,6 @@ class VoltDatabase:
         try:
             my_env = os.environ.copy()
             my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
-            print "VOLTDB_OPTS: " + my_env['VOLTDB_OPTS']
             return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                           env=my_env, preexec_fn=ignore_signals, close_fds=True)
         finally:
