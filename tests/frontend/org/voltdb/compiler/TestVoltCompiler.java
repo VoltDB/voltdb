@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -64,8 +66,6 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -4258,7 +4258,7 @@ public class TestVoltCompiler extends TestCase {
                 "export table table one;"
                 );
 
-        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
                 "export table books;"
                 );
 
@@ -4343,7 +4343,7 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar ();"
                 );
 
-        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 

@@ -676,6 +676,39 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
+    public void testCreateStreamNegative() throws Exception {
+        File jarOut = new File("createStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // with primary key
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT PK_TEST1 PRIMARY KEY (D1));\n",
+                // unique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 UNIQUE (D1));\n",
+                // assumeunique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 ASSUMEUNIQUE (D1));\n",
+                // with limit
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100);\n",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
     public void testExportDRTable() {
         File jarOut = new File("exportDrTables.jar");
         jarOut.deleteOnExit();
