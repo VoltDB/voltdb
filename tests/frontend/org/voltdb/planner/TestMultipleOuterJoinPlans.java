@@ -31,6 +31,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -400,6 +401,13 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
                 "R3 FULL JOIN R1 ON R3.A = R1.A WHERE R3.C IS NULL");
         n = pn.getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, ExpressionType.OPERATOR_IS_NULL, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN);
+        String json = (new PlanNodeTree(pn)).toJSONString();
+
+        // Same Join as above but using FULL OUTER JOIN syntax
+        pn = compile("select * FROM  " +
+                "R3 FULL OUTER JOIN R1 ON R3.A = R1.A WHERE R3.C IS NULL");
+        String json1 = (new PlanNodeTree(pn)).toJSONString();
+        assertEquals(json, json1);
 
         // FULL NLJ. R3.A is an index column but R3.A > 0 expression is used as a PREDICATE only
         pn = compile("select * FROM  " +

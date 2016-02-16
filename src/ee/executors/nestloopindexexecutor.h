@@ -50,7 +50,7 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractjoinexecutor.h"
 
 
 namespace voltdb {
@@ -69,11 +69,11 @@ class TableTuple;
  * This executor is faster than HashMatchJoin and MergeJoin if only one
  * of underlying tables has low selectivity.
  */
-class NestLoopIndexExecutor : public AbstractExecutor
+class NestLoopIndexExecutor : public AbstractJoinExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractJoinExecutor(engine, abstract_node)
         , m_indexNode(NULL)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
     { }
@@ -81,23 +81,16 @@ public:
     ~NestLoopIndexExecutor();
 
 protected:
+
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    // Write tuple to the output table. If inline aggregate is set and reached the limit
-    // return TRUE indicating the end of iteration. Otherwise return FALSE
-    bool outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
-
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
-    StandAloneTupleStorage m_null_outer_tuple;
-    StandAloneTupleStorage m_null_inner_tuple;
     StandAloneTupleStorage m_indexValues;
-    AggregateExecutorBase* m_aggExec;
 };
 
 }

@@ -80,7 +80,7 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
-    friend class TableView;
+    friend class TableTupleFilter;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;

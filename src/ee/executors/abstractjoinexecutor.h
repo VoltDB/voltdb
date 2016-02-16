@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,36 +43,47 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESEQSCANEXECUTOR_H
-#define HSTORESEQSCANEXECUTOR_H
+#ifndef HSTOREABSTRACTJOINEXECUTOR_H
+#define HSTOREABSTRACTJOINEXECUTOR_H
 
 #include "common/common.h"
-#include "common/valuevector.h"
+#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
-#include "execution/VoltDBEngine.h"
 
-namespace voltdb
-{
-    class AggregateExecutorBase;
-    struct CountingPostfilter;
+namespace voltdb {
 
-    class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-            , m_aggExec(NULL)
-        {}
+class AbstractPlanNode;
+class AggregateExecutorBase;
+struct CountingPostfilter;
+class ProgressMonitorProxy;
+class Table;
+class TempTableLimits;
+class VoltDBEngine;
+
+/**
+ *  Abstract base class for all join executors
+ */
+class AbstractJoinExecutor : public AbstractExecutor {
     protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
+        // Constructor
+        AbstractJoinExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+            AbstractExecutor(engine, abstract_node) { }
 
-    private:
+        bool p_init(AbstractPlanNode*, TempTableLimits* limits);
 
-        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+        void p_init_null_tuples(Table* inner_table, Table* outer_table);
+
+        // Write tuple to the output table
+        void outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp);
+
+        JoinType m_joinType;
+
+        StandAloneTupleStorage m_null_outer_tuple;
+        StandAloneTupleStorage m_null_inner_tuple;
 
         AggregateExecutorBase* m_aggExec;
-    };
+};
+
 }
 
 #endif

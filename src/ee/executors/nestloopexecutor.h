@@ -48,34 +48,22 @@
 
 #include "common/common.h"
 #include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractjoinexecutor.h"
 
 namespace voltdb {
-
-class AggregateExecutorBase;
-class ProgressMonitorProxy;
-class TableTuple;
 
 /**
  *
  */
-class NestLoopExecutor : public AbstractExecutor {
+class NestLoopExecutor : public AbstractJoinExecutor {
     public:
         NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractExecutor(engine, abstract_node) { }
+            AbstractJoinExecutor(engine, abstract_node) { }
     private:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
+
+        bool p_init(AbstractPlanNode*, TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        // Write tuple to the output table. If inline aggregate is set and reached the limit
-        // return TRUE indicating the end of iteration. Otherwise return FALSE
-        bool outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
-
-        StandAloneTupleStorage m_null_outer_tuple;
-        StandAloneTupleStorage m_null_inner_tuple;
-
-        AggregateExecutorBase* m_aggExec;
 };
 
 }
