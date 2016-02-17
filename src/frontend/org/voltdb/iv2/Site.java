@@ -404,17 +404,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void appendApplyBinaryLogTxns(int srcClusterId, int srcPartitionId, DRConsumerDrIdTracker tracker)
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId, DRConsumerDrIdTracker tracker)
         {
-            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(srcClusterId);
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
                 clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
-                clusterSources.put(srcPartitionId, tracker);
+                clusterSources.put(producerPartitionId, tracker);
             }
             else {
-                DRConsumerDrIdTracker targetTracker = clusterSources.get(srcPartitionId);
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
                 if (targetTracker == null) {
-                    clusterSources.put(srcPartitionId, tracker);
+                    clusterSources.put(producerPartitionId, tracker);
                 }
                 else {
                     targetTracker.appendTracker(tracker);
