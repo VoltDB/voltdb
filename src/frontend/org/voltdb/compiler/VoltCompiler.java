@@ -1726,7 +1726,7 @@ public class VoltCompiler {
         if (tableref.getIndexes().size() > 0) {
             compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
                     "Export tables can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Export tables or streams cannot be configured with indexes");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make
