@@ -1697,7 +1697,7 @@ public class VoltCompiler {
         }
 
         // streams cannot have tuple limits
-        if (tableref.getTuplelimit() >= 0) {
+        if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
             throw new VoltCompilerException("Streams cannot have row limits configured");
         }
         Column pc = tableref.getPartitioncolumn();

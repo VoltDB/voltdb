@@ -4266,7 +4266,7 @@ public class TestVoltCompiler extends TestCase {
                 "export table table one;"
                 );
 
-        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
+        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
                 "export table books;"
                 );
 
@@ -4351,7 +4351,7 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar ();"
                 );
 
-        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
+        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 
