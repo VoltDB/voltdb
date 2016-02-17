@@ -136,7 +136,7 @@ class VoltDatabase:
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
                                   (curr['hostname'], HTTPListener.__PORT__, self.database_id, action)
                 response = requests.put(url)
-                if (response.status_code != requests.codes.ok):
+                if response.status_code != requests.codes.ok:
                     failed = True
                 server_status[curr['hostname']] = json.loads(response.text)['statusstring']
             except Exception, err:
@@ -145,7 +145,10 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status), 200)
+            url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
+                  (curr['hostname'], HTTPListener.__PORT__, self.database_id)
+            response = requests.get(url)
+            return create_response(response.text, 200)
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
 
@@ -191,7 +194,7 @@ class VoltDatabase:
         if (retcode == 0):
             return create_response('Success', 200)
         else:
-            return create_response(Log.get_error_log(), 200)
+            return create_response(Log.get_error_log(), 500)
             # return create_response('Error starting server', 500)
     
     def is_voltserver_running(self):
@@ -423,9 +426,9 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status) ,500)
+            return create_response('There were errors stopping servers: ' + str(server_status) ,500)
         else:
-            return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Stop request sent successfully to servers: ' + str(server_status), 200)
 
     def kill_server(self, server_id):
         try:

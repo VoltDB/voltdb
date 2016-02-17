@@ -503,6 +503,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_DISTANCE_POLYGON_POINT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POLYGON_POINT>(*arguments);
             break;
+        case FUNC_VOLT_DWITHIN_POINT_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POINT_POINT>(*arguments);
+            break;
+        case FUNC_VOLT_DWITHIN_POLYGON_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POLYGON_POINT>(*arguments);
+            break;
         default:
             return NULL;
         }
