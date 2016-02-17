@@ -5,12 +5,12 @@
         <jsonapi enabled="true" />
     </httpd>
     <export>
-        <configuration stream="oldfile" enabled="true" type="file">
+        <configuration target="oldfile" enabled="true" type="file">
             <property name="type">csv</property>
             <property name="nonce">MyExport</property>
             <property name="period">5</property>
         </configuration>
-        <configuration stream="newfile" enabled="true" type="file">
+        <configuration target="newfile" enabled="true" type="file">
             <property name="type">csv</property>
             <property name="nonce">Bids</property>
             <property name="period">3</property>

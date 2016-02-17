@@ -1695,6 +1695,11 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         }
+
+        // streams cannot have tuple limits
+        if (tableref.getTuplelimit() >= 0) {
+            throw new VoltCompilerException("Streams cannot have row limits configured");
+        }
         Column pc = tableref.getPartitioncolumn();
         //Get views
         List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
@@ -1721,7 +1726,7 @@ public class VoltCompiler {
         if (tableref.getIndexes().size() > 0) {
             compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
                     "Export tables can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Table with indexes configured as an export table");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make

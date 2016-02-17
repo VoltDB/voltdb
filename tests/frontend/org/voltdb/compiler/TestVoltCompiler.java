@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -51,6 +53,7 @@ import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -63,8 +66,6 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -4200,10 +4201,28 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "Partial index \"IDX_T_IDNUM\" with subquery expression(s) is not supported.");
 }
 
-    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName, String target) {
+        Connector connector =  db.getConnectors().get(target);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
+    }
+
+    private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
+        return getConnectorTableInfoFor(db, tableName, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+    }
+
+    private String getPartitionColumnInfoFor( Database db, String tableName) {
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) return null;
+        if (table.getPartitioncolumn() == null) return null;
+        return table.getPartitioncolumn().getName();
+    }
+
+    private  MaterializedViewInfo getViewInfoFor( Database db, String tableName, String viewName) {
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) return null;
+        if (table.getViews() == null) return null;
+        return table.getViews().get(viewName);
     }
 
     public void testGoodExportTable() throws Exception {
@@ -4247,7 +4266,7 @@ public class TestVoltCompiler extends TestCase {
                 "export table table one;"
                 );
 
-        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
                 "export table books;"
                 );
 
@@ -4274,6 +4293,73 @@ public class TestVoltCompiler extends TestCase {
               "export table geogs to stream geog_stream;\n";
         badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
                                   ddl);
+    }
+
+    public void testGoodCreateStream() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create stream e1 (id integer, f1 varchar(16));"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "create stream e1 (id integer, f1 varchar(16));",
+                "create stream e2 partition on column id (id integer not null, f1 varchar(16));",
+                "create stream e3 export to target bar (id integer, f1 varchar(16));",
+                "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
+                "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
+                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
+        assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
+        assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
+        assertNotNull(getConnectorTableInfoFor(db, "e4", "bar"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e4"));
+        assertNotNull(getConnectorTableInfoFor(db, "e5", "bar"));
+        assertEquals("ID", getPartitionColumnInfoFor(db,"e5"));
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE STREAM User_Stream Partition On Column UserId"
+                + " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);",
+                "CREATE VIEW User_Logins (UserId, LoginCount)"
+                + "AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;",
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)"
+                + "AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;"
+                );
+        assertNotNull(getViewInfoFor(db,"User_Stream","User_Logins"));
+        assertNotNull(getViewInfoFor(db,"User_Stream","User_LoginLastTime"));
+    }
+
+    public void testBadCreateStream() throws Exception {
+
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
+                "create stream 1table_name_not_valid (id integer, f1 varchar(16));"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+               "create stream foo export to target bar1,bar2 (i bigint not null);"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+                "create stream foo,foo2 export to target bar (i bigint not null);"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+                "create stream foo export to target bar ();"
+                );
+
+        badDDLAgainstSimpleSchema("Export tables or streams cannot be configured with indexes.*",
+                "create stream foo export to target bar (id integer, primary key(id));"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as an export table.*",
+                "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
     }
 
     public void testGoodDRTable() throws Exception {
