@@ -267,7 +267,7 @@ class TableTupleFilter_iter
 
     uint64_t& dereference() const
     {
-        return (uint64_t&)m_tupleIdx;
+        return m_tupleIdx;
     }
 
     // Forward Iteration Support
@@ -281,7 +281,7 @@ class TableTupleFilter_iter
     }
 
     const TableTupleFilter* m_tableFilter;
-    uint64_t m_tupleIdx;
+    mutable uint64_t m_tupleIdx;
 };
 
 /**
@@ -354,7 +354,7 @@ class TableTupleFilter_const_iter
 
     uint64_t const& dereference() const
     {
-        return (uint64_t const&)m_tupleIdx;
+        return m_tupleIdx;
     }
 
     // Forward Iteration Support
