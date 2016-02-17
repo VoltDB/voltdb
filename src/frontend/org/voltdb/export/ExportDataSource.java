@@ -494,13 +494,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 }
                             }, uso, false));
                 } catch (IOException e) {
-                    if (e.getMessage().contains("No space left on device")) {
-                        VoltDB.crashLocalVoltDB("Unable to write to export overflow, no space left on device.");
-                    }
-                    exportLog.error(e);
-                    if (!deleted.get()) {
-                        cont.discard();
-                    }
+                    VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
             } else {
                 /*
