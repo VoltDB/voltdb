@@ -781,6 +781,11 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     endTxn(m_engine, true);
 
+    TableTuple existedTuple(m_table->schema());
+    boost::shared_array<char> existedData;
+    existedData = deepCopy(second_tuple, existedTuple, existedData);
+    StackCleaner secondExistingTupleCleaner(existedTuple);
+
     // delete the second row inserted in the last write
     beginTxn(m_engine, 112, 102, 101, 73);
     deleteTuple(m_table, second_tuple);
@@ -801,7 +806,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
     tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(existedTuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
