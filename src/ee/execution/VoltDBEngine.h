@@ -229,7 +229,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
         /** check if this value hashes to the local partition */
-        bool isLocalSite(const NValue& value);
+        bool isLocalSite(const NValue& value) const;
+
+        /** return partitionId for the provided hash */
+        int32_t getPartitionForPkHash(const int32_t pkHash) const;
+
+        /** check if this hash is in the local partition */
+        bool isLocalSite(const int32_t pkHash) const;
 
         // -------------------------------------------------
         // Non-transactional work methods
@@ -399,6 +405,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t getPartitionId() const {
             return m_partitionId;
         }
+
+    protected:
+        void setHashinator(TheHashinator* hashinator);
 
     private:
         /*
