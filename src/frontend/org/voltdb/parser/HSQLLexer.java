@@ -38,7 +38,7 @@ public class HSQLLexer extends SQLPatternFactory
         SPF.statementLeader(
             SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
             SPF.optional(SPF.capture("unique", SPF.tokenAlternatives("unique", "assumeunique"))),
-            SPF.capture("object", SPF.tokenAlternatives("table", "view", "index")),
+            SPF.capture("object", SPF.tokenAlternatives("table", "view", "index" , "stream")),
             SPF.capture("name", SPF.databaseObjectName()),  // table/view/index name
             SPF.optional(SPF.clause(
                     SPF.token("on"),
@@ -73,6 +73,7 @@ public class HSQLLexer extends SQLPatternFactory
             if (noun == null) {
                 return null;
             }
+            boolean createStream = noun.equals(HSQLDDLInfo.Noun.STREAM);
 
             String name = matcher.group("name");
             if (name == null) {
@@ -99,7 +100,7 @@ public class HSQLLexer extends SQLPatternFactory
                 }
             }
 
-            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists);
+            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists, createStream);
         }
         return null;
     }

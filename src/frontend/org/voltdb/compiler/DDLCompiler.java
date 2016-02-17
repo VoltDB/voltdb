@@ -276,10 +276,16 @@ public class DDLCompiler {
                     if (thisStmtDiff != null) {
                         applyDiff(thisStmtDiff);
                     }
+
+                    // special treatment for stream syntax
+                    if (ddlStmtInfo.creatStream) {
+                       processCreateStreamStatement(stmt, db, whichProcs);
+                    }
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
                 }
+
             }
             stmt = getNextStatement(reader, m_compiler);
         }
@@ -1060,6 +1066,93 @@ public class DDLCompiler {
 
         // Not a VoltDB-specific DDL statement.
         return false;
+    }
+
+    /**
+     * Process a VoltDB-specific create stream DDL statement
+     *
+     * @param stmt
+     *            DDL statement string
+     * @param db
+     * @param whichProcs
+     * @throws VoltCompilerException
+     */
+    private void processCreateStreamStatement(DDLStatement stmt, Database db, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
+        String statement = stmt.statement;
+        Matcher statementMatcher = SQLParser.matchCreateStream(statement);
+        if (statementMatcher.matches()) {
+            // check the table portion
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            String targetName = null;
+            String columnName = null;
+
+            // Parse the EXPORT and PARTITION clauses.
+            if ((statementMatcher.groupCount() > 1) &&
+                (statementMatcher.group(2) != null) &&
+                (!statementMatcher.group(2).isEmpty())) {
+                String clauses = statementMatcher.group(2);
+                Matcher matcher = SQLParser.matchAnyCreateStreamStatementClause(clauses);
+                int start = 0;
+                while ( matcher.find(start)) {
+                    start = matcher.end();
+
+                    if (matcher.group(1) != null) {
+                        // Add target info if it's an Export clause. Only one is allowed
+                        if (targetName != null) {
+                            throw m_compiler.new VoltCompilerException(
+                                "Only one Export clause is allowed for CREATE STREAM.");
+                        }
+                        targetName = matcher.group(1);
+                    }
+                    else {
+                        // Add partition info if it's a PARTITION clause. Only one is allowed.
+                        if (columnName != null) {
+                            throw m_compiler.new VoltCompilerException(
+                                "Only one PARTITION clause is allowed for CREATE STREAM.");
+                        }
+                        columnName = matcher.group(2);
+                    }
+                }
+            }
+
+            // process partition if specified
+            if (columnName != null) {
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML != null) {
+                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                    // Column validity check done by VoltCompiler in post-processing
+
+                    // mark the table as dirty for the purposes of caching sql statements
+                    m_compiler.markTableAsDirty(tableName);
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid PARTITION statement: table %s does not exist", tableName));
+                }
+            }
+
+            // process export
+            targetName = (targetName != null) ? checkIdentifierStart(
+                    targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
+
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
+                } else {
+                    tableXML.attributes.put("export", targetName);
+                }
+            } else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid EXPORT statement: table %s was not present in the catalog.", tableName));
+            }
+        } else {
+            throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
+                    + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); ",
+                    statement.substring(0, statement.length() - 1)));
+        }
     }
 
     private class CreateProcedurePartitionData {
