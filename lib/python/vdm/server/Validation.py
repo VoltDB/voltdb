@@ -95,7 +95,7 @@ class ServerInputs(Inputs):
     """
     json = {
         'name': [
-            DataRequired('Server name is required.'),
+            Optional(),
             Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'hostname': [
@@ -309,7 +309,7 @@ schema = {
                     "properties": {
                         "prefix": {
                             "id": "prefix",
-                            "type": "string"
+                            "type": "boolean"
                         }
                     },
                     "additionalProperties": False
@@ -391,7 +391,8 @@ schema = {
                 },
                 "prefix": {
                     "id": "prefix",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_.]+$"
                 },
                 "enabled": {
                     "id": "enabled",
@@ -479,6 +480,7 @@ schema = {
                                     "stream": {
                                         "id": "stream",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "enabled": {
                                         "id": "enabled",
@@ -549,7 +551,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
+                                        "enum": ["kafka", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
@@ -557,7 +559,7 @@ schema = {
                                     },
 
                                 },
-                                 "required": ["module"]
+                                 "required": ["format"]
                             }
                         ]
                     }
@@ -601,7 +603,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 4000
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
@@ -617,8 +619,8 @@ schema = {
                         "maxsize": {
                             "id": "maxsize",
                             "type": "integer",
-                            "minimum": 0,
-                            "maxvalue": 2147483647
+                            "minimum": 1,
+                            "maximum": 2147483647
                         }
                     },
                     "additionalProperties": False
@@ -675,7 +677,6 @@ schema = {
                                 "size": {
                                     "id": "size",
                                     "type": "string",
-                                    "minimum": 0,
                                 }
                             },
                             "additionalProperties": False
@@ -697,7 +698,9 @@ schema = {
                                             },
                                             "size": {
                                                 "id": "size",
-                                                "type": "string"
+                                                "type": "string",
+                                                "minimum": 0,
+                                                "maximum": 2147483647
                                             }
                                         },
                                         "additionalProperties": False
@@ -754,7 +757,7 @@ schema = {
                     "id": "port",
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 65536
+                    "maximum": 65535
                 },
                 "connection": {
                     "id": "connection",
