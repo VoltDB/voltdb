@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package kafkaimporter.client.kafkaimporter;
+package client.kafkaimporter;
 
 import java.io.IOException;
 
