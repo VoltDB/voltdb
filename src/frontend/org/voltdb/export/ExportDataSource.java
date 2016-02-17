@@ -513,7 +513,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //to a file. @Quiesce or blocking snapshot will do the sync
                 m_committedBuffers.sync(true);
             } catch (IOException e) {
-                exportLog.error(e);
+                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
         pollImpl(m_pollFuture);
