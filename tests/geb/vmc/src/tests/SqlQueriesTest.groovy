@@ -680,7 +680,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         List<String> unresolvedVariableNames = []
         for (String key : parsedText.keySet()) {
             if (key.startsWith("__")) {
-                Object value = getVariableValues(parsedText.get(key), true)
+                Object value = resolveVariableValues(parsedText.get(key), false, true)
                 sqlQueryVariables.put(key, value)
                 if (value instanceof String && value.contains("__")) {
                     unresolvedVariableNames.add(key)
@@ -690,9 +690,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         // For any variables that were defined using other variables that had
         // not yet been defined, resolve them now
         for (String key : unresolvedVariableNames) {
-            sqlQueryVariables.put(key, getVariableValues(sqlQueryVariables.get(key)))
+            sqlQueryVariables.put(key, resolveVariableValues(sqlQueryVariables.get(key)))
         }
-        return (String) getVariableValues(parsedText.sqlCmd)
+        return (String) resolveVariableValues(parsedText.sqlCmd)
     }
 
     /**
@@ -701,20 +701,31 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      * @param text - normally, the text to be searched, which is then returned
      * after resolving any unresolved variables; however, may also be a
      * non-String Object, in which case it is simply returned intact.
+     * @param gettingResult - should be true when resolving variable values in
+     * a result (as opposed to in a query), in which case, a single variable
+     * may be used to represent a non-String Object (typically, a Map), which
+     * will then be returned as said Object; when false, a String will always
+     * be returned (assuming that <i>text</i> is a String).
      * @param ignoreUnknownVariables - when true, no WARNING message will be
      * printed, when an unkown variable is encountered (optional, default false).
      * @return the original <i>text</i>, with any variable names resolved to
      * their values.
      */
-    static Object getVariableValues(Object text, boolean ignoreUnknownVariables=false) {
+    static Object resolveVariableValues(Object text, boolean gettingResult=false,
+                                        boolean ignoreUnknownVariables=false) {
         if (!(text instanceof String)) {
+            // TODO: at some point, we might want to handle Maps differently,
+            // to allow variables to be defined within a "result" Map; but
+            // for now, that is not supported
             return text
         }
         String result = text
-        for (Matcher variables = result =~ /(__\w+)/; variables.find(); variables = result =~ /(__\w+)/ ) {
+        // Used to prevent infinite loops via recursive variable definitions
+        int maxCount = 100, count = 0
+        for (Matcher variables = result =~ /(__\w+)/; count++ < maxCount && variables.find(); variables = result =~ /(__\w+)/ ) {
             String variable = variables.group(1)
-            // Special case, where the entire text consists of one variable
-            if (variable.equals(text)) {
+            // Special case, for a result whose entire text consists of one variable
+            if (gettingResult && variable.equals(text)) {
                 return sqlQueryVariables.get(variable)
             }
             Object value = sqlQueryVariables.get(variable);
@@ -725,6 +736,10 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                 break
             }
             result = result.replaceAll(variable, value.toString())
+        }
+        if (count >= maxCount) {
+            println "\nWARNING: this query or result contains an excessively nested, probably recursive, variable definition:\n  " +
+                    text + " (-> " + result + " )"
         }
         return result
     }
@@ -740,7 +755,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
         when: 'get the Query Result, and Expected Result'
         def qResult = page.getQueryResult()
-        def expectedResult = getVariableValues(expectedResponse.result)
+        def expectedResult = resolveVariableValues(expectedResponse.result, true)
 
         debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status

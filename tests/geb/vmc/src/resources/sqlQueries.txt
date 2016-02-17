@@ -44,7 +44,7 @@
 # For the columns of each data type, the insert values used in most tests:
     "__standard_int_values"     :"1, 2, 3, 4, 5, 6, 7, 8, 9, 10,",
     "__standard_time_values"    :"'2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012',",
-    "__standard_float_values"   :"13, 14, 15, 16,",
+    "__standard_float_values"   :"13.3, 14.4, 15.5, 16.6,",
     "__standard_varchar_values" :"'a', 'b', 'c', 'd', 'e', 'f',\n ",
     "__standard_point_values"   :"PointFromText('POINT(-23 23)'), PointFromText('POINT(24 -24)'),",
     "__standard_polygon_values" :"PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))'), PolygonFromText('POLYGON((26 22, 25 23, 25 22, 26 22))')",
@@ -56,20 +56,20 @@
 # All of the usual insert values:
     "__standard_insert_values"  :"__standard_num_values __standard_non_num_values",
 # Insert values in the slightly different format often used with Stored Procedures (with fewer commas and quotes):
-    "__stored_proc_non_geo_values"     :"1 2 3 4 5 6 7 8  9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13 14 15 16 a b c d e f\n ",
-    "__stored_proc_mod_non_geo_values" :"1 3 4 5 6 7 8 9 10 11 '2012-07-19 01:02:12.000012' '2013-10-30 23:22:13.000013' 14 15 16 17 b c d e f g\n ",
-    "__stored_proc_null_non_geo_values":"1 2 null 4 null 6 null 8 null 10 null '2012-07-19 01:02:12.000012' null 14 null 16 null b null d null f\n ",
+    "__stored_proc_non_geo_values"     :"1 2 3 4 5 6 7 8  9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13.3 14.4 15.5 16.6 a b c d e f\n ",
+    "__stored_proc_mod_non_geo_values" :"1 3 4 5 6 7 8 9 10 11 '2012-07-19 01:02:12.000012' '2013-10-30 23:22:13.000013' 14.4 15.5 16.6 17.7 b c d e f g\n ",
+    "__stored_proc_null_non_geo_values":"1 2 null 4 null 6 null 8 null 10 null '2012-07-19 01:02:12.000012'  null  14.4  null  16.6 null b null d null f\n ",
     "__stored_proc_geo_values"         :"'POINT(-23 23)' 'POINT(24 -24)' 'POLYGON((25 22, 25 21, 26 22, 25 22))' 'POLYGON((26 22, 25 23, 25 22, 26 22))'",
     "__stored_proc_mod_geo_values"     :"'POINT(24 -24)' 'POINT(-25 25)' 'POLYGON((26 22, 25 23, 25 22, 26 22))' 'POLYGON((27 22, 27 21, 28 22, 27 22))'",
     "__stored_proc_null_geo_values"    :" null           'POINT(24 -24)'  null                                   'POLYGON((26 22, 25 23, 25 22, 26 22))'",
     "__stored_proc_insert_values"      :"__stored_proc_non_geo_values __stored_proc_geo_values",
     "__stored_proc_mod_insert_values"  :"__stored_proc_mod_non_geo_values __stored_proc_mod_geo_values",
     "__stored_proc_null_insert_values" :"__stored_proc_null_non_geo_values __stored_proc_null_geo_values",
-# The usual result, which would be expected using the above insert values (except the "..._mod..." ones):
+# The usual result, which would be expected using the above insert values (except the "..._mod_..." or  "..._null_..." ones):
     "__standard_result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                          "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                          "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                         "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                         "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                          "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
                          "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
                          "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
@@ -195,7 +195,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":[";"],"type_not_null_varchar25":[";;"],"type_null_varchar128":["; "],"type_not_null_varchar128":[" ;"],
                        "type_null_varchar1024":[" ; "],"type_not_null_varchar1024":["; ;"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -206,7 +206,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],
                        "type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -218,7 +218,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],
                        "type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -229,7 +229,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],
                        "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -265,10 +265,10 @@
              UPDATE partitioned_table SET      type_not_null_bigint = 10;\n
              UPDATE partitioned_table SET       type_null_timestamp = '2010-07-31 16:08:11.000011';\n
              UPDATE partitioned_table SET   type_not_null_timestamp = '2012-07-19 01:02:12.000012' WHERE rowid = 1;\n
-             UPDATE partitioned_table SET           type_null_float = 13;\n
-             UPDATE partitioned_table SET       type_not_null_float = 14 WHERE rowid = 1;\n
-             UPDATE partitioned_table SET         type_null_decimal = 15 WHERE rowid = 1;\n
-             UPDATE partitioned_table SET     type_not_null_decimal = 16;\n
+             UPDATE partitioned_table SET           type_null_float = 13.3;\n
+             UPDATE partitioned_table SET       type_not_null_float = 14.4 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET         type_null_decimal = 15.5 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET     type_not_null_decimal = 16.6;\n
              UPDATE partitioned_table SET       type_null_varchar25 = 'a';\n
              UPDATE partitioned_table SET   type_not_null_varchar25 = 'b' WHERE rowid = 1;\n
              UPDATE partitioned_table SET      type_null_varchar128 = 'c' WHERE rowid = 1;\n
@@ -285,7 +285,7 @@
 
 
 #
-# VALID UPSERTS -- tables are cleared (DELETE FROM) after each test, so you must insert (and/or "upsert") data prior to SELECT, in the same "sqlCmd"
+# VALID UPSERTS -- tables are cleared (DELETE FROM) after each test, so you must insert and/or "upsert" data prior to SELECT, in the same "sqlCmd"
 #
 {"testName":"UpsertBigInt",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, __standard_non_int_values)",
@@ -379,7 +379,14 @@
                  type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM replicated_table WHERE rowid=2",
- "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],"type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+ "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
+                       "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
+                       "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"InsertIntoSelectRepl2Part",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
@@ -421,7 +428,14 @@
                  type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM replicated_table WHERE rowid=2",
- "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],"type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+ "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
+                       "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
+                       "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"UpsertIntoSelectRepl2Part",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
@@ -497,21 +511,21 @@
                        "type_null_integer":["null"],"type_not_null_integer":["8"],"type_null_bigint":["null"],"type_not_null_bigint":["10"],
 # Note: after VMC-267 is fixed, change "1970-01-01 00:00:00.000000" to "null" (which is correct):
                        "type_null_timestamp":["1970-01-01 00:00:00.000000"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["null"],"type_not_null_float":["14"],"type_null_decimal":["null"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["null"],"type_not_null_float":["14.4"],"type_null_decimal":["null"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":["null"],"type_not_null_varchar25":["b"],"type_null_varchar128":["null"],"type_not_null_varchar128":["d"],
                        "type_null_varchar1024":["null"],"type_not_null_varchar1024":["f"],
                        "type_null_point":["null"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["null"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"CrudRoundTripEmptyVarchar",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '', 'b', 'c', 'd', 'e', f\n  __stored_proc_geo_values;\n
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '', '', '', '', '', ''\n  __stored_proc_geo_values;\n
              exec PARTITIONED_TABLE.select 1",
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
-                       "type_null_varchar25":[""],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
-                       "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[""],"type_not_null_varchar25":[""],"type_null_varchar128":[""],"type_not_null_varchar128":[""],
+                       "type_null_varchar1024":[""],"type_not_null_varchar1024":[""],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"CrudRoundTripEmbeddedSpaces",
@@ -520,7 +534,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],
                        "type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -532,7 +546,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],
                        "type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
@@ -544,7 +558,7 @@
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
                        "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
-                       "type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],
                        "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
