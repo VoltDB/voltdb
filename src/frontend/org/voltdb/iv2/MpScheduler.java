@@ -177,7 +177,6 @@ public class MpScheduler extends Scheduler
                 ((TransactionInfoBaseMessage)message).isForDR()));
 
         if (dr) {
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
             InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
                     (TransactionInfoBaseMessage) message);
