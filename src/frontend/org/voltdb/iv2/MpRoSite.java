@@ -238,6 +238,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId, DRConsumerDrIdTracker tracker)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
