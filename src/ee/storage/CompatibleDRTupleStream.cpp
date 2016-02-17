@@ -107,6 +107,7 @@ size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
  */
 size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                               char *tableHandle,
+                                              int partitionColumn,
                                               int64_t txnId,
                                               int64_t spHandle,
                                               int64_t uniqueId,
@@ -166,6 +167,7 @@ size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
 size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                                      char *tableHandle,
+                                                     int partitionColumn,
                                                      int64_t txnId,
                                                      int64_t spHandle,
                                                      int64_t uniqueId,
@@ -485,7 +487,7 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyNValue, int
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
         stream.endTransaction(uid);
         ii += 5;
