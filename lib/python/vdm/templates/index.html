@@ -69,71 +69,68 @@
     	<p><img src="{{ url_for('static',filename='images/startLoader.gif') }}" alt="startloader"/></p>
     	<p>Starting.......</p>
     </div>    
-    <div class="databaseRg"  style="display:none;">
+    <div id="startSuccess" class="databaseRg" style="display:none;">
     <a id="vmcLink" class="btn">Go to Manangement Center</a>
     <p>Database Running</p>
     </div>
-    <div id="" class="stalledState"  style="display:none;">
-  <div class="modal-dialog modal-dialog-center">
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign redC" aria-hidden="true"></span>Stalled</h4>
-      </div>
-      <div class="modal-body">
-        <div class="containerStalled">
-		</div>
-        <div class="btnSpelled"> 
-   <p> Do you want to stop the cluster?</p> 
-    <button id="btnStopCluster" type="button" class="btn">Yes</button></div>
+    <div id="stallFailed" class="stalledState"  style="display:none;">
+      <div class="modal-dialog modal-dialog-center">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign redC" aria-hidden="true"></span>Stalled</h4>
+          </div>
+          <div class="modal-body">
+            <div class="containerStalled">
+            </div>
+            <div class="btnSpelled">
+       <p> Do you want to stop the cluster?</p>
+        <button id="btnStopCluster" type="button" class="btn">Yes</button></div>
            
  </div>
     
     </div>
   </div>
 </div>	
-	<div id="" class="startFail" style="display:none;" >
-  <div class="modal-dialog modal-dialog-center">
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Start Failed</h4>
-      </div>
-      <div class="modal-body">
-        <div class="containerFailed">
-        
-		</div>
+	<div id="startFailed" class="startFail" style="display:none;" >
+      <div class="modal-dialog modal-dialog-center">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Start Failed</h4>
+          </div>
+          <div class="modal-body">
+            <div class="containerFailed">
 
-        <div class="btnSpelled"> 
-    <button id="" type="button" class="btn">OK</button></div>
- </div>
+            </div>
+
+            <div class="btnSpelled">
+        <button id="btnFailedOk" type="button" class="btn">OK</button></div>
+     </div>
  
  
     
     </div>
   </div>
 </div>
-          <div id="" class="recoverFail" style="display:none;" >
-  <div class="modal-dialog modal-dialog-center">
-    <!-- Modal content-->
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Recover Failed</h4>
-      </div>
-      <div class="modal-body">
-        <div class="containerRecover">
+        <!--<div id="" class="recoverFail" style="display:none;" >-->
+          <!--<div class="modal-dialog modal-dialog-center">-->
+            <!--&lt;!&ndash; Modal content&ndash;&gt;-->
+            <!--<div class="modal-content">-->
+              <!--<div class="modal-header">-->
+                <!--<h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Recover Failed</h4>-->
+              <!--</div>-->
+              <!--<div class="modal-body">-->
+                <!--<div class="containerRecover">-->
 
-		</div>
+                <!--</div>-->
 
-        <div class="btnSpelled">
-    <button id="" type="button" class="btn">OK</button></div>
- </div>
-
-
-
-    </div>
-  </div>
-</div>
+                <!--<div class="btnSpelled">-->
+            <!--<button id="" type="button" class="btn">OK</button></div>-->
+         <!--</div>-->
+    <!--</div>-->
+  <!--</div>-->
+<!--</div>-->
 
         <div id="" class="connectionFail" style="display:none;" >
   <div class="modal-dialog modal-dialog-center">
