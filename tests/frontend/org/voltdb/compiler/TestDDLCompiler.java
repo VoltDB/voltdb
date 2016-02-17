@@ -713,6 +713,86 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
+    public void testDropStream() throws VoltCompilerException  {
+        File jarOut = new File("dropStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // drop an independent stream
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "DROP STREAM FOO;\n",
+
+                // try drop an non-existent stream
+                "DROP STREAM FOO IF EXISTS;\n",
+
+                //  automatically drop reference views for the stream
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                "DROP STREAM User_Stream IF EXISTS CASCADE ;\n"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertTrue(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+    public void testDropStreamNegtive() throws VoltCompilerException {
+        File jarOut = new File("dropStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // non-stream table
+                "CREATE TABLE FOO (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "DROP STREAM FOO;\n",
+
+                // non-existent stream
+                "DROP STREAM FOO;\n",
+
+                // stream with referencing view
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                "DROP STREAM User_Stream;\n",
+
+                // stream with referencing procedure
+                "CREATE STREAM User_Stream2 Partition On Column UserId" +
+                " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                "CREATE PROCEDURE Enter_User PARTITION ON TABLE User_Stream2 column UserId" +
+                " AS INSERT INTO User_Stream2 (UserId, SessionStart) VALUES (?,?);\n" +
+                "DROP STREAM User_Stream2 CASCADE;\n"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+
     public void testExportDRTable() {
         File jarOut = new File("exportDrTables.jar");
         jarOut.deleteOnExit();

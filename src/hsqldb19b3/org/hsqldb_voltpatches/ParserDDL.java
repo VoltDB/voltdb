@@ -471,6 +471,7 @@ public class ParserDDL extends ParserRoutine {
                 useIfExists   = true;
                 break;
 
+            case Tokens.STREAM :
             case Tokens.TABLE :
                 read();
 

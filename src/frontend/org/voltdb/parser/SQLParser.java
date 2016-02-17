@@ -285,6 +285,15 @@ public class SQLParser extends SQLPatternFactory
             );
 
     /**
+     * Regex to parse the DROP STREAM statement.
+     * Capture group is tagged as (1) in comments below.
+     */
+    private static final Pattern PAT_DROP_STREAM =
+            SPF.statementLeader(
+                    SPF.token("drop"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
+                    SPF.optional(SPF.clause(SPF.token("if"), SPF.token("exisit")))
+                    ).compile("PAT_DROP_STREAM");
+    /**
      * NB supports only unquoted table names
      * Captures 1 group, the table name.
      */
@@ -597,6 +606,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchDropRole(String statement)
     {
         return PAT_DROP_ROLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against drop stream pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchDropStream(String statement)
+    {
+        return PAT_DROP_STREAM.matcher(statement);
     }
 
     /**

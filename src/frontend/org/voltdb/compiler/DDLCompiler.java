@@ -352,6 +352,17 @@ public class DDLCompiler {
         return false;
     }
 
+    private static boolean isRegularTable(VoltXMLElement m_schema, String name) {
+        for (VoltXMLElement element : m_schema.children) {
+            if (element.name.equals("table")
+                    && (!element.attributes.containsKey("export"))
+                    && element.attributes.get("name").equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Drop the dr conflicts table if A/A is disabled
     private void dropDRConflictTablesIfNeeded(StringBuilder sb) {
         if (hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)) {
@@ -909,6 +920,22 @@ public class DDLCompiler {
                 groupMap.delete(roleName);
             }
             return true;
+        }
+
+        // matches if it is DROP STREAM
+        // group 1 is stream name
+        // guard against drop regular table
+        statementMatcher = SQLParser.matchDropStream(statement);
+        if (statementMatcher.matches()) {
+            String streamName = checkIdentifierStart(statementMatcher.group(1), statement);
+
+            if (isRegularTable(m_schema, streamName)) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid DROP STREAM statement: table %s was not a stream.",
+                        streamName));
+            }
+
+            return false;
         }
 
         // matches if it is EXPORT TABLE

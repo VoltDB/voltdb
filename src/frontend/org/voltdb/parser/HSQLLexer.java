@@ -73,7 +73,8 @@ public class HSQLLexer extends SQLPatternFactory
             if (noun == null) {
                 return null;
             }
-            boolean createStream = noun.equals(HSQLDDLInfo.Noun.STREAM);
+            boolean createStream = verb.equals(HSQLDDLInfo.Verb.CREATE) &&
+                                   noun.equals(HSQLDDLInfo.Noun.STREAM);
 
             String name = matcher.group("name");
             if (name == null) {
