@@ -1301,8 +1301,7 @@ public class TestCatalogDiffs extends TestCase {
         if (!MiscUtils.isPro()) { return; } // not supported in community
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-              + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);

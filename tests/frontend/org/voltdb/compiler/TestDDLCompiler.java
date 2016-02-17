@@ -693,6 +693,10 @@ public class TestDDLCompiler extends TestCase {
                 // with limit
                 "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
                 "LIMIT PARTITION ROWS 100);\n",
+                // with limit and execute
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100 EXECUTE (\n" +
+                "  DELETE FROM FOO WHERE D1 > 100));\n",
         };
 
         VoltCompiler compiler = new VoltCompiler();
