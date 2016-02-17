@@ -61,8 +61,7 @@ public abstract class NonVoltDBBackend {
     protected Connection dbconn;
 
     protected static final boolean DEBUG = false;
-    protected static boolean PRINT_TRANSFORMED_SQL = false;
-    protected static FileWriter TRANSFORMED_SQL_FILE_WRITER = null;
+    protected static final FileWriter TRANSFORMED_SQL_FILE_WRITER;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
@@ -88,15 +87,14 @@ public abstract class NonVoltDBBackend {
         // a format that the backend database can understand
         String transformSqlOutputFile = System.getProperty("sqlcoverage.transform.sql.file", null);
         if (transformSqlOutputFile == null) {
-            PRINT_TRANSFORMED_SQL = false;
             TRANSFORMED_SQL_FILE_WRITER = null;
         } else {
-            PRINT_TRANSFORMED_SQL = true;
             try {
                 TRANSFORMED_SQL_FILE_WRITER = new FileWriter(transformSqlOutputFile, true);
             } catch (IOException e) {
+                TRANSFORMED_SQL_FILE_WRITER = null;
                 System.out.println("Caught IOException:\n    " + e
-                        + "\nSQL transform debug output will go to stdout.");
+                        + "\nTransformed SQL output will not be printed.");
             }
         }
     }
@@ -126,21 +124,21 @@ public abstract class NonVoltDBBackend {
      */
     protected static class QueryTransformer {
         // Required parameter
-        private Pattern queryPattern;
+        private Pattern m_queryPattern;
 
         // Optional parameters, initialized with default values
-        private String initialText = "";
-        private String prefix = "";
-        private String suffix = "";
-        private String altSuffix = null;
-        private String useAltSuffixAfter = null;
-        private boolean useWholeMatch = false;
-        private String replacementText = null;
-        private ColumnType columnType = null;
-        private Double multiplier = null;
-        private Integer minimum = null;
-        private List<String> groups = new ArrayList<String>();
-        private boolean debugPrint = false;
+        private String m_initialText = "";
+        private String m_prefix = "";
+        private String m_suffix = "";
+        private String m_altSuffix = null;
+        private String m_useAltSuffixAfter = null;
+        private boolean m_useWholeMatch = false;
+        private String m_replacementText = null;
+        private ColumnType m_columnType = null;
+        private Double m_multiplier = null;
+        private Integer m_minimum = null;
+        private List<String> m_groups = new ArrayList<String>();
+        private boolean m_debugPrint = false;
 
         /**
          * Constructor for a QueryTransformer object.
@@ -153,7 +151,7 @@ public abstract class NonVoltDBBackend {
             if (queryPattern == null) {
                 throw new IllegalArgumentException("The queryPattern may not be null.");
             }
-            this.queryPattern = queryPattern;
+            this.m_queryPattern = queryPattern;
         }
 
         /** Specifies an initial string with which to begin the replacement
@@ -163,7 +161,7 @@ public abstract class NonVoltDBBackend {
             if (text == null) {
                 throw new IllegalArgumentException("The initialText may not be null.");
             }
-            this.initialText = text;
+            this.m_initialText = text;
             return this;
         }
 
@@ -174,7 +172,7 @@ public abstract class NonVoltDBBackend {
             if (text == null) {
                 throw new IllegalArgumentException("The prefix may not be null.");
             }
-            this.prefix = text;
+            this.m_prefix = text;
             return this;
         }
 
@@ -185,7 +183,7 @@ public abstract class NonVoltDBBackend {
             if (text == null) {
                 throw new IllegalArgumentException("The suffix may not be null.");
             }
-            this.suffix = text;
+            this.m_suffix = text;
             return this;
         }
 
@@ -199,8 +197,8 @@ public abstract class NonVoltDBBackend {
          * ends with <i>altEnding</i> (e.g. " NULLS LAST"); default is <b>null</b>.
          */
         protected QueryTransformer alternateSuffix(String useAltSuffixAfter, String altSuffix) {
-            this.useAltSuffixAfter = useAltSuffixAfter;
-            this.altSuffix = altSuffix;
+            this.m_useAltSuffixAfter = useAltSuffixAfter;
+            this.m_altSuffix = altSuffix;
             return this;
         }
 
@@ -209,7 +207,7 @@ public abstract class NonVoltDBBackend {
          *  to the whole <i>queryPattern</i>; when <b>false</b>, they will be
          *  applied to each <i>group</i> within it; default is <b>false</b>. */
         protected QueryTransformer useWholeMatch(boolean useWholeMatch) {
-            this.useWholeMatch = useWholeMatch;
+            this.m_useWholeMatch = useWholeMatch;
             return this;
         }
 
@@ -224,7 +222,7 @@ public abstract class NonVoltDBBackend {
          *  (e.g. "||", to replace "+"); default is <b>null</b>, in which
          *  case it is ignored. */
         protected QueryTransformer replacementText(String text) {
-            this.replacementText = text;
+            this.m_replacementText = text;
             return this;
         }
 
@@ -233,7 +231,7 @@ public abstract class NonVoltDBBackend {
          *  is a column of the specified type; default is <b>null</b>, in which
          *  case a matching query is always modified, regardless of column type. */
         protected QueryTransformer columnType(ColumnType columnType) {
-            this.columnType = columnType;
+            this.m_columnType = columnType;
             return this;
         }
 
@@ -241,7 +239,7 @@ public abstract class NonVoltDBBackend {
          *  the transformed query (e.g. 8.0, to convert from bytes to bits);
          *  default is <b>null</b>, in which case it is ignored. */
         protected QueryTransformer multiplier(Double multiplier) {
-            this.multiplier = multiplier;
+            this.m_multiplier = multiplier;
             return this;
         }
 
@@ -249,7 +247,7 @@ public abstract class NonVoltDBBackend {
          *  (int-valued) group by the <i>multiplier</i>; default is <b>null</b>,
          *  in which case it is ignored. */
         protected QueryTransformer minimum(Integer minimum) {
-            this.minimum = minimum;
+            this.m_minimum = minimum;
             return this;
         }
 
@@ -257,13 +255,13 @@ public abstract class NonVoltDBBackend {
          *  (e.g. "column"), the text matching each group will be modified as
          *  dictated by the other options (e.g. by adding a prefix and suffix). */
         protected QueryTransformer groups(String ... groups) {
-            this.groups.addAll(Arrays.asList(groups));
+            this.m_groups.addAll(Arrays.asList(groups));
             return this;
         }
 
         /** Specifies whether or not to print debug info; default is <b>false</b>. */
         protected QueryTransformer debugPrint(boolean debugPrint) {
-            this.debugPrint = debugPrint;
+            this.m_debugPrint = debugPrint;
             return this;
         }
 
@@ -314,7 +312,7 @@ public abstract class NonVoltDBBackend {
         return columnNameUpper.startsWith("PT") || columnNameUpper.startsWith("POLY");
     }
 
-    /** Returns the number of occurrence of the specified character in the specified String. */
+    /** Returns the number of occurrences of the specified character in the specified String. */
     static private int numOccurencesOfCharIn(String str, char ch) {
         int num = 0;
         for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
@@ -377,69 +375,69 @@ public abstract class NonVoltDBBackend {
      */
     static protected String transformQuery(String query, QueryTransformer qt) {
         StringBuffer modified_query = new StringBuffer();
-        Matcher matcher = qt.queryPattern.matcher(query);
+        Matcher matcher = qt.m_queryPattern.matcher(query);
         int count = 0;
         while (matcher.find()) {
-            StringBuffer replaceText = new StringBuffer(qt.initialText);
+            StringBuffer replaceText = new StringBuffer(qt.m_initialText);
             String wholeMatch = matcher.group();
             String group = wholeMatch;
-            if (qt.debugPrint) {
+            if (qt.m_debugPrint) {
                 if (count < 1) {
                     System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
-                    System.out.println("  queryPattern: " + qt.queryPattern);
+                    System.out.println("  queryPattern: " + qt.m_queryPattern);
                     System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix, replacementText:\n    '"
-                            + qt.initialText + "', '" + qt.prefix + "', '" + qt.suffix + "', '"
-                            + qt.useAltSuffixAfter + "', '" + qt.altSuffix + "', '" + qt.replacementText
+                            + qt.m_initialText + "', '" + qt.m_prefix + "', '" + qt.m_suffix + "', '"
+                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "', '" + qt.m_replacementText
                             + "'\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
-                            + qt.useWholeMatch + ", " + qt.columnType + ", " + qt.multiplier + ", "
-                            + qt.minimum + ", " + qt.debugPrint + "\n    " + qt.groups);
+                            + qt.m_useWholeMatch + ", " + qt.m_columnType + ", " + qt.m_multiplier + ", "
+                            + qt.m_minimum + ", " + qt.m_debugPrint + "\n    " + qt.m_groups);
                 }
                 System.out.println("  " + ++count + ".wholeMatch: " + wholeMatch);
             }
-            for (String groupName : qt.groups) {
+            for (String groupName : qt.m_groups) {
                 group = matcher.group(groupName);
-                if (qt.debugPrint) {
+                if (qt.m_debugPrint) {
                     System.out.println("    group     : " + group);
                 }
                 if (group == null) {
                     break;
-                } else if (!qt.useWholeMatch) {
-                    String groupValue = group, suffixValue = qt.suffix;
+                } else if (!qt.m_useWholeMatch) {
+                    String groupValue = group, suffixValue = qt.m_suffix;
                     // Check for the case where a multiplier & minimum are used
-                    if (qt.multiplier != null && qt.minimum != null) {
-                        groupValue = Long.toString(Math.round(Math.max(Integer.parseInt(group) * qt.multiplier, qt.minimum)));
+                    if (qt.m_multiplier != null && qt.m_minimum != null) {
+                        groupValue = Long.toString(Math.round(Math.max(Integer.parseInt(group) * qt.m_multiplier, qt.m_minimum)));
                     }
                     // Check for the ending that indicates to use the alternate suffix
-                    if (qt.altSuffix != null && group.toUpperCase().endsWith(qt.useAltSuffixAfter)) {
-                        suffixValue = qt.altSuffix;
+                    if (qt.m_altSuffix != null && group.toUpperCase().endsWith(qt.m_useAltSuffixAfter)) {
+                        suffixValue = qt.m_altSuffix;
                     }
                     // Make sure not to swallow up extra ')', in this group
-                    replaceText.append(handleParens(groupValue, qt.prefix, suffixValue));
+                    replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue));
                 }
             }
-            if (qt.useWholeMatch) {
-                if (qt.columnType != null && (
-                           (qt.columnType == ColumnType.INTEGER && !isIntegerColumn(group))
-                        || (qt.columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
+            if (qt.m_useWholeMatch) {
+                if (qt.m_columnType != null && (
+                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(group))
+                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
                     // Make no changes to query (when columnType is specified,
                     // but does not match the column type found in this query)
                     replaceText.append(wholeMatch);
                 } else {
                     // Check for the case where the group is to be replaced with replacementText
-                    if (qt.replacementText != null) {
-                        wholeMatch = wholeMatch.replace(group, qt.replacementText);
+                    if (qt.m_replacementText != null) {
+                        wholeMatch = wholeMatch.replace(group, qt.m_replacementText);
                     }
                     // Make sure not to swallow up extra ')', in whole match
-                    replaceText.append(handleParens(wholeMatch, qt.prefix, qt.suffix));
+                    replaceText.append(handleParens(wholeMatch, qt.m_prefix, qt.m_suffix));
                 }
             }
-            if (qt.debugPrint) {
+            if (qt.m_debugPrint) {
                 System.out.println("  replaceText : " + replaceText);
             }
             matcher.appendReplacement(modified_query, replaceText.toString());
         }
         matcher.appendTail(modified_query);
-        if ((DEBUG || qt.debugPrint) && !query.equalsIgnoreCase(modified_query.toString())) {
+        if ((DEBUG || qt.m_debugPrint) && !query.equalsIgnoreCase(modified_query.toString())) {
             System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
             System.out.println("  modified_query: " + modified_query);
         }
@@ -456,20 +454,15 @@ public abstract class NonVoltDBBackend {
         return result;
     }
 
-    /** Optionally (only if both the PRINT_TRANSFORMED_SQL constant and the
-     *  <i>print</i> argument are true), prints the original and modified
-     *  SQL statements, to a "Transformed SQL" output file, for the current
-     *  SQLCoverage test suite (if any). */
+    /** Optionally (only if the <i>print</i> argument is true and
+     *  TRANSFORMED_SQL_FILE_WRITER is non-null), prints the original and
+     *  modified SQL statements, to a "Transformed SQL" output file, for the
+     *  current SQLCoverage test suite (if any). */
     static protected void printTransformedSql(String originalSql, String modifiedSql, boolean print) {
-        if (PRINT_TRANSFORMED_SQL && print) {
+        if (print && TRANSFORMED_SQL_FILE_WRITER != null) {
             try {
-                if (TRANSFORMED_SQL_FILE_WRITER != null) {
-                    TRANSFORMED_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
-                    TRANSFORMED_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
-                } else {
-                    System.out.println("original SQL: " + originalSql);
-                    System.out.println("modified SQL: " + modifiedSql);
-                }
+                TRANSFORMED_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
+                TRANSFORMED_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
             } catch (IOException e) {
                 System.out.println("Caught IOException:\n    " + e);
                 System.out.println("original SQL: " + originalSql);
