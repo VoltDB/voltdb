@@ -316,15 +316,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //--------------------------------------------
 
         if (sequenceForReplay) {
-            //--------------------------------------------
-            // DRv1 path, mark for future removal
             InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
             if (dupe != null) {
                 // Duplicate initiate task message, send response
                 m_mailbox.send(dupe.getInitiatorHSId(), dupe);
             }
-            //--------------------------------------------
             else if (!m_replaySequencer.offer(sequenceWithUniqueId, (TransactionInfoBaseMessage) message)) {
                 canDeliver = true;
             }
