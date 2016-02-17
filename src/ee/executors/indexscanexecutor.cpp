@@ -261,40 +261,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
-                    // form new search key to add it to search key table tuple from original candidate
-                    // search key. To form new key, use the search column's length in bytes from org table
-                    // by fetching column size. Shrink the candidate key to fit within the column size
-                    // note: for varchar the column size can be in bytes or character. So logic
-                    // takes into account whether variable length column size is in bytes or not to
-                    // calculate new length in bytes.
-
-                    const TupleSchema::ColumnInfo *colInfo = tableIndex->getKeySchema()->getColumnInfo(ctr);
-                    uint32_t colLength = colInfo->length;
-                    bool inBytes = colInfo->inBytes;
-                    const ValueType valueType = colInfo->getVoltType();
-                    assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
-                    if (valueType == VALUE_TYPE_VARBINARY) {
-                        // for varbinary the size is always in bytes
-                        inBytes = true;
-                    }
-                    // get length of the original search key and storage location in memory
-                    int32_t candidateValueLength = 0;
-                    const char* candidateValueBuffPtr = ValuePeeker::peekObject_withoutNull(candidateValue, &candidateValueLength);
-                    // calculate the length for shrinked candidate key
-                    int32_t neededLength;
-                    if (inBytes) {
-                        // updated length of key will be equivalent to column length
-                        neededLength = colLength;
-                    }
-                    else {
-                        // column length is in terms of characters. Obtain the number of bytes needed for those many characters
-                        neededLength = static_cast<int32_t> (NValue::getIthCharPosition(candidateValueBuffPtr, candidateValueLength, colLength + 1) - candidateValueBuffPtr);
-                    }
-                    // obtain new, shrinked key using the length computed from the original key
-                    NValue updatedCandidateValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
-                    // update search tuple with search key
-                    searchKey.setNValue(ctr, updatedCandidateValue);
-
+                    // shrink the search key and add the updated key to search key table tuple
+                    searchKey.shrinkAndSetNValue(ctr, candidateValue);
+                    // search will be performed on shrinked key, so update lookup operation
+                    // to account for it
                     switch (localLookupType) {
                         case INDEX_LOOKUP_TYPE_LT:
                         case INDEX_LOOKUP_TYPE_LTE:
@@ -305,7 +275,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                             localLookupType = INDEX_LOOKUP_TYPE_GT;
                             break;
                         default:
-                            earlyReturnForSearchKeyOutOfRange = true;
                             assert(!"IndexScanExecutor::p_execute - can't index on not equals");
                             return false;
                     }
@@ -318,10 +287,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 // to search key length exceeding the search column length
                 // of variable length type
                 if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
-                    // for variable length, where the search key was greater than the column length,
-                    // logic above has generated shrinked key, updated index lookup up and inserted
-                    // the generated in search tuple. So no need to decrement activeNumOfSearchKeys
-                    // for this case
+                    // for variable length mismatch error, the needed search key to perform the search
+                    // has been generated and added to the search tuple. So no need to decrement
+                    // activeNumOfSearchKeys
                     activeNumOfSearchKeys--;
                 }
                 if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {

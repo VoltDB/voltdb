@@ -142,7 +142,7 @@ public class TestIndexOverflowSuite extends RegressionSuite {
 
         VoltTable vt, expectedVT;
         String sql;
-        String prefix = "Assertion failed for Index Test with one search key exceeding defined variable length column";
+        String prefix = "Assertion failed for Index Overflow Test with one search key exceeding defined variable length column";
 
         sql = "Select VC1 from INDEXED_VL_TABLE1 where VC1 < 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -190,11 +190,11 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         expectedVT.resetRowPosition();
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column";
+        prefix = "Assertion failed for Index Overflow Test on variable length column using self join: ";
         sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 > 'abc' OR VC2 > 'abb' order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
-        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 >= 'abcd' OR VC2 >= 'abbd' order by id;";
+        sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where 'abcd' >= VC1  OR VC2 >= 'abbd' order by id;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
 
 
@@ -219,7 +219,7 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        prefix = "Assertion failed for Index Test with two search keys exceeding defined variable length column involving Join";
+        prefix = "Assertion failed for Index overflow Test on variable length column using self Join with compound where clause";
         sql = "Select A.VC1, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE1 B where A.VC1 <= 'abc' AND B.VC2 > 'abb' order by A.VC1, B.VC2;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
@@ -227,7 +227,9 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertTablesAreEqual(prefix, expectedVT, vt);
 
-        sql = "Select A.VC1, B.VC1 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where A.VC1 > B.VC1 order by A.VC1, B.VC1;";
+        prefix = "Assertion failed for Index Overflow Test on variable length column using inner join: ";
+        // test join with inner table's variable length column exceeding outer table's variable length column
+        sql = "Select A.VC1, B.VC1 from INDEXED_VL_TABLE2 B, INDEXED_VL_TABLE1 A where A.VC1 > B.VC1 order by A.VC1, B.VC1;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {{"abb","aaaa"},
                                              {"abc", "aaaa"},
@@ -237,7 +239,7 @@ public class TestIndexOverflowSuite extends RegressionSuite {
                                              {"abd", "abcc"}},
                              vt);
 
-        sql = "Select A.VC2, B.VC2 from INDEXED_VL_TABLE1 A, INDEXED_VL_TABLE2 B where A.VC2 < B.VC2 order by A.VC2, B.VC2;";
+        sql = "Select A.VC2, B.VC2 from INDEXED_VL_TABLE2 B, INDEXED_VL_TABLE1 A where A.VC2 < B.VC2 order by A.VC2, B.VC2;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {{"aaa", "aaaa"},
                                              {"aaa", "abbb"},
@@ -251,8 +253,20 @@ public class TestIndexOverflowSuite extends RegressionSuite {
                                              {"abd", "abdd"}},
                              vt);
 
+        sql = "Select A.VC2, B.VC2 from INDEXED_VL_TABLE2 B, INDEXED_VL_TABLE1 A "
+              + "where A.VC2 < B.VC2 and A.VC2 > 'aaabc' order by A.VC2, B.VC2;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{"abb", "abbb"},
+                                             {"abb", "abcc"},
+                                             {"abb", "abdd"},
+                                             {"abc", "abcc"},
+                                             {"abc", "abdd"},
+                                             {"abd", "abdd"}},
+                             vt);
+
         // result set of 'not equal' lookup with search parameter exceeding indexed column length
         // will result in non-filtered result on that column except NULL values
+        prefix = "Assertion failed for Index Overflow Test on variable length column using not equals lookup operation: ";
         sql = "Select VC1, VC2 from INDEXED_VL_TABLE1 where VC1 IS NOT NULL AND VC2 IS NOT NULL order by id;";
         expectedVT = client.callProcedure("@AdHoc", sql).getResults()[0];
 
@@ -288,8 +302,6 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         catch (IOException excp) {
             assertFalse(true);
         }
-
-
 
         return builder;
     }
