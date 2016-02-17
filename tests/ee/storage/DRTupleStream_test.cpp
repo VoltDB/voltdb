@@ -56,7 +56,8 @@ const int COLUMN_COUNT = 5;
 // total: 39
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
-const int MAGIC_TRANSACTION_SIZE = 36;
+const int MAGIC_END_TRANSACTION_SIZE = 22;
+const int MAGIC_TRANSACTION_SIZE = MAGIC_BEGIN_TRANSACTION_SIZE + MAGIC_END_TRANSACTION_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
@@ -125,7 +126,7 @@ public:
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
+        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
                                currentSpHandle, currentSpHandle, *m_tuple, type, index);
     }
 

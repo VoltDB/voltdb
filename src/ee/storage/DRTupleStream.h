@@ -28,13 +28,13 @@ class DRTupleStream : public voltdb::AbstractDRTupleStream {
 public:
     //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), drId(8), checksum(4)
-    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
+    //Version(1), type(1), drId(8), partitionHash(8), checksum(4)
+    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
-    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
+    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 8 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 3;
+    static const uint8_t PROTOCOL_VERSION = 4;
 
     DRTupleStream(int defaultBufferSize);
 
@@ -47,6 +47,7 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -60,6 +61,7 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -103,6 +105,8 @@ private:
             size_t &rowMetadataSz,
             const std::vector<int> *&interestingColumns);
 
+    void updateTxnHash(TableTuple &tuple, int partitionColumn);
+
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
 };
@@ -112,6 +116,7 @@ public:
     MockDRTupleStream() : DRTupleStream(1024) {}
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
+                           int partitionColumn,
                            int64_t txnId,
                            int64_t spHandle,
                            int64_t uniqueId,
