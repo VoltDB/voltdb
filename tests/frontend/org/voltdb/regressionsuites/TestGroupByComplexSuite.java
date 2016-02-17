@@ -221,15 +221,15 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
 
             // (3) Test Order by with FUNCTION expression, no group by column in display columns
-            // Test Order by without tag
-            cr = client.callProcedure("@AdHoc", "SELECT ABS(dept) as tag, SUM(ABS(wage) - 1) as tag, " +
-                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY tag");
+            // Test Order by with unambiguous alias.
+            cr = client.callProcedure("@AdHoc", "SELECT ABS(dept) as tag1, SUM(ABS(wage) - 1) as tag2, " +
+                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY tag1");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             validateTableOfLongs(vt, expected);
 
-            // Test Order by without tag
+            // Test Order by without any alias.
             cr = client.callProcedure("@AdHoc", "SELECT ABS(dept), SUM(ABS(wage) - 1) as tag, " +
                     "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1204,6 +1204,8 @@ public class TestGroupByComplexSuite extends RegressionSuite {
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "STATE VARCHAR(2), " +
                 "PRIMARY KEY (ID) );" +
+
+                "create table t ( a INTEGER NOT NULL, b INTEGER NOT NULL, c INTEGER NOT NULL); " +
 
                 addProcs
                 ;
