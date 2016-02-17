@@ -64,7 +64,7 @@ void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTupl
     pmp.countdownProgress();
 }
 
-void AbstractJoinExecutor::p_init_null_tuples(Table* inner_table, Table* outer_table) {
+void AbstractJoinExecutor::p_init_null_tuples(Table* outer_table, Table* inner_table) {
     if (m_joinType != JOIN_TYPE_INNER) {
         assert(inner_table);
         m_null_inner_tuple.init(inner_table->schema());

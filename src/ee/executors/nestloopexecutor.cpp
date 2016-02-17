@@ -92,7 +92,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     // NULL tuples for left and full joins
-    p_init_null_tuples(node->getInputTable(1), node->getInputTable());
+    p_init_null_tuples(node->getInputTable(), node->getInputTable(1));
 
     return true;
 }

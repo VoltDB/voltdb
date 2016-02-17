@@ -141,7 +141,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     // NULL tuples for left and full joins
-    p_init_null_tuples(m_indexNode->getOutputTable(), node->getInputTable());
+    p_init_null_tuples(node->getInputTable(), m_indexNode->getTargetTable());
 
     m_indexValues.init(index->getKeySchema());
     return true;

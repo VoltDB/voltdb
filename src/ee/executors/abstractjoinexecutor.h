@@ -71,7 +71,7 @@ class AbstractJoinExecutor : public AbstractExecutor {
 
         bool p_init(AbstractPlanNode*, TempTableLimits* limits);
 
-        void p_init_null_tuples(Table* inner_table, Table* outer_table);
+        void p_init_null_tuples(Table* outer_table, Table* inner_table);
 
         // Write tuple to the output table
         void outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp);
