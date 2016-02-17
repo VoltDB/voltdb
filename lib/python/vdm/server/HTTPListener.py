@@ -2310,7 +2310,7 @@ class StatusDatabaseServerAPI(MethodView):
 
         server = [server for server in Global.SERVERS if server['id'] == server_id]
         try:
-            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 212121)
+            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
             proc = voltdbclient.VoltProcedure(client, "@Ping")
             response = proc.call()
             return jsonify({'status': "running"})
