@@ -37,7 +37,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -53,6 +52,7 @@ import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2GetDrTrackerRequestMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -149,15 +149,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
-
-    /*
-     * Track the last producer-cluster unique IDs and drIds associated with an
-     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
-     *  ReplicaDRGateway on repair
-     */
-    private Map<Integer, DRConsumerDrIdTracker> m_maxSeenDrLogsBySrcPartition;
-    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
@@ -392,6 +383,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof Iv2LogFaultMessage) {
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
+        }
+        else if (message instanceof Iv2GetDrTrackerRequestMessage) {
+            handleIv2DrTrackerMessage((Iv2GetDrTrackerRequestMessage)message);
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
@@ -989,6 +983,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the value sent by the master
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
         m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
+    }
+
+    public void handleIv2DrTrackerMessage(Iv2GetDrTrackerRequestMessage message)
+    {
+        assert(m_isLeader);
+        TxnEgo ego = advanceTxnEgo();
+        long txnId = ego.getTxnId();
+        message.setTxnId(txnId);
+        GetDrTrackerTask task = new GetDrTrackerTask(m_mailbox, m_pendingTasks, message);
+        m_pendingTasks.offer(task);
     }
 
     public void handleDumpMessage()

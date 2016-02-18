@@ -46,6 +46,8 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte MP_REPLAY_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 20;
     final public static byte SNAPSHOT_CHECK_REQUEST_ID = VOLTCORE_MESSAGE_ID_MAX + 21;
     final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
+    final public static byte IV2_GET_DR_TRACKER_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 23;
+    final public static byte IV2_GET_DR_TRACKER_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 24;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -124,6 +126,12 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case SNAPSHOT_CHECK_RESPONSE_ID:
             message = new SnapshotCheckResponseMessage();
+            break;
+        case IV2_GET_DR_TRACKER_REQUEST:
+            message = new Iv2GetDrTrackerRequestMessage();
+            break;
+        case IV2_GET_DR_TRACKER_RESPONSE:
+            message = new Iv2GetDrTrackerResponseMessage();
             break;
         default:
             message = null;

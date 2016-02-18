@@ -34,8 +34,7 @@ public class DRConsumerDrIdTracker {
         m_lastMpUniqueId = mpUniqueId;
     }
 
-    public DRConsumerDrIdTracker(byte[] flattened) {
-        ByteBuffer buff = ByteBuffer.wrap(flattened);
+    public DRConsumerDrIdTracker(ByteBuffer buff) {
         m_lastAckedDrId = buff.getLong();
         m_lastSpUniqueId = buff.getLong();
         m_lastMpUniqueId = buff.getLong();
@@ -43,6 +42,10 @@ public class DRConsumerDrIdTracker {
         for (int ii=0; ii<mapSize; ii++) {
             m_map.put(buff.getLong(), buff.getLong());
         }
+    }
+
+    public DRConsumerDrIdTracker(byte[] flattened) {
+        this(ByteBuffer.wrap(flattened));
     }
 
     public int getSerializedSize() {
@@ -53,9 +56,8 @@ public class DRConsumerDrIdTracker {
              + (m_map.size() * 16);
     }
 
-    public void serialize(byte[] flattened) {
-        assert(flattened.length >= getSerializedSize());
-        ByteBuffer buff = ByteBuffer.wrap(flattened);
+    public void serialize(ByteBuffer buff) {
+        assert(buff.remaining() > getSerializedSize());
         buff.putLong(m_lastAckedDrId);
         buff.putLong(m_lastSpUniqueId);
         buff.putLong(m_lastMpUniqueId);
@@ -64,6 +66,11 @@ public class DRConsumerDrIdTracker {
             buff.putLong(entry.getKey());
             buff.putLong(entry.getValue());
         }
+    }
+
+    public void serialize(byte[] flattened) {
+        ByteBuffer buff = ByteBuffer.wrap(flattened);
+        serialize(buff);
     }
 
     public int size() {
