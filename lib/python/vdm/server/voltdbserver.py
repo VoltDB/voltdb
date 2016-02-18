@@ -321,9 +321,13 @@ class VoltDatabase:
             return create_response('Server details not found for id ' + server_id, 404)
     
         args = [ '-H', server[0]['hostname'] ]
-        return self.run_voltdb_cmd('voltadmin', 'shutdown', args)
 
-    def run_voltdb_cmd(self, cmd, verb, args):
+        G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
+        outfilename = os.path.join(HTTPListener.Global.PATH,
+                ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
+        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
+
+    def run_voltdb_cmd(self, cmd, verb, args, outfilename):
         """
         Runs the given voltdb command using admin user, as needed
         """
@@ -336,8 +340,10 @@ class VoltDatabase:
     
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
-    
-        shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+
+        outfile = open(outfilename, 'w')
+
+        shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
         exit_code = shutdown_proc.wait()
         return output + error
