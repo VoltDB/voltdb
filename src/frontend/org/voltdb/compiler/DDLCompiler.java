@@ -931,7 +931,7 @@ public class DDLCompiler {
 
             if (isRegularTable(m_schema, streamName)) {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid DROP STREAM statement: table %s was not a stream.",
+                        "Invalid DROP STREAM statement: table %s is not a stream.",
                         streamName));
             }
 

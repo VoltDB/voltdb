@@ -4225,6 +4225,10 @@ public class TestVoltCompiler extends TestCase {
         return table.getViews().get(viewName);
     }
 
+    private Table getTableInfoFor( Database db, String tableName) {
+        return db.getTables().getIgnoreCase(tableName);
+    }
+
     public void testGoodExportTable() throws Exception {
         Database db;
 
@@ -4359,6 +4363,67 @@ public class TestVoltCompiler extends TestCase {
                 "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
+                );
+    }
+
+    public void testGoodDropStream() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                // drop an independent stream
+                "CREATE STREAM e1 (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "DROP STREAM e1;\n",
+
+                // try drop an non-existent stream
+                "DROP STREAM e2 IF EXISTS;\n",
+
+                //  automatically drop reference views for the stream
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                "DROP STREAM User_Stream IF EXISTS CASCADE ;\n"
+                );
+
+        assertNull(getTableInfoFor(db, "e1"));
+        assertNull(getTableInfoFor(db, "e2"));
+        assertNull(getTableInfoFor(db, "User_Stream"));
+        assertNull(getTableInfoFor(db, "User_Logins"));
+        assertNull(getTableInfoFor(db, "User_LoginLastTime"));
+    }
+
+    public void testBadDropStream() throws Exception {
+        // non-existent stream
+        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: e1.*",
+               "DROP STREAM e1;\n"
+                );
+
+        // non-stream table
+        badDDLAgainstSimpleSchema(".+Invalid DROP STREAM statement: table e2 is not a stream.*",
+                "CREATE TABLE e2 (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                        "DROP STREAM e2;\n"
+                );
+
+        // stream with referencing view
+        badDDLAgainstSimpleSchema(".+dependent objects exist:.*",
+                "CREATE STREAM User_Stream Partition On Column UserId" +
+                        " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                        "CREATE VIEW User_Logins (UserId, LoginCount)"  +
+                        " AS SELECT UserId, Count(*) FROM User_Stream GROUP BY UserId;\n" +
+                        "CREATE VIEW User_LoginLastTime (UserId, LoginCount, LoginLastTime)" +
+                        " AS SELECT UserId, Count(*), MAX(SessionStart) FROM User_Stream GROUP BY UserId;\n" +
+                        "DROP STREAM User_Stream;\n"
+                );
+
+        // stream with referencing procedure
+        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: USER_STREAM_2.*",
+                "CREATE STREAM User_Stream_2 Partition On Column UserId" +
+                        " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
+                        "CREATE PROCEDURE Enter_User PARTITION ON TABLE User_Stream_2 column UserId" +
+                        " AS INSERT INTO User_Stream_2 (UserId, SessionStart) VALUES (?,?);\n" +
+                        "DROP STREAM User_Stream_2 CASCADE;\n"
                 );
     }
 
