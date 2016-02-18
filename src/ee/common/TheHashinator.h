@@ -73,12 +73,6 @@ class TheHashinator {
             break;
         }
     }
-
-    /*
-     * Given a previously calculated hash value pick the partition to store the data in
-     */
-    virtual int32_t partitionForToken(int32_t hashCode) const = 0;
-
     virtual ~TheHashinator() {}
 
   protected:

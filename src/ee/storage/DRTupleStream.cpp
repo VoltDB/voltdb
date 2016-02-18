@@ -95,18 +95,6 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::updateTxnHash(TableTuple &tuple, int partitionColumn) {
-    if (partitionColumn != -1 && m_txnPkHash != LONG_MAX) {
-        int64_t txnPkHash = (int64_t)tuple.getNValue(partitionColumn).murmurHash3();
-        if (m_txnPkHash == LONG_MIN) {
-            m_txnPkHash = txnPkHash;
-        }
-        else if (txnPkHash != m_txnPkHash) {
-            m_txnPkHash = LONG_MAX;
-        }
-    }
-}
-
 /*
  * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
@@ -116,7 +104,6 @@ void DRTupleStream::updateTxnHash(TableTuple &tuple, int partitionColumn) {
  */
 size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   char *tableHandle,
-                                  int partitionColumn,
                                   int64_t txnId,
                                   int64_t spHandle,
                                   int64_t uniqueId,
@@ -135,7 +122,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const std::vector<int>* interestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    updateTxnHash(tuple, partitionColumn);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -177,7 +163,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
 size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                          char *tableHandle,
-                                         int partitionColumn,
                                          int64_t txnId,
                                          int64_t spHandle,
                                          int64_t uniqueId,
@@ -198,7 +183,6 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     const std::vector<int>* dummyInterestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    updateTxnHash(oldTuple, partitionColumn);
 
     DRRecordType type = DR_RECORD_UPDATE;
     maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
@@ -367,8 +351,6 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_uso += io.position();
 
      m_opened = true;
-     // LONG_MIN means unassigned hash key; LONG_MAX means multiple hash keys
-     m_txnPkHash = LONG_MIN;
 }
 
 void DRTupleStream::endTransaction(int64_t uniqueId) {
@@ -422,7 +404,6 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
-    io.writeLong(m_txnPkHash);
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
     crc = vdbcrc::crc32cFinish(crc);
@@ -492,7 +473,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
         stream.endTransaction(uid);
         ii += 5;
