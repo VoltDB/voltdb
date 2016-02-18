@@ -40,6 +40,8 @@ import scala.util.Random;
 
 public class TestGeospatialIndexes extends RegressionSuite{
 
+    private Random m_random = new Random(777);
+
     public TestGeospatialIndexes(String name) {
         super(name);
     }
@@ -48,9 +50,8 @@ public class TestGeospatialIndexes extends RegressionSuite{
         private GeographyValue      m_polygon;
         private GeographyPointValue m_center;
         private GeographyPointValue m_pointInside;                          // point inside polygon which is not the center
-        private GeographyPointValue m_polygonCellVertex;                    // point which is the vertex of surrounding cell regular convex polygon but is outside the polygon
-        private GeographyPointValue m_pointOutSidePolygonCell;              // point which is outside the polygon's surrounding cell
-        private Random              m_random = new Random(999);             // used for randomly generating phi for first vertex of the polygon w.r.t center's latitude line
+        private GeographyPointValue m_pointNearCellOutsidePolygon;            // point which is the near cell boundary covering regular polygon and is outside the polygon
+        private GeographyPointValue m_pointOutsidePolygonCell;              // point which is outside the polygon's surrounding cell
         private final double        m_incrementFactor = 0.01;               // used to calculate point inside polygon with or without hole
 
         PolygonPoints(GeographyPointValue center,
@@ -72,17 +73,17 @@ public class TestGeospatialIndexes extends RegressionSuite{
             // generate point inside polygon
             m_pointInside = firstVertex.scale(m_center, sizeOfHole + m_incrementFactor);
 
-            // get the vertex of the cell covering the polygon
-            m_polygonCellVertex = GeographyPointValue.normalizeLngLat(m_center.getLongitude() + radiusInDegrees, m_center.getLatitude() + radiusInDegrees);
+            // get the point which is near or on the vertex of the cell covering the polygon and outside of the polygon
+            m_pointNearCellOutsidePolygon = GeographyPointValue.normalizeLngLat(m_center.getLongitude() + radiusInDegrees, m_center.getLatitude() + radiusInDegrees);
             // point outside the cell
-            m_pointOutSidePolygonCell = GeographyPointValue.normalizeLngLat(m_center.getLongitude() + radiusInDegrees + 1, m_center.getLatitude() + radiusInDegrees + 1);
+            m_pointOutsidePolygonCell = GeographyPointValue.normalizeLngLat(m_center.getLongitude() + radiusInDegrees + 1, m_center.getLatitude() + radiusInDegrees + 1);
         }
 
         GeographyValue getPolygon() { return m_polygon; }
         GeographyPointValue getCenter() { return m_center; }
         GeographyPointValue getInsidePoint() { return m_pointInside; }
-        GeographyPointValue getPolygonCellVertex() { return m_polygonCellVertex; }
-        GeographyPointValue getPointOutSidePolygon() { return m_pointOutSidePolygonCell; }
+        GeographyPointValue getPointNearCellOutsidePolygon() { return m_pointNearCellOutsidePolygon; }
+        GeographyPointValue getPointOutSidePolygon() { return m_pointOutsidePolygonCell; }
     };
 
     private List<PolygonPoints> m_generatedPolygonPoints = new ArrayList<PolygonPoints>();
@@ -91,16 +92,16 @@ public class TestGeospatialIndexes extends RegressionSuite{
     static private GeographyValue polygonWithVertexNearBoundingBox
             = new GeographyValue("POLYGON((-102.001 41.001, -102.003 41.003, -107.009 41.001, -107.012 38.003, -107.009 38.001, -102.003 38.001, -102.001 38.003, -102.001 41.001,))");
 
-    // Polygon almost in it's bounding box with 2 holes which are almost filling up most of it's bounding box
-    static private GeographyValue polygonWithVertexNearBoundingBoxWith2Holes
+    // Polygon with couples of holes formed using same outer ring as of polygon above
+    static private GeographyValue polygonWithVertexNearBoundingBoxWithHoles
             = new GeographyValue("POLYGON((-102.001 41.001, -102.003 41.003, -107.009 41.001, -107.012 38.003, -107.009 38.001, -102.003 38.001, -102.001 38.003, -102.001 41.001,),"
                                        + "(-105.001 40.8, -104.798 40.798, -104.798 40.298, -105.001 40.298, -105.001 40.8), "
                                        + "(-104.412 39.612, -104.412 39.412, -105.512 39.412, -105.512 39.612, -104.412 39.612), "
                                        + "(-103.001 40.8, -102.798 40.798, -102.798 40.298, -103.001 40.298, -103.001 40.8))");
 
-    static private GeographyPointValue pointBBVertexOutsidePolygon = new GeographyPointValue(-102.001, 41.003);    // vertex of bounding box
+    static private GeographyPointValue pointBBVertexOutsidePolygon = new GeographyPointValue(-102.001, 41.003);         // vertex of bounding box
     static private GeographyPointValue pointDisjointRegionCellNPolygon = new GeographyPointValue(-102.0011, 41.002);    // in disjoint region of polygon and bounding box
-    static private GeographyPointValue pointOutSidePolygon = new GeographyPointValue(-107.015, 41.002);    // outside bounding box and polygon
+    static private GeographyPointValue pointOutSidePolygon = new GeographyPointValue(-107.015, 41.002);                 // outside bounding box and polygon
     static private GeographyPointValue pointCentroidOfPolygonWithNoHole = new GeographyPointValue(-104.505, 39.517);
 
     static private void setupGeoSchema(VoltProjectBuilder project) throws IOException {
@@ -150,17 +151,17 @@ public class TestGeospatialIndexes extends RegressionSuite{
     // - one is at the vertex of bounding box of polygon and
     // - another one that is outside the bounding box of polygon.
     // All the generated data is populated in borders and places tables - indexed and non-indexed version.
-    // Randomly generated data is cached in m_polygonPoints list
+    // Generated data is cached in m_polygonPoints list and used in data verification later
     private void populateGeoTables(Client client) throws NoConnectionsException, IOException, ProcCallException {
         final int polygonRadius = 3;
         final int numberOfPolygonPoints = 8;
 
-        Random rand = new Random(777);
         // generate latitude and longitudes for somewhere in north-west hemisphere
-        final int longitude = rand.nextInt(10) - 178;   // generate longitude between -178 to -168
-        final int latitude = rand.nextInt(10) + 72;     // generate latitude between 82 to 72
+        final int longitude = m_random.nextInt(10) - 178;   // generate longitude between -178 to -168
+        final int latitude = m_random.nextInt(10) + 72;     // generate latitude between 82 to 72
         GeographyPointValue center = new GeographyPointValue(longitude, latitude);
-        // offset to use for generating new center of polygon.
+        // offset to use for generating new center of polygon. this is not randomized, it will generate polygons in same order
+        // almost around regular steps running from north-west to south-east
         final GeographyPointValue centerShiftOffset = new GeographyPointValue(2.1 * polygonRadius, -1 * polygonRadius);
 
         // triangles without holes
@@ -196,7 +197,7 @@ public class TestGeospatialIndexes extends RegressionSuite{
         client.callProcedure("PLACES.Insert", 0, pointOutSidePolygon);
 
         client.callProcedure("BORDERS.INSERT", 0, polygonWithVertexNearBoundingBox);
-        client.callProcedure("BORDERS.INSERT", 0, polygonWithVertexNearBoundingBoxWith2Holes);
+        client.callProcedure("BORDERS.INSERT", 0, polygonWithVertexNearBoundingBoxWithHoles);
 
         client.callProcedure("INDEXED_PLACES.Insert", 0, pointCentroidOfPolygonWithNoHole);
         client.callProcedure("INDEXED_PLACES.Insert", 0, pointDisjointRegionCellNPolygon);
@@ -204,26 +205,27 @@ public class TestGeospatialIndexes extends RegressionSuite{
         client.callProcedure("INDEXED_PLACES.Insert", 0, pointOutSidePolygon);
 
         client.callProcedure("INDEXED_BORDERS.INSERT", 0, polygonWithVertexNearBoundingBox);
-        client.callProcedure("INDEXED_BORDERS.INSERT", 0, polygonWithVertexNearBoundingBoxWith2Holes);
+        client.callProcedure("INDEXED_BORDERS.INSERT", 0, polygonWithVertexNearBoundingBoxWithHoles);
 
         int entryIndex = 0;
         for(PolygonPoints polygonPoints: m_generatedPolygonPoints) {
             entryIndex++;
             client.callProcedure("PLACES.Insert", entryIndex, polygonPoints.getCenter());
             client.callProcedure("PLACES.Insert", entryIndex, polygonPoints.getInsidePoint());
-            client.callProcedure("PLACES.Insert", entryIndex, polygonPoints.getPolygonCellVertex());
+            client.callProcedure("PLACES.Insert", entryIndex, polygonPoints.getPointNearCellOutsidePolygon());
             client.callProcedure("PLACES.Insert", entryIndex, polygonPoints.getPointOutSidePolygon());
             client.callProcedure("BORDERS.Insert", entryIndex, polygonPoints.getPolygon());
 
             client.callProcedure("INDEXED_PLACES.Insert", entryIndex, polygonPoints.getCenter());
             client.callProcedure("INDEXED_PLACES.Insert", entryIndex, polygonPoints.getInsidePoint());
-            client.callProcedure("INDEXED_PLACES.Insert", entryIndex, polygonPoints.getPolygonCellVertex());
+            client.callProcedure("INDEXED_PLACES.Insert", entryIndex, polygonPoints.getPointNearCellOutsidePolygon());
             client.callProcedure("INDEXED_PLACES.Insert", entryIndex, polygonPoints.getPointOutSidePolygon());
             client.callProcedure("INDEXED_BORDERS.Insert", entryIndex, polygonPoints.getPolygon());
         }
     }
 
     public void testContains() throws Exception{
+        System.out.println("Starting tests for Contains() ... ");
         Client client = getClient();
 
         populateGeoTables(client);
@@ -242,7 +244,6 @@ public class TestGeospatialIndexes extends RegressionSuite{
 
         sql = "Select * from BORDERS order by id, region;";
         resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
-        //System.out.println("borders: " + vt1.toString());
 
         sql = "Select * from INDEXED_BORDERS order by id, region;";
         resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -274,10 +275,10 @@ public class TestGeospatialIndexes extends RegressionSuite{
         assertApproximateContentOfTable(new Object[][]{{0, polygonWithVertexNearBoundingBox,           pointOutSidePolygon},
                                                        {0, polygonWithVertexNearBoundingBox,           pointDisjointRegionCellNPolygon},
                                                        {0, polygonWithVertexNearBoundingBox,           pointBBVertexOutsidePolygon},
-                                                       {0, polygonWithVertexNearBoundingBoxWith2Holes, pointOutSidePolygon},
-                                                       {0, polygonWithVertexNearBoundingBoxWith2Holes, pointCentroidOfPolygonWithNoHole},
-                                                       {0, polygonWithVertexNearBoundingBoxWith2Holes, pointDisjointRegionCellNPolygon},
-                                                       {0, polygonWithVertexNearBoundingBoxWith2Holes, pointBBVertexOutsidePolygon}},
+                                                       {0, polygonWithVertexNearBoundingBoxWithHoles, pointOutSidePolygon},
+                                                       {0, polygonWithVertexNearBoundingBoxWithHoles, pointCentroidOfPolygonWithNoHole},
+                                                       {0, polygonWithVertexNearBoundingBoxWithHoles, pointDisjointRegionCellNPolygon},
+                                                       {0, polygonWithVertexNearBoundingBoxWithHoles, pointBBVertexOutsidePolygon}},
                                         resultsUsingGeoIndex, EPSILON);
 
         // match the results of indexed and non-indexed tables
@@ -290,31 +291,84 @@ public class TestGeospatialIndexes extends RegressionSuite{
         assertTablesAreEqual(prefixMsg, resultsUsingGeoIndex, resultsFromNonGeoIndex);
 
         // Cross check Contains and NOT Contains result set from indexed and non-indexed tables
-        // match the Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
-        sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
-              + "where Contains(A.region, B.loc) and A.id = B.id "
-              + "order by A.id, A.region, B.loc;";
-        resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
-        sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
-                + "where Contains(A.region, B.loc) and A.id = B.id "
-                + "order by A.id, A.region, B.loc;";
-        resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
-        prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
-        resultsUsingGeoIndex.resetRowPosition();
-        assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+        if (isValgrind()) {
+            // test result with large data-set in test result does not work well in valgrind environment.
+            // So perform test by breaking it down into multiple queries so that each produces limited
+            // data-set produced for now in valgrind environment
 
-        // match the NOT Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
-        sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
-              + "where NOT Contains(A.region, B.loc) and A.id = B.id "
-              + "order by A.id, A.region, B.loc;";
-        resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
-        sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
-                + "where NOT Contains(A.region, B.loc) and A.id = B.id "
-                + "order by A.id, A.region, B.loc;";
-        resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
-        prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
-        resultsUsingGeoIndex.resetRowPosition();
-        assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+            // match the Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where Contains(A.region, B.loc) and A.id = B.id and A.id < 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                  + "where Contains(A.region, B.loc) and A.id = B.id and A.id < 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where Contains(A.region, B.loc) and A.id = B.id and A.id >= 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                  + "where Contains(A.region, B.loc) and A.id = B.id and A.id >= 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+
+            // match the NOT Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
+            prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where NOT Contains(A.region, B.loc) and A.id = B.id and A.id < 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                  + "where NOT Contains(A.region, B.loc) and A.id = B.id and A.id < 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+            resultsUsingGeoIndex.resetRowPosition();
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where NOT Contains(A.region, B.loc) and A.id = B.id and A.id >= 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                  + "where NOT Contains(A.region, B.loc) and A.id = B.id and A.id >= 25 "
+                  + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+        }
+        else {
+            // Cross check Contains and NOT Contains result set from indexed and non-indexed tables
+            // match the Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where Contains(A.region, B.loc) and A.id = B.id "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                    + "where Contains(A.region, B.loc) and A.id = B.id "
+                    + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+
+            // match the NOT Contains results on indexed and non-indexed tables with complete data set - fixed and pseudo-random generated
+            sql = "Select A.id, A.region, B.loc from INDEXED_BORDERS A, INDEXED_PLACES B "
+                  + "where NOT Contains(A.region, B.loc) and A.id = B.id "
+                  + "order by A.id, A.region, B.loc;";
+            resultsUsingGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            sql = "Select A.id, A.region, B.loc from BORDERS A, PLACES B "
+                    + "where NOT Contains(A.region, B.loc) and A.id = B.id "
+                    + "order by A.id, A.region, B.loc;";
+            resultsFromNonGeoIndex = client.callProcedure("@AdHoc", sql).getResults()[0];
+            prefixMsg = "Assertion failed comparing results of Contains on indexed with non-indexed tables: ";
+            assertTablesAreEqual(prefixMsg, resultsFromNonGeoIndex, resultsUsingGeoIndex);
+        }
 
         // Test parameterized Contains() - test with point argument to Contains() being parameterized
         // To verify this, point which is inside polygon is fetched from the cached generated data and is supplied to SP.
@@ -326,15 +380,14 @@ public class TestGeospatialIndexes extends RegressionSuite{
               + "where Contains(A.region, ?) and A.id > 0;";
         client.callProcedure("@AdHoc", sql);
 
-        //int indexEntry = 0;
         for (PolygonPoints polygonPoints: m_generatedPolygonPoints) {
-            //indexEntry ++;
             resultsUsingGeoIndex = client.callProcedure("PointInPolygon", polygonPoints.getInsidePoint()).getResults()[0];
-            //System.out.println("Entry: " + indexEntry + " " + resultsUsingGeoIndex.toString() + " " + polygonPoints.getInsidePoint());
             assertApproximateContentOfTable(new Object[][]{{polygonPoints.getPolygon()}}, resultsUsingGeoIndex, EPSILON);
         }
 
+        System.out.println(" ... Completed tests for Contains().");
     }
+
     static public junit.framework.Test suite() {
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestGeospatialIndexes.class);
