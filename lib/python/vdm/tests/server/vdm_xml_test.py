@@ -239,13 +239,11 @@ class Server(unittest.TestCase):
             url = URL + str(last_db_id) + '/servers/'
             response = requests.get(url)
             value = response.json()
-            print value
             if value:
                 server_length = len(value['members'])
                 last_server_id = value['members'][server_length - 1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
                 url = URL + str(last_db_id) + '/servers/' + str(last_server_id)
-                print url
                 response = requests.delete(url, json=db_data, headers=headers)
                 self.assertEqual(response.status_code, 200)
                 # Delete database
