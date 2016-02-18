@@ -582,7 +582,8 @@ def make_configuration_file():
 
 def sync_configuration():
     headers = {'content-type': 'application/json'}
-    url = 'http://' + __IP__ + ':' + str(__PORT__) + '/api/1.0/vdm/configuration/'
+    url = 'http://%s:%u/api/1.0/vdm/configuration/' % \
+          (__IP__,str(__PORT__))
     response = requests.post(url, headers=headers)
     return response
 
