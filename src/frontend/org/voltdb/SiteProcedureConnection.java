@@ -64,6 +64,11 @@ public interface SiteProcedureConnection {
     public int getCorrespondingClusterId();
 
     /**
+     * Get the site's Tracker for Applied DR Txns for the corresponding SiteProceducreConnection
+     */
+    public DRConsumerDrIdTracker getCorrespondingDrAppliedTxns(int producerClusterId, int producerPartitionId);
+
+    /**
      * Log settings changed. Signal EE to update log level.
      */
     public void updateBackendLogLevels();

@@ -423,11 +423,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackersForSnapshot()
         {
             return m_maxSeenDrLogsBySrcPartition;
         }
-
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {
@@ -856,6 +855,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public DRConsumerDrIdTracker getCorrespondingDrAppliedTxns(int producerClusterId, int producerPartitionId)
+    {
+        Map<Integer, DRConsumerDrIdTracker> producerPartitionMap = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
+        if (producerPartitionMap != null) {
+            DRConsumerDrIdTracker producerPartitionTracker = producerPartitionMap.get(producerPartitionId);
+            if (producerPartitionTracker != null) {
+                return producerPartitionTracker;
+            }
+        }
+        return new DRConsumerDrIdTracker(-1L, Long.MIN_VALUE, Long.MIN_VALUE);
     }
 
     @Override
