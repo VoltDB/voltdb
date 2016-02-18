@@ -36,7 +36,7 @@ public class UpdateBaseProc extends VoltProcedure {
 
     // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
     public final SQLStmt p_getCIDData = new SQLStmt(
-            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, rid desc;");
+            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc;");
 
     public final SQLStmt p_cleanUp = new SQLStmt(
             "DELETE FROM partitioned WHERE cid = ? and cnt < ?;");
@@ -67,6 +67,12 @@ public class UpdateBaseProc extends VoltProcedure {
 
     public final SQLStmt p_deleteExViewShadowData = new SQLStmt(
             "DELETE FROM ex_partview_shadow WHERE cid=?;");
+
+    public final SQLStmt p_updateExViewData = new SQLStmt(
+            "UPDATE ex_partview SET entries = ?, minimum = ?, maximum = ?, summation = ? WHERE cid=?;");
+
+    public final SQLStmt p_updateExViewShadowData = new SQLStmt(
+            "UPDATE ex_partview_shadow SET entries = ?, minimum = ?, maximum = ?, summation = ? WHERE cid=?;");
 
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
@@ -145,6 +151,15 @@ public class UpdateBaseProc extends VoltProcedure {
             validateView(cid, cnt, "insert");
         }
 
+        // update export materialized view & validate
+        int someData = (int)System.currentTimeMillis();
+        if (usestreamviews) {
+            voltQueueSQL(p_updateExViewData, someData, someData, someData, someData, cid);
+            voltQueueSQL(p_updateExViewShadowData, someData, someData, someData, someData, cid);
+            voltExecuteSQL();
+            validateView(cid, cnt, "update");
+        }
+
         // delete from export materialized view & validate
         if (usestreamviews) {
             voltQueueSQL(p_deleteExViewData, cid);
@@ -167,12 +182,17 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(p_getExViewData, cid);
         voltQueueSQL(p_getExViewShadowData, cid);
         VoltTable[] streamresults = voltExecuteSQL();
+//        for (int i = 0; i < 5; i++) {
+//          String n = streamresults[0].getColumnName(i);
+//          VoltType  t = streamresults[0].getColumnType(i);
+//          System.out.println("+++ " + n + ": " + t.toSQLString());
+//        }
         validateStreamData(type, streamresults[0], streamresults[1], cid, cnt);
     }
 
     @SuppressWarnings("deprecation")
     protected VoltTable[] doWorkInProcAdHoc(byte cid, long rid, byte[] value, byte shouldRollback) {
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
         voltQueueSQLExperimental("SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
         voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] results = voltExecuteSQL();
@@ -216,7 +236,7 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
-        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;", cid);
+        voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);
         voltQueueSQLExperimental("SELECT * FROM replview WHERE cid = ? ORDER BY cid desc;", cid);
         VoltTable[] retval = voltExecuteSQL();
         // Verify that our update happened.  The client is reporting data errors on this validation
@@ -321,11 +341,13 @@ public class UpdateBaseProc extends VoltProcedure {
             long shadow_min = row0.getLong("minimum");
             long shadow_sum = row0.getLong("summation");
 
-            // adjust the shadow values for updated cnt
-            shadow_entries++;
-            shadow_max = Math.max(shadow_max, v_max);
-            shadow_min = Math.min(shadow_min, v_min);
-            shadow_sum += cnt;
+            // adjust the shadow values for updated cnt, not done for "update"
+            if (type == "insert") {
+                shadow_entries++;
+                shadow_max = Math.max(shadow_max, v_max);
+                shadow_min = Math.min(shadow_min, v_min);
+                shadow_sum += cnt;
+            }
 
             if (v_entries != shadow_entries)
                 throw new VoltAbortException("View entries:" + v_entries +

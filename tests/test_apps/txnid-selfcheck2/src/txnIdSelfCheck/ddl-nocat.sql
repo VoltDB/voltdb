@@ -172,7 +172,7 @@ FROM partitioned_export GROUP BY cid;
 
 CREATE TABLE ex_partview_shadow (
     cid tinyint not null,
-    entries bigint,
+    entries int,
     maximum bigint,
     minimum bigint,
     summation bigint,

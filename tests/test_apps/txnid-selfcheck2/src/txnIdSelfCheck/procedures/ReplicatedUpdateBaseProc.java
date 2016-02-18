@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
     public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;");
 
     public final SQLStmt r_cleanUp = new SQLStmt(
             "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
