@@ -2266,14 +2266,11 @@ class StatusDatabaseAPI(MethodView):
                 return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
 
             if response.json()['status'] == "stalled":
-                if not has_stalled:
-                    has_stalled = True
+                has_stalled = True
             elif response.json()['status'] == "running":
-                if not has_run:
-                    has_run = True
+                has_run = True
             elif response.json()['status'] == "stopped":
-                if not has_stopped:
-                    has_stopped = True
+                has_stopped = True
             serverDetails.append({server[0]['hostname']: response.json()})
 
         if has_stalled:
