@@ -1963,7 +1963,7 @@ class StopDatabaseAPI(MethodView):
                 response = server.stop_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
-                return make_response(jsonify({'statusstring': response}), 200)
+                return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),

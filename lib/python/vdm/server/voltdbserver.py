@@ -328,14 +328,14 @@ class VoltDatabase:
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s?force=false') % \
                                   (curr['hostname'], HTTPListener.__PORT__, self.database_id, server_id, 'stop')
                 response = requests.put(url)
-                server_status[curr['hostname']] = json.loads(response.text)
-                if response.status_code != requests.codes.ok:
-                    failed = True
+                server_status[curr['hostname']] = response.text
+                # if response.status_code != requests.codes.ok:
+                #     failed = True
 
             except Exception, err:
-                failed = True
+                # failed = True
                 print traceback.format_exc()
-                server_status[curr['hostname']] = json.loads(response.text)
+                server_status[curr['hostname']] = response.text
 
     
         # args = [ '-H', server[0]['hostname'] ]
@@ -344,10 +344,8 @@ class VoltDatabase:
         # outfilename = os.path.join(HTTPListener.Global.PATH,
         #         ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
         # return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
-        if failed:
-            return create_response(server_status,200)
-        else:
-            return create_response(server_status, 200)
+
+        return create_response(json.dumps(server_status), 200)
 
     def run_voltdb_cmd(self, cmd, verb, args, outfilename):
         """
@@ -417,12 +415,12 @@ class VoltDatabase:
         if not server:
             return create_response('Server details not found for id ' + server_id, 404)
     
-        args = [ '-H', server[0]['hostname'], server[0]['name'] ]
+        args = [ '-H', server[0]['hostname']]
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,
                 ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
-        return self.run_voltdb_cmd('voltadmin', 'stop', args, outfilename)
+        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
 
     def kill_database(self, database_id):
         members = []
