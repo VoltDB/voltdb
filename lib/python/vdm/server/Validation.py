@@ -309,7 +309,7 @@ schema = {
                     "properties": {
                         "prefix": {
                             "id": "prefix",
-                            "type": "boolean"
+                            "type": "string"
                         }
                     },
                     "additionalProperties": False
@@ -580,7 +580,7 @@ schema = {
                             "id": "time",
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 1000
+                            "maximum": 5000
                         },
                         "transactions": {
                             "id": "transactions",
@@ -603,7 +603,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 3000
+                    "maximum": 102400
                 }
             },
             "additionalProperties": False

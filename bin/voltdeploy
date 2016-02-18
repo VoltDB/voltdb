@@ -80,7 +80,3 @@ if options.virtual is not None:
         venv_starter.start_virtual_environment(arr, array_packages)
 else:
     venv_starter.start_virtual_environment(arr, array_packages)
-
-
-
-
