@@ -1951,22 +1951,47 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-        is_force = request.args.get('force')
+        is_force = request.args.get('force').lower()
 
-        if is_force == "false":
+        if is_force == "true":
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.kill_database(database_id)
+
+        else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
-                return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
+                return make_response(jsonify({'statusstring': response}), 200)
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
                                      500)
-        else:
+
+
+class StopServerAPI(MethodView):
+    """Class to handle request to stop a server."""
+
+    @staticmethod
+    def put(database_id, server_id):
+        """
+        Stops VoltDB database server on the specified server
+        Args:
+            database_id (int): The id of the database that should be stopped
+            server_id (int): The id of the server node that is to be stopped
+        Returns:
+            Status string indicating if the stop request was sent successfully
+        """
+
+        try:
             server = voltdbserver.VoltDatabase(database_id)
-            return server.kill_database(database_id)
+            response = server.kill_server(server_id)
+            return response
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
 
 
 class StartServerAPI(MethodView):
@@ -1990,6 +2015,7 @@ class StartServerAPI(MethodView):
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
+
 
 class StartLocalServerAPI(MethodView):
     """Class to handle request to start local server for this database."""
@@ -2029,30 +2055,6 @@ class RecoverServerAPI(MethodView):
         try:
             server = voltdbserver.VoltDatabase(database_id)
             return server.check_and_start_local_server(True)
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
-
-
-class StopServerAPI(MethodView):
-    """Class to handle request to stop a server."""
-
-    @staticmethod
-    def put(database_id, server_id):
-        """
-        Stops VoltDB database server on the specified server
-        Args:
-            database_id (int): The id of the database that should be stopped
-            server_id (int): The id of the server node that is to be stopped
-        Returns:
-            Status string indicating if the stop request was sent successfully
-        """
-
-        try:
-            server = voltdbserver.VoltDatabase(database_id)
-            response = server.kill_server(server_id)
-            return response
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),

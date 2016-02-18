@@ -341,11 +341,12 @@ class VoltDatabase:
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
 
-        outfile = open(outfilename, 'w')
 
-        shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.PIPE, close_fds=True)
+        shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
         exit_code = shutdown_proc.wait()
+
+        outfilename.write(output + error)
         return output + error
 
     def is_security_enabled(self):
