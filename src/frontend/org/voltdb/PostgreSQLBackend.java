@@ -343,9 +343,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
                 ex.printStackTrace();
             }
-            if (TRANSFORMED_SQL_FILE_WRITER != null) {
-                TRANSFORMED_SQL_FILE_WRITER.close();
-                TRANSFORMED_SQL_FILE_WRITER = null;
+            if (transformedSqlFileWriter != null) {
+                transformedSqlFileWriter.close();
+                transformedSqlFileWriter = null;
             }
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);

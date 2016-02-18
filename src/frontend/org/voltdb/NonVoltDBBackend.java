@@ -58,7 +58,7 @@ public abstract class NonVoltDBBackend {
     protected static NonVoltDBBackend m_backend = null;
     protected String m_database_type = null;
     protected Connection dbconn;
-    protected static FileWriter TRANSFORMED_SQL_FILE_WRITER;
+    protected static FileWriter transformedSqlFileWriter;
     protected static final boolean DEBUG = false;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
@@ -83,14 +83,14 @@ public abstract class NonVoltDBBackend {
         // If '-Dsqlcoverage.transform.sql.file=...' was specified on the
         // command line, print info when transforming SQL statements into
         // a format that the backend database can understand
-        String transformSqlOutputFile = System.getProperty("sqlcoverage.transform.sql.file", null);
-        if (transformSqlOutputFile == null) {
-            TRANSFORMED_SQL_FILE_WRITER = null;
+        String transformedSqlOutputFileName = System.getProperty("sqlcoverage.transform.sql.file", null);
+        if (transformedSqlOutputFileName == null) {
+            transformedSqlFileWriter = null;
         } else {
             try {
-                TRANSFORMED_SQL_FILE_WRITER = new FileWriter(transformSqlOutputFile, true);
+                transformedSqlFileWriter = new FileWriter(transformedSqlOutputFileName, true);
             } catch (IOException e) {
-                TRANSFORMED_SQL_FILE_WRITER = null;
+                transformedSqlFileWriter = null;
                 System.out.println("Caught IOException:\n    " + e
                         + "\nTransformed SQL output will not be printed.");
             }
@@ -460,10 +460,10 @@ public abstract class NonVoltDBBackend {
      *  the original and modified SQL are not the same, i.e., only if some
      *  transformation has indeed taken place. */
     static protected void printTransformedSql(String originalSql, String modifiedSql) {
-        if (TRANSFORMED_SQL_FILE_WRITER != null && !originalSql.equals(modifiedSql)) {
+        if (transformedSqlFileWriter != null && !originalSql.equals(modifiedSql)) {
             try {
-                TRANSFORMED_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
-                TRANSFORMED_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
+                transformedSqlFileWriter.write("original SQL: " + originalSql + "\n");
+                transformedSqlFileWriter.write("modified SQL: " + modifiedSql + "\n");
             } catch (IOException e) {
                 System.out.println("Caught IOException:\n    " + e);
                 System.out.println("original SQL: " + originalSql);
