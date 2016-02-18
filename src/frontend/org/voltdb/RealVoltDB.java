@@ -132,6 +132,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
+import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -479,6 +480,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             Map<Integer, String> hostGroups = null;
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
+
+            PathsType paths = m_catalogContext.getDeployment().getPaths();
+            File voltDbRoot;
+            if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null)
+                voltDbRoot = new VoltFile("voltdbroot");
+            else
+                voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+            if (voltDbRoot.exists() && voltDbRoot.list().length > 0) {
+                if (config.m_forceVoltdbrootCreate) {
+                    try {
+                        VoltFile.recursivelyDelete(voltDbRoot);
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB("Unable to delete the contents of voltdbroot.", false, e);
+                    }
+                } else if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
+                    VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + voltDbRoot.getAbsolutePath() +
+                                            ". Use the recover command to restore the previous database or use create --force " +
+                                            "to delete the directory and create a new database session.");
+                }
+            }
+
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
