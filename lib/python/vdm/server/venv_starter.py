@@ -214,7 +214,7 @@ def start_virtual_environment(arr, packages=None, verbose=False):
         venv_complete = True
         # the virtual environment's Python.
         python = os.path.join(venv_dir, 'bin', 'python')
-        args = [python, os.path.join(G.base_dir, 'lib/python/vdm/runner.py')]
+        args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
         if arr[0]['filepath'] is not None:
             args.append('-p' + str(arr[0]['filepath']))
         if arr[0]['server'] is not None:
