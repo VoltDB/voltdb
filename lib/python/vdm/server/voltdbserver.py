@@ -345,8 +345,8 @@ class VoltDatabase:
         shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
         exit_code = shutdown_proc.wait()
-
-        outfilename.write(output + error)
+        target = open(outfilename, 'w')
+        target.write(str(output + error))
         return output + error
 
     def is_security_enabled(self):
