@@ -135,10 +135,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
         msgsize += 8; // txnId
-        msgsize += 8; // localDrUniqueId
-        msgsize += 8; // binaryLogDRId
-        msgsize += 8; // binaryLogSpUniqueId
-        msgsize += 8; // binaryLogMpUniqueId
         if (m_payload != null) {
             msgsize += m_payload.getSerializedSize();
         }

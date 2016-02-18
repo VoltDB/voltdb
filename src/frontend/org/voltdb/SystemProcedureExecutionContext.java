@@ -87,7 +87,7 @@ public interface SystemProcedureExecutionContext {
     void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                   DRConsumerDrIdTracker tracker);
 
-    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns();
+    public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

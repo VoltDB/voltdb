@@ -423,11 +423,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
             return m_maxSeenDrLogsBySrcPartition;
         }
-
 
         @Override
         public Procedure ensureDefaultProcLoaded(String procName) {

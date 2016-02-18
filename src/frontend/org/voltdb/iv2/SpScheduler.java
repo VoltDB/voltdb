@@ -37,7 +37,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -149,15 +148,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
-
-    /*
-     * Track the last producer-cluster unique IDs and drIds associated with an
-     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
-     *  ReplicaDRGateway on repair
-     */
-    private Map<Integer, DRConsumerDrIdTracker> m_maxSeenDrLogsBySrcPartition;
-    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
