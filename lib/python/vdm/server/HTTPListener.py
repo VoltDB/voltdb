@@ -1984,14 +1984,27 @@ class StopServerAPI(MethodView):
             Status string indicating if the stop request was sent successfully
         """
 
-        try:
-            server = voltdbserver.VoltDatabase(database_id)
-            response = server.kill_server(server_id)
-            return response
-        except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
+        is_force = request.args.get('force').lower()
+
+        if is_force == "true":
+            try:
+                server = voltdbserver.VoltDatabase(database_id)
+                response = server.kill_server(server_id)
+                return response
+            except Exception, err:
+                print traceback.format_exc()
+                return make_response(jsonify({'statusstring': str(err)}),
+                                     500)
+        else:
+            try:
+                server = voltdbserver.VoltDatabase(database_id)
+                response = server.stop_server(server_id)
+                return response
+            except Exception, err:
+                print traceback.format_exc()
+                return make_response(jsonify({'statusstring': str(err)}),
+                                     500)
+
 
 
 class StartServerAPI(MethodView):
