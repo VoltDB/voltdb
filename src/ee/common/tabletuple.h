@@ -59,6 +59,10 @@
 #include <vector>
 #include <jsoncpp/jsoncpp.h>
 
+#ifndef NDEBUG
+#include "debuglog.h"
+#endif /* !define(NDEBUG) */
+
 class CopyOnWriteTest_TestTableTupleFlags;
 
 namespace voltdb {
@@ -110,7 +114,12 @@ public:
      * backing store
      */
     inline void move(void *address) {
-        assert(m_schema);
+#ifndef  NDEBUG
+        if (m_schema == NULL && address != NULL) {
+            StackTrace::printStackTrace();
+        }
+#endif
+        assert(m_schema != NULL || address == NULL);
         m_data = reinterpret_cast<char*> (address);
     }
 
@@ -350,7 +359,7 @@ public:
     }
 
     /** Copy values from one tuple into another (uses memcpy) */
-    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
+    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
@@ -374,7 +383,7 @@ public:
                        int colOffset, uint8_t *nullArray,
                        const std::vector<int>* interestingColumns);
 
-    void freeObjectColumns();
+    void freeObjectColumns() const;
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
 
@@ -683,7 +692,8 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 /*
  * With a persistent insert the copy should do an allocation for all uninlinable strings
  */
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) {
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) const
+{
     assert(m_schema);
     assert(source.m_schema);
     assert(source.m_data);
@@ -1026,7 +1036,7 @@ inline size_t TableTuple::hashCode() const {
 /**
  * Release to the heap any memory allocated for any uninlined columns.
  */
-inline void TableTuple::freeObjectColumns() {
+inline void TableTuple::freeObjectColumns() const {
     const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
     std::vector<char*> oldObjects;
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {

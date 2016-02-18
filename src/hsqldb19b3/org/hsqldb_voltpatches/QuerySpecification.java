@@ -256,7 +256,7 @@ public class QuerySpecification extends QueryExpression {
         resolveColumnReferencesInGroupBy();
     /**********************************************************************/
 
-        resolveColumnRefernecesInOrderBy(sortAndSlice);
+        resolveColumnReferencesInOrderBy(sortAndSlice);
     }
 
     /************************* Volt DB Extensions *************************/
@@ -350,7 +350,7 @@ public class QuerySpecification extends QueryExpression {
     }
     /**********************************************************************/
 
-    void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
+    void resolveColumnReferencesInOrderBy(SortAndSlice sortAndSlice) {
 
         // replace the aliases with expressions
         // replace column names with expressions and resolve the table columns

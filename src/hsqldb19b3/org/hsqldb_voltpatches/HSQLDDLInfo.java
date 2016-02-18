@@ -48,7 +48,7 @@ public class HSQLDDLInfo {
      * TABLE, INDEX or VIEW
      */
     public static enum Noun {
-        TABLE, INDEX, VIEW;
+        TABLE, INDEX, VIEW, STREAM;
 
         public static Noun get(String name) {
             if (name.equalsIgnoreCase("TABLE")) {
@@ -59,6 +59,9 @@ public class HSQLDDLInfo {
             }
             else if (name.equalsIgnoreCase("VIEW")) {
                 return VIEW;
+            }
+            else if (name.equalsIgnoreCase("STREAM")) {
+                return STREAM;
             }
             else {
                 return null;
@@ -75,13 +78,15 @@ public class HSQLDDLInfo {
     public final String secondName;
     public final boolean cascade;
     public final boolean ifexists;
+    public final boolean creatStream;
 
     public HSQLDDLInfo(HSQLDDLInfo.Verb verb,
                        HSQLDDLInfo.Noun noun,
                        String name,
                        String secondName,
                        boolean cascade,
-                       boolean ifexists)
+                       boolean ifexists,
+                       boolean createStream)
     {
         this.verb = verb;
         this.noun = noun;
@@ -89,5 +94,6 @@ public class HSQLDDLInfo {
         this.secondName = secondName;
         this.cascade = cascade;
         this.ifexists = ifexists;
+        this.creatStream = createStream;
     }
 }
