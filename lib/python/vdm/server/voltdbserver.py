@@ -69,15 +69,23 @@ def get_voltdb_dir():
     return os.path.realpath(os.path.join(HTTPListener.Global.MODULE_PATH, '../../../..', 'bin'))
 
 
-def check_snapshot_folder():
-    outfilename = os.path.join(HTTPListener.Global.PATH, "voltdbroot/snapshots")
+def check_snapshot_folder(database_id):
+    deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+    if len(deployment) > 0:
+        if 'paths' in deployment[0] and 'voltdbroot' in deployment[0]['paths'] and 'snapshots' in deployment[0]['paths']:
+            voltdb_root = deployment[0]['paths']['voltdbroot']['path']
+            snapshot = deployment[0]['paths']['snapshots']['path']
 
-    if os.path.isdir(outfilename):
-        freshStart = False
+            outfilename = os.path.join(HTTPListener.Global.PATH, str(voltdb_root), str(snapshot))
+            if os.path.isdir(outfilename):
+                freshStart = False
+            else:
+                freshStart = True
+            return freshStart
+        else:
+            return True
     else:
-        freshStart = True
-    return freshStart
-
+        return True
 
 def create_response(statusstr, statuscode):
     """

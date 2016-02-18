@@ -2249,8 +2249,8 @@ class StatusDatabaseAPI(MethodView):
                   (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
             try:
                 response = requests.get(url)
-            except:
-                return jsonify({'status':'error', 'hostname':server[0]['hostname']})
+            except Exception, err:
+                return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
 
             if response.json()['status'] == "stalled":
                 if not has_stalled:
@@ -2272,7 +2272,7 @@ class StatusDatabaseAPI(MethodView):
         elif has_stopped and not has_stalled and not has_run:
             status.append({'status': 'stopped'})
 
-        isFreshStart = voltdbserver.check_snapshot_folder()
+        isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
         return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
 
