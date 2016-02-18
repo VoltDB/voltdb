@@ -1970,6 +1970,30 @@ class StopDatabaseAPI(MethodView):
                                      500)
 
 
+class StopServerAPI(MethodView):
+    """Class to handle request to stop a server."""
+
+    @staticmethod
+    def put(database_id, server_id):
+        """
+        Stops VoltDB database server on the specified server
+        Args:
+            database_id (int): The id of the database that should be stopped
+            server_id (int): The id of the server node that is to be stopped
+        Returns:
+            Status string indicating if the stop request was sent successfully
+        """
+
+        try:
+            server = voltdbserver.VoltDatabase(database_id)
+            response = server.kill_server(server_id)
+            return response
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
+
+
 class StartServerAPI(MethodView):
     """Class to handle request to start a server for this database."""
 
