@@ -202,7 +202,7 @@ class VoltDatabase:
         if (retcode == 0):
             return create_response('Success', 200)
         else:
-            return create_response(Log.get_error_log_details(), 500)
+            return create_response('Error', 500)
             # return create_response('Error starting server', 500)
     
     def is_voltserver_running(self):
@@ -337,21 +337,10 @@ class VoltDatabase:
                                   (curr['hostname'], HTTPListener.__PORT__, self.database_id, server_id, 'stop')
                 response = requests.put(url)
                 server_status[curr['hostname']] = response.text
-                # if response.status_code != requests.codes.ok:
-                #     failed = True
 
             except Exception, err:
-                # failed = True
                 print traceback.format_exc()
                 server_status[curr['hostname']] = response.text
-
-    
-        # args = [ '-H', server[0]['hostname'] ]
-        #
-        # G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
-        # outfilename = os.path.join(HTTPListener.Global.PATH,
-        #         ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
-        # return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
 
         return create_response(json.dumps(server_status), 200)
 
