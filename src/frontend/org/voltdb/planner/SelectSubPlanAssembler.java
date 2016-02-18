@@ -38,9 +38,11 @@ import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.PermutationGenerator;
 
 /**
@@ -575,18 +577,34 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (canHaveNLJ) {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             // get all the clauses that join the applicable two tables
-            ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
-            if (innerPlan instanceof IndexScanPlanNode) {
-                // InnerPlan is an IndexScan. In this case the inner and inner-outer
-                // non-index join expressions (if any) are in the otherExpr. The former should stay as
-                // an IndexScanPlan predicate and the latter stay at the NLJ node as a join predicate
+            // Copy innerAccessPath.joinExprs to leave it unchanged,
+            // avoiding accumulation of redundant expressions when
+            // joinClauses gets built up for various alternative plans.
+            ArrayList<AbstractExpression> joinClauses = new ArrayList<>(innerAccessPath.joinExprs);
+            if ((innerPlan instanceof IndexScanPlanNode) ||
+                (innerPlan instanceof NestLoopIndexPlanNode
+                    && innerPlan.getChild(0) instanceof MaterializedScanPlanNode)) {
+                // InnerPlan is an IndexScan OR an NLIJ of a MaterializedScan
+                // (IN LIST) and an IndexScan. In this case, the inner and
+                // inner-outer non-index join expressions (if any) are in the
+                // indexScan's otherExpr. The former should stay as IndexScanPlan
+                // predicates but the latter need to be pulled up into NLJ
+                // predicates because the IndexScan is executed once, not once
+                // per outer tuple.
                 ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
                 // PLEASE do not update the "innerAccessPath.otherExprs", it may be reused
                 // for other path evaluation on the other outer side join.
                 List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs, otherExprs);
                 joinClauses.addAll(otherExprs);
-                AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
-                ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
+                IndexScanPlanNode scanNode = null;
+                if (innerPlan instanceof IndexScanPlanNode) {
+                    scanNode = (IndexScanPlanNode)innerPlan;
+                }
+                else {
+                    scanNode = (IndexScanPlanNode)
+                            innerPlan.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+                }
+                scanNode.setPredicate(innerExpr);
             }
             else if (innerJoinNode instanceof BranchNode && joinNode.getJoinType() == JoinType.LEFT) {
                 // If the innerJoinNode is a LEAF node OR if the join type is an INNER join,
@@ -623,7 +641,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
             // Set IndexScan predicate
-            innerNode.setPredicate(ExpressionUtil.combine(innerAccessPath.otherExprs));
+            innerNode.setPredicate(innerAccessPath.otherExprs);
 
             nlijNode.addInlinePlanNode(innerPlan);
 

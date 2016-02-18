@@ -44,6 +44,17 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
+    public static AbstractExpression cloneAndCombinePredicates(List<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
+            return null;
+        }
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (AbstractExpression expr : exps) {
+            stack.add((AbstractExpression)expr.clone());
+        }
+        return combineStack(stack);
+    }
+
     /**
      *
      * @param exps
@@ -55,6 +66,10 @@ public abstract class ExpressionUtil {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
+        return combineStack(stack);
+    }
+
+    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.
