@@ -325,7 +325,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     @Override
     public void runDDL(String ddl) {
         String modifiedDdl = transformDDL(ddl);
-        printTransformedSql(ddl, modifiedDdl, ddl != null && !ddl.equals(modifiedDdl));
+        printTransformedSql(ddl, modifiedDdl);
         super.runDDL(modifiedDdl, false);
     }
 
@@ -335,7 +335,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     @Override
     public VoltTable runDML(String dml) {
         String modifiedDml = transformDML(dml);
-        printTransformedSql(dml, modifiedDml, dml != null && !dml.equals(modifiedDml));
+        printTransformedSql(dml, modifiedDml);
         return super.runDML(modifiedDml, false);
     }
 

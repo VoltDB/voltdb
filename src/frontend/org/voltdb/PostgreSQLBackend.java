@@ -285,8 +285,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  work to the base class version. */
     protected void runDDL(String ddl, boolean transformDdl) {
         String modifiedDdl = (transformDdl ? transformDDL(ddl) : ddl);
-        printTransformedSql(ddl, modifiedDdl, transformDdl
-                && ddl != null && !ddl.equals(modifiedDdl));
+        printTransformedSql(ddl, modifiedDdl);
         super.runDDL(modifiedDdl);
     }
 
@@ -316,8 +315,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  class version. */
     protected VoltTable runDML(String dml, boolean transformDml) {
         String modifiedDml = (transformDml ? transformDML(dml) : dml);
-        printTransformedSql(dml, modifiedDml, transformDml
-                && dml != null && !dml.equals(modifiedDml));
+        printTransformedSql(dml, modifiedDml);
         return super.runDML(modifiedDml);
     }
 

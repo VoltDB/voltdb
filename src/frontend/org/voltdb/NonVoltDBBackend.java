@@ -56,12 +56,10 @@ public abstract class NonVoltDBBackend {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
     protected static final Object backendLock = new Object();
     protected static NonVoltDBBackend m_backend = null;
-
     protected String m_database_type = null;
     protected Connection dbconn;
-
+    protected static FileWriter TRANSFORMED_SQL_FILE_WRITER;
     protected static final boolean DEBUG = false;
-    protected static final FileWriter TRANSFORMED_SQL_FILE_WRITER;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
@@ -335,9 +333,12 @@ public abstract class NonVoltDBBackend {
 
     /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
      *  and <i>suffix</i> concatenated (in that order), but being careful not
-     *  to include more close-parentheses than open-parentheses; if the group
+     *  to include more close-parentheses than open-parentheses: if the group
      *  does contain more close-parens than open-parens, the <i>suffix</i> is
-     *  inserted before the extra close-parens, instead of at the very end. */
+     *  inserted just after the matching close-parens (i.e., after the number
+     *  of close-parens that equals the number of open-parens), instead of at
+     *  the very end; but if there are no open-parens, then the <i>suffix</i>
+     *  is inserted just before the first close-parens. */
     static private String handleParens(String group, String prefix, String suffix) {
         int numOpenParens  = numOccurencesOfCharIn(group, '(');
         int numCloseParens = numOccurencesOfCharIn(group, ')');
@@ -346,11 +347,11 @@ public abstract class NonVoltDBBackend {
         } else {  // numOpenParens < numCloseParens
             int index;
             if (numOpenParens == 0) {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', 1) - 1;
+                index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
             } else {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens);
+                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
             }
-            return (prefix + group.substring(0, index+1) + suffix + group.substring(index+1));
+            return (prefix + group.substring(0, index) + suffix + group.substring(index));
         }
     }
 
@@ -454,12 +455,12 @@ public abstract class NonVoltDBBackend {
         return result;
     }
 
-    /** Optionally (only if the <i>print</i> argument is true and
-     *  TRANSFORMED_SQL_FILE_WRITER is non-null), prints the original and
-     *  modified SQL statements, to a "Transformed SQL" output file, for the
-     *  current SQLCoverage test suite (if any). */
-    static protected void printTransformedSql(String originalSql, String modifiedSql, boolean print) {
-        if (print && TRANSFORMED_SQL_FILE_WRITER != null) {
+    /** Prints the original and modified SQL statements, to the "Transformed
+     *  SQL" output file, assuming that that file is defined; and only if
+     *  the original and modified SQL are not the same, i.e., only if some
+     *  transformation has indeed taken place. */
+    static protected void printTransformedSql(String originalSql, String modifiedSql) {
+        if (TRANSFORMED_SQL_FILE_WRITER != null && !originalSql.equals(modifiedSql)) {
             try {
                 TRANSFORMED_SQL_FILE_WRITER.write("original SQL: " + originalSql + "\n");
                 TRANSFORMED_SQL_FILE_WRITER.write("modified SQL: " + modifiedSql + "\n");
