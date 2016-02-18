@@ -1969,26 +1969,6 @@ class StopDatabaseAPI(MethodView):
             return server.kill_database(database_id)
 
 
-    # @staticmethod
-    # def put(database_id):
-    #
-    #     """
-    #     Stops the specified VoltDB
-    #     Args:
-    #         database_id (int): The id of the database that should be stopped
-    #     Returns:
-    #         Status string indicating if the stop request was sent successfully
-    #     """
-    #     # try:
-    #     #     test = Get_Voltdb_Process().processId
-    #     #     # os.kill(Get_Voltdb_Process().processId, signal.SIGTERM)
-    #     #     return make_response(jsonify({'statusstring': 'success'}), 200)
-    #     # except Exception, err:
-    #     #     return make_response(jsonify({'statusstring': str(err)}), 500)
-    #     server = voltdbserver.VoltDatabase(database_id)
-    #     return server.kill_database(database_id)
-
-
 class StartServerAPI(MethodView):
     """Class to handle request to start a server for this database."""
 
@@ -2340,7 +2320,6 @@ def main(runner, amodule, config_dir, server):
     global __IP__
     global __PORT__
 
-    # config_path = config_dir + '/' + 'vdm.xml'
     config_path = os.path.join(config_dir, 'vdm.xml')
 
     arrServer = {}
