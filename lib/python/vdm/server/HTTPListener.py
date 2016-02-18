@@ -1382,33 +1382,43 @@ class ServerAPI(MethodView):
     """Class to handle requests related to server"""
 
     @staticmethod
-    def get(database_id,server_id):
+    def get(database_id, server_id = None):
         """
-        Gets the information of the server with specified server_id. If the server_id is
-        not specified, then it returns the information of all the servers.
+        Get the members of the database with specified database_id.
         Args:
-            server_id (int): The first parameter. Defaults to None.
+            database_id (int): The first parameter.
         Returns:
-            server or list of servers.
+            List of member ids related to specified database.
         """
 
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
-        if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
-        else:
-            members = database[0]['members']
-
-        if server_id in members:
-            get_configuration()
-            if server_id is None:
-                return jsonify({'servers': [make_public_server(x) for x in Global.SERVERS]})
+        if server_id is None:
+            servers = []
+            database = [database for database in Global.DATABASES if database['id'] == database_id]
+            if len(database) == 0:
+                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
             else:
+                members = database[0]['members']
+
+            for servers_id in members:
+                server = [server for server in Global.SERVERS if server['id'] == servers_id]
+                if not server:
+                    return make_response(jsonify( { 'statusstring': 'Server details not found for id: %u' % server_id } ), 404)
+                servers.append(server[0])
+
+            return jsonify({'members': servers})
+        else:
+            database = [database for database in Global.DATABASES if database['id'] == database_id]
+            if len(database) == 0:
+                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+            else:
+                members = database[0]['members']
+            if server_id in members:
                 server = [server for server in Global.SERVERS if server['id'] == server_id]
                 if not server:
                     abort(404)
                 return jsonify({'server': make_public_server(server[0])})
-        else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
+            else:
+                return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
 
     @staticmethod
     def post(database_id):
@@ -1683,63 +1693,6 @@ class DatabaseAPI(MethodView):
         return jsonify({'result': True})
 
 
-class DatabaseMemberAPI(MethodView):
-    """
-    Class to handle request related to database member.
-    """
-
-    @staticmethod
-    def get(database_id):
-        """
-        Get the members of the database with specified database_id.
-        Args:
-            database_id (int): The first parameter.
-        Returns:
-            List of member ids related to specified database.
-        """
-        servers = []
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
-        if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
-        else:
-            members = database[0]['members']
-
-        for server_id in members:
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
-            if not server:
-                return make_response(jsonify( { 'statusstring': 'Server details not found for id: %u' % server_id } ), 404)
-            servers.append(server[0])
-
-        return jsonify({'members': servers})
-
-    @staticmethod
-    def put(database_id):
-        """
-        Add members to the database with specified database_id.
-        Args:
-            database_id (int): The first parameter.
-        Returns:
-            List of member ids related to specified database.
-        """
-        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-        if len(current_database) == 0:
-            abort(404)
-        if not request.json:
-            abort(400)
-
-        # if 'members' not in request.json:
-        for member_id in request.json['members']:
-            current_server = [server for server in Global.SERVERS if server['id'] == member_id]
-            if len(current_server) == 0:
-                return jsonify({'error': 'Server id %d does not exists' % member_id})
-
-            if member_id not in current_database[0]['members']:
-                current_database[0]['members'].append(member_id)
-        sync_configuration()
-        write_configuration_file()
-        return jsonify({'members': current_database[0]['members'], 'status': 1})
-
-
 class deploymentAPI(MethodView):
     """Class to handle request related to deployment."""
 
@@ -2004,7 +1957,6 @@ class StopServerAPI(MethodView):
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
                                      500)
-
 
 
 class StartServerAPI(MethodView):
@@ -2381,7 +2333,6 @@ def main(runner, amodule, config_dir, server):
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
     STOP_DATABASE_VIEW = StopDatabaseAPI.as_view('stop_database_api')
     RECOVER_DATABASE_VIEW = RecoverDatabaseAPI.as_view('recover_database_api')
-    DATABASE_MEMBER_VIEW = DatabaseMemberAPI.as_view('database_member_api')
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
@@ -2392,17 +2343,15 @@ def main(runner, amodule, config_dir, server):
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
-
     APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
                      view_func=DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
     APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/',
-                     view_func=DATABASE_MEMBER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
