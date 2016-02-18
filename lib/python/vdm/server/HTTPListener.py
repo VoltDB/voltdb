@@ -1484,14 +1484,6 @@ class ServerAPI(MethodView):
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
-            # Check if server is referenced by database
-            for database in Global.DATABASES:
-                if database["id"] == database_id:
-                    continue
-                if server_id in database["members"]:
-                    return jsonify({'success': "Server deleted from given member list only. "
-                                               "Server cannot be deleted completely since"
-                                               " it is referred by database."})
 
             Global.SERVERS.remove(server[0])
             sync_configuration()
