@@ -237,7 +237,7 @@ final class RangeVariable {
      *
      * @param tableName
      * @param columnName
-     * @return
+     * @return the column index or -1 if the column name is in a using list.
      */
     public int findColumn(String tableName, String columnName) {
         // The namedJoinColumnExpressions are ExpressionColumn objects

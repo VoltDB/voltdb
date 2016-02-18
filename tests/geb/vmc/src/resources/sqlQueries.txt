@@ -2,61 +2,128 @@
 # Rows starting with '#', and blank lines, will be ignored
 #
 
-# rowid                     BIGINT        NOT NULL
-# rowid_group               TINYINT       NOT NULL
+# Column definitions (names, types, nullable), for partitioned_table and replicated_table:
+# rowid                     BIGINT          NOT NULL
+# rowid_group               TINYINT         NOT NULL
 # type_null_tinyint         TINYINT
-# type_not_null_tinyint     TINYINT       NOT NULL
+# type_not_null_tinyint     TINYINT         NOT NULL
 # type_null_smallint        SMALLINT
-# type_not_null_smallint    SMALLINT      NOT NULL
+# type_not_null_smallint    SMALLINT        NOT NULL
 # type_null_integer         INTEGER
-# type_not_null_integer     INTEGER       NOT NULL
+# type_not_null_integer     INTEGER         NOT NULL
 # type_null_bigint          BIGINT
-# type_not_null_bigint      BIGINT        NOT NULL
+# type_not_null_bigint      BIGINT          NOT NULL
 # type_null_timestamp       TIMESTAMP
-# type_not_null_timestamp   TIMESTAMP     NOT NULL
+# type_not_null_timestamp   TIMESTAMP       NOT NULL
 # type_null_float           FLOAT
-# type_not_null_float       FLOAT         NOT NULL
+# type_not_null_float       FLOAT           NOT NULL
 # type_null_decimal         DECIMAL
-# type_not_null_decimal     DECIMAL       NOT NULL
-# type_null_varchar25       'VARCHAR'(32)
-# type_not_null_varchar25   'VARCHAR'(32)   NOT NULL
-# type_null_varchar128      'VARCHAR'(128)
-# type_not_null_varchar128  'VARCHAR'(128)  NOT NULL
-# type_null_varchar1024     'VARCHAR'(1024)
-# type_not_null_varchar1024 'VARCHAR'(1024) NOT NULL
+# type_not_null_decimal     DECIMAL         NOT NULL
+# type_null_varchar25       VARCHAR(32)
+# type_not_null_varchar25   VARCHAR(32)     NOT NULL
+# type_null_varchar128      VARCHAR(128)
+# type_not_null_varchar128  VARCHAR(128)    NOT NULL
+# type_null_varchar1024     VARCHAR(1024)
+# type_not_null_varchar1024 VARCHAR(1024)   NOT NULL
+# type_null_point           GEOGRAPHY_POINT
+# type_not_null_point       GEOGRAPHY_POINT NOT NULL
+# type_null_polygon         GEOGRAPHY
+# type_not_null_polygon     GEOGRAPHY       NOT NULL
 # PRIMARY KEY (rowid)
-# 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f
+#
+# Typical insert values, for partitioned_table and replicated_table:
+# 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012',
+# 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f',
+# PointFromText('POINT(-23 23)'), PointFromText('POINT(24 -24)'),
+# PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))'), PolygonFromText('POLYGON((26 22, 25 23, 25 22, 26 22))')
+
+#
+# FIRST, SET "VARIABLES" USED IN SUBSEQUENT TESTS
+#
+{"testName":"SetVariables",
+# For the columns of each data type, the insert values used in most tests:
+    "__standard_int_values"     :"1, 2, 3, 4, 5, 6, 7, 8, 9, 10,",
+    "__standard_time_values"    :"'2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012',",
+    "__standard_float_values"   :"13.3, 14.4, 15.5, 16.6,",
+    "__standard_varchar_values" :"'a', 'b', 'c', 'd', 'e', 'f',\n ",
+    "__standard_point_values"   :"PointFromText('POINT(-23 23)'), PointFromText('POINT(24 -24)'),",
+    "__standard_polygon_values" :"PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))'), PolygonFromText('POLYGON((26 22, 25 23, 25 22, 26 22))')",
+# Some useful combinations of the above variables:
+    "__standard_geo_values"     :"__standard_point_values __standard_polygon_values",
+    "__standard_num_values"     :"__standard_int_values __standard_time_values __standard_float_values",
+    "__standard_non_num_values" :"__standard_varchar_values __standard_geo_values",
+    "__standard_non_int_values" :"__standard_time_values __standard_float_values __standard_non_num_values",
+# All of the usual insert values:
+    "__standard_insert_values"  :"__standard_num_values __standard_non_num_values",
+# Insert values in the slightly different format often used with Stored Procedures (with fewer commas and quotes):
+    "__stored_proc_non_geo_values"     :"1 2 3 4 5 6 7 8  9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13.3 14.4 15.5 16.6 a b c d e f\n ",
+    "__stored_proc_mod_non_geo_values" :"1 3 4 5 6 7 8 9 10 11 '2012-07-19 01:02:12.000012' '2013-10-30 23:22:13.000013' 14.4 15.5 16.6 17.7 b c d e f g\n ",
+    "__stored_proc_null_non_geo_values":"1 2 null 4 null 6 null 8 null 10 null '2012-07-19 01:02:12.000012'  null  14.4  null  16.6 null b null d null f\n ",
+    "__stored_proc_geo_values"         :"'POINT(-23 23)' 'POINT(24 -24)' 'POLYGON((25 22, 25 21, 26 22, 25 22))' 'POLYGON((26 22, 25 23, 25 22, 26 22))'",
+    "__stored_proc_mod_geo_values"     :"'POINT(24 -24)' 'POINT(-25 25)' 'POLYGON((26 22, 25 23, 25 22, 26 22))' 'POLYGON((27 22, 27 21, 28 22, 27 22))'",
+    "__stored_proc_null_geo_values"    :" null           'POINT(24 -24)'  null                                   'POLYGON((26 22, 25 23, 25 22, 26 22))'",
+    "__stored_proc_insert_values"      :"__stored_proc_non_geo_values __stored_proc_geo_values",
+    "__stored_proc_mod_insert_values"  :"__stored_proc_mod_non_geo_values __stored_proc_mod_geo_values",
+    "__stored_proc_null_insert_values" :"__stored_proc_null_non_geo_values __stored_proc_null_geo_values",
+# The usual result, which would be expected using the above insert values (except the "..._mod_..." or  "..._null_..." ones):
+    "__standard_result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                         "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                         "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                         "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                         "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
+                         "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
+                         "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                         "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+# Note: we have to run a query of some kind, so here is a simple one, confirming that partitioned_table starts out empty:
+   "sqlCmd":"SELECT * FROM partitioned_table",
+ "response":{"result":{"rowid":[],"rowid_group":[],"type_null_tinyint":[],"type_not_null_tinyint":[],"type_null_smallint":[],"type_not_null_smallint":[],
+                       "type_null_integer":[],"type_not_null_integer":[],"type_null_bigint":[],"type_not_null_bigint":[],
+                       "type_null_timestamp":[],"type_not_null_timestamp":[],
+                       "type_null_float":[],"type_not_null_float":[],"type_null_decimal":[],"type_not_null_decimal":[],
+                       "type_null_varchar25":[],"type_not_null_varchar25":[],"type_null_varchar128":[],"type_not_null_varchar128":[],
+                       "type_null_varchar1024":[],"type_not_null_varchar1024":[],
+                       "type_null_point":[],"type_not_null_point":[],"type_null_polygon":[],"type_not_null_polygon":[]},
+             "status":"SUCCESS"}}
 
 
 #
 # VALID INSERTS
 #
 {"testName":"InsertBigInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertTinyInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertSmallInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertInteger",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertFloat",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3.402823466385e+27, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 3.402823466385e+27, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertDecimal",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.03406982457, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 15.03406982457, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertTimestamp",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1374588650, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 1374588650, 12, 13, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertVarchar",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"InsertNull",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f',\n
+                 null, PointFromText('POINT(24 -24)'), null, PolygonFromText('POLYGON((26 22, 25 23, 25 22, 26 22))') )",
+ "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertMinAndMaxValues",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, -127, 127, -32767, 32767, -2147483647, 2147483647, -9223372036854775807, 9223372036854775807, 11, 12,\n
+                 -1.69999999999e+308, 1.7e+308, -99999999999999999999999999.999999999999, 99999999999999999999999999.999999999999, '', 'zzzzzzzzzzzzzzzzzzzzzzzzz',\n
+                 '', 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',\n
+                 '', 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',\n
+                 PointFromText('POINT(-180 -90)'), PointFromText('POINT(180 90)'),\n
+                 PolygonFromText('POLYGON((-180 -90, -179 -89, -180 -89, -180 -90))'), PolygonFromText('POLYGON((180 90, 179 89, 180 89, 180 90))') )",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 
 
@@ -64,132 +131,201 @@
 # INVALID INSERTS
 #
 {"testName":"InsertIntOutOfBounds",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"Unable to convert string 3000 to byte"}}
 {"testName":"InsertExtraVarchar",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_num_values 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f',\n  __standard_geo_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"exceeds the size of the VARCHAR"}}
 {"testName":"InsertVarcharAsInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant integer value"}}
 {"testName":"InsertVarcharAsBigInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant bigint value"}}
 {"testName":"InsertVarcharAsSmallInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant smallint value"}}
 {"testName":"InsertVarcharAsTinyInt",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant tinyint value"}}
 {"testName":"InsertVarCharAsFloat",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 'VARCHAR', 14, 15, 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant float value"}}
 {"testName":"InsertVarcharAsDecimal",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 'VARCHAR', 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant decimal value"}}
 {"testName":"InsertVarcharAsTimestamp",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 'VARCHAR', 12, 13, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant timestamp value"}}
 {"testName":"InsertBadParamCount",
    "sqlCmd":"INSERT INTO partitioned_table VALUES(NotEnoughParameters)",
  "response":{"result":"ERROR","status":"FAILURE","error":"column count mismatch"}}
 {"testName":"InsertNullNotNull",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)",
-# Note: a more precise expected error than "PlanningErrorException" would be good here, but the
-# current error "user lacks privilege or object not found: A" seems wrong, so likely to change
- "response":{"result":"ERROR","status":"FAILURE","error":"PlanningErrorException"}}
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, 'A', null, 'C', null, 'E', null,\n
+                 PointFromText('POINT(-23 23)'), null, PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))'), null)",
+ "response":{"result":"ERROR","status":"FAILURE","error":"Attempted violation of constraint Constraint Type NOT_NULL"}}
 
 
 #
-# SELECTS -- Test clears tables after each query. You must insert data prior to SELECT, in the same line
+# SELECTS -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to SELECT, in the same "sqlCmd"
 #
 {"testName":"SelectAll",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
 {"testName":"SelectColumns",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              SELECT rowid,rowid_group,type_null_smallint,type_null_varchar128 FROM partitioned_table",
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_smallint":["5"],"type_null_varchar128":["c"]},
              "status":"SUCCESS"}}
-# Commented out test cases that always fail:
-#{"testName":"SelectInsertedEmptyVarchar",
-#   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, '', 'b', 'c', 'd', 'e', 'f');\n
-#             SELECT rowid,type_null_varchar25 FROM partitioned_table WHERE type_null_varchar25 = ''",
-# "response":{"result":{"rowid":["1"],"type_null_varchar25":["''"]},"status":"SUCCESS"}}
-{"testName":"SelectInsertedEmbeddedSemicolons",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, ';', ';;', '; ', ' ;', ' ; ', '; ;');\n
-             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ';'",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[";"],"type_not_null_varchar25":[";;"],"type_null_varchar128":["; "],"type_not_null_varchar128":[" ;"],"type_null_varchar1024":[" ; "],"type_not_null_varchar1024":["; ;"]},
+{"testName":"SelectGeoColumns",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
+             SELECT rowid,type_null_point,type_null_polygon,type_not_null_point,type_not_null_polygon FROM partitioned_table",
+ "response":{"result":{"rowid":["1"],"type_null_point":["POINT (-23.0 23.0)"],"type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],
+                       "type_not_null_point":["POINT (24.0 -24.0)"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
-#{"testName":"SelectInsertedEmbeddedSpaces",
-#   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, ' ', '  ', '   ', 'w ', '  x', 'y z';\n
-#             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ' '",
-# "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],"type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"]},
-#            "status":"SUCCESS"}}
-# Note: \t might not be interpreted reliably at either the input end or the expected output end of the test framework.
-# If that's an issue, comment out this next case.
-# Commented out test cases that always fail:
-#{"testName":"SelectInsertedEmbeddedWhitespace",
-#   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, ' ', '\t', '  ', 'w ', '\t x', 'y z');\n
-#             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ' '",
-# "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],"type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"]},
-#            "status":"SUCCESS"}}
-#{"testName":"SelectInsertedEmbeddedQuotes",
-#   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, '''', '''b''', 'can''t', 'doin''', '''"''', '''''''');\n
-#             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ' '",
-# "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],"type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"]},
-#             "status":"SUCCESS"}}
+{"testName":"SelectInsertedEmptyVarchar",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 15, 16, '', 'b', 'c', 'd', 'e', 'f',\n  __standard_geo_values);\n
+             SELECT rowid,type_null_varchar25 FROM partitioned_table WHERE type_null_varchar25 = ''",
+ "response":{"result":{"rowid":["1"],"type_null_varchar25":[""]},"status":"SUCCESS"}}
+{"testName":"SelectInsertedEmbeddedSemicolons",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_num_values ';', ';;', '; ', ' ;', ' ; ', '; ;',\n  __standard_geo_values);\n
+             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ';'",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[";"],"type_not_null_varchar25":[";;"],"type_null_varchar128":["; "],"type_not_null_varchar128":[" ;"],
+                       "type_null_varchar1024":[" ; "],"type_not_null_varchar1024":["; ;"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+             "status":"SUCCESS"}}
+{"testName":"SelectInsertedEmbeddedSpaces",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_num_values ' ', '  ', '   ', 'w ', '  x', 'y z',\n  __standard_geo_values);\n
+             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ' '",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],
+                       "type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+            "status":"SUCCESS"}}
+# Note: we pass '\\t' to JSON, to pass '\t' to the VMC, which it interprets (correctly) as a tab character
+{"testName":"SelectInsertedEmbeddedWhitespace",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_num_values ' ', '\\t', '  ', 'w ', '\\t x', 'y z',\n  __standard_geo_values);\n
+             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ' '",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],
+                       "type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+            "status":"SUCCESS"}}
+{"testName":"SelectInsertedEmbeddedQuotes",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_num_values '''', '''b''', 'can''t', 'doin''', '''\"''', '''''''',\n  __standard_geo_values);\n
+             SELECT * FROM partitioned_table WHERE type_null_varchar25 = ''''",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],
+                       "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+             "status":"SUCCESS"}}
+
+
+#
+# INVALID SELECTS
+#
 {"testName":"SelectBadColumn",
-   "sqlCmd":"SELECT badColumn FROM partitioned_table",
- "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BADCOLUMN"}}
+   "sqlCmd":"SELECT bad_column FROM partitioned_table",
+ "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BAD_COLUMN"}}
 {"testName":"SelectBadTable",
    "sqlCmd":"SELECT * FROM bad_table",
  "response":{"result":"ERROR","status":"FAILURE","error":"object not found: BAD_TABLE"}}
 
 
 #
-# VALID UPSERTS -- Test clears tables after each query. You must insert (and/or "upsert") data prior to SELECT, in the same line
+# UPDATES -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to UPDATE, in the same "sqlCmd"
+#
+{"testName":"UpdateAll",
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01 00:00:00.000000', '2000-01-01 00:00:00.000000',\n
+                0, 0, 0, 0, '0', '0', '0', '0', '0', '0', PointFromText('POINT(0 0)'), PointFromText('POINT(0 0)'),\n
+                PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))'), PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))') );\n
+             UPDATE partitioned_table SET               rowid_group = 2;\n
+             UPDATE partitioned_table SET         type_null_tinyint = 3;\n
+             UPDATE partitioned_table SET     type_not_null_tinyint = 4 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET        type_null_smallint = 5 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET    type_not_null_smallint = 6;\n
+             UPDATE partitioned_table SET         type_null_integer = 7;\n
+             UPDATE partitioned_table SET     type_not_null_integer = 8 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET          type_null_bigint = 9 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET      type_not_null_bigint = 10;\n
+             UPDATE partitioned_table SET       type_null_timestamp = '2010-07-31 16:08:11.000011';\n
+             UPDATE partitioned_table SET   type_not_null_timestamp = '2012-07-19 01:02:12.000012' WHERE rowid = 1;\n
+             UPDATE partitioned_table SET           type_null_float = 13.3;\n
+             UPDATE partitioned_table SET       type_not_null_float = 14.4 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET         type_null_decimal = 15.5 WHERE rowid = 1;\n
+             UPDATE partitioned_table SET     type_not_null_decimal = 16.6;\n
+             UPDATE partitioned_table SET       type_null_varchar25 = 'a';\n
+             UPDATE partitioned_table SET   type_not_null_varchar25 = 'b' WHERE rowid = 1;\n
+             UPDATE partitioned_table SET      type_null_varchar128 = 'c' WHERE rowid = 1;\n
+             UPDATE partitioned_table SET  type_not_null_varchar128 = 'd';\n
+             UPDATE partitioned_table SET     type_null_varchar1024 = 'e' WHERE rowid = 1;\n
+             UPDATE partitioned_table SET type_not_null_varchar1024 = 'f';\n
+             UPDATE partitioned_table SET           type_null_point = PointFromText('POINT(-23 23)');\n
+             UPDATE partitioned_table SET       type_not_null_point = PointFromText('POINT(24 -24)') WHERE rowid = 1;\n
+             UPDATE partitioned_table SET         type_null_polygon = PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))') WHERE rowid = 1;\n
+             UPDATE partitioned_table SET     type_not_null_polygon = PolygonFromText('POLYGON((26 22, 25 23, 25 22, 26 22))');\n
+             SELECT * FROM partitioned_table",
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+
+
+#
+# VALID UPSERTS -- tables are cleared (DELETE FROM) after each test, so you must insert and/or "upsert" data prior to SELECT, in the same "sqlCmd"
 #
 {"testName":"UpsertBigInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9223372036854775805, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertTinyInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 65, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertSmallInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 32760, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertInteger",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 2147483640, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertFloat",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 3.402823466385e+27, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 3.402823466385e+27, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertDecimal",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15.03406982457, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 15.03406982457, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertTimestamp",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1374588650, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 1374588650, 12, 13, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertVarchar",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_insert_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"UpsertNull",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, null, 4, null, 6, null, 8, null, 10, null, 12, null, 14, null, 16, null, 'b', null, 'd', null, 'f',\n  __standard_geo_values)",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 # UPSERT and check correct values inserted or updated:
 {"testName":"UpsertAsInsert",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
 {"testName":"UpsertAsUpdate",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01 00:00:00.000000', '2000-01-01 00:00:00.000000', 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');\n
-             UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01 00:00:00.000000', '2000-01-01 00:00:00.000000', 0, 0, 0, 0, '0', '0', '0', '0', '0', '0',\n
+                 PointFromText('POINT(0 0)'), PointFromText('POINT(0 0)'), PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))'), PolygonFromText('POLYGON((0 0, 1 0, 0 1, 0 0))') );\n
+             UPSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
 
 
@@ -197,116 +333,133 @@
 # INVALID UPSERTS
 #
 {"testName":"UpsertIntOutOfBounds",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3000, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"Unable to convert string 3000 to byte"}}
 {"testName":"UpsertExtraVarchar",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f',\n  __standard_geo_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"exceeds the size of the VARCHAR"}}
 {"testName":"UpsertVarcharAsInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant integer value"}}
 {"testName":"UpsertVarcharAsBigInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant bigint value"}}
 {"testName":"UpsertVarcharAsSmallInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant smallint value"}}
 {"testName":"UpsertVarcharAsTinyInt",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant tinyint value"}}
 {"testName":"UpsertVarCharAsFloat",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 'VARCHAR', 14, 15, 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant float value"}}
 {"testName":"UpsertVarcharAsDecimal",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 11, 12, 13, 14, 'VARCHAR', 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant decimal value"}}
 {"testName":"UpsertVarcharAsTimestamp",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')",
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(__standard_int_values 'VARCHAR', 12, 13, 14, 15, 16, __standard_non_num_values)",
  "response":{"result":"ERROR","status":"FAILURE","error":"invalid format for a constant timestamp value"}}
 {"testName":"UpsertBadParamCount",
    "sqlCmd":"UPSERT INTO partitioned_table VALUES(NotEnoughParameters)",
  "response":{"result":"ERROR","status":"FAILURE","error":"column count mismatch"}}
 {"testName":"UpsertNullNotNull",
-   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)",
-# Note: a more precise expected error than "PlanningErrorException" would be good here, but the
-# current error "user lacks privilege or object not found: A" seems wrong, so likely to change
- "response":{"result":"ERROR","status":"FAILURE","error":"PlanningErrorException"}}
+   "sqlCmd":"UPSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, 'A', null, 'C', null, 'E', null,\n
+                 PointFromText('POINT(-23 23)'), null, PolygonFromText('POLYGON((25 22, 25 21, 26 22, 25 22))'), null)",
+ "response":{"result":"ERROR","status":"FAILURE","error":"Attempted violation of constraint Constraint Type NOT_NULL"}}
 
 
 #
-# INSERT INTO SELECT -- Test clears tables after each query. You must insert data prior to SELECT, in the same line
+# INSERT INTO SELECT -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to INSERT INTO SELECT, in the same "sqlCmd"
 #
 {"testName":"InsertIntoSelectRepl2Repl",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              INSERT INTO replicated_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\n
-             type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
-             type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
+                 type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
+                 type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024,\n
+                 type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM replicated_table WHERE rowid=2",
- "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
+                       "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
+                       "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"InsertIntoSelectRepl2Part",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              INSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
-# Same Insert, without Order By, works fine (unlike UPSERT):
+# Same Insert, without Order By, works fine (unlike UPSERT, but correct):
 {"testName":"InsertIntoSelectNoOrderBy",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              INSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
 # Select from Partitioned, Insert into Replicated should fail:
 {"testName":"InsertIntoSelectPart2Repl",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              INSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
  "response":{"result":"ERROR","status":"FAILURE","error":"partitioned data for insertion into replicated table"}}
 # Select from Partitioned, Insert into (another) Partition should fail:
 {"testName":"InsertIntoSelectPart2Part",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              INSERT INTO partitioned_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\n
-             type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
-             type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
+                 type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
+                 type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024,\n
+                 type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
  "response":{"result":"ERROR","status":"FAILURE","error":"one partition to another, which is unsupported"}}
 
 
 #
-# UPSERT INTO SELECT -- Test clears tables after each query. You must insert data prior to SELECT, in the same line
+# UPSERT INTO SELECT -- tables are cleared (DELETE FROM) after each test, so you must insert data prior to UPSERT INTO SELECT, in the same "sqlCmd"
 #
 {"testName":"UpsertIntoSelectRepl2Repl",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              UPSERT INTO replicated_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\n
-             type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
-             type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
+                 type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
+                 type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024,\n
+                 type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM replicated_table WHERE rowid=2",
- "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":{"rowid":["2"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],
+                       "type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"],
+                       "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"UpsertIntoSelectRepl2Part",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM partitioned_table",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
-# Same Upsert, without Order By, fails (DML error):
+# Same Upsert, without Order By, fails (DML error; unlike INSERT, but correct):
 {"testName":"UpsertIntoSelectNoOrderBy",
-   "sqlCmd":"INSERT INTO replicated_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;               ",
  "response":{"result":"ERROR","status":"FAILURE","error":"non-deterministic"}}
 # Select from Partitioned, Upsert into Replicated should fail:
 {"testName":"UpsertIntoSelectPart2Repl",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              UPSERT INTO replicated_table SELECT * FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
  "response":{"result":"ERROR","status":"FAILURE","error":"partitioned data for insertion into replicated table"}}
 # Select from Partitioned, Upsert into (another) Partition should fail:
 {"testName":"UpsertIntoSelectPart2Part",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(__standard_insert_values);\n
              UPSERT INTO partitioned_table SELECT 2,rowid_group,type_null_tinyint,type_not_null_tinyint,type_null_smallint,type_not_null_smallint,type_null_integer,type_not_null_integer,\n
-             type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
-             type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024\n
+                 type_null_bigint,type_not_null_bigint,type_null_timestamp,type_not_null_timestamp,type_null_float,type_not_null_float,type_null_decimal,type_not_null_decimal,\n
+                 type_null_varchar25,type_not_null_varchar25,type_null_varchar128,type_not_null_varchar128,type_null_varchar1024,type_not_null_varchar1024,\n
+                 type_null_point,type_not_null_point,type_null_polygon,type_not_null_polygon\n
              FROM partitioned_table WHERE rowid=1 ORDER BY rowid",
  "response":{"result":"ERROR","status":"FAILURE","error":"one partition to another, which is unsupported"}}
 
@@ -315,9 +468,9 @@
 # DELETES -- You must know how many rows will be removed
 #
 {"testName":"DeleteAll",
-   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
-             INSERT INTO partitioned_table VALUES(2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
-             INSERT INTO partitioned_table VALUES(3, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');\n
+   "sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values);
+             INSERT INTO partitioned_table VALUES(2, 2, 3, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values);
+             INSERT INTO partitioned_table VALUES(3, 2, 3, 4, 5, 6, 7, 8, 9, 10, __standard_non_int_values);
              DELETE FROM partitioned_table",
  "response":{"result":{"modified_tuples":["3"]},"status":"SUCCESS"}}
 
@@ -326,51 +479,91 @@
 # CRUD PROCEDURES
 #
 {"testName":"SysInsert",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_insert_values",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysDelete",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\n
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_insert_values;\n
              exec PARTITIONED_TABLE.delete 1 ",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysUpdate",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\n
-             exec PARTITIONED_TABLE.update 1 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 b c d e f g 1",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_insert_values;\n
+             exec PARTITIONED_TABLE.update __stored_proc_mod_insert_values 1",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysUpsert1",
-   "sqlCmd":"exec PARTITIONED_TABLE.upsert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f",
+   "sqlCmd":"exec PARTITIONED_TABLE.upsert __stored_proc_insert_values",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysUpsert2",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\n
-             exec PARTITIONED_TABLE.upsert 1 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 b c d e f g",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_insert_values;\n
+             exec PARTITIONED_TABLE.upsert __stored_proc_mod_insert_values",
  "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysSelect",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13 14 15 16 a b c d e f;\n
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_insert_values;\n
              exec PARTITIONED_TABLE.select 1",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+{"testName":"SysInsertNulls",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_null_insert_values",
+ "response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"SysSelectNulls",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __stored_proc_null_insert_values;\n
+             exec PARTITIONED_TABLE.select 1",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["null"],"type_not_null_tinyint":["4"],"type_null_smallint":["null"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["null"],"type_not_null_integer":["8"],"type_null_bigint":["null"],"type_not_null_bigint":["10"],
+# Note: after VMC-267 is fixed, change "1970-01-01 00:00:00.000000" to "null" (which is correct):
+                       "type_null_timestamp":["1970-01-01 00:00:00.000000"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["null"],"type_not_null_float":["14.4"],"type_null_decimal":["null"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["null"],"type_not_null_varchar25":["b"],"type_null_varchar128":["null"],"type_not_null_varchar128":["d"],
+                       "type_null_varchar1024":["null"],"type_not_null_varchar1024":["f"],
+                       "type_null_point":["null"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["null"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"CrudRoundTripEmptyVarchar",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, '', 'b', 'c', 'd', 'e', 'f';\n
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '', '', '', '', '', ''\n  __stored_proc_geo_values;\n
              exec PARTITIONED_TABLE.select 1",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[""],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[""],"type_not_null_varchar25":[""],"type_null_varchar128":[""],"type_not_null_varchar128":[""],
+                       "type_null_varchar1024":[""],"type_not_null_varchar1024":[""],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
 {"testName":"CrudRoundTripEmbeddedSpaces",
-   "sqlCmd":"exec PARTITIONED_TABLE.insert 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, ' ', '  ', '   ', 'w ', '  x', 'y z';\n
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values ' ', '  ', '   ', 'w ', '  x', 'y z'\n  __stored_proc_geo_values;\n
              exec PARTITIONED_TABLE.select 1",
- "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],"type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"]},
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[" "],"type_not_null_varchar25":["  "],"type_null_varchar128":["   "],"type_not_null_varchar128":["w "],
+                       "type_null_varchar1024":["  x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
-# Note: \t might not be interpreted reliably at either the input end or the expected output end of the test framework.
-# If that's an issue, comment out this next case.
-# Commented out test cases that always fail:
-#{"testName":"CrudRoundTripEmbeddedWhitespace",
-#   "sqlCmd":"exec PARTITIONED_TABLE.insert 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, ' ', '\t', '  ', 'w ', '\t x', 'y z';\n
-#             exec PARTITIONED_TABLE.select 1",
-# "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],"type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"]},
-#             "status":"SUCCESS"}}
-#{"testName":"CrudRoundTripEmbeddedQuotes",
-#   "sqlCmd":"exec PARTITIONED_TABLE.insert 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '2010-07-31 16:08:11.000011', '2012-07-19 01:02:12.000012', 13, 14, 15, 16, '''', '''b''', can''t, doin'', '''"''', '''''''';\n
-#             exec PARTITIONED_TABLE.select 1",
-# "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],"type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"]},
-#             "status":"SUCCESS"}}
+# Note: we pass '\\t' to JSON, to pass '\t' to the VMC, which it interprets (correctly) as a tab character
+{"testName":"CrudRoundTripEmbeddedWhitespace",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values ' ', '\\t', '  ', 'w ', '\\t x', 'y z',\n  __stored_proc_geo_values;\n
+             exec PARTITIONED_TABLE.select 1",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":[" "],"type_not_null_varchar25":["\t"],"type_null_varchar128":["  "],"type_not_null_varchar128":["w "],
+                       "type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+             "status":"SUCCESS"}}
+# Note: after VMC-268 is fixed, try removing the single quotes around 'can''t' and/or 'doin''':
+{"testName":"CrudRoundTripEmbeddedQuotes",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '''', '''b''', 'can''t', 'doin''', '''\"''', '''''''',\n  __stored_proc_geo_values;\n
+             exec PARTITIONED_TABLE.select 1",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],
+                       "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+             "status":"SUCCESS"}}
+
 {"testName":"SysInvalid",
    "sqlCmd":"exec PARTITIONED_TABLE.badProc",
  "response":{"result":"ERROR","status":"FAILURE","error":"PARTITIONED_TABLE.badProc\" is undefined"}}
@@ -409,7 +602,7 @@
    "sqlCmd":"Create view view3a (gb, ct) as select i, count(*) from ddl_table group by i;\n
              Create view view3b (gb, ct) as select i, count(*) from ddl_table group by i;",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-# Worse case testing for new line character:
+# Worst case testing for new line character:
 {"testName":"DdlCreateView_required",
    "sqlCmd":"Create\nview\nview_required(gb,ct)\nas\nselect\ni,count(*)\nfrom\nddl_table\ngroup\nby\ni",
  "response":{"result":{"status":["0"]},"status":"SUCCESS"}}
