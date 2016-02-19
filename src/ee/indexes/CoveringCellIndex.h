@@ -72,7 +72,7 @@ class CoveringCellIndex : public TableIndex {
     typedef CellMapEntry::first_type CellKeyType;
     typedef CellKeyType::KeyComparator CellKeyComparator;
     typedef CompactingMap<CellMapEntry, CellKeyComparator> CellMapType;
-    typedef typename CellMapType::iterator CellMapIterator;
+    typedef CellMapType::iterator CellMapIterator;
     typedef std::pair<CellMapIterator, CellMapIterator> CellMapRange;
 
     /** Type names for the tuple map */
@@ -81,7 +81,7 @@ class CoveringCellIndex : public TableIndex {
     typedef TupleMapEntry::second_type TupleValueType;
     typedef TupleKeyType::KeyComparator TupleKeyComparator;
     typedef CompactingMap<TupleMapEntry, TupleKeyComparator> TupleMapType;
-    typedef typename TupleMapType::iterator TupleMapIterator;
+    typedef TupleMapType::iterator TupleMapIterator;
     typedef std::pair<TupleMapIterator, TupleMapIterator> TupleMapRange;
 
     /**
