@@ -1646,8 +1646,11 @@ private:
     /**
      * Assuming non-null NValue, validate the size of the variable length data
      */
-    static inline void checkTooWideForVariableLengthType(ValueType type, const char* ptr,
-            int32_t objLength, int32_t maxLength, bool isInBytes) {
+    static inline void checkTooWideForVariableLengthType(ValueType type,
+                                                         const char* ptr,
+                                                         int32_t objLength,
+                                                         int32_t maxLength,
+                                                         bool isInBytes) {
         if (maxLength == 0) {
             throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(type));
         }
@@ -1660,13 +1663,15 @@ private:
                 oss <<  "The size " << objLength << " of the value exceeds the size of ";
                 if (type == VALUE_TYPE_VARBINARY) {
                     oss << "the VARBINARY(" << maxLength << ") column.";
+                    throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                                       oss.str().c_str(),
+                                       SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
                 else {
                     oss << "the GEOGRAPHY column (" << maxLength << " bytes).";
+                    throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                                       oss.str().c_str());
                 }
-
-                throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                                   oss.str().c_str());
             }
             break;
         case VALUE_TYPE_VARCHAR:
@@ -1683,7 +1688,7 @@ private:
                             "The size %d of the value '%s' exceeds the size of the VARCHAR(%d BYTES) column.",
                             objLength, inputValue.c_str(), maxLength);
                     throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                            msg);
+                                       msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
                 }
             } else if (!validVarcharSize(ptr, objLength, maxLength)) {
                 const int32_t charLength = getCharLength(ptr, objLength);
@@ -1701,7 +1706,7 @@ private:
                         charLength, inputValue.c_str(), maxLength);
 
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                        msg);
+                        msg, SQLException::TYPE_VAR_LENGTH_MISMATCH);
             }
             break;
         default:

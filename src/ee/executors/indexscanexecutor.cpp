@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
@@ -67,6 +68,8 @@
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
+using std::cout;
+using std::endl;
 
 bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         TempTableLimits* limits)
@@ -122,8 +125,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
 
     Table* targetTable = m_node->getTargetTable();
-    //target table should be persistenttable
-    assert(static_cast<PersistentTable*>(targetTable));
+    //target table should be persistent table
+    assert(dynamic_cast<PersistentTable*>(targetTable));
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
@@ -195,6 +198,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
+
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
         if (candidateValue.isNull()) {
@@ -208,13 +212,15 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             searchKey.setNValue(ctr, candidateValue);
         }
         catch (const SQLException &e) {
-            // This next bit of logic handles underflow and overflow while
+            // This next bit of logic handles underflow, overflow and search key length
+            // exceeding variable length column size (variable lenght mismatch) when
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
+            // VarChar(3 bytes) < "abcd" or VarChar(3) > "abbd"
 
-            // re-throw if not an overflow or underflow
+            // re-throw if not an overflow, underflow or variable length mismatch
             // currently, it's expected to always be an overflow or underflow
-            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                 throw e;
             }
 
@@ -254,11 +260,38 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         localLookupType = INDEX_LOOKUP_TYPE_GT;
                     }
                 }
+                if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
+                    // shrink the search key and add the updated key to search key table tuple
+                    searchKey.shrinkAndSetNValue(ctr, candidateValue);
+                    // search will be performed on shrinked key, so update lookup operation
+                    // to account for it
+                    switch (localLookupType) {
+                        case INDEX_LOOKUP_TYPE_LT:
+                        case INDEX_LOOKUP_TYPE_LTE:
+                            localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                            break;
+                        case INDEX_LOOKUP_TYPE_GT:
+                        case INDEX_LOOKUP_TYPE_GTE:
+                            localLookupType = INDEX_LOOKUP_TYPE_GT;
+                            break;
+                        default:
+                            assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                            return false;
+                    }
+                }
 
                 // if here, means all tuples with the previous searchkey
-                // columns need to be scaned. Note, if only one column,
-                // then all tuples will be scanned
-                activeNumOfSearchKeys--;
+                // columns need to be scanned. Note, if only one column,
+                // then all tuples will be scanned. Only exception to this
+                // case is setting of search key in search tuple was due
+                // to search key length exceeding the search column length
+                // of variable length type
+                if (!(e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH)) {
+                    // for variable length mismatch error, the needed search key to perform the search
+                    // has been generated and added to the search tuple. So no need to decrement
+                    // activeNumOfSearchKeys
+                    activeNumOfSearchKeys--;
+                }
                 if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
                     localSortDirection = SORT_DIRECTION_TYPE_ASC;
                 }
@@ -280,7 +313,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
-    VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
+    VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d", searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
 
     //
     // END EXPRESSION
@@ -339,16 +372,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
             tableIndex->moveToLessThanKey(&searchKey, indexCursor);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
             bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
             if (isEnd) {
                 tableIndex->moveToEnd(false, indexCursor);
-            } else {
+            }
+            else {
                 while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
                     pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
@@ -365,7 +401,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    } else {
+    }
+    else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
         tableIndex->moveToEnd(toStartActually, indexCursor);
     }
@@ -390,6 +427,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             continue;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
+
         pmp.countdownProgress();
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
