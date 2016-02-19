@@ -233,7 +233,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
             exprs.add(expr);
 
-            skipNullPredicate = ExpressionUtil.combine(exprs);
+            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
@@ -447,7 +447,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         {
             List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
             newEndExpressions.add((AbstractExpression)newExpr.clone());
-            m_endExpression = ExpressionUtil.combine(newEndExpressions);
+            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
         }
     }
 
