@@ -2248,24 +2248,27 @@ class StatusDatabaseServerAPI(MethodView):
     def get(database_id, server_id):
 
         server = [server for server in Global.SERVERS if server['id'] == server_id]
-        try:
-            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
-            proc = voltdbclient.VoltProcedure(client, "@Ping")
-            response = proc.call()
-            return jsonify({'status': "running"})
-        except:
-            voltProcess = voltdbserver.VoltDatabase(database_id)
-
-            error = ''
+        if len(server) != 0:
             try:
-                error = Log.get_error_log_details()
+                client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+                proc = voltdbclient.VoltProcedure(client, "@Ping")
+                response = proc.call()
+                return jsonify({'status': "running"})
             except:
-                pass
+                voltProcess = voltdbserver.VoltDatabase(database_id)
 
-            if voltProcess.Get_Voltdb_Process().isProcessRunning:
-                return jsonify({'status': "stalled", "details": error})
-            else:
-                return jsonify({'status': "stopped", "details": error})
+                error = ''
+                try:
+                    error = Log.get_error_log_details()
+                except:
+                    pass
+
+                if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                    return jsonify({'status': "stalled", "details": error})
+                else:
+                    return jsonify({'status': "stopped", "details": error})
+        else:
+            return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 def main(runner, amodule, config_dir, server):
