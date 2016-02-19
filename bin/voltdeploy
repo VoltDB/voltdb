@@ -49,12 +49,15 @@ array_packages = []
 parser = OptionParser(usage="usage: %prog [options] filepath",
                           version="%prog 1.0")
 parser.add_option("-p", "--path",
-              action="store", type="string", dest="filepath")
+              action="store", type="string", dest="filepath", help="Specify file path for vdm root. Defaults to /.vdm "
+                                                                   "in home directory")
 parser.add_option("-s", "--server",
-              action="store", type="string", dest="server")
+              action="store", type="string", dest="server", help="Specify server ip and port to connect. Defaults to "
+                                                                 "0.0.0.0:8000")
 
 parser.add_option("-v", "--virtual",
-              action="store", type="string", dest="virtual")
+              action="store", type="string", dest="virtual", help="Enable or disable virtual environment for "
+                                                                  "installing dependencies")
 
 (options, args) = parser.parse_args()
 

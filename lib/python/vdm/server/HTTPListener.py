@@ -45,11 +45,14 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, Con
 import DeploymentConfig
 import voltdbserver
 import glob
+import psutil
 import Log
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
 import voltdbclient
+import logging
+from logging.handlers import RotatingFileHandler
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -1217,26 +1220,26 @@ def get_deployment_import_field(export_xml, is_list):
     return {'configuration': exports}
 
 
-def get_deployment_properties(dep_xml, is_list):
-    new_deployment = {}
-    dep_properties = []
+def get_deployment_properties(export_xml, is_list):
+    new_export = {}
+    exports = []
     if is_list is 'list':
-        for deployment in dep_xml:
-            new_deployment = {}
-            for field in deployment:
+        for export in export_xml:
+            new_export = {}
+            for field in export:
                 if field == 'plaintext':
-                    new_deployment[field] = parse_bool_string(deployment[field])
+                    new_export[field] = parse_bool_string(export[field])
                 else:
-                    new_deployment[field] = deployment[field]
-            dep_properties.append(new_deployment)
+                    new_export[field] = export[field]
+            exports.append(new_export)
     else:
-        for field in dep_xml:
+        for field in export_xml:
             if field == 'plaintext':
-                new_deployment[field] = parse_bool_string(dep_xml[field])
+                new_export[field] = parse_bool_string(export_xml[field])
             else:
-                new_deployment[field] = dep_xml[field]
-        dep_properties.append(new_deployment)
-    return dep_properties
+                new_export[field] = export_xml[field]
+        exports.append(new_export)
+    return exports
 
 
 def get_users_from_xml(deployment_xml, is_list):
@@ -1333,7 +1336,8 @@ def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
 
 
-def get_jar_file_path():
+def is_pro_version(deployment):
+    ##############################################
     file_path = ''
     try:
         volt_jar = glob.glob(os.path.join(get_volt_jar_dir(), 'voltdb-*.jar'))
@@ -1343,13 +1347,6 @@ def get_jar_file_path():
             print 'No voltdb jar file found.'
     except Exception, err:
         print err
-    finally:
-        return file_path
-
-
-def is_pro_version(deployment):
-    ##############################################
-    file_path = get_jar_file_path()
     if file_path != '':
         is_pro = utility.is_pro_version(file_path)
         if is_pro:
@@ -1911,7 +1908,10 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-        is_force = request.args.get('force').lower()
+        if 'force' in request.args:
+            is_force = request.args.get('force').lower()
+        else:
+            is_force = "false"
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
@@ -2253,24 +2253,27 @@ class StatusDatabaseServerAPI(MethodView):
     def get(database_id, server_id):
 
         server = [server for server in Global.SERVERS if server['id'] == server_id]
-        try:
-            client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
-            proc = voltdbclient.VoltProcedure(client, "@Ping")
-            response = proc.call()
-            return jsonify({'status': "running"})
-        except:
-            voltProcess = voltdbserver.VoltDatabase(database_id)
-
-            error = ''
+        if len(server) != 0:
             try:
-                error = Log.get_error_log_details()
+                client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+                proc = voltdbclient.VoltProcedure(client, "@Ping")
+                response = proc.call()
+                return jsonify({'status': "running"})
             except:
-                pass
+                voltProcess = voltdbserver.VoltDatabase(database_id)
 
-            if voltProcess.Get_Voltdb_Process().isProcessRunning:
-                return jsonify({'status': "stalled", "details": error})
-            else:
-                return jsonify({'status': "stopped", "details": error})
+                error = ''
+                try:
+                    error = Log.get_error_log_details()
+                except:
+                    pass
+
+                if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                    return jsonify({'status': "stalled", "details": error})
+                else:
+                    return jsonify({'status': "stopped", "details": error})
+        else:
+            return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 def main(runner, amodule, config_dir, server):
@@ -2394,4 +2397,15 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
+
+    if os.path.exists('voltdeploy.log'):
+        open('voltdeploy.log', 'w').close()
+    handler = RotatingFileHandler('voltdeploy.log')
+    handler.setFormatter(logging.Formatter(
+         "%(asctime)s|%(levelname)s|%(message)s|%(pathname)s:%(lineno)d"))
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.INFO)
+    log.addHandler(handler)
+    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)' %(bindIp, __PORT__))
+
     APP.run(threaded=True, host=bindIp, port=__PORT__)
