@@ -51,6 +51,8 @@ import Log
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
 import voltdbclient
+import logging
+from logging.handlers import RotatingFileHandler
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -2389,4 +2391,15 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
+
+    if os.path.exists('voltdeploy.log'):
+        open('voltdeploy.log', 'w').close()
+    handler = RotatingFileHandler('voltdeploy.log')
+    handler.setFormatter(logging.Formatter(
+         "%(asctime)s|%(levelname)s|%(message)s|%(pathname)s:%(lineno)d"))
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.INFO)
+    log.addHandler(handler)
+    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)' %(bindIp, __PORT__))
+
     APP.run(threaded=True, host=bindIp, port=__PORT__)
