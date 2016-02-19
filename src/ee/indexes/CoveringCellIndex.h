@@ -182,11 +182,19 @@ class CoveringCellIndex : public TableIndex {
      * A structure used to report stats about this index for testing.
      */
     struct StatsForTest {
-        int32_t numPolygons = 0;
-        int32_t numCells = 0;
+        int32_t numPolygons;
+        int32_t numCells;
 
-        double polygonsArea = 0.0;
-        double cellsArea = 0.0;
+        double polygonsArea;
+        double cellsArea;
+
+        StatsForTest()
+        : numPolygons(0)
+        , numCells(0)
+        , polygonsArea(0.0)
+        , cellsArea(0.0)
+        {
+        }
     };
 
     /**
