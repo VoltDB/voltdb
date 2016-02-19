@@ -1906,7 +1906,10 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-        is_force = request.args.get('force').lower()
+        if 'force' in request.args:
+            is_force = request.args.get('force').lower()
+        else:
+            is_force = "false"
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
