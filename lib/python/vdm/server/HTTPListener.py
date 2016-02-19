@@ -1218,26 +1218,26 @@ def get_deployment_import_field(export_xml, is_list):
     return {'configuration': exports}
 
 
-def get_deployment_properties(export_xml, is_list):
-    new_export = {}
-    exports = []
+def get_deployment_properties(dep_xml, is_list):
+    new_deployment = {}
+    dep_properties = []
     if is_list is 'list':
-        for export in export_xml:
-            new_export = {}
-            for field in export:
+        for deployment in dep_xml:
+            new_deployment = {}
+            for field in deployment:
                 if field == 'plaintext':
-                    new_export[field] = parse_bool_string(export[field])
+                    new_deployment[field] = parse_bool_string(deployment[field])
                 else:
-                    new_export[field] = export[field]
-            exports.append(new_export)
+                    new_deployment[field] = deployment[field]
+            dep_properties.append(new_deployment)
     else:
-        for field in export_xml:
+        for field in dep_xml:
             if field == 'plaintext':
-                new_export[field] = parse_bool_string(export_xml[field])
+                new_deployment[field] = parse_bool_string(dep_xml[field])
             else:
-                new_export[field] = export_xml[field]
-        exports.append(new_export)
-    return exports
+                new_deployment[field] = dep_xml[field]
+        dep_properties.append(new_deployment)
+    return dep_properties
 
 
 def get_users_from_xml(deployment_xml, is_list):
