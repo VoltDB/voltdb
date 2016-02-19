@@ -45,7 +45,6 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, Con
 import DeploymentConfig
 import voltdbserver
 import glob
-import psutil
 import Log
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
