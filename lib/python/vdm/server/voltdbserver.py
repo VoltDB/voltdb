@@ -141,8 +141,8 @@ class VoltDatabase:
             server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
             curr = server[0]
             try:
-                url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
-                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, action)
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u') % \
+                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id)
                 response = requests.put(url)
                 if response.status_code != requests.codes.ok:
                     failed = True
@@ -189,16 +189,19 @@ class VoltDatabase:
             print traceback.format_exc()
             return create_response(str(err), 500)
 
-    def check_and_start_local_server(self, recover=False):
+    def check_and_start_local_server(self, sid, recover=False):
         """
         Checks if voltdb server is running locally and
         starts it if the server is not running. 
         If the server is running, this returns an error
         """
+        if sid == -1:
+            return create_response('A VoltDB Server not started wrong configuration', 500)
+
         if self.is_voltserver_running():
             return create_response('A VoltDB Server process is already running', 500)
     
-        retcode = self.start_local_server(recover)
+        retcode = self.start_local_server(sid, recover)
         if (retcode == 0):
             return create_response('Success', 200)
         else:
@@ -237,7 +240,14 @@ class VoltDatabase:
 
         return VoltdbProcess
     
-    def start_local_server(self, recover=False):
+    def start_local_server(self, sid, recover=False):
+        """
+        Find server from id if its missing bail out.
+        """
+        server = [server for server in HTTPListener.Global.SERVERS if server['id'] == sid]
+        if not server:
+            return 0
+
         """
         Gets deployment.xml for this database and starts voltdb server locally
         """
@@ -252,7 +262,9 @@ class VoltDatabase:
         if recover:
             verb = 'recover'
         voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
-    
+        self.build_network_options(server, voltdb_cmd)
+        print voltdb_cmd
+
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,
                 ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
@@ -274,6 +286,52 @@ class VoltDatabase:
             return 0
         else:
             return 1
+
+    # Build network options for command line.
+    def build_network_options(self, server, voltdb_cmd):
+        if len(server) == 0:
+            return
+        sconfig = server[0]
+        ii = sconfig['internal-interface']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--internalinterface')
+            voltdb_cmd.append(ii)
+        ii = sconfig['internal-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--internal')
+            voltdb_cmd.append(ii)
+        ii = sconfig['external-interface']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--externalinterface')
+            voltdb_cmd.append(ii)
+        ii = sconfig['placement-group']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--placement-group')
+            voltdb_cmd.append(ii)
+        ii = sconfig['zookeeper-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--zookeeper')
+            voltdb_cmd.append(ii)
+        ii = sconfig['http-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--http')
+            voltdb_cmd.append(ii)
+        ii = sconfig['client-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--client')
+            voltdb_cmd.append(ii)
+        ii = sconfig['admin-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--admin')
+            voltdb_cmd.append(ii)
+        ii = sconfig['replication-listener']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--replication')
+            voltdb_cmd.append(ii)
+        ii = sconfig['public-interface']
+        if  ii != None and len(ii) > 0:
+            voltdb_cmd.append('--publicinterface')
+            voltdb_cmd.append(ii)
 
 
     def run_voltserver_process(self, voltdb_cmd, outfilename):
@@ -413,6 +471,7 @@ class VoltDatabase:
             return create_response('Server details not found for id ' + server_id, 404)
     
         args = [ '-H', server[0]['hostname']]
+        # This needs to look at authentication and port information.
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,

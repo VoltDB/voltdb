@@ -2006,8 +2006,11 @@ class StartLocalServerAPI(MethodView):
         """
 
         try:
+            sid = -1
+            if 'id' in request.args:
+                sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server()
+            return server.check_and_start_local_server(sid)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2365,19 +2368,21 @@ def main(runner, amodule, config_dir, server):
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
-                     view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
-                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
-                     view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+                     view_func=START_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
+
+    # Internal API
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+                     view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
 
     APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
                      view_func=DEPLOYMENT_VIEW, methods=['GET'])
@@ -2409,6 +2414,6 @@ def main(runner, amodule, config_dir, server):
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.INFO)
     log.addHandler(handler)
-    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)' %(bindIp, __PORT__))
+    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)\n' %(bindIp, __PORT__))
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)
