@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 public class ReadMP extends VoltProcedure {
 
     public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, rid desc;");
 
     public VoltTable[] run(byte cid) {
         voltQueueSQL(r_getCIDData, cid);
