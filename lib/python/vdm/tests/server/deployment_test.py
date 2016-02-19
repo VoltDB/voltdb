@@ -163,13 +163,13 @@ class UpdateDeployment(Deployment):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_time_maximum(self):
-        """ensure commandlog frequency time is greater than 1000"""
-        maximum_value = 1001
+        """ensure commandlog frequency time is greater than 5000"""
+        maximum_value = 5001
         response = requests.put(__url__, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                'commandlog': {'frequency': {'time': maximum_value}}})
         value = response.json()
         self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than "
-                                                                  "the maximum of 1000")
+                                                                  "the maximum of 5000")
         self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_transaction_empty(self):
@@ -217,14 +217,14 @@ class UpdateDeployment(Deployment):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_log_size_maximum(self):
-        """ensure commandlog log size is not greater than 4000"""
-        maximum_value = 4001
+        """ensure commandlog log size is not greater than 102400"""
+        maximum_value = 102401
         response = requests.put(__url__,
                                 json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                       'commandlog': {'logsize': maximum_value}})
         value = response.json()
         self.assertEqual(value['errors'][0], str(maximum_value) + " is greater "
-                                                                  "than the maximum of 4000")
+                                                                  "than the maximum of 102400")
         self.assertEqual(response.status_code, 200)
 
     def test_validate_heart_beat_timeout_empty(self):
@@ -300,7 +300,7 @@ class UpdateDeployment(Deployment):
                                 json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                       'systemsettings': {'temptables': {'maxsize': -1}}})
         value = response.json()
-        self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+        self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
         self.assertEqual(response.status_code, 200)
 
     def test_validate_snapshot_priority_empty(self):
@@ -345,9 +345,18 @@ class UpdateDeployment(Deployment):
         """ensure max java memory limit is not negative"""
         response = requests.put(__url__,
                                 json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
-                                      'systemsettings': {'resourcemonitor': {'memorylimit': {'size': -1}}}})
+                                      'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1'}}}})
         value = response.json()
-        self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+        self.assertEqual(value['error'], "memorylimit value must be between 0 and 2147483647.")
+        self.assertEqual(response.status_code, 200)
+
+    def test_validate_memory_limit_negative_percent(self):
+        """ensure max java memory limit is not negative"""
+        response = requests.put(__url__,
+                                json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
+                                      'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1%'}}}})
+        value = response.json()
+        self.assertEqual(value['error'], "memorylimit percent value must be between 0 and 100.")
         self.assertEqual(response.status_code, 200)
 
     def test_validate_export_invalid_export_type(self):
