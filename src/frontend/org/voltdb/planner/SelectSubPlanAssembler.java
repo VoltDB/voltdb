@@ -746,7 +746,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // the inner node ONLY, that can not be pushed down.
                 joinClauses.addAll(innerAccessPath.otherExprs);
             }
-            nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
+            nljNode.setJoinPredicate(ExpressionUtil.combinePredicates(joinClauses));
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(outerPlan);
@@ -787,8 +787,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return null;
         }
         ajNode.setJoinType(joinNode.getJoinType());
-        ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
-        ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
+        ajNode.setPreJoinPredicate(ExpressionUtil.combinePredicates(joinNode.m_joinOuterList));
+        ajNode.setWherePredicate(ExpressionUtil.combinePredicates(whereClauses));
         ajNode.resolveSortDirection();
         return ajNode;
     }

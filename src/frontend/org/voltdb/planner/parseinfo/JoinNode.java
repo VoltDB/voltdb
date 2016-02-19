@@ -210,7 +210,7 @@ public abstract class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return ExpressionUtil.combine(out);
+        return ExpressionUtil.combinePredicates(out);
     }
 
     protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }

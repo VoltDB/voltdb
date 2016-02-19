@@ -319,9 +319,7 @@ public abstract class ExpressionUtil {
             subExprMap.put(subExpr.m_id, subExpr);
         }
         // Now reconstruct the expression
-        ArrayList<AbstractExpression> newList = new ArrayList<AbstractExpression>();
-        newList.addAll(subExprMap.values());
-        return ExpressionUtil.combine(newList);
+        return ExpressionUtil.combinePredicates(subExprMap.values());
     }
 
     /**
