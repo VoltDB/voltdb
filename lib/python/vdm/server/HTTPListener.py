@@ -1329,8 +1329,7 @@ def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
 
 
-def is_pro_version(deployment):
-    ##############################################
+def get_jar_file_path():
     file_path = ''
     try:
         volt_jar = glob.glob(os.path.join(get_volt_jar_dir(), 'voltdb-*.jar'))
@@ -1340,6 +1339,13 @@ def is_pro_version(deployment):
             print 'No voltdb jar file found.'
     except Exception, err:
         print err
+    finally:
+        return file_path
+
+
+def is_pro_version(deployment):
+    ##############################################
+    file_path = get_jar_file_path()
     if file_path != '':
         is_pro = utility.is_pro_version(file_path)
         if is_pro:

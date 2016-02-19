@@ -40,6 +40,7 @@ import subprocess
 import time
 import traceback
 import Log
+from lib.python.voltcli import utility
 
 
 class G:
@@ -70,22 +71,24 @@ def get_voltdb_dir():
 
 
 def check_snapshot_folder(database_id):
-    deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
-    if len(deployment) > 0:
-        if 'paths' in deployment[0] and 'voltdbroot' in deployment[0]['paths'] and 'snapshots' in deployment[0]['paths']:
-            voltdb_root = deployment[0]['paths']['voltdbroot']['path']
-            snapshot = deployment[0]['paths']['snapshots']['path']
+    fresh_start = True;
+    file_path = HTTPListener.get_jar_file_path()
+    if file_path != '':
+        is_pro = utility.is_pro_version(file_path)
+        if is_pro:
+            deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+            if len(deployment) > 0:
+                if 'paths' in deployment[0] and 'voltdbroot' in deployment[0]['paths'] and 'snapshots' in deployment[0]['paths'] \
+                        and 'commandlog' in deployment[0]['paths']:
+                    volt_db_root = deployment[0]['paths']['voltdbroot']['path']
+                    snapshot = deployment[0]['paths']['snapshots']['path']
+                    command_log = deployment[0]['paths']['commandlog']['path']
+                    outfilename_snapshot = os.path.join(HTTPListener.Global.PATH, str(volt_db_root), str(snapshot))
+                    outfilename_command_log = os.path.join(HTTPListener.Global.PATH, str(volt_db_root), str(command_log))
+                    if os.path.isdir(outfilename_snapshot) and os.path.isdir(outfilename_command_log):
+                        fresh_start = False
+    return fresh_start
 
-            outfilename = os.path.join(HTTPListener.Global.PATH, str(voltdb_root), str(snapshot))
-            if os.path.isdir(outfilename):
-                freshStart = False
-            else:
-                freshStart = True
-            return freshStart
-        else:
-            return True
-    else:
-        return True
 
 def create_response(statusstr, statuscode):
     """
