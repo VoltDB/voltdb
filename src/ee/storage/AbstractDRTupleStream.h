@@ -62,7 +62,6 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -76,7 +75,6 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
-                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -106,9 +104,6 @@ protected:
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
     bool m_opened;
-    // If no pkHash for a txn exists, the value and the field in endTxn will be LONG_MIN
-    // If multiple pkHash values have been assigned for this txn, the endTxn will be LONG_MAX
-    int64_t m_txnPkHash;
     size_t m_txnRowCount;
 };
 

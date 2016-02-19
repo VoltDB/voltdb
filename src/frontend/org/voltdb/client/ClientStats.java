@@ -142,8 +142,7 @@ public class ClientStats {
         retval.m_roundTripTimeNanos = newer.m_roundTripTimeNanos - older.m_roundTripTimeNanos;
         retval.m_clusterRoundTripTime = newer.m_clusterRoundTripTime - older.m_clusterRoundTripTime;
 
-        newer.m_latencyHistogram.subtract(older.m_latencyHistogram);
-        retval.m_latencyHistogram = newer.m_latencyHistogram;
+        retval.m_latencyHistogram = Histogram.diff(newer.m_latencyHistogram, older.m_latencyHistogram);
 
         retval.m_bytesSent = newer.m_bytesSent - older.m_bytesSent;
         retval.m_bytesReceived = newer.m_bytesReceived - older.m_bytesReceived;

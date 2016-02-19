@@ -44,38 +44,42 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
-    /**
-    *
-    * @param colExps
-    */
-   @SafeVarargs
-   public static AbstractExpression combine(Collection<AbstractExpression>... colExps) {
-       Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-       for (Collection<AbstractExpression> exps : colExps) {
-           if (exps != null) {
-               stack.addAll(exps);
-           }
-       }
-       if (stack.isEmpty()) {
-           return null;
-       }
-       return combine(stack);
-   }
+    @SafeVarargs
+    public static AbstractExpression cloneAndCombinePredicates(Collection<AbstractExpression>... colExps) {
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps == null) {
+                continue;
+            }
+            for (AbstractExpression expr : exps) {
+                stack.add((AbstractExpression)expr.clone());
+            }
+        }
+        if (stack.isEmpty()) {
+            return null;
+        }
+        return combineStack(stack);
+    }
 
     /**
      *
-     * @param exps
+     * @param colExps
      */
-    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
-        if (exps.isEmpty()) {
+    @SafeVarargs
+    public static AbstractExpression combine(Collection<AbstractExpression>... colExps) {
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps != null) {
+                stack.addAll(exps);
+            }
+        }
+        if (stack.isEmpty()) {
             return null;
         }
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        stack.addAll(exps);
-        return combine(stack);
+        return combineStack(stack);
     }
 
-    private static AbstractExpression combine(Stack<AbstractExpression> stack) {
+    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.

@@ -531,7 +531,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -682,7 +682,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
+        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -846,7 +846,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
     }
 
     if (fallible) {
