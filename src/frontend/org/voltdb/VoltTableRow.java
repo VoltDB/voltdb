@@ -100,20 +100,20 @@ public abstract class VoltTableRow {
      * @param columnIndex Index of the column
      * @return {@link VoltType VoltType} of the column
      */
-    abstract VoltType getColumnType(int columnIndex);
+    abstract public VoltType getColumnType(int columnIndex);
 
     /**
-     * Return the index of the column with the specified index.
+     * Return the index of the column with the specified column name.
      * @param columnName Name of the column
      * @return Index of the column
      */
-    abstract int getColumnIndex(String columnName);
+    abstract public int getColumnIndex(String columnName);
 
     /**
      * Returns the number of columns in the table schema
      * @return Number of columns in the table schema
      */
-    abstract int getColumnCount();
+    abstract public int getColumnCount();
 
     /**
      * Returns the number of rows.
