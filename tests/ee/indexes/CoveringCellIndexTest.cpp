@@ -543,6 +543,10 @@ TEST_F(CoveringCellIndexTest, Simple) {
     searchKey.tuple().setNValue(0, wktToNval("point(10.01 10.01)"));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0, 1});
 
+    // Searching for the null value should return nothing.
+    searchKey.tuple().setNValue(0, NValue::getNullValue(VALUE_TYPE_POINT));
+    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
+
     // Make sure the index is still valid what with all these changes and all.
     std::string msg;
     ASSERT_TRUE_WITH_MESSAGE(ccIndex->checkValidityForTest(table.get(), &msg), msg.c_str());

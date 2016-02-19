@@ -157,6 +157,11 @@ bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey,
     cursor.m_forward = true;
 
     GeographyPointValue pt = ValuePeeker::peekGeographyPointValue(searchKey->getNValue(0));
+    if (pt.isNull()) {
+        cursor.m_match.move(NULL);
+        return false;
+    }
+
     S2CellId cell = S2CellId::FromPoint(pt.toS2Point());
 
     // Start at the highest level (smallest cells) and work to larger cells.
