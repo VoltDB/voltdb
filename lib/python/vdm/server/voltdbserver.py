@@ -40,7 +40,9 @@ import subprocess
 import time
 import traceback
 import Log
-from lib.python.voltcli import utility
+import sys
+sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
+from voltcli import utility
 
 
 class G:
