@@ -752,8 +752,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field] = {}
                         new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                         new_deployment[field]['snapshot'] = {}
-                        new_deployment[field]['snapshot']['prefix'] = parse_bool_string(
-                            deployment[field]['snapshot']['prefix'])
+                        new_deployment[field]['snapshot']['prefix'] = deployment[field]['snapshot']['prefix']
                     except Exception, err:
                         print str(err)
                 elif field == 'security':
@@ -916,8 +915,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field] = {}
                     new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                     new_deployment[field]['snapshot'] = {}
-                    new_deployment[field]['snapshot']['prefix'] = parse_bool_string(
-                        deployment_xml[field]['snapshot']['prefix'])
+                    new_deployment[field]['snapshot']['prefix'] = deployment_xml[field]['snapshot']['prefix']
                 except Exception, err:
                     print str(err)
                     print traceback.format_exc()
@@ -1084,7 +1082,7 @@ def get_deployment_for_upload(deployment_xml, is_list):
                 new_deployment[field] = {}
                 new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                 new_deployment[field]['snapshot'] = {}
-                new_deployment[field]['snapshot']['prefix'] = parse_bool_string(deployment_xml[field]['snapshot']['prefix'])
+                new_deployment[field]['snapshot']['prefix'] = deployment_xml[field]['snapshot']['prefix']
             except Exception, err:
                 return {'error': 'Partition-Detection: ' + str(err)}
         elif field == 'security':
@@ -1312,17 +1310,24 @@ def replace_last(source_string, replace_what, replace_with):
 
 
 def check_size_value(value, key):
-    str_value = replace_last(value, '%', '')
-    try:
-        split_value = str_value.split('%')
-        if len(split_value) > 1:
-            return jsonify({'error': 'Invalid ' + key + ' value.'})
-        int_value = int(str_value)
-        if int_value < 0 or int_value > 2147483647:
-            return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
-        return jsonify({'status':'success'})
-    except Exception, exp:
-        return jsonify({'error': str(exp)})
+    per_idx = value.find('%')
+    if per_idx != -1:
+        try:
+            str_value = replace_last(value, '%', '')
+            int_value = int(str_value)
+            if int_value < 0 or int_value > 100:
+                return jsonify({'error': key + ' percent value must be between 0 and 100.'})
+            return jsonify({'status':'success'})
+        except Exception, exp:
+            return jsonify({'error': str(exp)})
+    else:
+        try:
+            int_value = int(value)
+            if int_value < 0 or int_value > 2147483647:
+                return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+            return jsonify({'status':'success'})
+        except Exception, exp:
+            return jsonify({'error': str(exp)})
 
 
 def parse_bool_string(bool_string):
@@ -1491,13 +1496,10 @@ class ServerAPI(MethodView):
         else:
             members = database[0]['members']
         if server_id in members:
-            if not request.json or not 'dbId' in request.json:
-                abort(400)
-            database_id = request.json['dbId']
             # delete a single server
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(server) == 0:
-                abort(404)
+                return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
@@ -1507,7 +1509,7 @@ class ServerAPI(MethodView):
             write_configuration_file()
             return jsonify({'result': True})
         else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
+            return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
 
     @staticmethod
     def put(database_id, server_id):

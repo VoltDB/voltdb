@@ -59,6 +59,10 @@
 #include <vector>
 #include <jsoncpp/jsoncpp.h>
 
+#ifndef NDEBUG
+#include "debuglog.h"
+#endif /* !define(NDEBUG) */
+
 class CopyOnWriteTest_TestTableTupleFlags;
 
 namespace voltdb {
@@ -110,7 +114,12 @@ public:
      * backing store
      */
     inline void move(void *address) {
-        assert(m_schema);
+#ifndef  NDEBUG
+        if (m_schema == NULL && address != NULL) {
+            StackTrace::printStackTrace();
+        }
+#endif
+        assert(m_schema != NULL || address == NULL);
         m_data = reinterpret_cast<char*> (address);
     }
 
