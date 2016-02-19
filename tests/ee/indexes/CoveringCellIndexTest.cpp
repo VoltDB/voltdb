@@ -21,16 +21,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <unistd.h>
 #include <chrono>
-#include <iostream>
+#include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <memory>
-#include <random>
-
-#include "harness.h"
-
-#include "test_utils/ScopedTupleSchema.hpp"
+#include <unistd.h>
 
 #include "common/NValue.hpp"
 #include "common/TupleSchemaBuilder.h"
@@ -46,6 +42,7 @@
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
 
+#include "harness.h"
 #include "polygons.hpp"
 
 using std::unique_ptr;
@@ -218,8 +215,6 @@ public:
     // Delete some records from the table, forcing update of the geospatial index.
     static int deleteSomeRecords(PersistentTable* table, int totalTuples, int numTuplesToDelete) {
         std::cout << "            Deleting " << numTuplesToDelete << " tuples...\n";
-        std::default_random_engine generator;
-        std::uniform_int_distribution<int> distribution(0, totalTuples - 1);
         int numDeleted = 0;
 
         StandAloneTupleStorage tableTuple(table->schema());
@@ -229,7 +224,7 @@ public:
         std::chrono::microseconds usSpentDeleting = std::chrono::duration_cast<microseconds>(start - start);
 
         while (numDeleted < numTuplesToDelete) {
-            int idOfTupleToDelete = distribution(generator);
+            int idOfTupleToDelete = std::rand() % totalTuples;
             tableTuple.tuple().setNValue(0, ValueFactory::getIntegerValue(idOfTupleToDelete));
             TableTuple tupleToDelete = table->lookupTupleByValues(tableTuple.tuple());
             if (! tupleToDelete.isNullTuple()) {
@@ -256,8 +251,6 @@ public:
         std::chrono::microseconds usSpentScanning = std::chrono::duration_cast<microseconds>(start - start);
         std::chrono::microseconds usSpentContainsing = std::chrono::duration_cast<microseconds>(start - start);
 
-        std::default_random_engine generator;
-        std::uniform_int_distribution<int> distribution(0, numTuples - 1);
         CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
         TableTuple tempTuple = table->tempTuple();
         StandAloneTupleStorage searchKey(ccIndex->getKeySchema());
@@ -267,7 +260,7 @@ public:
 
         for (int i = 0; i < numScans; ++i) {
             // Pick a tuple at random.
-            int pk = distribution(generator);
+            int pk = std::rand() % numTuples;
             tempTuple.setNValue(0, ValueFactory::getIntegerValue(pk));
             TableTuple sampleTuple = table->lookupTupleByValues(tempTuple);
             ASSERT_FALSE(sampleTuple.isNullTuple());
@@ -636,6 +629,8 @@ TEST_F(CoveringCellIndexTest, UnsupportedMethods) {
 
 int main()
 {
+    std::srand(888);
+
     assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
 
     boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());

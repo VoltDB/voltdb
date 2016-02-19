@@ -144,8 +144,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (valueType != VALUE_TYPE_VARCHAR
-                && valueType != VALUE_TYPE_VARBINARY);
+        assert (! isVariableLengthType(valueType));
 
         setColumnAtIndex(index, valueType,
                          NValue::getTupleStorageSize(valueType),
@@ -181,7 +180,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (isVariableLengthType(valueType));
+        assert (! isVariableLengthType(valueType));
 
         setHiddenColumnAtIndex(index,
                                valueType,
