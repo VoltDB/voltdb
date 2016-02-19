@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
@@ -28,6 +29,11 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
@@ -50,9 +56,10 @@ public abstract class NonVoltDBBackend {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
     protected static final Object backendLock = new Object();
     protected static NonVoltDBBackend m_backend = null;
-
     protected String m_database_type = null;
     protected Connection dbconn;
+    protected static FileWriter transformedSqlFileWriter;
+    protected static final boolean DEBUG = false;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
@@ -72,11 +79,397 @@ public abstract class NonVoltDBBackend {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to open connection to: " + connectionURL, e);
         }
+
+        // If '-Dsqlcoverage.transform.sql.file=...' was specified on the
+        // command line, print info when transforming SQL statements into
+        // a format that the backend database can understand
+        String transformedSqlOutputFileName = System.getProperty("sqlcoverage.transform.sql.file", null);
+        if (transformedSqlOutputFileName == null) {
+            transformedSqlFileWriter = null;
+        } else {
+            try {
+                transformedSqlFileWriter = new FileWriter(transformedSqlOutputFileName, true);
+            } catch (IOException e) {
+                transformedSqlFileWriter = null;
+                System.out.println("Caught IOException:\n    " + e
+                        + "\nTransformed SQL output will not be printed.");
+            }
+        }
     }
 
     /** Creates a new NonVoltDBBackend wrapping dbconn. This is (was?) used for testing only. */
     protected NonVoltDBBackend(Connection dbconn) {
         this.dbconn = dbconn;
+    }
+
+    /** Used to specify when queries should only be modified if they apply to
+     *  columns of certain types; so this only includes column types that need
+     *  special treatment for a non-VoltDB backend database, such as PostgreSQL. */
+    protected enum ColumnType {
+        /** Any integer column type, including TINYINT, SMALLINT, INTEGER, BIGINT, etc. */
+        INTEGER,
+        /** Any Geospatial column type, including GEOGRAPHY_POINT or GEOGRAPHY. */
+        GEO
+    }
+
+    /**
+     * A QueryTransformer object is used to specify (using the builder pattern)
+     * which options should be used, when transforming SQL statements (DDL or
+     * DML) fitting certain patterns, as is often needed in order for the
+     * results of a backend database (e.g. PostgreSQL) to match those of VoltDB.
+     * This collection of options (the QueryTransformer object) is then passed
+     * to the <i>transformQuery</i> method (see below).
+     */
+    protected static class QueryTransformer {
+        // Required parameter
+        private Pattern m_queryPattern;
+
+        // Optional parameters, initialized with default values
+        private String m_initialText = "";
+        private String m_prefix = "";
+        private String m_suffix = "";
+        private String m_altSuffix = null;
+        private String m_useAltSuffixAfter = null;
+        private boolean m_useWholeMatch = false;
+        private String m_replacementText = null;
+        private ColumnType m_columnType = null;
+        private Double m_multiplier = null;
+        private Integer m_minimum = null;
+        private List<String> m_groups = new ArrayList<String>();
+        private boolean m_debugPrint = false;
+
+        /**
+         * Constructor for a QueryTransformer object.
+         * @param queryPattern - a regex Pattern to be detected and modified,
+         * within a SQL statement that may need to be modified, in order for
+         * the backend database's results to match those of VoltDB; may not
+         * be <b>null</b>.
+         */
+        protected QueryTransformer(Pattern queryPattern) {
+            if (queryPattern == null) {
+                throw new IllegalArgumentException("The queryPattern may not be null.");
+            }
+            this.m_queryPattern = queryPattern;
+        }
+
+        /** Specifies an initial string with which to begin the replacement
+         *  text (e.g. "ORDER BY"); default is an empty string; may not be
+         *  <b>null</b>. */
+        protected QueryTransformer initialText(String text) {
+            if (text == null) {
+                throw new IllegalArgumentException("The initialText may not be null.");
+            }
+            this.m_initialText = text;
+            return this;
+        }
+
+        /** Specifies a string to appear before each group, or before the whole
+         *  <i>queryPattern</i> (e.g. "TRUNC ( "); default is an empty string;
+         *  may not be <b>null</b>. */
+        protected QueryTransformer prefix(String text) {
+            if (text == null) {
+                throw new IllegalArgumentException("The prefix may not be null.");
+            }
+            this.m_prefix = text;
+            return this;
+        }
+
+        /** Specifies a string to appear after each group, or after the whole
+         *  <i>queryPattern</i> (e.g. " NULLS FIRST"); default is an empty
+         *  string; may not be <b>null</b>. */
+        protected QueryTransformer suffix(String text) {
+            if (text == null) {
+                throw new IllegalArgumentException("The suffix may not be null.");
+            }
+            this.m_suffix = text;
+            return this;
+        }
+
+        /**
+         * Specifies an alternate string to appear after each group, and under
+         * what circumstances.
+         * @param useAltSuffixAfter - when a matching group ends with this
+         * text (e.g. "DESC"), the <i>altSuffix</i> will be used, instead of
+         * <i>suffix</i>; default is <b>null</b>.
+         * @param altSuffix - the alternate suffix, to be used when the group
+         * ends with <i>altEnding</i> (e.g. " NULLS LAST"); default is <b>null</b>.
+         */
+        protected QueryTransformer alternateSuffix(String useAltSuffixAfter, String altSuffix) {
+            this.m_useAltSuffixAfter = useAltSuffixAfter;
+            this.m_altSuffix = altSuffix;
+            return this;
+        }
+
+        /** Specifies whether or not to use the whole matched pattern; when
+         *  <b>true</b>, the <i>prefix</i> and <i>suffix</i> will be applied
+         *  to the whole <i>queryPattern</i>; when <b>false</b>, they will be
+         *  applied to each <i>group</i> within it; default is <b>false</b>. */
+        protected QueryTransformer useWholeMatch(boolean useWholeMatch) {
+            this.m_useWholeMatch = useWholeMatch;
+            return this;
+        }
+
+        /** Specifies to use the whole matched pattern, i.e., the <i>prefix</i>
+         *  and <i>suffix</i> will be applied to the whole <i>queryPattern</i>. */
+        protected QueryTransformer useWholeMatch() {
+            useWholeMatch(true);
+            return this;
+        }
+
+        /** Specifies a string to replace each group, within the whole match
+         *  (e.g. "||", to replace "+"); default is <b>null</b>, in which
+         *  case it is ignored. */
+        protected QueryTransformer replacementText(String text) {
+            this.m_replacementText = text;
+            return this;
+        }
+
+        /** Specifies a ColumnType to which this QueryTransformer should be
+         *  applied, i.e., a query will only be modified if the <i>group</i>
+         *  is a column of the specified type; default is <b>null</b>, in which
+         *  case a matching query is always modified, regardless of column type. */
+        protected QueryTransformer columnType(ColumnType columnType) {
+            this.m_columnType = columnType;
+            return this;
+        }
+
+        /** Specifies a value to be multiplied by the (int-valued) group, in
+         *  the transformed query (e.g. 8.0, to convert from bytes to bits);
+         *  default is <b>null</b>, in which case it is ignored. */
+        protected QueryTransformer multiplier(Double multiplier) {
+            this.m_multiplier = multiplier;
+            return this;
+        }
+
+        /** Specifies a minimum value for the result of multiplying the
+         *  (int-valued) group by the <i>multiplier</i>; default is <b>null</b>,
+         *  in which case it is ignored. */
+        protected QueryTransformer minimum(Integer minimum) {
+            this.m_minimum = minimum;
+            return this;
+        }
+
+        /** Specifies one or more group names found within the <i>queryPattern</i>
+         *  (e.g. "column"), the text matching each group will be modified as
+         *  dictated by the other options (e.g. by adding a prefix and suffix). */
+        protected QueryTransformer groups(String ... groups) {
+            this.m_groups.addAll(Arrays.asList(groups));
+            return this;
+        }
+
+        /** Specifies whether or not to print debug info; default is <b>false</b>. */
+        protected QueryTransformer debugPrint(boolean debugPrint) {
+            this.m_debugPrint = debugPrint;
+            return this;
+        }
+
+        /** Specifies to print debug info. */
+        protected QueryTransformer debugPrint() {
+            debugPrint(true);
+            return this;
+        }
+
+    }
+
+    /** Returns true if the <i>columnName</i> is an integer column (including
+     *  types TINYINT, SMALLINT, INTEGER, BIGINT, etc.); false otherwise. */
+    static private boolean isIntegerColumn(String columnName, String... tableNames) {
+        // TODO: we may want to modify this to actually check the column type,
+        // rather than just go by the column name (ENG-9945)
+        if (DEBUG) {
+            System.out.println("In NonVoltDBBackend.isIntegerColumn, with columnName: '" + columnName + "'");
+        }
+        if (columnName == null) {
+            return false;
+        }
+        String columnNameUpper = columnName.trim().toUpperCase();
+        return  columnNameUpper.equals("ID")   || columnNameUpper.equals("NUM") ||
+                columnNameUpper.equals("TINY") || columnNameUpper.equals("SMALL") ||
+                columnNameUpper.equals("BIG")  || columnNameUpper.equals("POINTS") ||
+                columnNameUpper.equals("WAGE") || columnNameUpper.equals("DEPT") ||
+                columnNameUpper.equals("AGE")  || columnNameUpper.equals("RENT") ||
+                columnNameUpper.equals("A1")   || columnNameUpper.equals("A2") ||
+                columnNameUpper.equals("A3")   || columnNameUpper.equals("A4") ||
+                columnNameUpper.equals("V_G1") || columnNameUpper.equals("V_CNT") ||
+                columnNameUpper.equals("V_G2") || columnNameUpper.equals("V_SUM_AGE") ||
+                columnNameUpper.equals("V_SUM_RENT");
+    }
+
+    /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e. a
+     *  GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column; false otherwise. */
+    static private boolean isGeoColumn(String columnName, String... tableNames) {
+        // TODO: we may want to modify this to actually check the column type,
+        // rather than just go by the column name (ENG-9945)
+        if (DEBUG) {
+            System.out.println("In NonVoltDBBackend.isGeoColumn, with columnName: '" + columnName + "'");
+        }
+        if (columnName == null) {
+            return false;
+        }
+        String columnNameUpper = columnName.trim().toUpperCase();
+        return columnNameUpper.startsWith("PT") || columnNameUpper.startsWith("POLY");
+    }
+
+    /** Returns the number of occurrences of the specified character in the specified String. */
+    static private int numOccurencesOfCharIn(String str, char ch) {
+        int num = 0;
+        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
+            num++;
+        }
+        return num;
+    }
+
+    /** Returns the Nth occurrence of the specified character in the specified String. */
+    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
+        int index = -1;
+        for (int i=0; i < n; i++) {
+            index = str.indexOf(ch, index+1);
+            if (index < 0) {
+                return -1;
+            }
+        }
+        return index;
+    }
+
+    /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
+     *  and <i>suffix</i> concatenated (in that order), but being careful not
+     *  to include more close-parentheses than open-parentheses: if the group
+     *  does contain more close-parens than open-parens, the <i>suffix</i> is
+     *  inserted just after the matching close-parens (i.e., after the number
+     *  of close-parens that equals the number of open-parens), instead of at
+     *  the very end; but if there are no open-parens, then the <i>suffix</i>
+     *  is inserted just before the first close-parens. */
+    static private String handleParens(String group, String prefix, String suffix) {
+        int numOpenParens  = numOccurencesOfCharIn(group, '(');
+        int numCloseParens = numOccurencesOfCharIn(group, ')');
+        if (numOpenParens >= numCloseParens || suffix.isEmpty()) {
+            return (prefix + group + suffix);
+        } else {  // numOpenParens < numCloseParens
+            int index;
+            if (numOpenParens == 0) {
+                index = indexOfNthOccurrenceOfCharIn(group, ')', 1);
+            } else {
+                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens) + 1;
+            }
+            return (prefix + group.substring(0, index) + suffix + group.substring(index));
+        }
+    }
+
+    /**
+     * Modifies a <i>query</i> containing the specified <i>queryPattern</i>, in
+     * such a way that the backend database (e.g. PostgreSQL) results will match
+     * VoltDB results, typically by adding a <i>prefix</i> and/or <i>suffix</i>,
+     * either to individual <i>groups</i> within the <i>queryPattern</i>, or to
+     * the <i>queryPattern</i> as a whole.
+     *
+     * @param query - the query text (DDL, DML or DQL) to be transformed.
+     * @param qt - a QueryTransformer object, specifying the various options to
+     * be used to transform the query, e.g., a <i>queryPattern</i>, <i>prefix</i>,
+     * <i>suffix</i>, or one or more <i>groups</i>. For details of all options,
+     * see the <i>QueryTransformer</i> JavaDoc.
+     *
+     * @return the <i>query</i>, transformed in the specified ways (possibly
+     * unchanged).
+     * @throws NullPointerException if <i>query</i> or <i>qt</i> is <b>null</b>,
+     * or if the <i>qt</i>'s <i>queryPattern</i>, <i>initText</i>, <i>prefix</i>,
+     * or <i>suffix</i> is <b>null</b>.
+     */
+    static protected String transformQuery(String query, QueryTransformer qt) {
+        StringBuffer modified_query = new StringBuffer();
+        Matcher matcher = qt.m_queryPattern.matcher(query);
+        int count = 0;
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer(qt.m_initialText);
+            String wholeMatch = matcher.group();
+            String group = wholeMatch;
+            if (qt.m_debugPrint) {
+                if (count < 1) {
+                    System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
+                    System.out.println("  queryPattern: " + qt.m_queryPattern);
+                    System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix, replacementText:\n    '"
+                            + qt.m_initialText + "', '" + qt.m_prefix + "', '" + qt.m_suffix + "', '"
+                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "', '" + qt.m_replacementText
+                            + "'\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
+                            + qt.m_useWholeMatch + ", " + qt.m_columnType + ", " + qt.m_multiplier + ", "
+                            + qt.m_minimum + ", " + qt.m_debugPrint + "\n    " + qt.m_groups);
+                }
+                System.out.println("  " + ++count + ".wholeMatch: " + wholeMatch);
+            }
+            for (String groupName : qt.m_groups) {
+                group = matcher.group(groupName);
+                if (qt.m_debugPrint) {
+                    System.out.println("    group     : " + group);
+                }
+                if (group == null) {
+                    break;
+                } else if (!qt.m_useWholeMatch) {
+                    String groupValue = group, suffixValue = qt.m_suffix;
+                    // Check for the case where a multiplier & minimum are used
+                    if (qt.m_multiplier != null && qt.m_minimum != null) {
+                        groupValue = Long.toString(Math.round(Math.max(Integer.parseInt(group) * qt.m_multiplier, qt.m_minimum)));
+                    }
+                    // Check for the ending that indicates to use the alternate suffix
+                    if (qt.m_altSuffix != null && group.toUpperCase().endsWith(qt.m_useAltSuffixAfter)) {
+                        suffixValue = qt.m_altSuffix;
+                    }
+                    // Make sure not to swallow up extra ')', in this group
+                    replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue));
+                }
+            }
+            if (qt.m_useWholeMatch) {
+                if (qt.m_columnType != null && (
+                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(group))
+                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
+                    // Make no changes to query (when columnType is specified,
+                    // but does not match the column type found in this query)
+                    replaceText.append(wholeMatch);
+                } else {
+                    // Check for the case where the group is to be replaced with replacementText
+                    if (qt.m_replacementText != null) {
+                        wholeMatch = wholeMatch.replace(group, qt.m_replacementText);
+                    }
+                    // Make sure not to swallow up extra ')', in whole match
+                    replaceText.append(handleParens(wholeMatch, qt.m_prefix, qt.m_suffix));
+                }
+            }
+            if (qt.m_debugPrint) {
+                System.out.println("  replaceText : " + replaceText);
+            }
+            matcher.appendReplacement(modified_query, replaceText.toString());
+        }
+        matcher.appendTail(modified_query);
+        if ((DEBUG || qt.m_debugPrint) && !query.equalsIgnoreCase(modified_query.toString())) {
+            System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
+            System.out.println("  modified_query: " + modified_query);
+        }
+        return modified_query.toString();
+    }
+
+    /** Calls the transformQuery method above multiple times, for each
+     *  specified QueryTransformer. */
+    static protected String transformQuery(String query, QueryTransformer ... qts) {
+        String result = query;
+        for (QueryTransformer qt : qts) {
+            result = transformQuery(result, qt);
+        }
+        return result;
+    }
+
+    /** Prints the original and modified SQL statements, to the "Transformed
+     *  SQL" output file, assuming that that file is defined; and only if
+     *  the original and modified SQL are not the same, i.e., only if some
+     *  transformation has indeed taken place. */
+    static protected void printTransformedSql(String originalSql, String modifiedSql) {
+        if (transformedSqlFileWriter != null && !originalSql.equals(modifiedSql)) {
+            try {
+                transformedSqlFileWriter.write("original SQL: " + originalSql + "\n");
+                transformedSqlFileWriter.write("modified SQL: " + modifiedSql + "\n");
+            } catch (IOException e) {
+                System.out.println("Caught IOException:\n    " + e);
+                System.out.println("original SQL: " + originalSql);
+                System.out.println("modified SQL: " + modifiedSql);
+            }
+        }
     }
 
     protected abstract void shutdown();

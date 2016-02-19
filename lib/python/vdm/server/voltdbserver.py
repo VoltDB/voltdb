@@ -39,6 +39,8 @@ import signal
 import subprocess
 import time
 import traceback
+import Log
+
 
 class G:
     """
@@ -51,6 +53,7 @@ class G:
     OUTFILE_TIME = str(time.time())
     OUTFILE_COUNTER = 0
 
+
 def ignore_signals():
     """
     Used when forking voltdbserver process to ignore certain signals
@@ -58,18 +61,44 @@ def ignore_signals():
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+
 def get_voltdb_dir():
     """
     Utility method to get voltdb bin directory
     """
     return os.path.realpath(os.path.join(HTTPListener.Global.MODULE_PATH, '../../../..', 'bin'))
 
+
+def check_snapshot_folder(database_id):
+    deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+    if len(deployment) > 0:
+        if 'paths' in deployment[0] and 'voltdbroot' in deployment[0]['paths'] and 'snapshots' in deployment[0]['paths']:
+            voltdb_root = deployment[0]['paths']['voltdbroot']['path']
+            snapshot = deployment[0]['paths']['snapshots']['path']
+
+            outfilename = os.path.join(HTTPListener.Global.PATH, str(voltdb_root), str(snapshot))
+            if os.path.isdir(outfilename):
+                freshStart = False
+            else:
+                freshStart = True
+            return freshStart
+        else:
+            return True
+    else:
+        return True
+
 def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
     """
     return make_response(jsonify( { 'statusstring': statusstr } ), statuscode)
-    
+
+
+class VoltdbProcess:
+    isProcessRunning = False
+    processId = -1
+
+
 class VoltDatabase:
     """Represents a Volt database"""
 
@@ -115,7 +144,7 @@ class VoltDatabase:
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
                                   (curr['hostname'], HTTPListener.__PORT__, self.database_id, action)
                 response = requests.put(url)
-                if (response.status_code != requests.codes.ok):
+                if response.status_code != requests.codes.ok:
                     failed = True
                 server_status[curr['hostname']] = json.loads(response.text)['statusstring']
             except Exception, err:
@@ -124,7 +153,10 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors starting servers: ' + str(server_status), 500)
+            url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
+                  (curr['hostname'], HTTPListener.__PORT__, self.database_id)
+            response = requests.get(url)
+            return create_response(response.text, 200)
         else:
             return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
 
@@ -170,7 +202,8 @@ class VoltDatabase:
         if (retcode == 0):
             return create_response('Success', 200)
         else:
-            return create_response('Error starting server', 500)
+            return create_response('Error', 500)
+            # return create_response('Error starting server', 500)
     
     def is_voltserver_running(self):
         """
@@ -186,6 +219,23 @@ class VoltDatabase:
                 pass
     
         return False
+
+    def Get_Voltdb_Process(self):
+        VoltdbProcess.isProcessRunning = False
+        VoltdbProcess.processId = -1
+        for proc in psutil.process_iter():
+
+            try:
+                cmd = proc.cmdline()
+                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
+                    VoltdbProcess.isProcessRunning = True
+                    VoltdbProcess.processId = proc.pid
+                    return VoltdbProcess
+            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
+                # print traceback.format_exc()
+                pass
+
+        return VoltdbProcess
     
     def start_local_server(self, recover=False):
         """
@@ -218,13 +268,14 @@ class VoltDatabase:
             time.sleep(0.5)
             voltserver.poll()
             initialized = 'Server completed initialization' in rfile.readline()
-    
+
         rfile.close()
         if (voltserver.returncode is None):
             return 0
         else:
             return 1
-    
+
+
     def run_voltserver_process(self, voltdb_cmd, outfilename):
         """
         Utility method to start voltdb process given the cmd details
@@ -264,6 +315,7 @@ class VoltDatabase:
         Stops voltdb cluster for this database
         """
         members = []
+        server_status ={}
         current_database = [database for database in HTTPListener.Global.DATABASES if database['id'] == self.database_id]
         if not current_database:
             abort(404)
@@ -276,11 +328,23 @@ class VoltDatabase:
         server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
         if not server:
             return create_response('Server details not found for id ' + server_id, 404)
-    
-        args = [ '-H', server[0]['hostname'] ]
-        return self.run_voltdb_cmd('voltadmin', 'shutdown', args)
 
-    def run_voltdb_cmd(self, cmd, verb, args):
+        for server_id in members:
+            server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+            curr = server[0]
+            try:
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s?force=false') % \
+                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, server_id, 'stop')
+                response = requests.put(url)
+                server_status[curr['hostname']] = response.text
+
+            except Exception, err:
+                print traceback.format_exc()
+                server_status[curr['hostname']] = response.text
+
+        return create_response(json.dumps(server_status), 200)
+
+    def run_voltdb_cmd(self, cmd, verb, args, outfilename):
         """
         Runs the given voltdb command using admin user, as needed
         """
@@ -293,10 +357,13 @@ class VoltDatabase:
     
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
-    
+
+
         shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
         exit_code = shutdown_proc.wait()
+        target = open(outfilename, 'w')
+        target.write(str(output + error))
         return output + error
 
     def is_security_enabled(self):
@@ -345,5 +412,62 @@ class VoltDatabase:
         if not server:
             return create_response('Server details not found for id ' + server_id, 404)
     
-        args = [ '-H', server[0]['hostname'], server[0]['name'] ]
-        return self.run_voltdb_cmd('voltadmin', 'stop', args)
+        args = [ '-H', server[0]['hostname']]
+
+        G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
+        outfilename = os.path.join(HTTPListener.Global.PATH,
+                ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
+        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
+
+    def kill_database(self, database_id):
+        members = []
+        current_database = [database for database in HTTPListener.Global.DATABASES if database['id'] == database_id]
+        if not current_database:
+            abort(404)
+        else:
+            members = current_database[0]['members']
+        if not members:
+            return create_response('No servers configured for the database', 500)
+
+        server_id = members[0]
+        server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+        if not server:
+            return create_response('Server details not found for id ' + server_id, 404)
+
+        # Now stop each server
+        failed = False
+        server_status = {}
+        action = "stop"
+        for server_id in members:
+            server = [server for server in HTTPListener.Global.SERVERS if server['id'] == server_id]
+            curr = server[0]
+            try:
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s?force=true') % \
+                      (curr['hostname'], HTTPListener.__PORT__, database_id, server_id, action)
+                response = requests.put(url)
+                if (response.status_code != requests.codes.ok):
+                    failed = True
+                server_status[curr['hostname']] = json.loads(response.text)['statusstring']
+            except Exception, err:
+                failed = True
+                print traceback.format_exc()
+                server_status[curr['hostname']] = str(err)
+
+        if failed:
+            return create_response('There were errors stopping servers: ' + str(server_status) ,500)
+        else:
+            return create_response('Stop request sent successfully to servers: ' + str(server_status), 200)
+
+    def kill_server(self, server_id):
+        try:
+            processId = self.Get_Voltdb_Process().processId
+            if processId is not None and processId != -1:
+                os.kill(processId, signal.SIGKILL)
+                return create_response('success', 200)
+            else:
+                return create_response('process not found', 200)
+        except Exception, err:
+            return create_response(str(err), 500)
+
+
+

@@ -39,7 +39,7 @@ __host_or_ip__ = socket.gethostbyname(__host_name__)
 
 __url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/vdm/'
 __db_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
-__server_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/servers/'
+__server_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 
 
 def get_last_db_id():
@@ -61,12 +61,13 @@ def get_last_server_id():
         Get last Server Id
     """
 
-    response = requests.get(__server_url__)
+    url = __server_url__ + str(get_last_db_id()) + '/servers/'
+    response = requests.get(url)
     value = response.json()
     last_server_id = 0
     if value:
-        server_length = len(value['servers'])
-        last_server_id = value['servers'][server_length - 1]['id']
+        server_length = len(value['members'])
+        last_server_id = value['members'][server_length - 1]['id']
 
     return last_server_id
 
@@ -95,8 +96,7 @@ class Database(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-URL = 'http://' + __host_or_ip__ + ':8000/api/1.0/servers/'
-
+URL = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 
 class XML(unittest.TestCase):
     """
@@ -215,7 +215,7 @@ class Server(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
-            url = URL + str(last_db_id)
+            url = URL + str(last_db_id) + '/servers/'
             data = {'description': 'test', 'hostname': 'test', 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 201:
@@ -236,13 +236,14 @@ class Server(unittest.TestCase):
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
             db_data = {'dbId': last_db_id}
-            response = requests.get(URL)
+            url = URL + str(last_db_id) + '/servers/'
+            response = requests.get(url)
             value = response.json()
             if value:
-                server_length = len(value['servers'])
-                last_server_id = value['servers'][server_length - 1]['id']
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length - 1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
-                url = URL + str(last_server_id)
+                url = URL + str(last_db_id) + '/servers/' + str(last_server_id)
                 response = requests.delete(url, json=db_data, headers=headers)
                 self.assertEqual(response.status_code, 200)
                 # Delete database

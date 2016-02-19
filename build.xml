@@ -1554,24 +1554,7 @@ NATIVE EE STUFF
     <antcall target="prep_libvoltdb"/>
 </target>
 
-<target name='ee_makefile.uptodate'>
-  <condition property="makefile.uptodate">
-    <and>
-    <!--set if makefile up to date and makefile non-zero length
-            Eliminates timeconsuming build.py in ee -->
-    <uptodate>
-      <srcfiles dir='${src.ee.dir}' includes='**/*' />
-      <srcfiles dir='${vendor.cpp.dir}'  includes='**/*' />
-      <srcfiles dir='${src.ee.test.dir}'  includes='**/*' />
-      <mapper type="merge" to="${build.dir}/makefile"/>
-    </uptodate>
-    <length file="${build.dir}/makefile" when="greater" length="0" />
-    </and>
-  </condition>
-</target>
-
-<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo, ee_makefile.uptodate"
-    unless="makefile.uptodate"
+<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
     description="Just make the makefile for the C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
@@ -2392,7 +2375,7 @@ TEST CASES
 </target>
 
 
-<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-2.0.0" />
+<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-3.0.1" />
 
 <taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" >
   <classpath>
