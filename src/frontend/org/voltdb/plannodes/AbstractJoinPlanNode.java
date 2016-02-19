@@ -349,19 +349,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     protected static void resolvePredicate(AbstractExpression expression,
             NodeSchema outer_schema, NodeSchema inner_schema)
     {
-        // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
                 ExpressionUtil.getTupleValueExpressions(expression);
-        for (TupleValueExpression tve : predicate_tves)
-        {
+        for (TupleValueExpression tve : predicate_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
-            if (index == -1)
-            {
+            if (index == -1) {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for join TVE: " +
+                if (index == -1) {
+                    throw new RuntimeException("Unable to resolve column index for join TVE: " +
                                                tve.toString());
                 }
                 tableIdx = 1;   // 1 for inner table
