@@ -54,10 +54,7 @@ using namespace voltdb;
 
 void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
     if (m_aggExec != NULL) {
-        if (m_aggExec->p_execute_tuple(join_tuple)) {
-            // Aggregate has reached the limit
-            postfilter.setAboveLimit();
-        }
+        m_aggExec->p_execute_tuple(join_tuple);
         return;
     }
     m_tmpOutputTable->insertTempTuple(join_tuple);

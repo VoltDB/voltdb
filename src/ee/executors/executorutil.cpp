@@ -47,6 +47,7 @@
 
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "storage/temptable.h"
 
 namespace voltdb {
 
@@ -69,6 +70,55 @@ bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* i
         ++m_tuple_ctr;
         return true;
     }
+    return false;
+}
+
+AggCountingPostfilter::AggCountingPostfilter() :
+    m_table(NULL),
+    m_postfilter(NULL),
+    m_parentPostfilter(NULL),
+    m_limit(CountingPostfilter::NO_LIMIT),
+    m_offset(CountingPostfilter::NO_OFFSET),
+    m_tuple_skipped(0),
+    m_under_limit(true)
+{}
+
+AggCountingPostfilter::AggCountingPostfilter(const TempTable* table, const AbstractExpression * postfilter, int limit, int offset, CountingPostfilter* parentPostfilter) :
+    m_table(table),
+    m_postfilter(postfilter),
+    m_parentPostfilter(parentPostfilter),
+    m_limit(limit),
+    m_offset(offset),
+    m_tuple_skipped(0),
+    m_under_limit(true)
+{}
+
+// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
+bool AggCountingPostfilter::eval(const TableTuple* tuple) {
+    assert(m_table);
+    if (m_postfilter == NULL || m_postfilter->eval(tuple, NULL).isTrue()) {
+        // Verify the OFFSET first
+        if (m_tuple_skipped < m_offset) {
+                m_tuple_skipped++;
+                return false;
+            }
+        // LIMIT check
+        if (m_limit >= 0) {
+            // If there is an inlined limit for serial aggregate and
+            // it is possible for LIMIT 0.
+            if (m_table->tempTableTupleCount() == m_limit) {
+                m_under_limit = false;
+                // Notify a parent that the limit is reached
+                if (m_parentPostfilter) {
+                    m_parentPostfilter->setAboveLimit();
+                }
+                return false;
+            }
+        }
+        // LIMIT/OFFSET are satisfied
+        return true;
+    }
+    // Predicate is not NULL and was evaluated to FALSE
     return false;
 }
 
