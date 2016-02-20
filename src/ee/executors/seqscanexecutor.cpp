@@ -176,8 +176,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
-        int limit = -1;
-        int offset = -1;
+        int limit = CountingPostfilter::NO_LIMIT;
+        int offset = CountingPostfilter::NO_OFFSET;
         if (limit_node) {
             limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
@@ -193,7 +193,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
             temp_tuple = m_aggExec->p_execute_init(params, &pmp,
-                    inputSchema, m_tmpOutputTable);
+                    inputSchema, m_tmpOutputTable, &postfilter);
         } else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
@@ -246,10 +246,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
 void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
     if (m_aggExec != NULL) {
-        if (m_aggExec->p_execute_tuple(tuple)) {
-            // Aggregate has reached the limit
-            postfilter.setAboveLimit();
-        }
+        m_aggExec->p_execute_tuple(tuple);
         return;
     }
     //
