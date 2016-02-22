@@ -456,7 +456,7 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     return false;
 }
 
-int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyNValue, int32_t partitionId, char *outBytes) {
+int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, char *outBytes) {
     CompatibleDRTupleStream stream;
     stream.configure(partitionId);
 
@@ -477,8 +477,8 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyNValue, int
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
-    // update the primary key column
-    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyNValue));
+    // set the partition key
+    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
@@ -495,10 +495,10 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyNValue, int
 
     TupleSchema::freeTupleSchema(schema);
 
-//    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-//    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-//    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-//    stream.endTransaction(uid);
+    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
+    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
+    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+    stream.endTransaction(uid);
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);

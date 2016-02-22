@@ -46,25 +46,23 @@ const int COLUMN_COUNT = 5;
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
 // columns, which includes:
-// 1 version byte
 // 1 type byte
 // 8 table signature bytes
 // 4 row length bytes
 // 1 (5 columns rounds to 8, /8 = 1) null mask byte
 // 5 * sizeof(int32_t) = 20 data bytes
-// 4 checksum bytes
-// total: 39
-const int MAGIC_TUPLE_SIZE = 39;
-const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
-const int MAGIC_END_TRANSACTION_SIZE = 22;
+// total: 34
+const int MAGIC_TUPLE_SIZE = 34;
+const int MAGIC_BEGIN_TRANSACTION_SIZE = 27;
+const int MAGIC_END_TRANSACTION_SIZE = 13;
 const int MAGIC_TRANSACTION_SIZE = MAGIC_BEGIN_TRANSACTION_SIZE + MAGIC_END_TRANSACTION_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
 // 4 index checksum bytes
 // 1 * sizeof(int32_t) = 4 data bytes
-// new total: 27
-const int MAGIC_OPTIMIZED_TUPLE_SIZE = 27;
+// new total: 22
+const int MAGIC_OPTIMIZED_TUPLE_SIZE = 22;
 const int MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_OPTIMIZED_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 const int BUFFER_SIZE = 950;
 // roughly 22.5k
@@ -98,7 +96,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper.configure(42);
+        m_wrapper.configure(16383);
 
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
@@ -733,7 +731,7 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     for (int i = 1; i < tuples_to_fill; i++) {
         appendTuple(2, 3);
     }
-    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() < MAGIC_TUPLE_SIZE);
+    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
 
     appendTuple(2, 3);
     m_wrapper.endTransaction(addPartitionId(3));
