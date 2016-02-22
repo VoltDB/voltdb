@@ -24,6 +24,7 @@ import java.util.Map;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
@@ -70,11 +71,11 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
             if (producerPartitionMap != null) {
                 tracker = producerPartitionMap.get(producerPartitionId);
                 if (tracker == null) {
-                    tracker = new DRConsumerDrIdTracker(-1L, Long.MIN_VALUE, Long.MIN_VALUE);
+                    tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeEmptyDRId(producerClusterId), Long.MIN_VALUE, Long.MIN_VALUE);
                 }
             }
             else {
-                tracker = new DRConsumerDrIdTracker(-1L, Long.MIN_VALUE, Long.MIN_VALUE);
+                tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeEmptyDRId(producerClusterId), Long.MIN_VALUE, Long.MIN_VALUE);
             }
             JSONStringer stringer = new JSONStringer();
             try {
