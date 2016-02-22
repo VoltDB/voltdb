@@ -242,11 +242,12 @@ class VoltDatabase:
     
     def start_local_server(self, sid, recover=False):
         """
-        Find server from id if its missing bail out.
+        start a local server process. recover if recover is true else create.
         """
+        # if server is not found bail out.
         server = [server for server in HTTPListener.Global.SERVERS if server['id'] == sid]
         if not server:
-            return 0
+            return 1
 
         """
         Gets deployment.xml for this database and starts voltdb server locally
@@ -262,8 +263,7 @@ class VoltDatabase:
         if recover:
             verb = 'recover'
         voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
-        self.build_network_options(server, voltdb_cmd)
-        print voltdb_cmd
+        self.build_network_options(server[0], voltdb_cmd)
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,
@@ -288,51 +288,24 @@ class VoltDatabase:
             return 1
 
     # Build network options for command line.
-    def build_network_options(self, server, voltdb_cmd):
-        if len(server) == 0:
-            return
-        sconfig = server[0]
-        ii = sconfig['internal-interface']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--internalinterface')
-            voltdb_cmd.append(ii)
-        ii = sconfig['internal-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--internal')
-            voltdb_cmd.append(ii)
-        ii = sconfig['external-interface']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--externalinterface')
-            voltdb_cmd.append(ii)
-        ii = sconfig['placement-group']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--placement-group')
-            voltdb_cmd.append(ii)
-        ii = sconfig['zookeeper-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--zookeeper')
-            voltdb_cmd.append(ii)
-        ii = sconfig['http-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--http')
-            voltdb_cmd.append(ii)
-        ii = sconfig['client-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--client')
-            voltdb_cmd.append(ii)
-        ii = sconfig['admin-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--admin')
-            voltdb_cmd.append(ii)
-        ii = sconfig['replication-listener']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--replication')
-            voltdb_cmd.append(ii)
-        ii = sconfig['public-interface']
-        if  ii != None and len(ii) > 0:
-            voltdb_cmd.append('--publicinterface')
-            voltdb_cmd.append(ii)
+    def build_network_options(self, sconfig, voltdb_cmd):
+        self.add_voltdb_option(sconfig, 'internal-interface', '--internalinterface', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'external-interface', '--externalinterface', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'internal-listener', '--internal', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'placement-group', '--placement-group', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'zookeeper-listener', '--zookeeper', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'http-listener', '--http', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'client-listener', '--client', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'admin-listener', '--admin', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'replication-listener', '--replication', voltdb_cmd)
+        self.add_voltdb_option(sconfig, 'public-interface', '--publicinterface', voltdb_cmd)
 
+    # Given server config and option name add corrorponding cli switch for building command.
+    def add_voltdb_option(self, sconfig, option_name, cli_switch, voltdb_cmd):
+        opt_val = sconfig[option_name]
+        if  opt_val != None and len(opt_val) > 0:
+            voltdb_cmd.append(cli_switch)
+            voltdb_cmd.append(opt_val)
 
     def run_voltserver_process(self, voltdb_cmd, outfilename):
         """
