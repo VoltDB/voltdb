@@ -28,6 +28,10 @@
 #include <memory>
 #include <unistd.h>
 
+#include "boost/format.hpp"
+
+#include "s2geo/s2cellid.h"
+
 #include "common/NValue.hpp"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
@@ -605,7 +609,6 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
             expr;                                                       \
             fail(__FILE__, __LINE__,                                    \
                  "expected FatalException that did not occur");         \
-            EXPECT_FALSE(true);                                         \
         }                                                               \
         catch (FatalException& exc) {                                   \
             std::ostringstream oss;                                     \
@@ -628,6 +631,31 @@ TEST_F(CoveringCellIndexTest, UnsupportedMethods) {
     ASSERT_FATAL_EXCEPTION("unsupported on geospatial indexes", ccIndex->hasKey(NULL));
     ASSERT_FATAL_EXCEPTION("unsupported on geospatial indexes", ccIndex->exists(NULL));
 }
+
+TEST_F(CoveringCellIndexTest, GenerateCellLevelInfo) {
+    std::cout << "\n";
+    for (int i = 0; i <= S2::kMaxCellLevel; ++i) {
+        double areaSqM = S2Cell::AverageArea(i) * 6371008.8 * 6371008.8;
+
+        std::cout << "    //    avg area of cells in level "
+                  << boost::format("%2d: ") % i;
+
+        if (areaSqM > 100000.0) {
+            double areaSqKm = areaSqM / 1000000.0;
+            std::cout << boost::format("%11.2f") % areaSqKm << " km^2\n";
+        }
+        else if (areaSqM > 0.1) {
+            std::cout << boost::format("%11.2f") % areaSqM << " m^2\n";
+        }
+        else {
+            double areaSqCm = areaSqM * 10000.0;
+            std::cout << boost::format("%11.2f") % areaSqCm << " cm^2\n";
+        }
+    }
+
+    std::cout << "            ";
+}
+
 
 } // end namespace voltdb
 

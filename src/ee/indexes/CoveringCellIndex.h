@@ -47,9 +47,9 @@ class PersistentTable;
  * filtered by actually evaluating CONTAINS.
  *
  * Under the hood this index uses two maps:
+ * - One map from (cell ID, tuple address) to tuple address
  * - One map from a tuple address to an array of cell IDs (64-bit
  *      unsigned ints)
- * - One map from (cell ID, tuple address) to tuple address
  *
  * Given a point, the first map facilitates scanning the index for
  * potentially containing polygons.  The point is converted to a cell

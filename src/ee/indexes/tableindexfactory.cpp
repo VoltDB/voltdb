@@ -78,7 +78,7 @@ class TableIndexPicker
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {
-                    return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
             } else {
                 return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
             }
