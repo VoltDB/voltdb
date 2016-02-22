@@ -54,7 +54,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 
-filter_log = Filter('/api/1.0/')
+filter_log = Filter('/api/1.0/', 'GET')
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
