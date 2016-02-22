@@ -1421,17 +1421,17 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: ()[B
+ * Signature: (ZIII)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jboolean compatible, jint primaryKeyValue, jint partitionId) {
+  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionKeyValue, jint partitionId, jint flag) {
     try {
         char *output = new char[1024 * 256];
         int32_t length;
         if (compatible) {
-            length = CompatibleDRTupleStream::getTestDRBuffer(primaryKeyValue, partitionId, output);
+            length = CompatibleDRTupleStream::getTestDRBuffer(partitionKeyValue, partitionId, output);
         } else {
-            length = DRTupleStream::getTestDRBuffer(primaryKeyValue, partitionId, output);
+            length = DRTupleStream::getTestDRBuffer(partitionKeyValue, partitionId, flag, output);
         }
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);

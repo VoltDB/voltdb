@@ -32,14 +32,14 @@ int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
 
-    size_t rowCount = 0;
+    int64_t rowCount = 0;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
         const uint8_t drVersion = taskInfo.readByte();
-        if (drVersion == DRTupleStream::PROTOCOL_VERSION) {
-            rowCount += m_sink.apply(&taskInfo, tables, pool, engine, remoteClusterId,
-                                     recordStart, &uniqueId, &sequenceNumber);
+        if (drVersion == DRTupleStream::PROTOCOL_VERSION) { // currently 4
+            rowCount += m_sink.applyTxn(&taskInfo, tables, pool, engine, remoteClusterId,
+                                        recordStart, &uniqueId, &sequenceNumber);
         } else if (drVersion == CompatibleDRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
             rowCount += m_compatibleSink.apply(&taskInfo, tables, pool, engine, remoteClusterId,
                                                recordStart, &uniqueId, &sequenceNumber);
@@ -47,5 +47,5 @@ int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map
             throwFatalException("Unsupported DR version %d", drVersion);
         }
     }
-    return static_cast<int64_t>(rowCount);
+    return rowCount;
 }

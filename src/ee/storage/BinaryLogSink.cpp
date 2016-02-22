@@ -461,22 +461,39 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
 BinaryLogSink::BinaryLogSink() {}
 
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unordered_map<int64_t,
-                             PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-                             int32_t remoteClusterId, const char *recordStart, int64_t *uniqueId,
-                             int64_t *sequenceNumber) {
-    CachedIndexKeyTuple indexKeyTuple;
+int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
+                                boost::unordered_map<int64_t, PersistentTable*> &tables,
+                                Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                                const char *txnStart, int64_t *uniqueId, int64_t *sequenceNumber) {
+    int64_t rowCount = 0;
+    DRRecordType type;
+    bool begin = true;
 
-    const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
-    size_t rowCount = rowCostForDRRecord(type);
+    // Read the whole txn since there is only one version number at the beginning
+    do {
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+        if (begin)  {
+            assert(type == DR_RECORD_BEGIN_TXN);
+            begin = false;
+        }
+        rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
+                          txnStart, uniqueId, sequenceNumber);
+    } while (type != DR_RECORD_END_TXN);
+
+    return rowCount;
+}
+
+int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
+                             boost::unordered_map<int64_t, PersistentTable*> &tables,
+                             Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                             const char *txnStart, int64_t *uniqueId, int64_t *sequenceNumber) {
+    CachedIndexKeyTuple indexKeyTuple;
 
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -507,8 +524,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -556,8 +571,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         const char *oldRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowLength));
         int32_t newRowLength = taskInfo->readInt();
         const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -630,8 +643,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         int32_t rowKeyLength = taskInfo->readInt();
         uint32_t indexCrc = taskInfo->readInt();
         const char *rowKeyData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowKeyLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -664,8 +675,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         const char *oldRowKeyData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowKeyLength));
         int32_t newRowLength = taskInfo->readInt();
         const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -711,8 +720,11 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             }
         }
         *sequenceNumber = tempSequenceNumber;
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+
+        // skip information that is only used in Topend
+        taskInfo->readByte(); // hashFlag
+        taskInfo->readInt();  // txnLength
+        taskInfo->readInt();  // first parHash
         break;
     }
     case DR_RECORD_END_TXN: {
@@ -721,21 +733,13 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
                                 (intmax_t)*sequenceNumber, (intmax_t)tempSequenceNumber);
         }
-        int64_t txnPkHash = taskInfo->readLong();
-        if (txnPkHash > LONG_MIN && txnPkHash < LONG_MAX && !engine->isLocalSite((int32_t)txnPkHash)) {
-            throwSerializableEEException("Binary log transaction routed to wrong partition. Expected %d but found %d",
-                    engine->getPartitionId(), engine->getPartitionForPkHash((int32_t)txnPkHash));
-        }
         uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+        validateChecksum(checksum, txnStart, taskInfo->getRawPointer());
         break;
     }
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
         std::string tableName = taskInfo->readTextString();
-
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -749,11 +753,16 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         break;
     }
+    // for ee test only, records of this type should have been removed in Topend before reaching here
+    case DR_RECORD_HASH_DELIMITER: {
+        int32_t __attribute__ ((unused)) parHash = taskInfo->readInt();
+        break;
+    }
     default:
         throwFatalException("Unrecognized DR record type %d", type);
         break;
     }
-    return static_cast<int64_t>(rowCount);
+    return static_cast<int64_t>(rowCostForDRRecord(type));
 }
 
 }
