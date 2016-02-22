@@ -2215,38 +2215,41 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_stopped = False
         has_run = False
-        if len(database[0]['members']) == 0:
-            return jsonify({'status':'errorNoMembers'})
-        for server_id in database[0]['members']:
+        if len(database) != 0:
+            if len(database[0]['members']) == 0:
+                return jsonify({'status':'errorNoMembers'})
+            for server_id in database[0]['members']:
 
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
-                  (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
-            try:
-                response = requests.get(url)
-            except Exception, err:
-                return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
+                server = [server for server in Global.SERVERS if server['id'] == server_id]
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
+                      (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
+                try:
+                    response = requests.get(url)
+                except Exception, err:
+                    return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
 
-            if response.json()['status'] == "stalled":
-                has_stalled = True
-            elif response.json()['status'] == "running":
-                has_run = True
-            elif response.json()['status'] == "stopped":
-                has_stopped = True
-            serverDetails.append({server[0]['hostname']: response.json()})
+                if response.json()['status'] == "stalled":
+                    has_stalled = True
+                elif response.json()['status'] == "running":
+                    has_run = True
+                elif response.json()['status'] == "stopped":
+                    has_stopped = True
+                serverDetails.append({server[0]['hostname']: response.json()})
 
-        if has_stalled:
-            status.append({'status': 'stalled'})
-        elif has_run == True and has_stopped:
-            status.append({'status': 'stalled'})
-        elif not has_stalled and not has_stopped and has_run:
-            status.append({'status': 'running'})
-        elif has_stopped and not has_stalled and not has_run:
-            status.append({'status': 'stopped'})
+            if has_stalled:
+                status.append({'status': 'stalled'})
+            elif has_run == True and has_stopped:
+                status.append({'status': 'stalled'})
+            elif not has_stalled and not has_stopped and has_run:
+                status.append({'status': 'running'})
+            elif has_stopped and not has_stalled and not has_run:
+                status.append({'status': 'stopped'})
 
-        isFreshStart = voltdbserver.check_snapshot_folder(database_id)
+            isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-        return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
+            return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
+        else:
+            return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -2254,27 +2257,31 @@ class StatusDatabaseServerAPI(MethodView):
 
     @staticmethod
     def get(database_id, server_id):
-
-        server = [server for server in Global.SERVERS if server['id'] == server_id]
-        if len(server) != 0:
-            try:
-                client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
-                proc = voltdbclient.VoltProcedure(client, "@Ping")
-                response = proc.call()
-                return jsonify({'status': "running"})
-            except:
-                voltProcess = voltdbserver.VoltDatabase(database_id)
-
-                error = ''
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        if len(database) !=0:
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
+            if len(server) != 0:
                 try:
-                    error = Log.get_error_log_details()
+                    client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+                    proc = voltdbclient.VoltProcedure(client, "@Ping")
+                    response = proc.call()
+                    return jsonify({'status': "running"})
                 except:
-                    pass
+                    voltProcess = voltdbserver.VoltDatabase(database_id)
 
-                if voltProcess.Get_Voltdb_Process().isProcessRunning:
-                    return jsonify({'status': "stalled", "details": error})
-                else:
-                    return jsonify({'status': "stopped", "details": error})
+                    error = ''
+                    try:
+                        error = Log.get_error_log_details()
+                    except:
+                        pass
+
+                    if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                        return jsonify({'status': "stalled", "details": error})
+                    else:
+                        return jsonify({'status': "stopped", "details": error})
+
+            else:
+                return make_response(jsonify({'error': 'Not found'}), 404)
         else:
             return make_response(jsonify({'error': 'Not found'}), 404)
 
