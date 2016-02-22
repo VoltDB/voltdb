@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
 
 # Copyright (C) 2008-2016 VoltDB Inc.
@@ -54,8 +53,8 @@ try:
 
     cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
     # Adjust these variables as needed for other base commands, locations, etc..
-    base_dir    = os.path.dirname(cmd_dir)
-    version     = open(os.path.join(base_dir, 'version.txt')).read().strip()
+    base_dir = os.path.realpath(os.path.join(cmd_dir,'../../../'))
+    version = open(os.path.join(base_dir, 'version.txt')).read().strip()
     description = 'Command line interface to VoltDB functions.'
     standalone  = False
     # Tweak the Python library path to call voltcli.runner.main().
@@ -76,6 +75,7 @@ try:
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
+
 
 def main():
     parser = OptionParser(usage="usage: %prog [options] filepath",
@@ -100,12 +100,8 @@ if __name__ == '__main__':
   path = options[0]['filepath']
   server = options[0]['server']
 
-
 app_root = os.path.dirname(os.path.abspath(__file__))
-os.chdir(os.path.normpath(os.path.join(app_root, os.pardir, 'lib/python/vdm')))
-os.getcwd()
-
-
+os.chdir(os.path.normpath(app_root))
 
 if path is None:
     home = expanduser("~")
