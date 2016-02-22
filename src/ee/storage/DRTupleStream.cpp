@@ -59,30 +59,31 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     if (!m_enabled) return INVALID_DR_MARK;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
+    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(LONG_MAX);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
 
-    const size_t tupleMaxLength = 1 + 1 + 8 + 4 + tableName.size() + 4;//version, type, table handle, name length prefix, table name, checksum
+    size_t tupleMaxLength = TXN_RECORD_HEADER_SIZE + 4 + tableName.size(); // table name length and table name
+    if (requireHashDelimiter) {
+        tupleMaxLength += HASH_DELIMITER_SIZE;
+    }
     if (m_currBlock->remaining() < tupleMaxLength) {
         extendBufferChain(tupleMaxLength);
     }
 
-
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
 
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+    if (requireHashDelimiter) {
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        io.writeInt(0);  // hash delimiter for TRUNCATE_TABLE records is always 0
+    }
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
     io.writeInt(static_cast<int32_t>(tableName.size()));
     io.writeBytes(tableName.c_str(), tableName.size());
-
-    uint32_t crc = vdbcrc::crc32cInit();
-    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
-    crc = vdbcrc::crc32cFinish(crc);
-    io.writeInt(crc);
 
     // update m_offset
     m_currBlock->consumed(io.position());
@@ -96,15 +97,34 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::updateTxnHash(TableTuple &tuple, int partitionColumn) {
-    if (partitionColumn != -1 && m_txnPkHash != LONG_MAX) {
-        int64_t txnPkHash = (int64_t)tuple.getNValue(partitionColumn).murmurHash3();
-        if (m_txnPkHash == LONG_MIN) {
-            m_txnPkHash = txnPkHash;
-        } else if (txnPkHash != m_txnPkHash) {
-            m_txnPkHash = LONG_MAX;
-        }
+int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
+    return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
+}
+
+bool DRTupleStream::updateParHash(int64_t parHash) {
+    if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {  // initial status, first record
+        m_lastParHash = parHash;
+        m_firstParHash = (parHash == LONG_MAX) ? 0 : parHash; // save first hash
+        // if the first record is TRUNCATE_TABLE, set to SPECIAL, otherwise SINGLE
+        m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
+        // no delimiter needed for first record
+        return false;
     }
+    else if (parHash != m_lastParHash) {
+        m_lastParHash = parHash;
+        // set to SPECIAL whenever we see a TRUNCATE_TABLE record
+        if (parHash == LONG_MAX) {
+            m_hashFlag = TXN_PAR_HASH_SPECIAL;
+        }
+        // set to MULTI if it was SINGLE
+        else if (m_hashFlag == TXN_PAR_HASH_SINGLE) {
+            m_hashFlag = TXN_PAR_HASH_MULTI;
+        }
+        // delimiter needed before the pending record
+        return true;
+    }
+    // no delimiter needed for contiguous identical hashes
+    return false;
 }
 
 /*
@@ -135,11 +155,14 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const std::vector<int>* interestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    updateTxnHash(tuple, partitionColumn);
+    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(getParHashForTuple(tuple, partitionColumn));
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
     tupleMaxLength = computeOffsets(type, indexPair, tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
+    if (requireHashDelimiter) {
+        tupleMaxLength += HASH_DELIMITER_SIZE;
+    }
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -151,16 +174,16 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+
+    if (requireHashDelimiter) {
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        io.writeInt(static_cast<int32_t>(m_lastParHash));
+    }
+
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
     writeRowTuple(tuple, rowHeaderSz, rowMetadataSz, interestingColumns, indexPair, io);
-
-    uint32_t crc = vdbcrc::crc32cInit();
-    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
-    crc = vdbcrc::crc32cFinish(crc);
-    io.writeInt(crc);
 
     // update m_offset
     m_currBlock->consumed(io.position());
@@ -198,7 +221,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     const std::vector<int>* dummyInterestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    updateTxnHash(oldTuple, partitionColumn);
+    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(getParHashForTuple(oldTuple, partitionColumn));
 
     DRRecordType type = DR_RECORD_UPDATE;
     maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
@@ -206,6 +229,9 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     // it has already done so in the above computeOffsets() call
     maxLength += computeOffsets(type, indexPair, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns);
     assert(!dummyInterestingColumns);
+    if (requireHashDelimiter) {
+        maxLength += HASH_DELIMITER_SIZE;
+    }
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -217,17 +243,17 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                                  m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+
+    if (requireHashDelimiter) {
+        io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
+        io.writeInt(static_cast<int32_t>(m_lastParHash));
+    }
+
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
     writeRowTuple(oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns, indexPair, io);
     writeRowTuple(newTuple, newRowHeaderSz, newRowMetadataSz, NULL, indexPair, io);
-
-    uint32_t crc = vdbcrc::crc32cInit();
-    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
-    crc = vdbcrc::crc32cFinish(crc);
-    io.writeInt(crc);
 
     // update m_offset
     m_currBlock->consumed(io.position());
@@ -358,17 +384,16 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
-     uint32_t crc = vdbcrc::crc32cInit();
-     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), BEGIN_RECORD_SIZE - 4);
-     crc = vdbcrc::crc32cFinish(crc);
-     io.writeInt(crc);
+     io.writeByte(0); // placeholder for hash flag
+     io.writeInt(0); // placeholder for txn length
+     io.writeInt(0);  // placeholder for first partition hash
+
      m_currBlock->consumed(io.position());
 
+     m_beginTxnUso = m_uso;
      m_uso += io.position();
 
      m_opened = true;
-     // LONG_MIN means unassigned hash key; LONG_MAX means multiple hash keys
-     m_txnPkHash = LONG_MIN;
 }
 
 void DRTupleStream::endTransaction(int64_t uniqueId) {
@@ -419,19 +444,32 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
-    io.writeLong(m_txnPkHash);
-    uint32_t crc = vdbcrc::crc32cInit();
-    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
-    crc = vdbcrc::crc32cFinish(crc);
-    io.writeInt(crc);
+    io.writeInt(0); // placeholder for checksum of the entire txn
+
     m_currBlock->consumed(io.position());
 
     m_uso += io.position();
 
+    size_t txnLength = m_uso - m_beginTxnUso;
+    ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
+                                  txnLength);
+    extraio.position(BEGIN_RECORD_HEADER_SIZE);
+    extraio.writeByte(static_cast<int8_t>(m_hashFlag));
+    extraio.writeInt(static_cast<uint32_t>(txnLength));
+    extraio.writeInt(static_cast<int32_t>(m_firstParHash));
+
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c(crc, m_currBlock->mutableDataPtr() - txnLength, txnLength - 4);
+    crc = vdbcrc::crc32cFinish(crc);
+    extraio.position(txnLength - 4);
+    extraio.writeInt(crc);
+
     m_opened = false;
+    if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
+        m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
+    }
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -463,7 +501,10 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partitionId, char *outBytes) {
+int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *outBytes) {
+    if (flag == TXN_PAR_HASH_REPLICATED) {
+        partitionId = 16383;
+    }
     DRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
     stream.configure(partitionId);
 
@@ -484,8 +525,8 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partiti
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
-    // update the primary key column
-    tuple.setNValue(0, ValueFactory::getIntegerValue(primaryKeyNValue));
+    // set the partition key
+    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
@@ -496,18 +537,27 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t primaryKeyNValue, int32_t partiti
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
+
+        if (flag == TXN_PAR_HASH_REPLICATED || flag == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+        }
+
+        if (flag != TXN_PAR_HASH_SINGLE) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + 1));
+            for (int zz = 0; zz < 5; zz++) {
+                stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            }
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
+        }
+
         stream.endTransaction(uid);
         ii += 5;
     }
 
     TupleSchema::freeTupleSchema(schema);
 
-//    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-//    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-//    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-//    stream.endTransaction(uid);
-
-    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);
+    int64_t committedUID = UniqueId::makeIdFromComponents(95, 0, partitionId);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
