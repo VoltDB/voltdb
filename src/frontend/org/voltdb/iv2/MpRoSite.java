@@ -244,7 +244,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackersForSnapshot()
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -374,12 +374,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
-    }
-
-    @Override
-    public DRConsumerDrIdTracker getCorrespondingDrAppliedTxns(int producerClusterId, int producerPartitionId)
-    {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
