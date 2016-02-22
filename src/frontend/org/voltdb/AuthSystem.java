@@ -30,6 +30,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -344,6 +345,8 @@ public class AuthSystem {
 
     private final GSSManager m_gssManager;
 
+    private final InternalImporterUser m_internalImporterUser;
+
     //Auth system keeps a array of all perms used for auth disabled user not for checking permissions.
     private static String[] m_perm_list;
 
@@ -359,6 +362,8 @@ public class AuthSystem {
         for (Permission p : Permission.values()) {
             m_perm_list[idx++] = p.name();
         }
+
+        m_internalImporterUser = new InternalImporterUser(enabled);
 
         m_enabled = enabled;
         if (!m_enabled) {
@@ -572,6 +577,10 @@ public class AuthSystem {
         }
     }
 
+    public InternalImporterUser getImporterUser() {
+        return m_internalImporterUser;
+    }
+
     public static class AuthDisabledUser extends AuthUser {
         public AuthDisabledUser() {
             super(null, null, null, null, null);
@@ -597,6 +606,46 @@ public class AuthSystem {
             return false;
         }
 
+    }
+
+    public static class InternalImporterUser extends AuthUser {
+        final static private EnumSet<Permission> PERMS = EnumSet.<Permission>of(
+                Permission.ALLPROC, Permission.DEFAULTPROC
+                );
+        private final boolean m_authEnabled;
+
+        private InternalImporterUser(boolean authEnabled) {
+            super(null, null, null, null, null);
+            m_authEnabled = authEnabled;
+        }
+
+        @Override
+        public boolean hasUserDefinedProcedurePermission(Procedure proc) {
+            return true;
+        }
+
+        @Override
+        public boolean hasPermission(Permission... p) {
+            if (!m_authEnabled) {
+                return true;
+            } else if (p != null && p.length == 1) {
+                return PERMS.contains(p[0]);
+            } else if (p == null || p.length == 0) {
+                return false;
+            } else {
+                return PERMS.containsAll(Arrays.asList(p));
+            }
+        }
+
+        @Override
+        public boolean authorizeConnector(String connectorName) {
+            return true;
+        }
+
+        @Override
+        public boolean isAuthEnabled() {
+            return m_authEnabled;
+        }
     }
 
     private final AuthUser m_authDisabledUser = new AuthDisabledUser();
@@ -700,6 +749,24 @@ public class AuthSystem {
         RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
             authLogger, Level.INFO, format, ". This message is rate limited to once every 60 seconds.");
 
+    }
+
+    public class SpnegoPassthroughRequest extends AuthenticationRequest {
+        private final String m_authenticatedPrincipal;
+        public SpnegoPassthroughRequest(final String authenticatedPrincipal) {
+            m_authenticatedPrincipal = authenticatedPrincipal;
+        }
+        @Override
+        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
+            final AuthUser user = m_users.get(m_authenticatedPrincipal);
+            if (user == null) {
+                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {m_authenticatedPrincipal}, null);
+                return false;
+            }
+            m_authenticatedUser = m_authenticatedPrincipal;
+            logAuthSuccess(m_authenticatedUser);
+            return true;
+        }
     }
 
     public class KerberosAuthenticationRequest extends AuthenticationRequest {

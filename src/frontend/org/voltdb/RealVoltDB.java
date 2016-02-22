@@ -2232,29 +2232,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_clientInterface.notifyOfCatalogUpdate();
             }
 
-            // 3. update HTTPClientInterface (asynchronously)
-            // This purges cached connection state so that access with
-            // stale auth info is prevented.
-            if (m_adminListener != null)
-            {
-                m_adminListener.notifyOfCatalogUpdate();
-            }
-
-            // 4. Flush StatisticsAgent old catalog statistics.
+            // 3. Flush StatisticsAgent old catalog statistics.
             // Otherwise, the stats agent will hold all old catalogs
             // in memory.
             getStatsAgent().notifyOfCatalogUpdate();
 
-            // 5. MPIs don't run fragments. Update them here. Do
+            // 4. MPIs don't run fragments. Update them here. Do
             // this after flushing the stats -- this will re-register
             // the MPI statistics.
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
-            // 6. Perform updates required by the DR subsystem
+            // 5. Perform updates required by the DR subsystem
 
-            // 6.1. Create the DR consumer if we've just enabled active-active.
+            // 5.1. Create the DR consumer if we've just enabled active-active.
             // Perform any actions that would have been taken during the ordinary
             // initialization path
             if (createDRConsumerIfNeeded()) {
@@ -2263,12 +2255,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
                 m_consumerDRGateway.initialize(false);
             }
-            // 6.2. If we are a DR replica, we may care about a
+            // 5.2. If we are a DR replica, we may care about a
             // deployment update
             if (m_consumerDRGateway != null) {
                 m_consumerDRGateway.updateCatalog(m_catalogContext);
             }
-            // 6.3. If we are a DR master, update the DR table signature hash
+            // 5.3. If we are a DR master, update the DR table signature hash
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.updateCatalog(m_catalogContext,
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));

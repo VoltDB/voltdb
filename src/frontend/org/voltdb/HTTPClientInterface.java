@@ -20,12 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.Principal;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicReference;
 
-import javax.security.auth.Subject;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.continuation.Continuation;
@@ -44,41 +40,24 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.DelegatePrincipal;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class HTTPClientInterface {
 
     public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
     public static final String JSONP = "jsonp";
-    private static final VoltLogger m_log;
-
-    final static Oid KRB5OID;
-    static {
-        m_log = new VoltLogger("HOST");
-        Oid krb5oid = null;
-        try {
-            krb5oid = new Oid("1.3.6.1.5.5.2");
-        } catch (GSSException e) {
-            m_log.fatal("failed to initialize security primitive for kerberos OID", e);
-            Throwables.propagate(e);
-        }
-        KRB5OID = krb5oid;
-    }
-
+    private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
-    AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference<AuthenticatedConnectionCache>();
-    private AuthenticatedConnectionCache m_oldCache;
     static final int CACHE_TARGET_SIZE = 10;
 
     public static final String PARAM_USERNAME = "User";
@@ -92,6 +71,20 @@ public class HTTPClientInterface {
 
     final String m_timeoutResponse;
     private final ExecutorService m_closeAllExecutor;
+
+    private final Supplier<InternalConnectionHandler> m_invocationHandler =
+            Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
+
+        @Override
+        public InternalConnectionHandler get() {
+            ClientInterface ci = VoltDB.instance().getClientInterface();
+            if (ci == null || !ci.isAcceptingConnections()) {
+                throw new IllegalStateException("Client interface is not ready to be used");
+            }
+            return ci.getInternalConnectionHandler();
+        }
+
+    });
 
     public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
     public final static int MAX_FORM_KEYS = 512;
@@ -122,9 +115,7 @@ public class HTTPClientInterface {
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
-            if (m_jsonp != null) {
-                msg = asJsonp(m_jsonp, msg);
-            }
+            msg = asJsonp(m_jsonp, msg);
 
             m_continuation.setAttribute("result", msg);
             try {
@@ -141,7 +132,7 @@ public class HTTPClientInterface {
         final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
                 new VoltTable[0], "Request Timeout");
         m_timeoutResponse = r.toJSONString();
-        m_closeAllExecutor = CoreUtils.getSingleThreadExecutor("HttpClientInterface-closeAll");
+        m_closeAllExecutor = CoreUtils.getSingleThreadExecutor("HttpClientInterface-closeAll"); // STEBUG remove
         m_servicePrincipal = getAuthSystem().getServicePrincipal();
         m_spnegoEnabled = m_servicePrincipal != null && !m_servicePrincipal.isEmpty();
     }
@@ -152,7 +143,8 @@ public class HTTPClientInterface {
         m_closeAllExecutor.shutdownNow();
     }
 
-    private final static String asJsonp(String jsonp, String msg) {
+    public final static String asJsonp(String jsonp, String msg) {
+        if (jsonp == null) return msg;
         StringBuilder sb = new StringBuilder(jsonp.length() + msg.length() + 8);
         return sb.append(jsonp).append("( ").append(msg).append(" )").toString();
     }
@@ -161,9 +153,7 @@ public class HTTPClientInterface {
         ClientResponseImpl rimpl = new ClientResponseImpl(
                 ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], message);
         String msg = rimpl.toJSONString();
-        if (jsonp != null) {
-            msg = asJsonp(jsonp, msg);
-        }
+        msg = asJsonp(jsonp, msg);
         rsp.setStatus(code);
         try {
             rsp.getWriter().print(msg);
@@ -187,7 +177,6 @@ public class HTTPClientInterface {
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
         boolean suspended = false;
-        boolean forceClose = false;
 
         String jsonp = request.getHeader(JSONP);
         if (jsonp != null && jsonp.trim().isEmpty()) {
@@ -306,18 +295,10 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                if (queryTimeout==-1) {
-                    success = authResult.m_client.callProcedure(cb, procName, paramSet.toArray());
-                } else {
-                    success = authResult.m_client.callProcedureWithTimeout(cb, queryTimeout, procName, paramSet.toArray());
-                }
+                success = callProcedure(authResult, queryTimeout, cb, procName, paramSet.toArray());
             }
             else {
-                if (queryTimeout==-1) {
-                    success = authResult.m_client.callProcedure(cb, procName);
-                } else {
-                    success = authResult.m_client.callProcedureWithTimeout(cb, queryTimeout, procName);
-                }
+                success = callProcedure(authResult, queryTimeout, cb, procName);
             }
             if (!success) {
                 ok(jsonp, "Server is not accepting work at this time.", response);
@@ -331,18 +312,17 @@ public class HTTPClientInterface {
             continuation.setAttribute("SQLSUBMITTED", Boolean.TRUE);
         } catch (Exception e) {
             String msg = Throwables.getStackTraceAsString(e);
-            if (e instanceof IOException || e instanceof NoConnectionsException) {
-                forceClose = true;
-            }
             m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, e, "JSON interface exception");
             ok(jsonp, msg, response);
             if (suspended) {
                 continuation.complete();
             }
             request.setHandled(true);
-        } finally {
-            releaseClient(authResult, forceClose);
         }
+    }
+
+    public boolean callProcedure(final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        return m_invocationHandler.get().callProcedure(ar.m_authUser, ar.m_adminMode, timeout, cb, procName, args);
     }
 
     Configuration getVoltDBConfig() {
@@ -390,38 +370,6 @@ public class HTTPClientInterface {
         }
         String admin = request.getParameter(PARAM_ADMIN);
 
-        AuthenticatedConnectionCache connection_cache = m_connections.get();
-        while (connection_cache == null) { // Need a while loop here because there is a small chance that
-            // catalog update could null out the cache immediately after another request thread sets it.
-            if (m_oldCache!=null) {
-                closeAllAsync(m_oldCache);
-            }
-            final Configuration config = getVoltDBConfig();
-            int port = config.m_port;
-            int adminPort = config.m_adminPort;
-            String externalInterface = config.m_externalInterface;
-            String adminInterface = "localhost";
-            String clientInterface = "localhost";
-            if (externalInterface != null && !externalInterface.isEmpty()) {
-                clientInterface = externalInterface;
-                adminInterface = externalInterface;
-            }
-            //If individual override is available use them.
-            if (config.m_clientInterface.length() > 0) {
-                clientInterface = config.m_clientInterface;
-            }
-            if (config.m_adminInterface.length() > 0) {
-                adminInterface = config.m_adminInterface;
-            }
-            AuthenticatedConnectionCache newCache = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
-            boolean setNewValue = m_connections.compareAndSet(null, newCache);
-            if (setNewValue) {
-                connection_cache = newCache;
-            } else {
-                connection_cache = m_connections.get();
-            }
-        }
-
         adminMode = "true".equalsIgnoreCase(admin);
 
         // The SHA-1 hash of the password
@@ -433,7 +381,7 @@ public class HTTPClientInterface {
                 MessageDigest md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(ClientAuthScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-256 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(false, null, adminMode, username, "JVM doesn't support SHA-256 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -442,44 +390,46 @@ public class HTTPClientInterface {
         // Hashedassword must be a 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)
         if (hashedPassword != null) {
             if (hashedPassword.length() != 40 && hashedPassword.length() != 64) {
-                return new AuthenticationResult(null, null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(false, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
             try {
                 hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
             }
             catch (Exception e) {
-                return new AuthenticationResult(null, null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(false, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
         }
 
         assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20) || (hashedPasswordBytes.length == 32));
 
-        AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme;
-        try {
-            // get a connection to localhost from the pool
-            if (m_spnegoEnabled) {
-                clientWithScheme = connection_cache.getClient(spnegoLogin(token), adminMode);
-                if (clientWithScheme == null) {
-                    return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get SPNEGO authenticated client.");
-                }
-                return new AuthenticationResult(clientWithScheme.m_client, connection_cache, clientWithScheme.m_scheme,
-                        adminMode, username, "");
-            } else {
-                clientWithScheme = connection_cache.getClient(username, password, hashedPasswordBytes, adminMode);
-                if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
-                    return new AuthenticationResult(clientWithScheme.m_client, connection_cache, clientWithScheme.m_scheme,
-                            adminMode, username, "");
-                }
-                return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get client.");
+        if (m_spnegoEnabled) {
+            final String principal = spnegoLogin(token);
+            AuthenticationRequest authReq = getAuthSystem().new SpnegoPassthroughRequest(principal);
+            if (!authReq.authenticate(ClientAuthScheme.SPNEGO)) {
+                return new AuthenticationResult(
+                        false, null, adminMode, principal,
+                        "User " + principal + " failed to authorize"
+                        );
             }
-        } catch (IOException ex) {
-            return new AuthenticationResult(null, null, null, adminMode, username, ex.getMessage());
+            return new AuthenticationResult(true, ClientAuthScheme.SPNEGO, adminMode, principal, "");
+        } else {
+            AuthenticationRequest authReq = getAuthSystem().new HashAuthenticationRequest(username, hashedPasswordBytes);
+            ClientAuthScheme scheme = hashedPasswordBytes != null ?
+                    ClientAuthScheme.getByUnencodedLength(hashedPasswordBytes.length)
+                    : ClientAuthScheme.HASH_SHA256;
+            if (!authReq.authenticate(scheme)) {
+                return new AuthenticationResult(
+                        false, null, adminMode, username,
+                        "User " + username + " failed to authorize"
+                        );
+            }
+            return new AuthenticationResult(true, scheme, adminMode, username, "");
         }
     }
 
-    private Subject spnegoLogin(String encodedToken) {
+    private String spnegoLogin(String encodedToken) {
         byte[] token = B64Code.decode(encodedToken);
         try {
             if (encodedToken == null || encodedToken.isEmpty()) {
@@ -517,7 +467,7 @@ public class HTTPClientInterface {
                 if (m_log.isDebugEnabled()) {
                     m_log.debug("established SPNEGO security context for " + user);
                 }
-                return makeDelegateSubject(user);
+                return user;
             }
             return null;
         } catch (GSSException e) {
@@ -526,38 +476,8 @@ public class HTTPClientInterface {
         }
     }
 
-    private Subject makeDelegateSubject(String forDelegate) {
-        if (!m_spnegoEnabled || forDelegate == null || forDelegate.isEmpty()) {
-            return null;
-        }
-        ImmutableSet.Builder<Principal> sbld = ImmutableSet.builder();
-        Subject svc = getAuthSystem().getLoginContext().getSubject();
-        sbld.addAll(svc.getPrincipals())
-            .add(new DelegatePrincipal(forDelegate, System.identityHashCode(getAuthSystem())))
-            ;
-        return new Subject(true, sbld.build(), svc.getPublicCredentials(), svc.getPrivateCredentials());
-    }
-
     AuthSystem getAuthSystem() {
         return VoltDB.instance().getCatalogContext().authSystem;
-    }
-
-    private void closeAllAsync(final AuthenticatedConnectionCache cache) {
-        if (cache.isClosing()) {
-            return;
-        }
-
-        try {
-            m_closeAllExecutor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    cache.closeAll();
-                }
-            });
-        } catch(RejectedExecutionException e) {
-            m_rate_limited_log.log(System.currentTimeMillis(), Level.WARN, e,
-                    "Task to close connections in old connection cache was rejected. Old connections will not be closed");
-        }
     }
 
     //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
@@ -567,22 +487,5 @@ public class HTTPClientInterface {
             m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
         }
         return authResult;
-    }
-
-    //Must be called by all who call authenticate.
-    public void releaseClient(AuthenticationResult authResult, boolean force) {
-        if (authResult != null && authResult.m_client != null && authResult.m_connectionCache != null) {
-            authResult.m_connectionCache.releaseClient(authResult.m_client, authResult.m_scheme, force || (authResult.m_connectionCache != m_connections.get()));
-        }
-    }
-
-    public void notifyOfCatalogUpdate()
-    {
-        AuthenticatedConnectionCache cache = m_connections.get();
-        if (cache!=null) { // save the old cache so that it will be closed before we create cache again.
-            // Check for null to make sure that two consecutive catalog updates won't null out old cache erroneously.
-            m_oldCache = cache;
-        }
-        m_connections.set(null);
     }
 }
