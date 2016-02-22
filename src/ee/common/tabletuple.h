@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
+#include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
 #include "common/ExportSerializeIo.h"
@@ -213,6 +214,42 @@ public:
             }
         }
         return bytes;
+    }
+
+    /* Utility function to shrink and set given NValue based. Uses data from it's column information to compute
+     * the length to shrink the NValue to. This function operates is intended only to be used on variable length
+     * columns ot type varchar and varbinary.
+     */
+    void shrinkAndSetNValue(const int idx, const voltdb::NValue& value) const {
+        assert(m_schema);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        assert(columnInfo);
+        const ValueType valueType = columnInfo->getVoltType();
+        // shrink is permissible only on variable length column and currently only for varchar and varbinary
+        assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
+        bool isColumnLngthInBytes = (valueType == VALUE_TYPE_VARBINARY) ? true : columnInfo->inBytes;
+        uint32_t columnLength = columnInfo->length;
+
+        // For the given NValue, compute the shrink length in bytes to shrink the nvalue based on
+        // current column length. Use the computed shrink length to create new NValue based so that
+        // it can fits in current tuple's column
+
+        int32_t nValueLength = 0;
+        const char* candidateValueBuffPtr = ValuePeeker::peekObject_withoutNull(value, &nValueLength);
+        // compute length for shrinked candidate key
+        int32_t neededLength;
+        if (isColumnLngthInBytes) {
+            neededLength = columnLength;
+        }
+        else {
+            // column length is defined in characters. Obtain the number of bytes needed for those many characters
+            neededLength = static_cast<int32_t> (NValue::getIthCharPosition(candidateValueBuffPtr,
+                                                                            nValueLength,
+                                                                            columnLength + 1) - candidateValueBuffPtr);
+        }
+        // create new nvalue using the computed length
+        NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
+        setNValue(columnInfo, shrinkedNValue, false, NULL);
     }
 
     /*

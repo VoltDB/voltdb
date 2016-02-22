@@ -2375,7 +2375,7 @@ TEST CASES
 </target>
 
 
-<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-2.0.0" />
+<property name="findbugs.home" value="${vendor.lib.dir}/findbugs-3.0.1" />
 
 <taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" >
   <classpath>
