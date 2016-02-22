@@ -196,7 +196,24 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    private void writeRemoteDRLastIdsToSnapshot(JSONStringer stringer) throws IOException {
+    static public void serializeConsumerDrIdTrackerToJSON(JSONStringer stringer,
+            Integer partitionId, DRConsumerDrIdTracker tracker)  throws JSONException {
+        stringer.key(partitionId.toString());
+        stringer.object();
+        stringer.key("lastAckedDrId").value(tracker.getLastAckedDrId());
+        stringer.key("spUniqueId").value(tracker.getLastSpUniqueId());
+        stringer.key("mpUniqueId").value(tracker.getLastMpUniqueId());
+        stringer.key("drIdRanges").array();
+        for (Map.Entry<Long, Long> sequenceRange : tracker.getDrIdRanges().entrySet()) {
+            stringer.object();
+            stringer.key(sequenceRange.getKey().toString()).value(sequenceRange.getValue());
+            stringer.endObject();
+        }
+        stringer.endArray();
+        stringer.endObject();
+    }
+
+    private void writeConsumerDrIdTracker(JSONStringer stringer) throws IOException {
         try {
             stringer.key("remoteDCLastIds");
             stringer.object();
@@ -206,19 +223,7 @@ public class ExtensibleSnapshotDigestData {
                 stringer.key(e.getKey().toString());
                 stringer.object();
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
-                    stringer.key(e2.getKey().toString());
-                    stringer.object();
-                    stringer.key("lastAckedDrId").value(e2.getValue().getLastAckedDrId());
-                    stringer.key("spUniqueId").value(e2.getValue().getLastSpUniqueId());
-                    stringer.key("mpUniqueId").value(e2.getValue().getLastMpUniqueId());
-                    stringer.key("drIdRanges").array();
-                    for (Map.Entry<Long, Long> sequenceRange : e2.getValue().getDrIdRanges().entrySet()) {
-                        stringer.object();
-                        stringer.key(sequenceRange.getKey().toString()).value(sequenceRange.getValue());
-                        stringer.endObject();
-                    }
-                    stringer.endArray();
-                    stringer.endObject();
+                    serializeConsumerDrIdTrackerToJSON(stringer, e2.getKey(), e2.getValue());
                 }
                 stringer.endObject();
             }
@@ -233,7 +238,7 @@ public class ExtensibleSnapshotDigestData {
      * as JSON. Need to merge our unique ids with existing numbers
      * since multiple replicas will submit the unique ids
      */
-    private void mergeRemoteDRLastIdsToZK(JSONObject jsonObj) throws JSONException {
+    private void mergeConsumerDrIdTrackerToZK(JSONObject jsonObj) throws JSONException {
         //DR ids/unique ids for remote partitions indexed by remote datacenter id,
         //each DC has a full partition set
         JSONObject dcIdMap;
@@ -287,12 +292,12 @@ public class ExtensibleSnapshotDigestData {
         writeExportSequenceNumbersToSnapshot(stringer);
         writeDRVersionToSnapshot(stringer);
         writeDRTupleStreamInfoToSnapshot(stringer);
-        writeRemoteDRLastIdsToSnapshot(stringer);
+        writeConsumerDrIdTracker(stringer);
     }
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
         mergeExportSequenceNumbersToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj);
-        mergeRemoteDRLastIdsToZK(jsonObj);
+        mergeConsumerDrIdTrackerToZK(jsonObj);
     }
 }

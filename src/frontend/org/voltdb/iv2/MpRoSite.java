@@ -244,7 +244,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTxns()
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
