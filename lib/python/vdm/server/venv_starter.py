@@ -166,7 +166,7 @@ def _build_virtual_environment(venv_dir, version, packages):
 
 def main(arr):
     python = 'python'
-    args = [python, os.path.join(G.base_dir, 'bin/vdm')]
+    args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
     if arr[0]['filepath'] is not None:
         args.append('-p' + str(arr[0]['filepath']))
     if arr[0]['server'] is not None:
