@@ -124,7 +124,7 @@ public abstract class ExpressionUtil {
      * @param expr
      * @return
      */
-    public static List<AbstractExpression> uncombine(AbstractExpression expr)
+    public static List<AbstractExpression> uncombinePredicate(AbstractExpression expr)
     {
         if (expr == null) {
             return new ArrayList<AbstractExpression>();
@@ -133,7 +133,7 @@ public abstract class ExpressionUtil {
             ConjunctionExpression conj = (ConjunctionExpression)expr;
             if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                 // Calculate the list for the tree or leaf on the left.
-                List<AbstractExpression> branch = uncombine(conj.getLeft());
+                List<AbstractExpression> branch = uncombinePredicate(conj.getLeft());
                 // Insert the leaf on the right at the head of that list
                 branch.add(0, conj.getRight());
                 return branch;

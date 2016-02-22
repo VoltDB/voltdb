@@ -275,7 +275,7 @@ public abstract class SubPlanAssembler {
             assert(false);
             return false;
         }
-        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombinePredicate(indexPredicate);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {

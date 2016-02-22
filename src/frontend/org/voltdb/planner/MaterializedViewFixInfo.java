@@ -393,7 +393,7 @@ public class MaterializedViewFixInfo {
         // Collect all TVEs that need re-aggregation in the coordinator.
         List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
         // Check where clause.
-        List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
+        List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
             ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
