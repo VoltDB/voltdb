@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -32,11 +31,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientAuthScheme;
@@ -49,226 +43,285 @@ import org.voltdb.types.TimestampType;
 
 public class GenerateCPPTestFiles {
     private final static byte PROTOCOL_VERSION = 1;
-    private enum GenerateCPPTestOperation {
-        Authentication,
-        Interactions,
-        GenerateAllDataTypes
-    }
+    private final static int  TRUE_SERVER_PORT = 21212;
+    private final static int  FAKE_SERVER_PORT = 31212;
+    private final static int  DEFAULT_BUFFER_SIZE = 1024;
 
-    private static FileOutputStream getClientDataFile(String clientDataDirName, String fileName) throws FileNotFoundException {
-        // Where is the client data to be generated?  Is it
-        // sensible?
-        File clientDir = new File(clientDataDirName);
-        if (!clientDir.exists() || !clientDir.isDirectory()) {
-            throw new IllegalArgumentException(String.format("ClientDirectory \"%s\" does not exist.", clientDataDirName));
+    /**
+     * @param args
+     */
+    public static void main(String[] args) throws Exception {
+        String clientDataDirName = ".";
+        for (int idx = 0; idx < args.length; idx += 1) {
+            if ("--client-dir".equals(args[idx])) {
+                idx += 1;
+                clientDataDirName = args[idx];
+            } else {
+                abend("GenerateCPPTestFiles: Unknown command line argument \"%s\"\n",
+                      args[idx]);
+            }
         }
-        return new FileOutputStream(new File(clientDir, fileName));
+        File clientDataDir = new File(clientDataDirName);
+        if (clientDataDir.exists() && !clientDataDir.isDirectory()) {
+            if (!clientDataDir.isDirectory()) {
+                abend("GenerateCPPTestFiles: Client data dir \"%s\" exists but is not a directory.\n", clientDataDirName);
+            }
+        } else {
+            clientDataDir.mkdirs();
+        }
+        ServerSocketChannel ssc = ServerSocketChannel.open();
+        ssc.socket().bind(new InetSocketAddress("localhost", FAKE_SERVER_PORT));
+        ClientConfig config = new ClientConfig("hello", "world", (ClientStatusListenerExt )null, ClientAuthScheme.HASH_SHA256);
+        final org.voltdb.client.Client client = ClientFactory.createClient(config);
+        Thread clientThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    client.createConnection( "localhost", FAKE_SERVER_PORT);
+                    client.close();
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        };
+        clientThread.setDaemon(true);
+        clientThread.start();
+        SocketChannel sc = ssc.accept();
+        sc.socket().setTcpNoDelay(true);
+        ByteBuffer authReqSHA256 = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        sc.configureBlocking(true);
+        readMessage(authReqSHA256, sc);
+        writeDataFile(clientDataDir, "authentication_request_sha256.msg", authReqSHA256);
+        writeServerAuthenticationResponse(sc, true);
+        ssc.close();
+        clientThread.join(0);
+
+        ssc = ServerSocketChannel.open();
+        ssc.socket().bind(new InetSocketAddress("localhost", FAKE_SERVER_PORT));
+        config = new ClientConfig("hello", "world", (ClientStatusListenerExt )null, ClientAuthScheme.HASH_SHA1);
+        final org.voltdb.client.Client oclient = ClientFactory.createClient(config);
+        Thread oclientThread = new Thread() {
+            @Override
+            public void run() {
+                NullCallback ncb = new NullCallback();
+                try {
+                    oclient.createConnection("localhost", FAKE_SERVER_PORT);
+                    oclient.callProcedure("Insert", "Hello", "World", "English");
+                    try {
+                        oclient.callProcedure("Insert", "Hello", "World", "English");
+                    } catch (Exception e) {
+
+                    }
+                    oclient.callProcedure("Select", "English");
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        };
+        oclientThread.setDaemon(true);
+        oclientThread.start();
+        sc = ssc.accept();
+        sc.socket().setTcpNoDelay(true);
+        ByteBuffer authReqSHA1 = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        sc.configureBlocking(true);
+        readMessage(authReqSHA1, sc);
+        writeDataFile(clientDataDir, "authentication_request.msg", authReqSHA1);
+        writeServerAuthenticationResponse(sc, true);
+        //
+        // Read the some call procedure messages.
+        //
+        // The client engages us in some witty banter, which we don't
+        // actually care about for the purposes of this program.  But
+        // we need to read past it, and acknowledge it anyway.  We are
+        // acting as a server here.
+        //
+        ByteBuffer subscription_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(subscription_request, sc);
+        writeServerCallResponse(sc, getClientData(subscription_request));
+
+        ByteBuffer stats_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(stats_request, sc);
+        writeServerCallResponse(sc, getClientData(stats_request));
+
+        ByteBuffer syscat_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(syscat_request, sc);
+        writeServerCallResponse(sc, getClientData(stats_request));
+
+        //
+        // Now, read the invocation requests from the client.  We can't
+        // actually respond, so we fake up a response.  But this is good
+        // enough for now, and we save the message.
+        //
+        ByteBuffer invocationRequestSuccess = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(invocationRequestSuccess, sc);
+        writeServerCallResponse(sc, getClientData(invocationRequestSuccess));
+
+        ByteBuffer invocationRequestFailCV = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(invocationRequestFailCV, sc);
+        writeServerCallResponse(sc, getClientData(invocationRequestFailCV));
+        writeDataFile(clientDataDir, "invocation_request_failure_cv.msg", invocationRequestFailCV);
+
+        ByteBuffer invocationRequestSelect = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(invocationRequestSelect, sc);
+        writeServerCallResponse(sc, getClientData(invocationRequestSelect));
+        writeDataFile(clientDataDir, "invocation_request_select.msg", invocationRequestSelect);
+
+        oclient.close();
+        ssc.close();
+        oclientThread.join();
+
+        // Now, connect to a real server.
+        SocketChannel voltsc = SocketChannel.open(new InetSocketAddress("localhost", TRUE_SERVER_PORT));
+        voltsc.socket().setTcpNoDelay(true);
+        voltsc.configureBlocking(true);
+
+        // Write the authentication message and then
+        // read the response.  We need the response.
+        ByteBuffer scratch = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        voltsc.write(authReqSHA1);
+        readMessage(scratch, voltsc);
+        writeDataFile(clientDataDir, "authentication_response.msg", scratch);
+
+        // Write the three procedure messages.
+        voltsc.write(invocationRequestSuccess);
+        readMessage(scratch, voltsc);
+        writeDataFile(clientDataDir, "invocation_response_success.msg", scratch);
+
+        voltsc.write(invocationRequestFailCV);
+        readMessage(scratch, voltsc);
+        writeDataFile(clientDataDir, "invocation_response_failure_cv.msg", scratch);
+
+        voltsc.write(invocationRequestSelect);
+        readMessage(scratch, voltsc);
+        writeDataFile(clientDataDir, "invocation_response_select.msg", scratch);
+
+        voltsc.close();
+        clientThread.join();
+
+        Thread.sleep(3000);
+        ssc = ServerSocketChannel.open();
+        ssc.socket().bind(new InetSocketAddress("localhost", FAKE_SERVER_PORT));
+
+        clientThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    org.voltdb.client.Client newClient = ClientFactory.createClient();
+                    newClient.createConnection( "localhost", FAKE_SERVER_PORT);
+                    String strings[] = new String[] { "oh", "noes" };
+                    byte bytes[] = new byte[] { 22, 33, 44 };
+                    short shorts[] = new short[] { 22, 33, 44 };
+                    int ints[] = new int[] { 22, 33, 44 };
+                    long longs[] = new long[] { 22, 33, 44 };
+                    double doubles[] = new double[] { 3, 3.1, 3.14, 3.1459 };
+                    TimestampType timestamps[] = new TimestampType[] { new TimestampType(33), new TimestampType(44) };
+                    BigDecimal bds[] = new BigDecimal[] { new BigDecimal( "3" ), new BigDecimal( "3.14" ), new BigDecimal( "3.1459" ) };
+                    try {
+                        newClient.callProcedure("foo", strings, bytes, shorts, ints, longs, doubles, timestamps, bds, null, "ohnoes!", (byte)22, (short)22, 22, (long)22, 3.1459, new TimestampType(33), new BigDecimal("3.1459"));
+                    } catch (Exception e) {}
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        clientThread.setDaemon(true);
+        clientThread.start();
+
+        voltsc = ssc.accept();
+        // Read the authentication message.  We don't need it.
+        readMessage(scratch, voltsc);
+        writeServerAuthenticationResponse(voltsc, true);
+
+        //
+        // The client engages us in some dialog.  We don't need this
+        // either, but we need to read past it.
+        //
+        subscription_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(subscription_request, voltsc);
+        writeServerCallResponse(voltsc, getClientData(subscription_request));
+
+        stats_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(stats_request, voltsc);
+        writeServerCallResponse(voltsc, getClientData(stats_request));
+
+        syscat_request = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+        readMessage(syscat_request, voltsc);
+        writeServerCallResponse(voltsc, getClientData(stats_request));
+
+        // Read the all-types call procedure message.
+        readMessage(scratch, voltsc);
+        writeServerCallResponse(voltsc, getClientData(scratch));
+        writeDataFile(clientDataDir, "invocation_request_all_params.msg", scratch);
+        voltsc.close();
+        clientThread.join();
+
+        ColumnInfo columns[] = new ColumnInfo[] {
+                new ColumnInfo("column1", VoltType.TINYINT),
+                new ColumnInfo("column2", VoltType.STRING),
+                new ColumnInfo("column3", VoltType.SMALLINT),
+                new ColumnInfo("column4", VoltType.INTEGER),
+                new ColumnInfo("column5", VoltType.BIGINT),
+                new ColumnInfo("column6", VoltType.TIMESTAMP),
+                new ColumnInfo("column7", VoltType.DECIMAL)
+        };
+        VoltTable vt = new VoltTable(columns);
+        vt.addRow( null, null, null, null, null, null, null);
+        vt.addRow( 0, "", 2, 4, 5, new TimestampType(44), new BigDecimal("3.1459"));
+        vt.addRow( 0, null, 2, 4, 5, null, null);
+        vt.addRow( null, "woobie", null, null, null, new TimestampType(44), new BigDecimal("3.1459"));
+        ByteBuffer bb = ByteBuffer.allocate(vt.getSerializedSize());
+        vt.flattenToBuffer(bb);
+        FastSerializer fs = new FastSerializer(vt.getSerializedSize());
+        fs.write(bb);
+        bb.flip();
+        writeDataFile(clientDataDir, "serialized_table.bin", bb);
+        clientThread.join();
     }
 
-    private static void writeClientDataFile(String clientDataDirName, String fileName, ByteBuffer message) {
+    private static void writeDataFile(File clientDataDir, String filename, ByteBuffer message) {
+        writeDataFile(clientDataDir, filename, message.array(), message.limit());
+    }
+
+    private static void writeDataFile(File clientDataDir, String filename, byte[] array, int len) {
+        File datafile = null;
         FileOutputStream fos = null;
         try {
-            fos = getClientDataFile(clientDataDirName, fileName);
-            fos.write(message.array(), 0, message.remaining());
+            datafile = new File(clientDataDir, filename);
+            fos = new FileOutputStream(datafile);
+            fos.write(array, 0, len);
         } catch (IOException ex) {
-            ex.printStackTrace();
-            System.exit(100);
+            abend("GenerateCPPTestFiles: Can't open file \"%s\": %s\n",
+                  datafile.getName(),
+                  ex.getMessage());
         } finally {
             if (fos != null) {
                 try {
                     fos.close();
                 } catch (IOException ex) {
-                    // Swallow it.
-                    ;
+                    abend("GenerateCPPTestFiles: Can't close file \"%s\": %s\n",
+                          datafile.getName(),
+                          ex.getMessage());
                 }
             }
         }
-
     }
 
-    /**
-     * @param args
-     */
-    public static void main(String[] args) {
-        String clientDirName = ".";
-        // Get the arguments.
-        EnumSet<GenerateCPPTestOperation> ops = EnumSet.noneOf(GenerateCPPTestOperation.class);
-        for (int idx = 0; idx < args.length; idx += 1) {
-            if ("--client-dir".equals(args[idx])) {
-                idx += 1;
-                clientDirName = args[idx];
-            } else if ("--authentication".equals(args[idx])) {
-                ops.add(GenerateCPPTestOperation.Authentication);
-            } else if ("--interactions".equals(args[idx])) {
-                ops.add(GenerateCPPTestOperation.Interactions);
-            } else if ("--alltypes".equals(args[idx])) {
-                ops.add(GenerateCPPTestOperation.GenerateAllDataTypes);
-            } else if ("--allops".equals(args[idx])) {
-                ops = EnumSet.allOf(GenerateCPPTestOperation.class);
-            } else {
-                System.err.printf("GenerateCPPTestFiles: Unknown command line argument: \"%s\"\n",
-                                  args[idx]);
-                System.exit(100);
-            }
+    private static void readMessage(ByteBuffer message, SocketChannel sc) throws Exception {
+        message.clear();
+        ByteBuffer lenbuf = ByteBuffer.wrap(message.array(), 0, 4);
+        sc.read(lenbuf);
+        int len = lenbuf.getInt(0);
+        ByteBuffer body = null;
+        if (len > message.capacity()-4) {
+            throw new IllegalArgumentException(String.format("Message too big: %d > %d", len, message.capacity()-4));
+        } else {
+            body = ByteBuffer.wrap(message.array(), 4, len);
+            sc.read(body);
+            message.position(0);
+            message.limit(4+len);
         }
-        for (GenerateCPPTestOperation op : ops) {
-            switch (op) {
-            case Authentication:
-                generateAuthentications(clientDirName);
-                break;
-            case Interactions:
-                generateInteractions(clientDirName);
-                break;
-            case GenerateAllDataTypes:
-                generateAllDataTypes(clientDirName);
-                break;
-            default:
-                System.err.printf("GenerateCPPTestFiles: This can't happen.  Operation is \"%s\"\n", op);
-                System.exit(100);
-            }
-        }
-    }
-
-    private static class GenConnection {
-        private final Map<String, ByteBuffer> m_messages = new HashMap<String, ByteBuffer>();
-        private final ServerSocketChannel m_ssc;
-        private final SocketChannel m_sc;
-        private final ByteBuffer m_authMessage;
-        public GenConnection(ByteBuffer authMessage, ServerSocketChannel ssc, SocketChannel sc) {
-            m_authMessage = authMessage;
-            m_ssc = ssc;
-            m_sc = sc;
-        }
-        public final void add(String label, ByteBuffer message) {
-            m_messages.put(label, message);
-        }
-        public final ByteBuffer get(String label) {
-            return m_messages.get(label);
-        }
-        public final ServerSocketChannel getSsc() {
-            return m_ssc;
-        }
-        public final SocketChannel getSc() {
-            return m_sc;
-        }
-        public final ByteBuffer getAuthMessage() {
-            return m_authMessage;
-        }
-
-    }
-
-    private static class ProcedureSpecification {
-        private final String m_fileName;
-        private final String m_responseFileName;
-        private final String m_procName;
-        private final Object[] m_params;
-        public ProcedureSpecification(String requestFileName, String responseFileName,
-                                      String procName, Object[] params) {
-            m_fileName = requestFileName;
-            m_responseFileName = responseFileName;
-            m_procName = procName;
-            m_params = params;
-        }
-        public final String getFileName() {
-            return m_fileName;
-        }
-        public final String getResponseFileName() {
-            return m_responseFileName;
-        }
-        public final String getProcName() {
-            return m_procName;
-        }
-        public final Object[] getParams() {
-            return m_params;
-        }
-
-    }
-    /**
-     * Create a fake server on the usual port.  When the client calls procedures
-     * we store the messages.  We return a map associating labels with messages.
-     * We also store the authentication request message.  We can't actually store
-     * any response messages, since we don't have a real server.  We will send
-     * these request messages out separately.
-     *
-     * @param authScheme
-     * @return
-     */
-    public static GenConnection generateRequestMessages(ClientAuthScheme authScheme, final Map<String,ProcedureSpecification> procedures) {
-        ServerSocketChannel ssc = null;
-        SocketChannel sc = null;
-        try {
-            ssc = ServerSocketChannel.open();
-            ssc.socket().bind(new InetSocketAddress("localhost", 21212));
-            ClientConfig config = new ClientConfig("hello", "world", (ClientStatusListenerExt )null, authScheme);
-            final org.voltdb.client.Client client = ClientFactory.createClient(config);
-
-            // Create a thread to call a set of procedures.  We will just read the
-            // answers from the server in this thread, and not process them as client interactions.
-            Thread clientThread = new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        client.createConnection( "localhost", 21212);
-                        for (Map.Entry<String, ProcedureSpecification> oneProc : procedures.entrySet()) {
-                            ProcedureSpecification spec = oneProc.getValue();
-                            String procName = spec.getProcName();
-                            Object[] params = spec.getParams();
-                            if (oneProc.getKey().startsWith("async")) {
-                                client.callProcedure(new NullCallback(), procName, params);
-                            } else if (oneProc.getKey().startsWith("caught")){
-                                try {
-                                    client.callProcedure(procName, params);
-                                } catch (Exception ex) {
-
-                                }
-                            } else {
-                                client.callProcedure(procName, params);
-                            }
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            };
-
-            // Start the client calling the procedures.
-            clientThread.setDaemon(true);
-            clientThread.start();
-            sc = ssc.accept();
-            sc.socket().setTcpNoDelay(true);
-            ByteBuffer message = ByteBuffer.allocate(8096);
-            sc.configureBlocking(true);
-
-            // First, read the server response.  Then prepare
-            // to write what we just read by flipping it.
-            sc.read(message);
-            message.flip();
-            GenConnection answer = new GenConnection(message, ssc, sc);
-            // Write the authentication response.
-            writeServerAuthenticationResponse(sc, true);
-            for (Map.Entry<String, ProcedureSpecification> oneProc : procedures.entrySet()) {
-                message = ByteBuffer.allocate(8096);
-                sc.read(message);
-                message.flip();
-                answer.add(oneProc.getKey(), message);
-                writeServerCallResponse(sc, getClientData(message));
-            }
-            clientThread.join();
-            client.close();
-            return answer;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(100);
-        } finally {
-            if (ssc != null) {
-                try {
-                    ssc.close();
-                } catch (IOException ex) {
-                    // We don't care about this really.
-                }
-            }
-        }
-        return null;
     }
 
     private static long getClientData(ByteBuffer message) {
@@ -277,8 +330,9 @@ public class GenerateCPPTestFiles {
         return clientData;
     }
 
+
     private static void writeServerCallResponse(SocketChannel sc, long clientData) throws IOException {
-        ByteBuffer message = ByteBuffer.allocate(8096);
+        ByteBuffer message = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
         // Message size.
         writeMessageHeader(message);
         // Match the client data.
@@ -299,9 +353,10 @@ public class GenerateCPPTestFiles {
         sc.write(message);
     }
 
+
     private static void writeServerAuthenticationResponse(SocketChannel sc, boolean success) throws IOException {
         ByteBuffer message;
-        message = ByteBuffer.allocate(8096);
+        message = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
         writeMessageHeader(message);
         // success == 0, failure == 100
         message.put(success ? (byte)0 : (byte)100);
@@ -322,165 +377,17 @@ public class GenerateCPPTestFiles {
         sc.write(message);
     }
 
+
     private static void writeMessageHeader(ByteBuffer message) {
         // message header.
         message.putInt(0);
         message.put(PROTOCOL_VERSION);
     }
 
-    public static void generateAuthentications(String clientDataDirName) {
-        try {
-            Map<String, ProcedureSpecification> noprocs = new LinkedHashMap<String, ProcedureSpecification>();
-            GenConnection connection = generateRequestMessages(ClientAuthScheme.HASH_SHA256, noprocs);
-            ByteBuffer message = connection.getAuthMessage();
-            writeClientDataFile(clientDataDirName, "authentication_request_sha256.msg", message);
-            connection.m_ssc.close();
-            // Now do it all again, but this time the SHA1 hash authentication.
-            GenConnection oconnection = generateRequestMessages(ClientAuthScheme.HASH_SHA1, noprocs);
-            ByteBuffer omessage = oconnection.getAuthMessage();
-            writeClientDataFile(clientDataDirName, "authentication_request.msg", omessage);
-            oconnection.m_ssc.close();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(100);
-        }
+
+    private static void abend(String format, Object ...args) {
+        System.err.printf(format, args);
+        System.exit(100);
     }
 
-    @SuppressWarnings("serial")
-    public static void generateInteractions(String clientDataDirName) {
-        // Authenticate.  We'll need this later, but
-        // we won't actually need the message.
-        Map<String, ProcedureSpecification> procedures = new LinkedHashMap<String, ProcedureSpecification>(){{
-            put("insert1",
-                new ProcedureSpecification("invocation_request_success.msg",
-                                           "invocation_response_success.msg",
-                                           "Insert",
-                                           new String[]{"Hello", "World", "English"}));
-            put("caughtInsert2",
-                new ProcedureSpecification("invocation_request_failure_cv.msg",
-                                           "invocation_response_failure_cv.msg",
-                                           "Insert",
-                                           new String[]{"Insert", "Hello", "World", "English"}));
-            put("select",
-                new ProcedureSpecification("invocation_request_select.msg",
-                                           "invocation_response_select.msg",
-                                           "Select",
-                                           new String[]{"Select", "English"}));
-            put("asyncStop",
-                new ProcedureSpecification("stopRequest.msg",
-                                           null,
-                                           "@Shutdown",
-                                           new String[]{}));
-        }};
-        // Note: This does not actually connect to a server.  It just
-        //       generates a bunch of messages in the order specified above.
-        //       We will then send the resulting messages out and see
-        //       what comes back.
-        GenConnection connection = generateRequestMessages(ClientAuthScheme.HASH_SHA1, procedures);
-        try {
-            connection.getSsc().close();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-        try {
-            /**
-             * Now connect to a real server, send the requests we cached above
-             * and read the responses.
-             */
-            final SocketChannel voltsc = SocketChannel.open(new InetSocketAddress("localhost", 21212));
-            voltsc.socket().setTcpNoDelay(true);
-            voltsc.configureBlocking(true);
-            // Write the authentication message, which is cached in
-            // the connection.  We don't need to save this, since we
-            // saved it in generateAuthentications.  Then read the
-            // authentication response.
-            voltsc.write(connection.getAuthMessage());
-            // Go through the procedures table.  For each procedure,
-            // labeled by its key, there should be a request message.
-            // Save this request message to a file, send the
-            ByteBuffer message = ByteBuffer.allocate(8096);
-            voltsc.read(message);
-            message.flip();
-            ByteBuffer authenticationResponse = ByteBuffer.allocate(message.remaining());
-            authenticationResponse.put(message);
-            message.flip();
-            authenticationResponse.flip();
-            writeClientDataFile(clientDataDirName, "authentication_response.msg", message);
-            for (Map.Entry<String, ProcedureSpecification> oneProc : procedures.entrySet()) {
-                String label = oneProc.getKey();
-                ByteBuffer request = connection.get(label);
-                String requestFileName = oneProc.getValue().getFileName();
-                String responseFileName = oneProc.getValue().getResponseFileName();
-                voltsc.write(request);
-                message.clear();
-                voltsc.read(message);
-                request.flip();
-                message.flip();
-                writeClientDataFile(clientDataDirName, requestFileName, request);
-                writeClientDataFile(clientDataDirName, responseFileName, message);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(100);
-        }
-    }
-
-    private static Object[] addAll(Object ... objs) {
-        ArrayList<Object> answer = new ArrayList<Object>();
-        for (Object obj : objs) {
-            answer.add(obj);
-        }
-        return answer.toArray();
-    }
-    public static void generateAllDataTypes(String clientDataDirName) {
-        try {
-            ServerSocketChannel ssc = ServerSocketChannel.open();
-            ssc.socket().bind(new InetSocketAddress("localhost", 21212));
-            String strings[] = new String[] { "oh", "noes" };
-            byte bytes[] = new byte[] { 22, 33, 44 };
-            short shorts[] = new short[] { 22, 33, 44 };
-            int ints[] = new int[] { 22, 33, 44 };
-            long longs[] = new long[] { 22, 33, 44 };
-            double doubles[] = new double[] { 3, 3.1, 3.14, 3.1459 };
-            TimestampType timestamps[] = new TimestampType[] { new TimestampType(33), new TimestampType(44) };
-            BigDecimal bds[] = new BigDecimal[] { new BigDecimal( "3" ), new BigDecimal( "3.14" ), new BigDecimal( "3.1459" ) };
-            final Object[] params = addAll(strings, bytes, shorts, ints, longs, doubles, timestamps, bds, null, "ohnoes!", (byte)22,
-                                     (short)22, 22, (long)22, 3.1459, new TimestampType(33), new BigDecimal("3.1459"));
-            @SuppressWarnings("serial")
-            Map<String, ProcedureSpecification> procedures = new LinkedHashMap<String, ProcedureSpecification>() {{
-               put("caught.allData",
-                   new ProcedureSpecification("invocation_request_all_params.msg", null, "foo", params));
-            }};
-            GenConnection connection = generateRequestMessages(ClientAuthScheme.HASH_SHA1, procedures);
-            writeClientDataFile(clientDataDirName, "invocation_request_all_params.msg", connection.get("caught.allData"));
-
-            ColumnInfo columns[] = new ColumnInfo[] {
-                    new ColumnInfo("column1", VoltType.TINYINT),
-                    new ColumnInfo("column2", VoltType.STRING),
-                    new ColumnInfo("column3", VoltType.SMALLINT),
-                    new ColumnInfo("column4", VoltType.INTEGER),
-                    new ColumnInfo("column5", VoltType.BIGINT),
-                    new ColumnInfo("column6", VoltType.TIMESTAMP),
-                    new ColumnInfo("column7", VoltType.DECIMAL)
-            };
-            VoltTable vt = new VoltTable(columns);
-            vt.addRow( null, null, null, null, null, null, null);
-            vt.addRow( 0, "", 2, 4, 5, new TimestampType(44), new BigDecimal("3.1459"));
-            vt.addRow( 0, null, 2, 4, 5, null, null);
-            vt.addRow( null, "woobie", null, null, null, new TimestampType(44), new BigDecimal("3.1459"));
-            ByteBuffer bb = ByteBuffer.allocate(vt.getSerializedSize());
-            vt.flattenToBuffer(bb);
-            FastSerializer fs = new FastSerializer(vt.getSerializedSize());
-            fs.write(bb);
-            FileOutputStream fos = getClientDataFile(clientDataDirName, "serialized_table.bin");
-            fos.write(fs.getBytes());
-            fos.flush();
-            fos.close();
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(100);
-        }
-        System.exit(0);
-    }
 }

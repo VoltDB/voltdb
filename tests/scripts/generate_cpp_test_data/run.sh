@@ -2,9 +2,10 @@
 
 # Global state variables.
 OBJ="./obj"
-CLIENTDIR="./cpp-test-files"
+CLIENT_DIR="./cpp-test-files"
 BUILD=debug
 CLEANUP=YES
+VOLTDB_VERSION=6.1
 
 function help() {
     echo "Usage: ./run.sh ... arguments ..."
@@ -32,83 +33,9 @@ function help() {
     echo "                       By default this will be ./obj.  After a"
     echo "                       successful generation run this will be"
     echo "                       deleted."
+    echo "  --voltdb-version V   Set the voltdb version to the given one."
     echo "  --no-cleanup         Don't clean up the working directory."
     echo "  --help               Print this message and exit."
-}
-
-
-function readargs() {
-    while [ -z "$DONE" ]; do
-        case "$1" in
-            --#)
-                shift
-                set -x
-                ;;
-            --authenticate)
-                shift
-                AUTHENTICATION=YES
-                ;;
-            --interaction)
-                shift
-                INTERACTION=YES
-                ;;
-            --all)
-                shift
-                ALLOPS=YES
-                ;;
-            --voltdb)
-                shift
-                VOLTDB_BASE="$1"
-                if [ ! -d  "$VOLTDB_BASE" ] || [ ! -x "$VOLTDB_BASE/bin/voltdb" ] ; then
-                    echo "$0: The voltdb base directory \"$VOLTDB_BASE\" is not helpful."
-                    echo "    This must exist and contain commands \"$VOLTDB_BASE/bin/voltdb\" and"
-                    echo "    \"VOLTDB_BASE/bin/voltadmin\"".
-                    shift
-                    ;;
-                    --license)
-                        shift;
-                        LICENSE="$1"
-                        shift
-                        ;;
-                    --client-dir)
-                        shift
-                        CLIENT_DIR="$1"
-                        shift
-                        ;;
-                    --build)
-                        shift
-                        BUILD="$1"
-                        case "$BUILD" in
-                            release|debug)
-                            ;;
-                            *)
-                                echo "$0: The --build argument must be \"debug\" or \"release\", not \"$BUILD\"."
-                                return 100
-                                ;;
-                        esac
-                        ;;
-                    --working-dir)
-                        shift
-                        OBJ="$1"
-                        shift
-                        ;;
-                    --no-cleanup)
-                        shift
-                        CLEANUP=NO
-                        ;;
-                    --help)
-                        help
-                        return 100
-                        ;;
-                    "")
-                        DONE=YES
-                        ;;
-                    *)
-                        echo "$0: Unknown command line argument: \"$1\""
-                        return 100
-                        ;;
-        esac
-    done
 }
 
 function calculate_volt_paths() {
@@ -134,20 +61,26 @@ function calculate_volt_paths() {
     return 0
 }
 
+function make_fulders() {
+    make_dir_if_necessary "$CLIENT_DIR"
+    make_dir_if_necessary "$OBJ"
+}
+
 function initialize_script() {
     # Remember where we are now.
     START_DIR=$(/bin/pwd)
 
+    calculate_volt_paths
     # Set up and validate some other detritus.
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
     VOLTDB_LIB="$VOLTDB_BASE/lib"
     LOG4J="$VOLTDB_VOLTDB/log4j.xml"
     DEPLOYMENT_FILE="$START_DIR/deployment.xml"
-    if [ -z "$LICENSE" ] ; then
-        LICENSE="$VOLTDB_VOLTDB/license.xml"
+    if [ -z "$LICENSE_FILE" ] ; then
+        LICENSE_FILE="$VOLTDB_VOLTDB/license.xml"
     fi
 
-    if [ ! -f "$LICENSE" ] ; then
+    if [ ! -f "$LICENSE_FILE" ] ; then
         echo "$0: The license file \"$LICENSE\" does not seem to exist.  Please sort this out before we continue."
         return 100
     fi
@@ -159,8 +92,12 @@ function server() {
     local DEPLOYMENT_FILE="$1"
     local LICENSE_FILE="$2"
     # run the server
+    echo "Starting a voltdb server"
+    echo "  with deployment file \"$DEPLOYMENT_FILE\""
+    echo "  with license file \"$LICENSE_FILE\""
     /bin/rm -rf "$OBJ"
-    (cd "$OBJ"; voltdb create -d $DEPLOYMENT_FILE -l $LICENSE_FILE -H localhost &)
+    mkdir -p "$OBJ"
+    (cd "$OBJ"; voltdb create -d "$DEPLOYMENT_FILE" -l "$LICENSE_FILE" -H localhost &)
 }
 
 # Load the schema.  We don't have any stored procedures
@@ -172,22 +109,41 @@ function init_database() {
     local DONE
     while [ -z "$DONE" ] && [ $NTRIES -lt $MAXTRIES ] ; do
         NTRIES=$((NTRIES + 1))
-        sqlcmd < helloworld.sql && DONE=YES
+        sqlcmd < "$SQL_FILE" && DONE=YES
+        if [ -z "$DONE" ] ; then
+            echo "Cannot connect to the server.  We'll try again soon."
+            sleep 5
+        fi
     done
+    if [ -z "$DONE" ] ; then
+        echo "Could not connect to the server in half a minute.  Something is wrong."
+        return 100
+    else
+        return 0
+    fi
 }
 
 function noserver() {
+    echo "Shutting down the server."
     voltadmin shutdown
 }
 
 # run the client that drives the example
 function client() {
-    java -classpath $VOLTDB_BASE/voltdb/voltdb/voltdb-$VOLTDB_VERSION.jar:$VOLTDB_BASE/voltdb/obj/${BUILD}/test org.voltdb.GenerateCPPTestFiles --clientdir "$CLIENT_DIR" "$@"
+    echo "Running the client.  Data files go in \"$CLIENT_DIR\""
+    echo "  Classpath:"
+    echo "    $VOLTDB_BASE/voltdb/voltdb-$VOLTDB_VERSION.jar"
+    echo "    $VOLTDB_BASE/obj/${BUILD}/test"
+    (set -x ; java -classpath $VOLTDB_BASE/voltdb/voltdb-$VOLTDB_VERSION.jar:$VOLTDB_BASE/obj/${BUILD}/test org.voltdb.GenerateCPPTestFiles --client-dir "$CLIENT_DIR" "$@")
 }
 
 function cleanup() {
     if [ "$CLEANUP" == YES ] ; then
+        echo "Cleaning up."
         rm -rf "$OBJ"
+        rm -rf "${START_DIR}/log"
+    else
+        echo "The server's data and log files are in \"$OBJ\" and perhaps \"${START_DIR}/log\"."
     fi
 }
 
@@ -201,39 +157,87 @@ function make_dir_if_necessary() {
 }
 
 
-function make_fulders() {
-    make_dir_if_necessary "$CLIENT_DIR"
-    make_dir_if_necessary "$OBJ"
-}
-
-
-function generate_authentication() {
-    run_one_test deployment_auth.xml generate_auth.sql
-}
-
-function generate_interactions() {
-    run_one_test deployment_noauth.xml generate_noauth.sql
-}
-
 function run_one_test() {
-    local DEPLOYMENT_FILE = "R1"
+    local DEPLOYMENT_FILE="$1"
     local SCHEMA_FILE="$2"
+    echo "Shutting down any existing servers.  This may cause an error message."
+    voltadmin shutdown
     server "$DEPLOYMENT_FILE" "$LICENSE_FILE" \
-        && init_database $SCHEMA_FILE \
-        && client --clientdir "$CLIENTDIR" --authentication \
-        && noserver
+        && init_database "$SCHEMA_FILE" \
+        && client \
+        && noserver \
         && cleanup
 }
 
-readargs || exit 100
+while [ -z "$DONE" ]; do
+    case "$1" in
+        --#)
+            shift
+            set -x
+            ;;
+        --voltdb)
+            shift
+            VOLTDB_BASE="$1"
+            if [ ! -d  "$VOLTDB_BASE" ] || [ ! -x "$VOLTDB_BASE/bin/voltdb" ] ; then
+                echo "$0: The voltdb base directory \"$VOLTDB_BASE\" is not helpful."
+                echo "    This must exist and contain commands \"$VOLTDB_BASE/bin/voltdb\" and"
+                echo "    \"VOLTDB_BASE/bin/voltadmin\"".
+                exit 100
+            fi
+            shift
+            ;;
+        --voltdb-version)
+            shift
+            VOLTDB_VERSION="$1"
+            shift
+            ;;
+        --license)
+            shift;
+            LICENSE_FILE="$1"
+            shift
+            ;;
+        --client-dir)
+            shift
+            CLIENT_DIR="$1"
+            echo "CLIENT_DIR -> $CLIENT_DIR"
+            shift
+            ;;
+        --build)
+            shift
+            BUILD="$1"
+            case "$BUILD" in
+                release|debug)
+                    ;;
+                *)
+                    echo "$0: The --build argument must be \"debug\" or \"release\", not \"$BUILD\"."
+                    exit 100
+                    ;;
+            esac
+            ;;
+        --working-dir)
+            shift
+            OBJ="$1"
+            shift
+            ;;
+        --no-cleanup)
+            shift
+            CLEANUP=NO
+            ;;
+        --help)
+            help
+            exit 100
+            ;;
+        "")
+            DONE=YES
+            ;;
+        *)
+            echo "$0: Unknown command line argument: \"$1\""
+            exit 100
+            ;;
+    esac
+done
+
 initialize_script || exit 100
 
+run_one_test "$PWD/deployment.xml" "$PWD/generate.sql"
 
-
-if [ -n "$ALLOPS" ] || [ -n "$AUTHENTICATION" ] ; then
-    generate_authentication
-fi
-
-if [ -n "$ALLOPS" ] || [ -n "$INTERACTION" ] ; then
-    generate_interactions
-fi
