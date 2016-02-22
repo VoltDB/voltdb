@@ -43,7 +43,7 @@ struct DRCommittedInfo{
 
 class AbstractDRTupleStream : public TupleStreamBase {
 public:
-    AbstractDRTupleStream();
+    AbstractDRTupleStream(int defaultBufferSize);
 
     virtual ~AbstractDRTupleStream() {}
 
