@@ -47,12 +47,14 @@ import voltdbserver
 import glob
 import psutil
 import Log
-
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
 import voltdbclient
 import logging
 from logging.handlers import RotatingFileHandler
+from flask_logging import Filter
+
+filter_log = Filter('/api/1.0/')
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -75,7 +77,6 @@ def not_found(error):
     Returns:
         Error message.
     """
-    print error
     return make_response(jsonify({'error': 'Bad request'}), 400)
 
 
@@ -88,7 +89,6 @@ def not_found(error):
     Returns:
         Error message.
     """
-    print error
     return make_response(jsonify({'error': 'Not found'}), 404)
 
 
@@ -2402,10 +2402,9 @@ def main(runner, amodule, config_dir, server):
         open('voltdeploy.log', 'w').close()
     handler = RotatingFileHandler('voltdeploy.log')
     handler.setFormatter(logging.Formatter(
-         "%(asctime)s|%(levelname)s|%(message)s|%(pathname)s:%(lineno)d"))
+         "%(asctime)s|%(levelname)s|%(message)s"))
     log = logging.getLogger('werkzeug')
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.NOTSET)
     log.addHandler(handler)
-    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)' %(bindIp, __PORT__))
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)
