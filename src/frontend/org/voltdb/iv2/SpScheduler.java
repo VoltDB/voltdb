@@ -52,7 +52,6 @@ import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Iv2GetDrTrackerRequestMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -383,9 +382,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof Iv2LogFaultMessage) {
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
-        }
-        else if (message instanceof Iv2GetDrTrackerRequestMessage) {
-            handleIv2DrTrackerMessage((Iv2GetDrTrackerRequestMessage)message);
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
@@ -983,16 +979,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the value sent by the master
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
         m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
-    }
-
-    public void handleIv2DrTrackerMessage(Iv2GetDrTrackerRequestMessage message)
-    {
-        assert(m_isLeader);
-        TxnEgo ego = advanceTxnEgo();
-        long txnId = ego.getTxnId();
-        message.setTxnId(txnId);
-        GetDrTrackerTask task = new GetDrTrackerTask(m_mailbox, m_pendingTasks, message);
-        m_pendingTasks.offer(task);
     }
 
     public void handleDumpMessage()
