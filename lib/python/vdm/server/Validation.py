@@ -309,7 +309,7 @@ schema = {
                     "properties": {
                         "prefix": {
                             "id": "prefix",
-                            "type": "string"
+                            "type": "boolean"
                         }
                     },
                     "additionalProperties": False
