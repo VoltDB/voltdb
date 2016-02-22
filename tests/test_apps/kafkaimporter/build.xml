@@ -28,6 +28,11 @@
            <!-- <include name="voltdbclient*.jar"/> -->
          <include name="voltdb*.jar"/>
        </fileset>
+       <fileset dir="${basedir}/../../../lib">
+           <!-- <include name="voltdbclient*.jar"/> -->
+           <!-- <include name="kafka-clients-0.8.2.1.jar"/> -->
+           <include name="*.jar"/>
+       </fileset>
     </path>
 
     <target name="client-compile">

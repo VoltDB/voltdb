@@ -101,29 +101,8 @@ protected:
      * pick a partition to store the data
      */
     int32_t hashinate(const char *string, int32_t length) const {
-        int32_t hashCode = MurmurHash3_x64_128(string, length, 0);
-        return partitionForToken(hashCode);
-    }
-
-    int32_t partitionForToken(int32_t hashCode) const {
-        int32_t min = 0;
-        int32_t max = tokenCount - 1;
-
-        while (min <= max) {
-            assert(min >= 0);
-            assert(max >= 0);
-            uint32_t mid = (min + max) >> 1;
-            int32_t midval = tokens[mid * 2];
-
-            if (midval < hashCode) {
-                min = mid + 1;
-            } else if (midval > hashCode) {
-                max = mid - 1;
-            } else {
-                return tokens[mid * 2 + 1];
-            }
-        }
-        return tokens[(min - 1) * 2 + 1];
+        int32_t hash = MurmurHash3_x64_128(string, length, 0);
+        return partitionForToken(hash);
     }
 
 private:
@@ -133,6 +112,27 @@ private:
     const int32_t *tokens;
     const uint32_t tokenCount;
     boost::scoped_array<int32_t> tokensOwner;
+
+    int32_t partitionForToken(int32_t hash) const {
+        int32_t min = 0;
+        int32_t max = tokenCount - 1;
+
+        while (min <= max) {
+            assert(min >= 0);
+            assert(max >= 0);
+            uint32_t mid = (min + max) >> 1;
+            int32_t midval = tokens[mid * 2];
+
+            if (midval < hash) {
+                min = mid + 1;
+            } else if (midval > hash) {
+                max = mid - 1;
+            } else {
+                return tokens[mid * 2 + 1];
+            }
+        }
+        return tokens[(min - 1) * 2 + 1];
+    }
 };
 }
 #endif /* ELASTICHASHINATOR_H_ */

@@ -1,43 +1,32 @@
-# This file is part of VoltDB.
-
-# Copyright (C) 2008-2016 VoltDB Inc.
-#
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-
 """
-    This test requires installation of flask-Testing from http://pythonhosted.org/Flask-Testing/
-    To install flask-Testing use command:
-    pip install Flask-Testing
+This file is part of VoltDB.
 
+Copyright (C) 2008-2016 VoltDB Inc.
 
-    This test also requires installation of requests library https://pypi.python.org/pypi/requests/
-    To install latest requests version 2.8.1 use command:
+This file contains original code and/or modifications of original code.
+Any modifications made by VoltDB Inc. are licensed under the following
+terms and conditions:
 
-    sudo pip install requests --upgrade
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from flask import Flask
 import unittest
 import requests
 import xmlrunner
@@ -46,8 +35,10 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-URL = 'http://'+__host_or_ip__+':8000/api/1.0/servers/'
-__db_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
+URL = 'http://%s:8000/api/1.0/databases/1/servers/' % \
+(__host_or_ip__)
+__db_url__ = 'http://%s:8000/api/1.0/databases/' % \
+             (__host_or_ip__)
 
 
 class Server(unittest.TestCase):
@@ -71,8 +62,11 @@ class Server(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            url = URL + str(last_db_id)
-            data = {'description': 'test', 'hostname': 'test', 'name': 'test'}
+
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 201:
                 self.assertEqual(response.status_code, 201)
@@ -92,13 +86,15 @@ class Server(unittest.TestCase):
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
             db_data = {'dbId': last_db_id}
-            response = requests.get(URL)
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
             value = response.json()
             if value:
-                server_length = len(value['servers'])
-                last_server_id = value['servers'][server_length-1]['id']
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
-                url = URL + str(last_server_id)
+                url = url + str(last_server_id)
                 response = requests.delete(url, json=db_data, headers=headers)
                 self.assertEqual(response.status_code, 200)
                 # Delete database
@@ -115,40 +111,25 @@ class CreateServer(Server):
     """
     Create Server
     """
-    def create_app(self):
-        """
-        Create app
-        """
-        app = Flask(__name__)
-        app.config['TESTING'] = True
-        return app
 
     def test_get_servers(self):
         """
         ensure GET server list
         """
-        response = requests.get(URL)
-        value = response.json()
-        if not value:
-            print "The Server list is empty"
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_server_name(self):
-        """
-        ensure server name is not empty
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
-        data = {'description': 'test', 'hostname': 'test', 'name': ''}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], 'Server name is required.')
-        self.assertEqual(response.status_code, 200)
+
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+
+            response = requests.get(url)
+            value = response.json()
+            if not value:
+                print "The Server list is empty"
+            self.assertEqual(response.status_code, 200)
 
     def test_validate_host_name(self):
         """
@@ -160,55 +141,15 @@ class CreateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
+
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        # url = URL + str(last_db_id)
         data = {'description': 'test', 'hostname': '', 'name': 'test'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
         self.assertEqual(value['errors'][0], 'Host name is required.')
         self.assertEqual(response.status_code, 200)
-
-    def test_validate_duplicate_server(self):
-        """
-        ensure Duplicate Server name is not added
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
-        data = {'description': 'test', 'hostname': 'test12345', 'name': 'test'}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        if response.status_code == 201:
-            print "new server created"
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-            self.assertEqual(value['error'], 'Server name already exists')
-            print value['error']
-
-    def test_validate_duplicate_host(self):
-        """
-        ensure Duplicate Host name is not added
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
-        data = {'description': 'test', 'hostname': 'test', 'name': 'test12345'}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-            self.assertEqual(value['error'], 'Host name already exists')
-            print value['error']
 
     def test_validate_port(self):
         """
@@ -220,7 +161,8 @@ class CreateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
         data = {'description': 'test', 'hostname': 'test4567',
                 'name': 'test12345', 'admin-listener': '88888'}
         response = requests.post(url, json=data, headers=headers)
@@ -241,7 +183,8 @@ class CreateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
         data = {'description': 'test', 'hostname': 'test4567',
                 'name': 'test12345', 'internal-interface': '127.0.0.12345'}
         response = requests.post(url, json=data, headers=headers)
@@ -257,36 +200,10 @@ class UpdateServer(Server):
     """
     Update server
     """
-    def test_get_servers(self):
-        """
-        ensure GET server list
-        """
-        response = requests.get(URL)
-        value = response.json()
-        if not value:
-            print "The Server list is empty"
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_server_name(self):
-        """
-        ensure server name is not empty
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
-        data = {'description': 'test', 'hostname': 'test', 'name': ''}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], 'Server name is required.')
-        self.assertEqual(response.status_code, 200)
 
     def test_validate_hostname(self):
         """
-        ensure server name is not empty
+        ensure host name is not empty
         """
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         response = requests.get(__db_url__)
@@ -294,7 +211,8 @@ class UpdateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = URL + str(last_db_id)
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+             (__host_or_ip__,last_db_id)
         data = {'description': 'test', 'hostname': '', 'name': 'test'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -303,67 +221,32 @@ class UpdateServer(Server):
 
     def test_update_servers(self):
         """
-        get a serverId
+        Ensure update server is working
         """
-        response = requests.get(URL)
-        value = response.json()
 
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
         if value:
-            server_length = len(value['servers'])
-            last_server_id = value['servers'][server_length-1]['id']
-            print "ServerId to be updated is " + str(last_server_id)
-            url = URL + str(last_server_id)
-            response = requests.put(url, json={'description': 'test123'})
-            self.assertEqual(response.status_code, 200)
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            db_data = {'dbId': last_db_id}
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id)
+                db_data = {'description': 'test123'}
+                response = requests.put(url, db_data)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
         else:
-            print "The Server list is empty"
-
-    def test_validate_duplicate_server(self):
-        """
-        ensure Duplicate Server name is not added
-        """
-        response = requests.get(URL)
-        value = response.json()
-
-        if value:
-            server_length = len(value['servers'])
-            last_server_id = value['servers'][server_length-1]['id']
-            print "ServerId to be updated is " + str(last_server_id)
-            url = URL + str(last_server_id)
-            hostname = socket.gethostname()
-
-        response = requests.put(url, json={"description": "test",
-                                           "hostname": "test12345", "name": hostname})
-        value = response.json()
-        if response.status_code == 200:
-            self.assertEqual(response.status_code, 200)
-        else:
-            self.assertEqual(response.status_code, 404)
-            self.assertEqual(value['error'], 'Server name already exists')
-
-    def test_validate_duplicate_host(self):
-        """
-        ensure Duplicate Host name is not added
-        """
-        # Get a serverId
-        response = requests.get(URL)
-        value = response.json()
-
-        if value:
-            server_length = len(value['servers'])
-            last_server_id = value['servers'][server_length-1]['id']
-            print "ServerId to be updated is " + str(last_server_id)
-            url = URL + str(last_server_id)
-            hostname = socket.gethostname()
-            hostname_ip = socket.gethostbyname(hostname)
-        response = requests.put(url, json={'description': 'test',
-                                           'hostname': hostname_ip, 'name': 'test12345'})
-        value = response.json()
-        if response.status_code == 200:
-            self.assertEqual(response.status_code, 200)
-        else:
-            self.assertEqual(response.status_code, 404)
-            self.assertEqual(value['error'], 'Host name already exists')
+            print "The database list is empty"
 
 
 class DeleteServer(unittest.TestCase):
@@ -388,8 +271,9 @@ class DeleteServer(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            url = URL + str(last_db_id)
-            data = {'description': 'test', 'hostname': 'test', 'name': 'test'}
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 201:
                 self.assertEqual(response.status_code, 201)
@@ -402,13 +286,17 @@ class DeleteServer(unittest.TestCase):
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
             db_data = {'dbId': last_db_id}
-            response = requests.get(URL)
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
             value = response.json()
             if value:
-                server_length = len(value['servers'])
-                last_server_id = value['servers'][server_length-1]['id']
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
-                url = URL + str(last_server_id)
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+                url += str(last_server_id)
                 response = requests.delete(url, json=db_data, headers=headers)
                 self.assertEqual(response.status_code, 200)
 

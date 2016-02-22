@@ -52,4 +52,3 @@ environments {
         driver = { new PhantomJSDriver() }
     }
 }
-

@@ -74,29 +74,6 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
-class MockHashinator : public TheHashinator {
-public:
-    static MockHashinator* newInstance() {
-        return new MockHashinator();
-    }
-
-    ~MockHashinator() {}
-
-protected:
-   int32_t hashinate(int64_t value) const {
-       return 0;
-   }
-
-   int32_t hashinate(const char *string, int32_t length) const {
-       return 0;
-   }
-
-   int32_t partitionForToken(int32_t hashCode) const {
-       // partition of VoltDBEngine super of MockVoltDBEngine is 0
-       return -1;
-   }
-};
-
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
@@ -132,7 +109,6 @@ public:
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                                                                m_exportSchema, exportColumnName,
                                                                m_exportStream, true);
-        setHashinator(MockHashinator::newInstance());
     }
     ~MockVoltDBEngine() {
         delete m_conflictExportTable;
@@ -781,6 +757,11 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     endTxn(m_engine, true);
 
+    TableTuple existedTuple(m_table->schema());
+    boost::shared_array<char> existedData;
+    existedData = deepCopy(second_tuple, existedTuple, existedData);
+    StackCleaner secondExistingTupleCleaner(existedTuple);
+
     // delete the second row inserted in the last write
     beginTxn(m_engine, 112, 102, 101, 73);
     deleteTuple(m_table, second_tuple);
@@ -801,7 +782,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
     tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(existedTuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);

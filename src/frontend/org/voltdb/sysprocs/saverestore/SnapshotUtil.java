@@ -37,10 +37,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -62,7 +60,7 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.DRLogSegmentId;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
@@ -72,7 +70,6 @@ import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
-import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -83,7 +80,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -137,7 +133,7 @@ public class SnapshotUtil {
      * @param nonce   nonce used to distinguish this snapshot
      * @param tables   List of tables present in this snapshot
      * @param hostId   Host ID where this is happening
-     * @param exportSequenceNumbers  ???
+     * @param extraSnapshotData persisted export, DR, etc state
      * @throws IOException
      */
     public static Runnable writeSnapshotDigest(
@@ -147,10 +143,8 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
-        Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+        ExtensibleSnapshotDigestData extraSnapshotData,
         InstanceId instanceId,
         long timestamp,
         long clusterCreateTime,
@@ -177,32 +171,9 @@ public class SnapshotUtil {
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("newPartitionCount").value(newPartitionCount);
-                Iterator<Entry<Integer, TupleStreamStateInfo>> iter = drTupleStreamInfo.entrySet().iterator();
-                if (iter.hasNext()) {
-                    stringer.key("drVersion").value(iter.next().getValue().drVersion);
-                }
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
-                }
-                stringer.endArray();
-                stringer.key("exportSequenceNumbers").array();
-                for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : exportSequenceNumbers.entrySet()) {
-                    stringer.object();
-
-                    stringer.key("exportTableName").value(entry.getKey());
-
-                    stringer.key("sequenceNumberPerPartition").array();
-                    for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
-                        stringer.object();
-                        stringer.key("partition").value(sequenceNumber.getKey());
-                        //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                        stringer.key("exportSequenceNumber").value(sequenceNumber.getValue().getSecond());
-                        stringer.endObject();
-                    }
-                    stringer.endArray();
-
-                    stringer.endObject();
                 }
                 stringer.endArray();
 
@@ -216,39 +187,7 @@ public class SnapshotUtil {
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.key("clusterCreateTime").value(clusterCreateTime);
 
-                stringer.key("remoteDCLastIds");
-                stringer.object();
-                for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> e : remoteDCLastIds.entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.object();
-                    for (Map.Entry<Integer, DRLogSegmentId> e2 : e.getValue().entrySet()) {
-                        stringer.key(e2.getKey().toString());
-                        stringer.object();
-                        stringer.key("drId").value(e2.getValue().drId);
-                        stringer.key("spUniqueId").value(e2.getValue().spUniqueId);
-                        stringer.key("mpUniqueId").value(e2.getValue().mpUniqueId);
-                        stringer.endObject();
-                    }
-                    stringer.endObject();
-                }
-                stringer.endObject();
-                stringer.key("drTupleStreamStateInfo");
-                stringer.object();
-                for (Map.Entry<Integer, TupleStreamStateInfo> e : drTupleStreamInfo.entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.object();
-                    if (e.getKey() != MpInitiator.MP_INIT_PID) {
-                        stringer.key("sequenceNumber").value(e.getValue().partitionInfo.drId);
-                        stringer.key("spUniqueId").value(e.getValue().partitionInfo.spUniqueId);
-                        stringer.key("mpUniqueId").value(e.getValue().partitionInfo.mpUniqueId);
-                    } else {
-                        stringer.key("sequenceNumber").value(e.getValue().replicatedInfo.drId);
-                        stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
-                        stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
-                    }
-                    stringer.endObject();
-                }
-                stringer.endObject();
+                extraSnapshotData.writeToSnapshotDigest(stringer);
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);

@@ -140,7 +140,10 @@ label.error {
 	height: 10px;
 }
 
-.redC { color:#ff0000;}
+.redC, .redC a { color:#ff0000;}
+.left-space{padding-left:5px;}
+.cross-spacer{padding-left:13px;}
+.error-dialog-wrapper{max-height:350px; overflow-y:auto;}
 
 label.ccErrorMsg {
   line-height: 15px!important;
