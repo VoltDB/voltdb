@@ -244,7 +244,7 @@ releaseDir = "unknown"
 
 # get ssh config [key_filename, hostname]
 CentosSSHInfo = getSSHInfoForHost("volt5f")
-MacSSHInfo = getSSHInfoForHost("voltmini")
+MacSSHInfo = getSSHInfoForHost("voltmini2")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
