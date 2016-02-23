@@ -147,14 +147,6 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public LocalCluster(String jarFileName,
-            boolean forceVoltdbrootCreate,
-            BackendTarget target)
-    {
-        this(jarFileName, 1, 1, 0, 0, target,
-            FailureState.ALL_RUNNING, false, false, forceVoltdbrootCreate, null);
-    }
-
-    public LocalCluster(String jarFileName,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -186,7 +178,7 @@ public class LocalCluster implements VoltServerConfig {
             boolean isRejoinTest)
     {
         this(jarFileName, siteCount, hostCount, kfactor, clusterId, target,
-            FailureState.ALL_RUNNING, false, isRejoinTest, false, null);
+            FailureState.ALL_RUNNING, false, isRejoinTest, null);
     }
 
     public LocalCluster(String jarFileName,
@@ -211,7 +203,7 @@ public class LocalCluster implements VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env) {
         this(jarFileName, siteCount, hostCount, kfactor, 0, target,
-                failureState, debug, isRejoinTest, false, env);
+                failureState, debug, isRejoinTest, env);
     }
 
     public LocalCluster(String jarFileName,
@@ -223,7 +215,6 @@ public class LocalCluster implements VoltServerConfig {
                         FailureState failureState,
                         boolean debug,
                         boolean isRejoinTest,
-                        boolean forceVoltdbrootCreate,
                         Map<String, String> env)
     {
         assert (jarFileName != null);
@@ -325,7 +316,7 @@ public class LocalCluster implements VoltServerConfig {
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j).
-            force(forceVoltdbrootCreate);
+            isTest(true);
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
@@ -420,6 +411,14 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
+    }
+
+    public void setForce(boolean force) {
+        templateCmdLine.force(force);
+    }
+
+    public void setIsTest(boolean isTest) {
+        templateCmdLine.isTest(isTest);
     }
 
     public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {

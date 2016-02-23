@@ -352,7 +352,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void voltdbrootEmptyCheck(VoltDB.Configuration config, File voltDbRoot) {
-        if (voltDbRoot.exists() && voltDbRoot.list().length > 0) {
+        if (voltDbRoot.exists() && voltDbRoot.list().length > 0 && !config.m_isTest) {
             if (config.m_forceVoltdbrootCreate) {
                 try {
                     VoltFile.recursivelyDelete(voltDbRoot);

@@ -233,6 +233,9 @@ public class VoltDB {
 
         public boolean m_forceVoltdbrootCreate = false;
 
+        /** Allow starting voltdb with non-empty voltdbroot directory. */
+        public boolean m_isTest = false;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -483,6 +486,8 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbrootCreate = true;
+                else if (arg.equalsIgnoreCase("istest"))
+                    m_isTest = true;
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");

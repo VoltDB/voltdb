@@ -396,6 +396,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine isTest(boolean isTest)
+    {
+        m_isTest = isTest;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -618,6 +624,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_forceVoltdbrootCreate)
         {
             cmdline.add("force");
+        }
+
+        if (m_isTest)
+        {
+            cmdline.add("istest");
         }
 
         if (m_isEnterprise) {
