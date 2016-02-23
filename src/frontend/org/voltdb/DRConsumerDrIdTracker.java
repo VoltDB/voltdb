@@ -164,10 +164,7 @@ public class DRConsumerDrIdTracker {
         m_lastAckedDrId = newTruncationPoint;
     }
 
-    public void mergeTracker(DRConsumerDrIdTracker tracker) {
-        if (tracker.m_lastAckedDrId > m_lastAckedDrId) {
-            truncate(tracker.m_lastAckedDrId);
-        }
+    private void doMerge(DRConsumerDrIdTracker tracker) {
         for(Map.Entry<Long, Long> entry : tracker.m_map.entrySet()) {
             if (entry.getValue() <= m_lastAckedDrId) {
                 // skip entries before the truncation (ack) point
@@ -181,8 +178,44 @@ public class DRConsumerDrIdTracker {
                 put(entry.getKey(), entry.getValue());
             }
         }
+    }
+
+    public void mergeTracker(DRConsumerDrIdTracker tracker) {
+        if (tracker.m_lastAckedDrId > m_lastAckedDrId) {
+            truncate(tracker.m_lastAckedDrId);
+        }
+        doMerge(tracker);
         m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
+    }
+
+    /**
+     * This function does everything mergeTracker() do, it also moves the truncation (ack) point to
+     * the beginning of first gap and truncates to this point
+     * @param tracker
+     */
+    //
+    public void aggregateTracker(DRConsumerDrIdTracker tracker) {
+        doMerge(tracker);
+        if (m_map.firstEntry() != null) {
+            m_lastAckedDrId = m_map.firstEntry().getValue();
+        }
+        truncate(m_lastAckedDrId);
+        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
+        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
+    }
+
+    /**
+     * Check if this tracker contains a given DR id
+     * @param startDrId
+     * @return the entry if this tracker has an entry contains the given DR id, otherwise returns null
+     */
+    public Map.Entry<Long, Long> contains(Long startDrId) {
+        Map.Entry<Long, Long> prevEntry = m_map.floorEntry(startDrId);
+        if (prevEntry != null && startDrId >= prevEntry.getKey() && startDrId <= prevEntry.getValue()) {
+            return prevEntry;
+        }
+        return null;
     }
 
     public long getLastAckedDrId() {
