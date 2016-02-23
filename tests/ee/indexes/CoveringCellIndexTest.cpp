@@ -55,17 +55,25 @@ using std::chrono::microseconds;
 namespace voltdb {
 
 class CoveringCellIndexTest : public Test {
-private:
+protected:
+    // The tables used in this suite all have:
+    // - An integer primary key on the 0th field
+    // - A geography column in the 1st field
+    // - Optional VARBINARY(63) columns to take up space (to test compaction)
+    static const int PK_COL_INDEX = 0;
+    static const int GEOG_COL_INDEX = 1;
+    static const int FIRST_EXTRA_COL_INDEX = 2;
 
+private:
     // Create a tuple schema where the first two columns are
     //   INTEGER
     //   GEOGRAPHY(32767)
     // And the rest are VARBINARY(63)
     static TupleSchema* createTupleSchemaWithExtraCols(int numExtraCols) {
         TupleSchemaBuilder builder(2 + numExtraCols);
-        builder.setColumnAtIndex(0, VALUE_TYPE_INTEGER);
-        builder.setColumnAtIndex(1, VALUE_TYPE_GEOGRAPHY, 32767);
-        for (int i = 2; i < 2 + numExtraCols; ++i) {
+        builder.setColumnAtIndex(PK_COL_INDEX, VALUE_TYPE_INTEGER);
+        builder.setColumnAtIndex(GEOG_COL_INDEX, VALUE_TYPE_GEOGRAPHY, 32767);
+        for (int i = FIRST_EXTRA_COL_INDEX; i < 2 + numExtraCols; ++i) {
             builder.setColumnAtIndex(i, VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
         }
         return builder.build();
@@ -73,7 +81,7 @@ private:
 
     static TableIndex* createPrimaryKeyIndex(const TupleSchema* schema) {
         std::vector<int32_t> columnIndices;
-        columnIndices.push_back(0);
+        columnIndices.push_back(static_cast<int32_t>(PK_COL_INDEX));
         std::vector<AbstractExpression*> exprs;
         TableIndexScheme scheme("pk",
                                 BALANCED_TREE_INDEX,
@@ -90,7 +98,7 @@ private:
 
     static CoveringCellIndex* createGeospatialIndex(const TupleSchema* schema) {
         std::vector<int32_t> columnIndices;
-        columnIndices.push_back(1);
+        columnIndices.push_back(static_cast<int32_t>(GEOG_COL_INDEX));
         std::vector<AbstractExpression*> exprs;
 
         TableIndexScheme scheme("poly_idx",
@@ -108,8 +116,9 @@ private:
     }
 
 protected:
-    // Create a table with the schema described above.  Also add two
-    // indexes: one integer primary key and one geospatial.
+    // Create a table with the schema described above, where the
+    // caller may have specified a number of extra columns.  Also add
+    // two indexes: one integer primary key and one geospatial.
     static unique_ptr<PersistentTable> createTable(int numExtraCols = 0) {
         TupleSchema* schema = createTupleSchemaWithExtraCols(numExtraCols);
         char signature[20];
@@ -157,7 +166,7 @@ protected:
 #endif
 
         std::cout << "\n            Loading polygons...\n";
-        std::istringstream sstream(POLYGONS); // defined in polygons.hpp
+        std::istringstream instream(POLYGONS); // defined in polygons.hpp
 
         TableTuple tempTuple = table->tempTuple();
         auto start = std::chrono::high_resolution_clock::now();
@@ -165,9 +174,9 @@ protected:
 
         int pk = 0;
         std::string line;
-        while (std::getline(sstream, line)) {
-            tempTuple.setNValue(0, ValueFactory::getIntegerValue(pk));
-            tempTuple.setNValue(1, wktToNval(line));
+        while (std::getline(instream, line)) {
+            tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(pk));
+            tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval(line));
 
             start = std::chrono::high_resolution_clock::now();
             table->insertTuple(tempTuple);
@@ -183,8 +192,8 @@ protected:
         std::cout << "              Average duration of insert: " << (usSpentInserting.count() / pk) << " us\n";
 
         // Add a null value
-        tempTuple.setNValue(0, ValueFactory::getIntegerValue(pk));
-        tempTuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+        tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(pk));
+        tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
         table->insertTuple(tempTuple);
 
         // Dump some stats about the index.
@@ -209,14 +218,20 @@ protected:
         int numDeleted = 0;
 
         StandAloneTupleStorage tableTuple(table->schema());
-        tableTuple.tuple().setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+        tableTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
 
         auto start = std::chrono::high_resolution_clock::now();
         std::chrono::microseconds usSpentDeleting = std::chrono::duration_cast<microseconds>(start - start);
 
+        // Choose a random row, and delete it, and do this until we've
+        // deleted as many rows as the caller has requested.
+        // Sometimes the random number generator will select a
+        // previously deleted row, and we just try again when this
+        // happens.  This might seem like it would take a long time,
+        // but practically it happens instantaneously.
         while (numDeleted < numTuplesToDelete) {
             int idOfTupleToDelete = std::rand() % totalTuples;
-            tableTuple.tuple().setNValue(0, ValueFactory::getIntegerValue(idOfTupleToDelete));
+            tableTuple.tuple().setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(idOfTupleToDelete));
             TableTuple tupleToDelete = table->lookupTupleByValues(tableTuple.tuple());
             if (! tupleToDelete.isNullTuple()) {
                 start = std::chrono::high_resolution_clock::now();
@@ -252,11 +267,11 @@ protected:
         for (int i = 0; i < numScans; ++i) {
             // Pick a tuple at random.
             int pk = std::rand() % numTuples;
-            tempTuple.setNValue(0, ValueFactory::getIntegerValue(pk));
+            tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(pk));
             TableTuple sampleTuple = table->lookupTupleByValues(tempTuple);
             ASSERT_FALSE(sampleTuple.isNullTuple());
 
-            NValue geog = sampleTuple.getNValue(1);
+            NValue geog = sampleTuple.getNValue(GEOG_COL_INDEX);
             if (geog.isNull()) {
                 // There is one null row in the table.
                 continue;
@@ -302,7 +317,7 @@ protected:
                     if (polygonContains)
                         ++numContainingPolygons;
 
-                    int foundPk = ValuePeeker::peekAsInteger(foundTuple.getNValue(0));
+                    int foundPk = ValuePeeker::peekAsInteger(foundTuple.getNValue(PK_COL_INDEX));
                     if (foundPk == pk && polygonContains) {
                         foundSamplePoly = true;
                     }
@@ -355,20 +370,19 @@ protected:
         IndexCursor cursor(ccIndex->getTupleSchema());
 
         bool b = ccIndex->moveToCoveringCell(&searchKey, cursor);
-        if (expectedTuples.size() > 0) {
-            EXPECT_TRUE(b);
-        }
-        else {
+        if (expectedTuples.empty()) {
             EXPECT_FALSE(b);
             return;
         }
+
+        EXPECT_TRUE(b);
 
         std::set<int32_t> foundTuples;
         TableTuple foundTuple(table->schema());
         foundTuple = ccIndex->nextValueAtKey(cursor);
         while (! foundTuple.isNullTuple()) {
 
-            int pk = ValuePeeker::peekAsInteger(foundTuple.getNValue(0));
+            int pk = ValuePeeker::peekAsInteger(foundTuple.getNValue(PK_COL_INDEX));
             foundTuples.insert(pk);
 
             foundTuple = ccIndex->nextValueAtKey(cursor);
@@ -381,17 +395,15 @@ protected:
         }
     }
 
-    static NValue wktToNval(const std::string& wkt) {
-        NValue result;
+    static NValue polygonWktToNval(const std::string& wkt) {
         NValue input = ValueFactory::getTempStringValue(wkt);
-        try {
-            result = input.callUnary<FUNC_VOLT_POLYGONFROMTEXT>();
-        }
-        catch (const SQLException &exc) {
-            // It might be a point and not a polygon.
-            result = input.callUnary<FUNC_VOLT_POINTFROMTEXT>();
-        }
+        NValue result = input.callUnary<FUNC_VOLT_POLYGONFROMTEXT>();
+        return result;
+    }
 
+    static NValue pointWktToNval(const std::string& wkt) {
+        NValue input = ValueFactory::getTempStringValue(wkt);
+        NValue result = input.callUnary<FUNC_VOLT_POINTFROMTEXT>();
         return result;
     }
 
@@ -473,19 +485,19 @@ TEST_F(CoveringCellIndexTest, Simple) {
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
     TableTuple tempTuple = table->tempTuple();
 
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(0));
-    tempTuple.setNValue(1, wktToNval("polygon((0 0, 1 0, 0 1, 0 0))"));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
+    tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((0 0, 1 0, 0 1, 0 0))"));
     table->insertTuple(tempTuple);
 
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(1));
-    tempTuple.setNValue(1, wktToNval("polygon((10 10, 11 10, 10 11, 10 10))"));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(1));
+    tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((10 10, 11 10, 10 11, 10 10))"));
     table->insertTuple(tempTuple);
 
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(2));
-    tempTuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(2));
+    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
 
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(3));
-    tempTuple.setNValue(1, wktToNval("polygon((0 0, 5 0, 0 5, 0 0))"));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(3));
+    tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((0 0, 5 0, 0 5, 0 0))"));
     table->insertTuple(tempTuple);
 
     // This number is always 1440000, regardless of number of indexed
@@ -497,40 +509,40 @@ TEST_F(CoveringCellIndexTest, Simple) {
     ASSERT_EQ(ccIndex->getSize(), 3);
 
     StandAloneTupleStorage searchKey(ccIndex->getKeySchema());
-    searchKey.tuple().setNValue(0, wktToNval("point(0.01 0.01)"));
+    searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));
 
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0, 3});
 
-    searchKey.tuple().setNValue(0, wktToNval("point(-1 -1)"));
+    searchKey.tuple().setNValue(0, pointWktToNval("point(-1 -1)"));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
 
     // Now try to delete a tuple.
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(3));
-    tempTuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(3));
+    tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
     TableTuple foundTuple = table->lookupTupleByValues(tempTuple);
     ASSERT_FALSE(foundTuple.isNullTuple());
     ASSERT_TRUE(table->deleteTuple(foundTuple));
 
     // Verify deleted table is gone from index
-    searchKey.tuple().setNValue(0, wktToNval("point(0.01 0.01)"));
+    searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0});
 
-    tempTuple.setNValue(0, ValueFactory::getIntegerValue(0));
+    tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
     foundTuple = table->lookupTupleByValues(tempTuple);
     ASSERT_FALSE(foundTuple.isNullTuple());
 
-    tempTuple.setNValue(1, wktToNval("polygon((10 10, 11 10, 10 11, 10 10))"));
+    tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((10 10, 11 10, 10 11, 10 10))"));
     bool success = table->updateTupleWithSpecificIndexes(foundTuple,
                                                          tempTuple,
                                                          {ccIndex});
     ASSERT_TRUE(success);
 
     // Now tuple 0 should not contain this point.
-    searchKey.tuple().setNValue(0, wktToNval("point(0.01 0.01)"));
+    searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
 
     // But tuple 0 should contains this one.
-    searchKey.tuple().setNValue(0, wktToNval("point(10.01 10.01)"));
+    searchKey.tuple().setNValue(0, pointWktToNval("point(10.01 10.01)"));
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0, 1});
 
     // Searching for the null value should return nothing.
@@ -550,29 +562,29 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
     StandAloneTupleStorage oldTuple(table->schema());
     StandAloneTupleStorage newTuple(table->schema());
 
-    oldTuple.tuple().setNValue(0, ValueFactory::getIntegerValue(0));
-    newTuple.tuple().setNValue(0, ValueFactory::getIntegerValue(0));
+    oldTuple.tuple().setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
+    newTuple.tuple().setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(0));
 
-    oldTuple.tuple().setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
-    newTuple.tuple().setNValue(1, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    oldTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
+    newTuple.tuple().setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
 
     // Both tuples are null, so no index update necessary
     EXPECT_FALSE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
 
-    NValue geog1 = wktToNval("polygon((10 10, 11 10, 10 11, 10 10))");
-    newTuple.tuple().setNValue(1, geog1);
+    NValue geog1 = polygonWktToNval("polygon((10 10, 11 10, 10 11, 10 10))");
+    newTuple.tuple().setNValue(GEOG_COL_INDEX, geog1);
 
     // new tuple now non-null, index change is required.
     EXPECT_TRUE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
 
-    NValue geog2 = wktToNval("polygon((20 20, 21 20, 20 21, 20 20))");
-    oldTuple.tuple().setNValue(1, geog2);
+    NValue geog2 = polygonWktToNval("polygon((20 20, 21 20, 20 21, 20 20))");
+    oldTuple.tuple().setNValue(GEOG_COL_INDEX, geog2);
 
     // Old tuple now non-null, but is a different polygon.  Index change still required.
     EXPECT_TRUE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
 
-    NValue sameAsGeog1 = wktToNval("polygon((10 10, 11 10, 10 11, 10 10))");
-    oldTuple.tuple().setNValue(1, sameAsGeog1);
+    NValue sameAsGeog1 = polygonWktToNval("polygon((10 10, 11 10, 10 11, 10 10))");
+    oldTuple.tuple().setNValue(GEOG_COL_INDEX, sameAsGeog1);
 
     // Old tuple and new have the same polygon, but they are different instances.
     // We don't actually check to see if the polygons are the same (could be costly,
@@ -580,7 +592,7 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
     // Index change required.
     EXPECT_TRUE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
 
-    oldTuple.tuple().setNValue(1, geog1);
+    oldTuple.tuple().setNValue(GEOG_COL_INDEX, geog1);
 
     // old and new tuple now contain same instance of geography, no update required.
     EXPECT_FALSE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
