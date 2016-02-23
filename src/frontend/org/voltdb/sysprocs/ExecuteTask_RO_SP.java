@@ -52,14 +52,15 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
      * Use the base class implementation.
      *
      * @param ctx  execution context
+     * @param partitionParam  key for routing stored procedure to correct site
      * @param payload  serialized task-specific parameters
      * @return  results as VoltTable array
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] payload)
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] payload)
     {
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         int taskId = buffer.getInt();
-        TaskType taskType = TaskType.values()[taskId]; // Param(0)
+        TaskType taskType = TaskType.values()[taskId]; // Param(1) in payload
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
             ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[] { payload });
