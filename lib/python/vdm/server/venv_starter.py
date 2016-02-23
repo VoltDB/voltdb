@@ -166,7 +166,7 @@ def _build_virtual_environment(venv_dir, version, packages):
 
 def main(arr):
     python = 'python'
-    args = [python, os.path.join(G.base_dir, 'bin/vdm')]
+    args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
     if arr[0]['filepath'] is not None:
         args.append('-p' + str(arr[0]['filepath']))
     if arr[0]['server'] is not None:
@@ -286,7 +286,11 @@ def run_cmd(*args):
     for is_error, line in pipe_cmd(*args):
         if G.log_file:
             if is_error:
-                s = '[ERROR] %s\n' % line
+                if 'You are using pip version 6.1.1, however version 8.0.2 is available.' in line or \
+                                'You should consider upgrading via the \'pip install --upgrade pip\' command.' in line:
+                    s = '[WARNING] %s\n' % line
+                else:
+                    s = '[ERROR] %s\n' % line
                 G.log_file.write(s)
                 sys.stderr.write(s)
             else:
