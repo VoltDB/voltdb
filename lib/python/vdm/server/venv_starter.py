@@ -154,8 +154,8 @@ def _build_virtual_environment(venv_dir, version, packages):
         run_cmd(*args)
         if packages:
             for package in packages:
-                info('Installing virtual environment package: %s' % package)
-                run_cmd(pip, 'install', package)
+                # info('Installing virtual environment package: %s' % package)
+                run_cmd(pip, '--quiet', 'install', package)
     finally:
         os.chdir(save_dir)
         if save_lc_all is None:
