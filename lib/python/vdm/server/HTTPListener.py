@@ -2218,7 +2218,9 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_stopped = False
         has_run = False
-        if len(database) != 0:
+        if not database:
+            return make_response(jsonify({'error': 'Not found'}), 404)
+        else:
             if len(database[0]['members']) == 0:
                 return jsonify({'status':'errorNoMembers'})
             for server_id in database[0]['members']:
@@ -2251,8 +2253,6 @@ class StatusDatabaseAPI(MethodView):
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
             return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
-        else:
-            return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -2261,9 +2261,18 @@ class StatusDatabaseServerAPI(MethodView):
     @staticmethod
     def get(database_id, server_id):
         database = [database for database in Global.DATABASES if database['id'] == database_id]
-        if len(database) !=0:
+        if not database:
+            return make_response(jsonify({'error': 'Not found'}), 404)
+        else:
             server = [server for server in Global.SERVERS if server['id'] == server_id]
-            if len(server) != 0:
+            if len(database[0]['members']) == 0:
+                return jsonify({'error':'errorNoMembers'})
+
+            if not server:
+                return make_response(jsonify({'error': 'Not found'}), 404)
+            elif server_id not in database[0]['members']:
+                return make_response(jsonify({'error': 'Not found'}), 404)
+            else:
                 try:
                     client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
                     proc = voltdbclient.VoltProcedure(client, "@Ping")
@@ -2282,11 +2291,6 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stalled", "details": error})
                     else:
                         return jsonify({'status': "stopped", "details": error})
-
-            else:
-                return make_response(jsonify({'error': 'Not found'}), 404)
-        else:
-            return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 def main(runner, amodule, config_dir, server):
