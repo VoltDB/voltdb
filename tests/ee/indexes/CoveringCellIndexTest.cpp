@@ -55,15 +55,7 @@ using std::chrono::microseconds;
 namespace voltdb {
 
 class CoveringCellIndexTest : public Test {
-public:
-
-    static bool isMemcheck() {
-#ifdef MEMCHECK
-        return true;
-#else
-        return false;
-#endif
-    }
+private:
 
     // Create a tuple schema where the first two columns are
     //   INTEGER
@@ -77,39 +69,6 @@ public:
             builder.setColumnAtIndex(i, VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
         }
         return builder.build();
-    }
-
-    // Create a tuple schema where the first two columns are
-    //   INTEGER
-    //   GEOGRAPHY(32767)
-    static TupleSchema* createTupleSchema() {
-        return createTupleSchemaWithExtraCols(0);
-    }
-
-    // Create a table with the schema described above.  Also add two
-    // indexes: one integer primary key and one geospatial.
-    static unique_ptr<PersistentTable> createTable(TupleSchema* schema) {
-        char signature[20];
-        CatalogId databaseId = 1000;
-        std::vector<std::string> columnNames;
-        for (int i = 0; i < schema->columnCount(); ++i) {
-            std::ostringstream oss;
-            oss << "col_" << i;
-            columnNames.push_back(oss.str());
-        }
-        auto table = unique_ptr<PersistentTable>(
-                         static_cast<PersistentTable*>(TableFactory::getPersistentTable(databaseId,
-                                                                                        "test_table",
-                                                                                        schema,
-                                                                                        columnNames,
-                                                                                        signature)));
-        table->addIndex(createGeospatialIndex(table->schema()));
-
-        TableIndex* pkIndex = createPrimaryKeyIndex(table->schema());
-        table->addIndex(pkIndex);
-        table->setPrimaryKeyIndex(pkIndex);
-
-        return table;
     }
 
     static TableIndex* createPrimaryKeyIndex(const TupleSchema* schema) {
@@ -148,6 +107,34 @@ public:
         return static_cast<CoveringCellIndex*>(index);
     }
 
+protected:
+    // Create a table with the schema described above.  Also add two
+    // indexes: one integer primary key and one geospatial.
+    static unique_ptr<PersistentTable> createTable(int numExtraCols = 0) {
+        TupleSchema* schema = createTupleSchemaWithExtraCols(numExtraCols);
+        char signature[20];
+        CatalogId databaseId = 1000;
+        std::vector<std::string> columnNames;
+        for (int i = 0; i < schema->columnCount(); ++i) {
+            std::ostringstream oss;
+            oss << "col_" << i;
+            columnNames.push_back(oss.str());
+        }
+        auto table = unique_ptr<PersistentTable>(
+                         static_cast<PersistentTable*>(TableFactory::getPersistentTable(databaseId,
+                                                                                        "test_table",
+                                                                                        schema,
+                                                                                        columnNames,
+                                                                                        signature)));
+        table->addIndex(createGeospatialIndex(table->schema()));
+
+        TableIndex* pkIndex = createPrimaryKeyIndex(table->schema());
+        table->addIndex(pkIndex);
+        table->setPrimaryKeyIndex(pkIndex);
+
+        return table;
+    }
+
     // Load table from the polygons in the string POLYGONS, defined in
     // polygons.hpp.  Also print out some stats about how long it
     // took.
@@ -163,14 +150,14 @@ public:
     //
     // In memcheck mode, only loads 50 rows.
     void loadTable(PersistentTable* table) {
+#ifndef MEMCHECK
         int rowLimit = -1;
-        if (isMemcheck()) {
-            // memcheck slows things down a lot...
-            rowLimit = 50;
-        }
+#else
+        int rowLimit = 50;
+#endif
 
         std::cout << "\n            Loading polygons...\n";
-        std::istringstream infile(POLYGONS); // defined in polygons.hpp
+        std::istringstream sstream(POLYGONS); // defined in polygons.hpp
 
         TableTuple tempTuple = table->tempTuple();
         auto start = std::chrono::high_resolution_clock::now();
@@ -178,7 +165,7 @@ public:
 
         int pk = 0;
         std::string line;
-        while (std::getline(infile, line)) {
+        while (std::getline(sstream, line)) {
             tempTuple.setNValue(0, ValueFactory::getIntegerValue(pk));
             tempTuple.setNValue(1, wktToNval(line));
 
@@ -435,8 +422,8 @@ public:
 // Test table compaction, since this forces the index to be updated
 // when tuples move around.
 TEST_F(CoveringCellIndexTest, TableCompaction) {
-    // Create a table with some extra cols inline so it has more than one block.
-    unique_ptr<PersistentTable> table = createTable(createTupleSchemaWithExtraCols(120));
+    // Create a table with 120 extra cols inline so it has more than one block.
+    unique_ptr<PersistentTable> table = createTable(120);
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
 
     loadTable(table.get());
@@ -445,15 +432,14 @@ TEST_F(CoveringCellIndexTest, TableCompaction) {
     int numTuples = table->visibleTupleCount();
     deleteSomeRecords(table.get(), numTuples, numTuples * 0.99);
 
-    if (isMemcheck()) {
+#ifndef MEMCHECK
+    ASSERT_TRUE(table->doForcedCompaction());
+#else
         // This returns a boolean indicating if compaction was done.
         // MEMCHECK mode limits table blocks to one tuple for block, so
         // compaction won't occur.  Too bad.
         ASSERT_FALSE(table->doForcedCompaction());
-    }
-    else {
-        ASSERT_TRUE(table->doForcedCompaction());
-    }
+#endif
 
     std::string msg;
     ASSERT_TRUE_WITH_MESSAGE(ccIndex->checkValidityForTest(table.get(), &msg), msg.c_str());
@@ -463,7 +449,7 @@ TEST_F(CoveringCellIndexTest, TableCompaction) {
 
 // Test a larger workload of 1000 polygons.
 TEST_F(CoveringCellIndexTest, LargerWorkload) {
-    unique_ptr<PersistentTable> table = createTable(createTupleSchema());
+    unique_ptr<PersistentTable> table = createTable();
 
     loadTable(table.get());
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
@@ -483,7 +469,7 @@ TEST_F(CoveringCellIndexTest, LargerWorkload) {
 
 // Test basic insert, scan, update and delete operations.
 TEST_F(CoveringCellIndexTest, Simple) {
-    unique_ptr<PersistentTable> table = createTable(createTupleSchema());
+    unique_ptr<PersistentTable> table = createTable();
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
     TableTuple tempTuple = table->tempTuple();
 
@@ -558,7 +544,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
 
 // Test the checkForIndexChange method
 TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
-    unique_ptr<PersistentTable> table = createTable(createTupleSchema());
+    unique_ptr<PersistentTable> table = createTable();
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
 
     StandAloneTupleStorage oldTuple(table->schema());
@@ -622,7 +608,7 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
 
 // Verify that unsupported methods throw fatal exceptions
 TEST_F(CoveringCellIndexTest, UnsupportedMethods) {
-    unique_ptr<PersistentTable> table = createTable(createTupleSchema());
+    unique_ptr<PersistentTable> table = createTable();
     CoveringCellIndex* ccIndex = static_cast<CoveringCellIndex*>(table->index("poly_idx"));
     IndexCursor cursor(ccIndex->getTupleSchema());
 
