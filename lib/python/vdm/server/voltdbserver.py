@@ -87,6 +87,7 @@ def check_snapshot_folder(database_id):
     else:
         return True
 
+
 def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
@@ -500,6 +501,5 @@ class VoltDatabase:
                 return create_response('process not found', 200)
         except Exception, err:
             return create_response(str(err), 500)
-
 
 
