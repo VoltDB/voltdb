@@ -467,8 +467,7 @@ class ServerBundle(JavaBundle):
                                   #'specify an instance number for multiple servers on the same host'))
                                   None))
         if self.force_voltdbroot_create:
-            verb.add_options(cli.BooleanOption(None, '--force', 'force', 
-                                               'force the creation of a new voltdbroot directory'))
+            verb.add_options(cli.BooleanOption(None, '--force', 'force', None))
 
     def go(self, verb, runner):
         if self.check_environment_config:

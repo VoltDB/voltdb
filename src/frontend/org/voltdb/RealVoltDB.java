@@ -351,6 +351,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseInformation;
     }
 
+    private void voltdbrootEmptyCheck(VoltDB.Configuration config, File voltDbRoot) {
+        if (voltDbRoot.exists() && voltDbRoot.list().length > 0) {
+            if (config.m_forceVoltdbrootCreate) {
+                try {
+                    VoltFile.recursivelyDelete(voltDbRoot);
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Unable to delete the contents of voltdbroot.", false, e);
+                }
+            } else if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
+                VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + voltDbRoot.getAbsolutePath() +
+                                        ". Use the recover command to restore the previous database or use create --force " +
+                                        "to delete the directory and create a new database session.");
+            }
+        }
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -368,6 +384,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
+                    voltdbrootEmptyCheck(config, new VoltFile("voltdbroot"));
+
                     config.m_pathToDeployment = setupDefaultDeployment(hostLog);
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
@@ -479,26 +497,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             validateStartAction();
 
             Map<Integer, String> hostGroups = null;
+
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
 
-            PathsType paths = m_catalogContext.getDeployment().getPaths();
-            File voltDbRoot;
-            if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null)
-                voltDbRoot = new VoltFile("voltdbroot");
-            else
-                voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
-            if (voltDbRoot.exists() && voltDbRoot.list().length > 0) {
-                if (config.m_forceVoltdbrootCreate) {
-                    try {
-                        VoltFile.recursivelyDelete(voltDbRoot);
-                    } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Unable to delete the contents of voltdbroot.", false, e);
-                    }
-                } else if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
-                    VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + voltDbRoot.getAbsolutePath() +
-                                            ". Use the recover command to restore the previous database or use create --force " +
-                                            "to delete the directory and create a new database session.");
-                }
+            if (!config.m_deploymentDefault) {
+                PathsType paths = m_catalogContext.getDeployment().getPaths();
+                File voltDbRoot;
+                if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null)
+                    voltDbRoot = new VoltFile("voltdbroot");
+                else
+                    voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+                voltdbrootEmptyCheck(config, voltDbRoot);
             }
 
             if (!isRejoin && !m_joining) {
