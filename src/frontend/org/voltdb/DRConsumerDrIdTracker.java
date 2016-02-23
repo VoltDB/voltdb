@@ -185,6 +185,14 @@ public class DRConsumerDrIdTracker {
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
     }
 
+    public boolean contains(Long startDrId) {
+        Map.Entry<Long, Long> prevEntry = m_map.floorEntry(startDrId);
+        if (prevEntry != null && startDrId >= prevEntry.getKey() && startDrId <= prevEntry.getValue()) {
+            return true;
+        }
+        return false;
+    }
+
     public long getLastAckedDrId() {
         return m_lastAckedDrId;
     }
