@@ -2093,7 +2093,7 @@ class VdmConfiguration(MethodView):
         for member in result['voltdeploy']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://%s:%u/api/1.0/vdm/sync_configuration/' % (member['hostname'], __PORT__)
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
                 data = result
                 response = requests.post(url, data=json.dumps(data), headers=headers)
             except Exception, errs:
