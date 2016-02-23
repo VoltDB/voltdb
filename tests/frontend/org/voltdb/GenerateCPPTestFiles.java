@@ -161,7 +161,7 @@ public class GenerateCPPTestFiles {
         ByteBuffer invocationRequestFailCV = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
         readMessage(invocationRequestFailCV, sc);
         writeServerCallResponse(sc, getClientData(invocationRequestFailCV));
-        writeDataFile(clientDataDir, "invocation_request_failure_cv.msg", invocationRequestFailCV);
+        writeDataFile(clientDataDir, "invocation_request_fail_cv.msg", invocationRequestFailCV);
 
         ByteBuffer invocationRequestSelect = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
         readMessage(invocationRequestSelect, sc);
@@ -191,7 +191,7 @@ public class GenerateCPPTestFiles {
 
         voltsc.write(invocationRequestFailCV);
         readMessage(scratch, voltsc);
-        writeDataFile(clientDataDir, "invocation_response_failure_cv.msg", scratch);
+        writeDataFile(clientDataDir, "invocation_response_fail_cv.msg", scratch);
 
         voltsc.write(invocationRequestSelect);
         readMessage(scratch, voltsc);
