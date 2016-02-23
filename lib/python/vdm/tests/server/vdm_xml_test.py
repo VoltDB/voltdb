@@ -37,7 +37,7 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/vdm/'
+__url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/voltdeploy/'
 __db_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 __server_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 
