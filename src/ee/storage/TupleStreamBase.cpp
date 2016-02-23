@@ -24,6 +24,7 @@
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
+#include "storage/TupleStreamException.h"
 
 #include <cstdio>
 #include <limits>
@@ -295,7 +296,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
     if (blockSize == 0) {
-        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+        throw TupleStreamException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
     }
 
     char *buffer = new char[blockSize];

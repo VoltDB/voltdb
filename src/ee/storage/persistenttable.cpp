@@ -79,6 +79,7 @@
 #include "storage/PersistentTableUndoTruncateTableAction.h"
 #include "storage/PersistentTableUndoUpdateAction.h"
 #include "storage/ConstraintFailureException.h"
+#include "storage/TupleStreamException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/DRTupleStream.h"
@@ -442,9 +443,10 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 
     try {
         insertTupleCommon(source, target, fallible);
-    } catch (...) {
-        // Free the target if insertTupleCommon() throws for any reason. It is
-        // likely that the undo action is not registered.
+    } catch (ConstraintFailureException &e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    } catch (TupleStreamException &e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
