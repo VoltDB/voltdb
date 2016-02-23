@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,9 +45,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
@@ -374,11 +375,12 @@ public final class InvocationDispatcher {
                             task.clientHandle);
                 }
             }
+            final boolean useDdlSchema = catalogContext.cluster.getUseddlschema();
             if ("@UpdateApplicationCatalog".equals(task.procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user);
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
             }
             else if ("@UpdateClasses".equals(task.procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user);
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
             }
             else if ("@SnapshotSave".equals(task.procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
@@ -401,9 +403,12 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
             }
             else if ("@SnapshotRestore".equals(task.procName)) {
-                ClientResponseImpl errorResponse = dispatchSnapshotRestore(task, handler, ccxn, user);
-                if (errorResponse != null) {
-                    return errorResponse;
+                ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
+                if (retval != null) {
+                    return retval;
+                }
+                if (isSchemaEmpty()) {
+                    return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user);
                 }
             }
         }
@@ -445,6 +450,10 @@ public final class InvocationDispatcher {
         }
 
         return null;
+    }
+
+    private final boolean isSchemaEmpty() {
+        return m_catalogContext.get().database.getTables().size() == 0;
     }
 
     public final static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -862,7 +871,8 @@ public final class InvocationDispatcher {
     }
 
     private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user)
+            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
+            boolean useDdlSchema)
     {
         ParameterSet params = task.getParams();
         final Object [] paramArray = params.toArray();
@@ -893,7 +903,7 @@ public final class InvocationDispatcher {
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
-                    VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
+                    useDdlSchema,
                     m_adhocCompletionHandler, user));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -926,77 +936,91 @@ public final class InvocationDispatcher {
         return null;
     }
 
-    private final ClientResponseImpl dispatchSnapshotRestore(
+    private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
             AuthUser user
             )
-
     {
-        ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
-        if (retval != null) {
-            return retval;
-        }
         CatalogContext catalogContext = m_catalogContext.get();
-        if (catalogContext.database.getTables().size() == 0) {
-            if (!catalogContext.cluster.getUseddlschema()) {
-                return gracefulFailureResponse(
-                        "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
+        if (!catalogContext.cluster.getUseddlschema()) {
+            return gracefulFailureResponse(
+                    "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
+                    task.clientHandle);
+        }
+        log.info("No schema found. Restoring schema and procedures from snapshot.");
+        try {
+            JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
+            final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
+            final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+            final File catalogFH = new File(path, nonce + ".jar");
+
+            final byte[] catalog;
+            try {
+                catalog = MiscUtils.fileToBytes(catalogFH);
+            } catch (IOException e) {
+                log.warn("Unable to access catalog file " + catalogFH, e);
+                return unexpectedFailureResponse(
+                        "Unable to access catalog file " + catalogFH,
                         task.clientHandle);
             }
-            log.info("No schema found. Restoring schema and procedures from snapshot.");
-            try {
-                JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-                final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
-                final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-                final File catalogFH = new File(path, nonce + ".jar");
+            final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
 
-                final byte[] catalog;
-                try {
-                    catalog = MiscUtils.fileToBytes(catalogFH);
-                } catch (IOException e) {
-                    log.warn("Unable to access catalog file " + catalogFH, e);
-                    return unexpectedFailureResponse(
-                            "Unable to access catalog file " + catalogFH,
-                            task.clientHandle);
+            final StoredProcedureInvocation catalogUpdateTask = new StoredProcedureInvocation();
+
+            catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
+            catalogUpdateTask.setParams(catalog,dep);
+
+            final long catalogUpdateConnectionId = VoltProtocolHandler.getNextConnectionId();
+            SimpleClientResponseAdapter catalogUpdateAdapter = new SimpleClientResponseAdapter(
+                    catalogUpdateConnectionId, "Empty database restore catalog update"
+                    );
+            InvocationClientHandler catalogUpdateHandler = new InvocationClientHandler() {
+                @Override
+                public boolean isAdmin() {
+                    return handler.isAdmin();
                 }
-                final String dep = new String(catalogContext.getDeploymentBytes(), StandardCharsets.UTF_8);
+                @Override
+                public long connectionId() {
+                    return catalogUpdateConnectionId;
+                }
+            };
 
-                StoredProcedureInvocation catalogUpdateTask = new StoredProcedureInvocation();
-                catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
-                catalogUpdateTask.setParams(catalog,dep);
-
-                Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>> p =
-                        SimpleClientResponseAdapter.getAsListenableFuture();
-
-                final ListenableFuture<ClientResponseImpl> fut = p.getSecond();
-                fut.addListener(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        try {
-                            ClientResponseImpl r = fut.get();
-                            if (r.getStatus() != ClientResponse.SUCCESS) {
-                                hostLog.warn("Received error response for updating catalog " + r.getStatusString());
-                                return;
-                            }
-                            m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                            dispatch(task, handler, ccxn, user);
-                        } catch (Throwable t) {
-                            hostLog.error("Error updating catalog", Throwables.getRootCause(t));
-                        }
+            SimpleClientResponseAdapter.SyncCallback catalogUpdateCallback =
+                    new SimpleClientResponseAdapter.SyncCallback();
+            final ListenableFuture<ClientResponse> fut = catalogUpdateCallback.getResponseFuture();
+            fut.addListener(new Runnable() {
+                @Override
+                public void run() {
+                    ClientResponse r;
+                    try {
+                        r = fut.get();
+                    } catch (ExecutionException|InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                        return;
                     }
+                    if (r.getStatus() != ClientResponse.SUCCESS) {
+                        log.error("Received error response for updating catalog " + r.getStatusString());
+                        return;
+                    }
+                    dispatch(task, handler, ccxn, user);
+                }
 
-                }, CoreUtils.SAMETHREADEXECUTOR);
+            },
+            VoltDB.instance().getSES(true));
+            long catalogUpdateHandle = catalogUpdateAdapter.registerCallback(catalogUpdateCallback);
 
-                dispatchUpdateApplicationCatalog(catalogUpdateTask, handler, p.getFirst(), user);
-            } catch (JSONException e) {
-                return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
-            }
+            VoltDB.instance().getClientInterface().bindAdapter(catalogUpdateAdapter, null);
 
+            catalogUpdateTask.setClientHandle(catalogUpdateHandle);
+            dispatchUpdateApplicationCatalog(catalogUpdateTask, catalogUpdateHandler, catalogUpdateAdapter, user, false);
+
+        } catch (JSONException e) {
+            return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
         }
         return null;
     }
+
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks

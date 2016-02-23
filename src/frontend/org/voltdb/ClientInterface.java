@@ -748,12 +748,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public long connectionId()
-        {
-            return m_connection.connectionId();
-        }
-
-        @Override
         public int getMaxRead() {
             if (m_hasDTXNBackPressure) {
                 return 0;
@@ -1325,24 +1319,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
-    ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
-    {
-        try {
-            OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
-            if (agent != null) {
-                agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
-            }
-            else {
-                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                        "Unknown OPS selector", null, true);
-            }
-
-            return null;
-        } catch (Exception e) {
-            return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-        }
-    }
-
     /**
      *
      * @param port
@@ -1518,7 +1494,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);
         spi.setClientHandle(ASYNC_TOPO_HANDLE);
-        dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
+        InvocationDispatcher.dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
     }
 
     private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 30000);
@@ -1633,11 +1609,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.clientHandle = clientData;
         // Ugh, need to consolidate this with handleRead() somehow but not feeling it at the moment
         if (procedureName.equals("@SnapshotScan")) {
-            dispatchStatistics(OpsSelector.SNAPSHOTSCAN, spi, m_snapshotDaemonAdapter);
+            InvocationDispatcher.dispatchStatistics(OpsSelector.SNAPSHOTSCAN, spi, m_snapshotDaemonAdapter);
             return;
         }
         else if (procedureName.equals("@SnapshotDelete")) {
-            dispatchStatistics(OpsSelector.SNAPSHOTDELETE, spi, m_snapshotDaemonAdapter);
+            InvocationDispatcher.dispatchStatistics(OpsSelector.SNAPSHOTDELETE, spi, m_snapshotDaemonAdapter);
             return;
         }
         // initiate the transaction
