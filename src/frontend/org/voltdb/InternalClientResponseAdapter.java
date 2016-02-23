@@ -55,8 +55,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION =
             Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
-    private final static int GUARD_MASK = 15; // power of 2 minus 1 i.e. 16 - 1
-
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
         public String getProcedureName();
@@ -67,8 +65,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
-
-    private final Object [] m_guards = new Object[GUARD_MASK+1];
 
     private final ConcurrentMap<Long, InternalCallback> m_callbacks = new NonBlockingHashMap<>();
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
@@ -229,13 +225,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
      */
     public InternalClientResponseAdapter(long connectionId) {
         m_connectionId = connectionId;
-        for (int i = 0; i < m_guards.length; ++i) {
-            m_guards[i] = new Object();
-        }
-    }
-
-    private final Object guard(Object o) {
-        return m_guards[System.identityHashCode(o) & GUARD_MASK];
     }
 
     public long nextHandle() {
@@ -257,7 +246,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public void enqueue(DeferredSerialization ds) {
         try {
             ByteBuffer buf = null;
-            synchronized (guard(ds)) {
+            synchronized (this) {
                 final int serializedSize = ds.getSerializedSize();
                 if (serializedSize <= 0) {
                     //Bad ignored transacton.

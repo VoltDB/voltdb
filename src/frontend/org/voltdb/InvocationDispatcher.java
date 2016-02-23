@@ -1000,19 +1000,24 @@ public final class InvocationDispatcher {
                         return;
                     }
                     if (r.getStatus() != ClientResponse.SUCCESS) {
+                        ClientResponseImpl error = ClientResponseImpl.class.cast(r);
+                        error.setClientHandle(task.clientHandle);
+                        ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                        buf.putInt(buf.capacity() - 4);
+                        error.flattenToBuffer(buf).flip();
+                        ccxn.writeStream().enqueue(buf);
+
                         log.error("Received error response for updating catalog " + r.getStatusString());
                         return;
                     }
                     dispatch(task, handler, ccxn, user);
                 }
-
             },
-            VoltDB.instance().getSES(true));
-            long catalogUpdateHandle = catalogUpdateAdapter.registerCallback(catalogUpdateCallback);
+            CoreUtils.SAMETHREADEXECUTOR);
+            catalogUpdateTask.setClientHandle(catalogUpdateAdapter.registerCallback(catalogUpdateCallback));
 
             VoltDB.instance().getClientInterface().bindAdapter(catalogUpdateAdapter, null);
 
-            catalogUpdateTask.setClientHandle(catalogUpdateHandle);
             dispatchUpdateApplicationCatalog(catalogUpdateTask, catalogUpdateHandler, catalogUpdateAdapter, user, false);
 
         } catch (JSONException e) {
