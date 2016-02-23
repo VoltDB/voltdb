@@ -77,11 +77,16 @@ static void getCovering(const Polygon &poly, std::vector<S2CellId> *coveringCell
 
 static CoveringCellIndex::CellKeyType setKeyFromCellId(uint64_t cellId, const TableTuple* tuple) {
     CoveringCellIndex::CellKeyType key;
+    // these two ints cannot be const since callee is expecting a
+    // non-const ref.  Typical use is to call this in a loop for
+    // multi-component indexes.
     int keyOffset = 0;
     int intraKeyOffset = static_cast<int>(sizeof(uint64_t) - 1);
     key.insertKeyValue<uint64_t>(keyOffset, intraKeyOffset, cellId);
-    if (tuple != NULL)
+    if (tuple != NULL) {
         key.setValue(tuple->address());
+    }
+
     return key;
 }
 
@@ -114,11 +119,11 @@ static void* extractTupleAddress(const CoveringCellIndex::TupleKeyType &key) {
 }
 
 
-static CoveringCellIndex::CellMapIterator& castToIter(IndexCursor& cursor) {
+static CoveringCellIndex::CellMapIterator& getIterFromCursor(IndexCursor& cursor) {
     return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&(cursor.m_keyIter[0]));
 }
 
-static CoveringCellIndex::CellMapIterator& castToEndIter(IndexCursor& cursor) {
+static CoveringCellIndex::CellMapIterator& getEndIterFromCursor(IndexCursor& cursor) {
     return *reinterpret_cast<CoveringCellIndex::CellMapIterator*>(&(cursor.m_keyEndIter[0]));
 }
 
@@ -187,8 +192,8 @@ bool CoveringCellIndex::moveToCoveringCell(const TableTuple* searchKey,
 
         CellMapRange iterPair = m_cellEntries.equalRange(setKeyFromCellId(cell.id()));
 
-        CellMapIterator &mapIter = castToIter(cursor);
-        CellMapIterator &mapEndIter = castToEndIter(cursor);
+        CellMapIterator &mapIter = getIterFromCursor(cursor);
+        CellMapIterator &mapEndIter = getEndIterFromCursor(cursor);
 
         mapIter = iterPair.first;
         mapEndIter = iterPair.second;
@@ -214,8 +219,8 @@ TableTuple CoveringCellIndex::nextValueAtKey(IndexCursor& cursor) const
 
     TableTuple retval = cursor.m_match;
 
-    CellMapIterator &mapIter = castToIter(cursor);
-    CellMapIterator &mapEndIter = castToEndIter(cursor);
+    CellMapIterator &mapIter = getIterFromCursor(cursor);
+    CellMapIterator &mapEndIter = getEndIterFromCursor(cursor);
 
     S2CellId cell = S2CellId(extractCellId(mapIter.key()));
 

@@ -55,6 +55,29 @@ using std::chrono::microseconds;
 namespace voltdb {
 
 class CoveringCellIndexTest : public Test {
+public:
+
+    CoveringCellIndexTest() {
+        std::srand(888);
+        assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
+
+        m_testPool.reset(new voltdb::Pool());
+        voltdb::UndoQuantum* wantNoQuantum = NULL;
+        voltdb::Topend* topless = NULL;
+        m_executorContext.reset(new voltdb::ExecutorContext(0,                // siteId
+                                                            0,                // partitionId
+                                                            wantNoQuantum,    // undoQuantum
+                                                            topless,          // topend
+                                                            m_testPool.get(), // tempStringPool
+                                                            NULL,             // params
+                                                            NULL,             // engine
+                                                            "",               // hostname
+                                                            0,                // hostId
+                                                            NULL,             // drTupleStream
+                                                            NULL,             // drReplicatedStream
+                                                            0));              // drClusterId
+    }
+
 protected:
     // The tables used in this suite all have:
     // - An integer primary key on the 0th field
@@ -64,58 +87,6 @@ protected:
     static const int GEOG_COL_INDEX = 1;
     static const int FIRST_EXTRA_COL_INDEX = 2;
 
-private:
-    // Create a tuple schema where the first two columns are
-    //   INTEGER
-    //   GEOGRAPHY(32767)
-    // And the rest are VARBINARY(63)
-    static TupleSchema* createTupleSchemaWithExtraCols(int numExtraCols) {
-        TupleSchemaBuilder builder(2 + numExtraCols);
-        builder.setColumnAtIndex(PK_COL_INDEX, VALUE_TYPE_INTEGER);
-        builder.setColumnAtIndex(GEOG_COL_INDEX, VALUE_TYPE_GEOGRAPHY, 32767);
-        for (int i = FIRST_EXTRA_COL_INDEX; i < 2 + numExtraCols; ++i) {
-            builder.setColumnAtIndex(i, VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
-        }
-        return builder.build();
-    }
-
-    static TableIndex* createPrimaryKeyIndex(const TupleSchema* schema) {
-        std::vector<int32_t> columnIndices;
-        columnIndices.push_back(static_cast<int32_t>(PK_COL_INDEX));
-        std::vector<AbstractExpression*> exprs;
-        TableIndexScheme scheme("pk",
-                                BALANCED_TREE_INDEX,
-                                columnIndices,
-                                exprs,
-                                NULL,  // predicate
-                                true, // unique
-                                false, // countable
-                                "",    // expression as text
-                                "",    // predicate as text
-                                schema);
-        return TableIndexFactory::getInstance(scheme);
-    }
-
-    static CoveringCellIndex* createGeospatialIndex(const TupleSchema* schema) {
-        std::vector<int32_t> columnIndices;
-        columnIndices.push_back(static_cast<int32_t>(GEOG_COL_INDEX));
-        std::vector<AbstractExpression*> exprs;
-
-        TableIndexScheme scheme("poly_idx",
-                                COVERING_CELL_INDEX,
-                                columnIndices,
-                                exprs,
-                                NULL,  // predicate
-                                false, // unique
-                                false, // countable
-                                "",    // expression as text
-                                "",    // predicate as text
-                                schema);
-        TableIndex* index = TableIndexFactory::getInstance(scheme);
-        return static_cast<CoveringCellIndex*>(index);
-    }
-
-protected:
     // Create a table with the schema described above, where the
     // caller may have specified a number of extra columns.  Also add
     // two indexes: one integer primary key and one geospatial.
@@ -429,6 +400,60 @@ protected:
 
         return "NULL";
     }
+
+private:
+    // Create a tuple schema where the first two columns are
+    //   INTEGER
+    //   GEOGRAPHY(32767)
+    // And the rest are VARBINARY(63)
+    static TupleSchema* createTupleSchemaWithExtraCols(int numExtraCols) {
+        TupleSchemaBuilder builder(2 + numExtraCols);
+        builder.setColumnAtIndex(PK_COL_INDEX, VALUE_TYPE_INTEGER);
+        builder.setColumnAtIndex(GEOG_COL_INDEX, VALUE_TYPE_GEOGRAPHY, 32767);
+        for (int i = FIRST_EXTRA_COL_INDEX; i < 2 + numExtraCols; ++i) {
+            builder.setColumnAtIndex(i, VALUE_TYPE_VARBINARY, UNINLINEABLE_OBJECT_LENGTH - 1);
+        }
+        return builder.build();
+    }
+
+    static TableIndex* createPrimaryKeyIndex(const TupleSchema* schema) {
+        std::vector<int32_t> columnIndices;
+        columnIndices.push_back(static_cast<int32_t>(PK_COL_INDEX));
+        std::vector<AbstractExpression*> exprs;
+        TableIndexScheme scheme("pk",
+                                BALANCED_TREE_INDEX,
+                                columnIndices,
+                                exprs,
+                                NULL,  // predicate
+                                true, // unique
+                                false, // countable
+                                "",    // expression as text
+                                "",    // predicate as text
+                                schema);
+        return TableIndexFactory::getInstance(scheme);
+    }
+
+    static CoveringCellIndex* createGeospatialIndex(const TupleSchema* schema) {
+        std::vector<int32_t> columnIndices;
+        columnIndices.push_back(static_cast<int32_t>(GEOG_COL_INDEX));
+        std::vector<AbstractExpression*> exprs;
+
+        TableIndexScheme scheme("poly_idx",
+                                COVERING_CELL_INDEX,
+                                columnIndices,
+                                exprs,
+                                NULL,  // predicate
+                                false, // unique
+                                false, // countable
+                                "",    // expression as text
+                                "",    // predicate as text
+                                schema);
+        TableIndex* index = TableIndexFactory::getInstance(scheme);
+        return static_cast<CoveringCellIndex*>(index);
+    }
+
+    boost::scoped_ptr<voltdb::Pool> m_testPool;
+    boost::scoped_ptr<voltdb::ExecutorContext> m_executorContext;
 };
 
 // Test table compaction, since this forces the index to be updated
@@ -598,26 +623,6 @@ TEST_F(CoveringCellIndexTest, CheckForIndexChange) {
     EXPECT_FALSE(ccIndex->checkForIndexChange(&oldTuple.tuple(), &newTuple.tuple()));
 }
 
-// This ought to go into harness.h, but I experienced compile failures
-// (on OS X) when I tried to put it there.  Something about a .h file
-// containing C++ code.
-#define ASSERT_FATAL_EXCEPTION(msgFragment, expr)                       \
-    do {                                                                \
-        try {                                                           \
-            expr;                                                       \
-            fail(__FILE__, __LINE__,                                    \
-                 "expected FatalException that did not occur");         \
-        }                                                               \
-        catch (FatalException& exc) {                                   \
-            std::ostringstream oss;                                     \
-            oss << "did not find \""                                    \
-                << (msgFragment) << "\" in \""                          \
-                << exc.m_reason << "\"";                                \
-            ASSERT_TRUE_WITH_MESSAGE(exc.m_reason.find(msgFragment) != std::string::npos, \
-                                     oss.str().c_str());                \
-        }                                                               \
-    } while(false)
-
 // Verify that unsupported methods throw fatal exceptions
 TEST_F(CoveringCellIndexTest, UnsupportedMethods) {
     unique_ptr<PersistentTable> table = createTable();
@@ -659,26 +664,5 @@ TEST_F(CoveringCellIndexTest, GenerateCellLevelInfo) {
 
 int main()
 {
-    std::srand(888);
-
-    assert (voltdb::ExecutorContext::getExecutorContext() == NULL);
-
-    boost::scoped_ptr<voltdb::Pool> testPool(new voltdb::Pool());
-    voltdb::UndoQuantum* wantNoQuantum = NULL;
-    voltdb::Topend* topless = NULL;
-    boost::scoped_ptr<voltdb::ExecutorContext>
-        executorContext(new voltdb::ExecutorContext(0,              // siteId
-                                                    0,              // partitionId
-                                                    wantNoQuantum,  // undoQuantum
-                                                    topless,        // topend
-                                                    testPool.get(), // tempStringPool
-                                                    NULL,           // params
-                                                    NULL,           // engine
-                                                    "",             // hostname
-                                                    0,              // hostId
-                                                    NULL,           // drTupleStream
-                                                    NULL,           // drReplicatedStream
-                                                    0));            // drClusterId
-
     return TestSuite::globalInstance()->runAll();
 }
