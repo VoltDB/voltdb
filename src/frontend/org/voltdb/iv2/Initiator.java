@@ -25,6 +25,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.StartAction;
@@ -48,6 +49,7 @@ public interface Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway nodeDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
@@ -72,4 +74,7 @@ public interface Initiator
 
     /** Assign a listener to the spScheduler for notification of CommandLogged (durable) UniqueIds */
     public void setDurableUniqueIdListener(DurableUniqueIdListener listener);
+
+    /** Hook a new ConsumerDRGateway into Initiator promotion */
+    public void setConsumerDRGateway(ConsumerDRGateway gateway);
 }
