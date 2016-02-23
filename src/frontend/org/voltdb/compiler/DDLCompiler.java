@@ -276,10 +276,16 @@ public class DDLCompiler {
                     if (thisStmtDiff != null) {
                         applyDiff(thisStmtDiff);
                     }
+
+                    // special treatment for stream syntax
+                    if (ddlStmtInfo.creatStream) {
+                       processCreateStreamStatement(stmt, db, whichProcs);
+                    }
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
                 }
+
             }
             stmt = getNextStatement(reader, m_compiler);
         }
@@ -340,6 +346,17 @@ public class DDLCompiler {
             if (element.name.equals("table")
                     && element.attributes.containsKey("export")
                     && element.attributes.get("name").equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRegularTable(VoltXMLElement m_schema, String name) {
+        for (VoltXMLElement element : m_schema.children) {
+            if (element.name.equals("table")
+                    && (!element.attributes.containsKey("export"))
+                    && element.attributes.get("name").equalsIgnoreCase(name)) {
                 return true;
             }
         }
@@ -905,6 +922,22 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is DROP STREAM
+        // group 1 is stream name
+        // guard against drop regular table
+        statementMatcher = SQLParser.matchDropStream(statement);
+        if (statementMatcher.matches()) {
+            String streamName = checkIdentifierStart(statementMatcher.group(1), statement);
+
+            if (isRegularTable(m_schema, streamName)) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid DROP STREAM statement: table %s is not a stream.",
+                        streamName));
+            }
+
+            return false;
+        }
+
         // matches if it is EXPORT TABLE
         statementMatcher = SQLParser.matchExportTable(statement);
         if (statementMatcher.matches()) {
@@ -1060,6 +1093,93 @@ public class DDLCompiler {
 
         // Not a VoltDB-specific DDL statement.
         return false;
+    }
+
+    /**
+     * Process a VoltDB-specific create stream DDL statement
+     *
+     * @param stmt
+     *            DDL statement string
+     * @param db
+     * @param whichProcs
+     * @throws VoltCompilerException
+     */
+    private void processCreateStreamStatement(DDLStatement stmt, Database db, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
+        String statement = stmt.statement;
+        Matcher statementMatcher = SQLParser.matchCreateStream(statement);
+        if (statementMatcher.matches()) {
+            // check the table portion
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            String targetName = null;
+            String columnName = null;
+
+            // Parse the EXPORT and PARTITION clauses.
+            if ((statementMatcher.groupCount() > 1) &&
+                (statementMatcher.group(2) != null) &&
+                (!statementMatcher.group(2).isEmpty())) {
+                String clauses = statementMatcher.group(2);
+                Matcher matcher = SQLParser.matchAnyCreateStreamStatementClause(clauses);
+                int start = 0;
+                while ( matcher.find(start)) {
+                    start = matcher.end();
+
+                    if (matcher.group(1) != null) {
+                        // Add target info if it's an Export clause. Only one is allowed
+                        if (targetName != null) {
+                            throw m_compiler.new VoltCompilerException(
+                                "Only one Export clause is allowed for CREATE STREAM.");
+                        }
+                        targetName = matcher.group(1);
+                    }
+                    else {
+                        // Add partition info if it's a PARTITION clause. Only one is allowed.
+                        if (columnName != null) {
+                            throw m_compiler.new VoltCompilerException(
+                                "Only one PARTITION clause is allowed for CREATE STREAM.");
+                        }
+                        columnName = matcher.group(2);
+                    }
+                }
+            }
+
+            // process partition if specified
+            if (columnName != null) {
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML != null) {
+                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                    // Column validity check done by VoltCompiler in post-processing
+
+                    // mark the table as dirty for the purposes of caching sql statements
+                    m_compiler.markTableAsDirty(tableName);
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid PARTITION statement: table %s does not exist", tableName));
+                }
+            }
+
+            // process export
+            targetName = (targetName != null) ? checkIdentifierStart(
+                    targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
+
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
+                } else {
+                    tableXML.attributes.put("export", targetName);
+                }
+            } else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid EXPORT statement: table %s was not present in the catalog.", tableName));
+            }
+        } else {
+            throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
+                    + "expected syntax: CREATE STREAM <table> [PARTITION ON COLUMN <column-name>] [EXPORT TO TARGET <target>] (column datatype, ...); ",
+                    statement.substring(0, statement.length() - 1)));
+        }
     }
 
     private class CreateProcedurePartitionData {
@@ -2341,7 +2461,6 @@ public class DDLCompiler {
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
             boolean hasAggregationExprs = false;
-            boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                 ParsedColInfo col = stmt.m_displayColumns.get(i);
@@ -2352,10 +2471,8 @@ public class DDLCompiler {
                 aggregationExprs.add(aggExpr);
                 if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
                         col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
-                    hasMinOrMaxAgg = true;
                     minMaxAggs.add(aggExpr);
-                }
-            }
+                }            }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
@@ -2374,23 +2491,14 @@ public class DDLCompiler {
                 matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
             }
 
-            if (hasMinOrMaxAgg) {
-                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                boolean needsWarning = false;
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
-                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
-                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
-                    if (found != null) {
-                        refFound.setName(found.getTypeName());
-                    } else {
-                        refFound.setName("");
-                        needsWarning = true;
-                    }
-                }
-                if (needsWarning) {
-                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
-                            matviewinfo.getTypeName() +
-                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+            // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+            for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                if (found != null) {
+                    refFound.setName(found.getTypeName());
+                } else {
+                    refFound.setName("");
                 }
             }
 
@@ -2410,6 +2518,87 @@ public class DDLCompiler {
                 // Correctly set the type of the column so that it's consistent.
                 // Otherwise HSQLDB might promote types differently than Volt.
                 destColumn.setType(col.expression.getValueType().getValue());
+            }
+        }
+    }
+
+    /**
+     * Process materialized view warnings.
+     */
+    public void processMaterializedViewWarnings(Database db) throws VoltCompilerException {
+        HashSet <String> viewTableNames = new HashSet<>();
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
+            viewTableNames.add(entry.getKey().getTypeName());
+        }
+
+
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
+            Table destTable = entry.getKey();
+            String query = entry.getValue();
+
+            // get the xml for the query
+            VoltXMLElement xmlquery = null;
+            try {
+                xmlquery = m_hsql.getXMLCompiledStatement(query);
+            }
+            catch (HSQLParseException e) {
+                e.printStackTrace();
+            }
+            assert(xmlquery != null);
+
+            // parse the xml like any other sql statement
+            ParsedSelectStmt stmt = null;
+            try {
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
+            }
+            catch (Exception e) {
+                throw m_compiler.new VoltCompilerException(e.getMessage());
+            }
+            assert(stmt != null);
+
+            String viewName = destTable.getTypeName();
+            // create the materializedviewinfo catalog node for the source table
+            Table srcTable = stmt.m_tableList.get(0);
+            //export table does not need agg min and max warning.
+            if (CatalogUtil.isTableExportOnly(db, srcTable)) continue;
+
+            MaterializedViewInfo matviewinfo = srcTable.getViews().get(viewName);
+
+            boolean hasMinOrMaxAgg = false;
+            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
+                AbstractExpression aggExpr = col.expression.getLeft();
+                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
+                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
+                    hasMinOrMaxAgg = true;
+                    minMaxAggs.add(aggExpr);
+                }
+            }
+
+            if (hasMinOrMaxAgg) {
+                List<AbstractExpression> groupbyExprs = null;
+
+                if (stmt.hasComplexGroupby()) {
+                    groupbyExprs = new ArrayList<AbstractExpression>();
+                    for (ParsedColInfo col: stmt.m_groupByColumns) {
+                        groupbyExprs.add(col.expression);
+                    }
+                }
+
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    if (found == null) {
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
+                            matviewinfo.getTypeName() +
+                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                }
             }
         }
     }

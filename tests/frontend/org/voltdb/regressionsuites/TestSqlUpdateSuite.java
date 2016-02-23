@@ -201,6 +201,13 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         executeAndTestUpdate("STRINGPART", update, 1);
     }
 
+    public void testInvalidUpdate() throws Exception
+    {
+        Client client = getClient();
+        verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
+                "Illegal to modify a materialized view.");
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

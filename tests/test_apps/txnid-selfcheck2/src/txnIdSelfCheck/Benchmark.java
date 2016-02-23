@@ -23,6 +23,9 @@
 
 package txnIdSelfCheck;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,9 +44,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -176,6 +176,9 @@ public class Benchmark {
         String disabledthreads = "none";
         ArrayList<String> disabledThreads = null;
 
+        // @Option(desc = "Add views from persistent and exported tables to the activity mix. ")
+        // boolean useviews = true;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -193,6 +196,7 @@ public class Benchmark {
             if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
             if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
             if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
+            // if (useviews != true && useviews != false) exitWithMessageAndUsage("useviews must be between true and false inclusive");
         }
 
         @Override
@@ -514,6 +518,7 @@ public class Benchmark {
     }
 
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
+        @Override
         public void uncaughtException(Thread th, Throwable ex) {
         log.error("Uncaught exception: " + ex.getMessage(), ex);
         printJStack();

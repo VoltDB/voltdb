@@ -79,10 +79,10 @@
 #include "storage/PersistentTableUndoTruncateTableAction.h"
 #include "storage/PersistentTableUndoUpdateAction.h"
 #include "storage/ConstraintFailureException.h"
-#include "storage/TupleStreamException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/AbstractDRTupleStream.h"
+#include "ExportMaterializedViewMetadata.h"
 
 namespace voltdb {
 
@@ -480,9 +480,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     } catch (ConstraintFailureException &e) {
         deleteTupleStorage(target); // also frees object columns
         throw;
-    } catch (TupleStreamException &e) {
-        deleteTupleStorage(target); // also frees object columns
-        throw;
     }
 }
 
@@ -494,25 +491,6 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
             throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
         }
 
-    }
-
-    // Write to DR stream before everything else to ensure nothing gets left in
-    // the index if the append fails.
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn()) {
-        setDRTimestampForTuple(ec, target, false);
-    }
-
-    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
-    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -537,9 +515,24 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     TableTuple conflict(m_schema);
     tryInsertOnAllIndexes(&target, &conflict);
     if (!conflict.isNullTuple()) {
-        // Roll the DR stream back because the undo action is not registered
-        m_surgeon.DRRollback(drMark, rowCostForDRRecord(DR_RECORD_INSERT));
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+    }
+
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn()) {
+        setDRTimestampForTuple(ec, target, false);
+    }
+
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = INVALID_DR_MARK;
+    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -641,25 +634,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // Write to the DR stream before doing anything else to ensure we don't
-    // leave a half updated tuple behind in case this throws.
-    ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn() && updateDRTimestamp) {
-        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
-    }
-
-    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
-    if (drStream && !m_isMaterialized && m_drEnabled) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
-        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
-        const int64_t currentSpHandle = ec->currentSpHandle();
-        const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
-    }
-
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
@@ -693,6 +667,23 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
         }
+    }
+
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    if (hasDRTimestampColumn() && updateDRTimestamp) {
+        setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
+    }
+
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = INVALID_DR_MARK;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -836,8 +827,17 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // The tempTuple is forever!
     assert(&target != &m_tempTuple);
 
-    // Write to the DR stream before doing anything else to ensure nothing will
-    // be left forgotten in case this throws.
+    // Just like insert, we want to remove this tuple from all of our indexes
+    deleteFromAllIndexes(&target);
+
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(target);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(target, fallible);
+        }
+    }
+
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
@@ -848,17 +848,6 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
         drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
-    }
-
-    // Just like insert, we want to remove this tuple from all of our indexes
-    deleteFromAllIndexes(&target);
-
-    {
-        // handle any materialized views, hide the tuple from the scan temporarily.
-        SetAndRestorePendingDeleteFlag setPending(target);
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleDelete(target, fallible);
-        }
     }
 
     if (fallible) {
