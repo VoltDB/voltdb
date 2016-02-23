@@ -223,34 +223,26 @@ TableTuple CoveringCellIndex::nextValueAtKey(IndexCursor& cursor) const
     CellMapIterator &mapEndIter = getEndIterFromCursor(cursor);
 
     S2CellId cell = S2CellId(extractCellId(mapIter.key()));
+    int nextLevel = cell.level();
 
     mapIter.moveNext();
-    if (mapIter.equals(mapEndIter)) {
+    while (mapIter.equals(mapEndIter)) {
         // No more matches at the current level, but check the lower levels
         // (that is, the cells that contain the one we just checked).
-        int nextLevel = cell.level() - CELL_LEVEL_MOD;
+        nextLevel -= CELL_LEVEL_MOD;
 
-        while (nextLevel >= MIN_CELL_LEVEL) {
-            cell = cell.parent(nextLevel);
-            CellMapRange iterPair = m_cellEntries.equalRange(setKeyFromCellId(cell.id()));
-
-            mapIter = iterPair.first;
-            mapEndIter = iterPair.second;
-            if (! mapIter.equals(mapEndIter)) {
-                // There was a match in a larger, containing cell.
-                cursor.m_match.move(const_cast<void*>(mapIter.value()));
-                return retval;
-            }
-
-            nextLevel -= CELL_LEVEL_MOD;
+        if (nextLevel < MIN_CELL_LEVEL) {
+            // No more matches.
+            cursor.m_match.move(NULL);
+            return retval;
         }
+        cell = cell.parent(nextLevel);
+        CellMapRange iterPair = m_cellEntries.equalRange(setKeyFromCellId(cell.id()));
 
-        // No more matches.
-        cursor.m_match.move(NULL);
-        return retval;
+        mapIter = iterPair.first;
+        mapEndIter = iterPair.second;
     }
 
-    // There is another match at the current level
     cursor.m_match.move(const_cast<void*>(mapIter.value()));
     return retval;
 }
