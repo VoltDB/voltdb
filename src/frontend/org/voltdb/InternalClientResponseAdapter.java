@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -66,7 +67,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
 
-    private final ConcurrentMap<Long, InternalCallback> m_callbacks = new NonBlockingHashMap<>();
+    private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
     // Maintain internal connection ids per caller id. This is useful when collecting statistics
     // so that information can be grouped per user of this Connection.
