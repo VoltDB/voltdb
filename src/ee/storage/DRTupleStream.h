@@ -36,7 +36,7 @@ public:
     // Also update DRProducerProtocol.java if version changes
     static const uint8_t PROTOCOL_VERSION = 3;
 
-    DRTupleStream();
+    DRTupleStream(int defaultBufferSize);
 
     virtual ~DRTupleStream() {
     }
@@ -109,7 +109,7 @@ private:
 
 class MockDRTupleStream : public DRTupleStream {
 public:
-    MockDRTupleStream() : DRTupleStream() {}
+    MockDRTupleStream() : DRTupleStream(1024) {}
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
                            int64_t txnId,

@@ -21,8 +21,8 @@
 using namespace std;
 using namespace voltdb;
 
-AbstractDRTupleStream::AbstractDRTupleStream()
-        : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
+AbstractDRTupleStream::AbstractDRTupleStream(int defaultBufferSize)
+        : TupleStreamBase(defaultBufferSize, MAGIC_DR_TRANSACTION_PADDING),
           m_enabled(true),
           m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
           m_rowTarget(-1),
