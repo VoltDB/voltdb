@@ -91,6 +91,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
         cl.m_forceVoltdbrootCreate = m_forceVoltdbrootCreate;
+        cl.m_isTest = m_isTest;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
