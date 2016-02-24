@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -39,6 +41,24 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     public TestGeospatialFunctions(String name) {
         super(name);
+    }
+
+    static private void setUpSchema(VoltProjectBuilder project) throws IOException {
+        String literalSchema =
+                "CREATE TABLE places (\n"
+                + "  pk         INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  name       VARCHAR(64),\n"
+                + "  loc        GEOGRAPHY_POINT\n"
+                + ");\n"
+                + "CREATE TABLE borders (\n"
+                + "  pk         INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  name       VARCHAR(64),\n"
+                + "  message    VARCHAR(64),\n"
+                + "  region     GEOGRAPHY\n"
+                + ");\n"
+                + "\n"
+                ;
+        project.addLiteralSchema(literalSchema);
     }
 
     /*
@@ -566,16 +586,19 @@ public class TestGeospatialFunctions extends RegressionSuite {
     /*
      * X-----X-----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR3
       = "POLYGON((0 0, 1 0 , 2 0 , 0 0))";
     /*
      * X-----X-----X-----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR4
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 0 0))";
     /*
      * X-----X-----X-----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR5
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 0 0))";
     /*
@@ -830,7 +853,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         populateTables(client);
         String sql;
 
-     // polygon-to-point
+        // polygon-to-point
         sql = "create procedure DWithin_Proc as select borders.name, places.name, distance(borders.region, places.loc) as distance "
                 + "from borders, places where DWithin(borders.region, places.loc, ?) and borders.pk = 1 "
                 + "order by distance, borders.pk, places.pk;";
@@ -942,41 +965,23 @@ public class TestGeospatialFunctions extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeospatialFunctions.class);
-        boolean success;
-
+                new MultiConfigSuiteBuilder(TestGeospatialFunctions.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        String literalSchema =
-                "CREATE TABLE places (\n"
-                + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  name VARCHAR(64),\n"
-                + "  loc GEOGRAPHY_POINT\n"
-                + ");\n"
-                + "CREATE TABLE borders (\n"
-                + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  name VARCHAR(64),\n"
-                + "  message VARCHAR(64),\n"
-                + "  region GEOGRAPHY\n"
-                + ");\n"
-                + "\n"
-                ;
         try {
-            project.addLiteralSchema(literalSchema);
-        }
-        catch (Exception e) {
-            fail();
-        }
-        project.setUseDDLSchema(true);
-        config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
+            VoltServerConfig config = null;
+            boolean success;
 
-        assertTrue(success);
-        builder.addServerConfig(config);
-
+            setUpSchema(project);
+            config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            project.setUseDDLSchema(true);
+            success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
+        } catch  (IOException excp) {
+            assert (false);
+        }
         return builder;
     }
 }
