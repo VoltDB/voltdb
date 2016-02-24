@@ -1714,6 +1714,9 @@ public class VoltCompiler {
                     compilerLog.error("While configuring export, table " + t + " is a source table " +
                             "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
                     throw new VoltCompilerException("Export table configured with materialized view without partitioned column in the view.");
+                } else {
+                    //Set partition column of view table to partition column of export table
+                    t.setPartitioncolumn(t.getColumns().get(pc.getName()));
                 }
             }
         }

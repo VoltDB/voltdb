@@ -125,6 +125,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
+    m_isMaterialized = targetTable->isMaterialized();
 
     return true;
 }
@@ -195,9 +196,14 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         if (m_partitionColumn != -1) {
             // check for partition problems
             // get the value for the partition column
-            NValue value = tempTuple.getNValue(m_partitionColumn);
+            NValue value;
+            //If materiliazer is true meaning we are updating stream view
+            if (m_isMaterialized) {
+                value = ValueFactory::getBigIntValue(0);
+            } else {
+                value = tempTuple.getNValue(m_partitionColumn);
+            }
             bool isLocal = m_engine->isLocalSite(value);
-
             // if it doesn't map to this site
             if (!isLocal) {
                 throw ConstraintFailureException(

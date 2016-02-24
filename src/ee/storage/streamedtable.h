@@ -127,6 +127,10 @@ class StreamedTable : public Table {
         return true;
     }
 
+    bool isMaterialized() {
+        return false;
+    }
+
     /*
      * For an export table return the sequence number
      */
