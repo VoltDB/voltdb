@@ -813,6 +813,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             m_memoryStats,
                             m_commandLog,
                             m_producerDRGateway,
+                            m_consumerDRGateway,
                             iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
 
@@ -2741,12 +2742,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         int.class,
                         String.class,
                         ClientInterface.class,
-                        byte.class);
+                        byte.class,
+                        int.class);
                 m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                         m_messenger.getHostId(),
                         drProducerHost,
                         m_clientInterface,
-                        drConsumerClusterId);
+                        drConsumerClusterId,
+                        m_configuredNumberOfPartitions);
                 m_globalServiceElector.registerService(m_consumerDRGateway);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);

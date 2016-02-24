@@ -28,6 +28,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
@@ -93,6 +94,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway nodeDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
@@ -117,7 +119,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, drGateway, mpPDRG);
+                coreBindIds, drGateway, mpPDRG, consumerDRGateway);
 
         m_tickProducer.start();
 
@@ -175,6 +177,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    // If we are a DR replica, inform that subsystem of any remote data we've seen
+                    if (m_consumerDRGateway != null) {
+                        m_consumerDRGateway.beginPromotePartition(m_partitionId, false);
+                    }
+
                 }
                 else {
                     // The only known reason to fail is a failed replica during
