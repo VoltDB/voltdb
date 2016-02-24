@@ -269,8 +269,10 @@ struct IntsKey
         }
     }
 
-    IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
-            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
+    IntsKey(const TableTuple *tuple,
+            const std::vector<int> &indices,
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
@@ -843,6 +845,11 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 template <typename KeyType>
 inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) { k.setValue(v); }
 
+// PointerKeyValuePair is the entry type for multimaps that implement
+// non-unique indexes, to speed up deletion of entries.  When rows are
+// deleted, they are deleted by a pointer to the tuple.  In order to
+// find all the rows that need to be deleted quickly, the pointer to
+// the tuple is the last component of the key.
 template < typename KeyType, typename DataType = const void*>
 class PointerKeyValuePair {
 public:
