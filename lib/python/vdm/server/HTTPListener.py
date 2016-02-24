@@ -53,6 +53,10 @@ from voltcli import utility
 import voltdbclient
 import logging
 from logging.handlers import RotatingFileHandler
+from flask_logging import Filter
+
+filter_log = Filter('/api/1.0/', 'GET')
+
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -75,7 +79,6 @@ def not_found(error):
     Returns:
         Error message.
     """
-    print error
     return make_response(jsonify({'error': 'Bad request'}), 400)
 
 
@@ -88,7 +91,6 @@ def not_found(error):
     Returns:
         Error message.
     """
-    print error
     return make_response(jsonify({'error': 'Not found'}), 404)
 
 
@@ -498,7 +500,7 @@ def get_volt_jar_dir():
 
 def get_configuration():
     deployment_json = {
-        'vdm': {
+        'voltdeploy': {
             'databases': Global.DATABASES,
             'members': Global.SERVERS,
             'deployments': Global.DEPLOYMENT,
@@ -512,7 +514,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(Global.PATH, 'vdm.xml')
+        path = os.path.join(Global.PATH, 'voltdeploy.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
@@ -522,7 +524,7 @@ def write_configuration_file():
 
 
 def make_configuration_file():
-    main_header = Element('vdm')
+    main_header = Element('voltdeploy')
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
@@ -584,7 +586,7 @@ def make_configuration_file():
 
 def sync_configuration():
     headers = {'content-type': 'application/json'}
-    url = 'http://%s:%u/api/1.0/vdm/configuration/' % \
+    url = 'http://%s:%u/api/1.0/voltdeploy/configuration/' % \
           (__IP__,__PORT__)
     response = requests.post(url, headers=headers)
     return response
@@ -595,24 +597,24 @@ def convert_xml_to_json(config_path):
         xml = f.read()
     o = XML(xml)
     xml_final = json.loads(json.dumps(etree_to_dict(o)))
-    if type(xml_final['vdm']['members']['member']) is dict:
-        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
+    if type(xml_final['voltdeploy']['members']['member']) is dict:
+        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'dict')
     else:
-        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'list')
+        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'list')
 
-    if type(xml_final['vdm']['databases']['database']) is dict:
-        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'dict')
+    if type(xml_final['voltdeploy']['databases']['database']) is dict:
+        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'dict')
     else:
-        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'list')
+        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'list')
 
-    if type(xml_final['vdm']['deployments']['deployment']) is dict:
-        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
+        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
     else:
-        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
-    if type(xml_final['vdm']['deployments']['deployment']) is dict:
-        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
+    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
+        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
     else:
-        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
+        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
 
     Global.DATABASES = db_json
 
@@ -1397,7 +1399,6 @@ class ServerAPI(MethodView):
         Returns:
             List of member ids related to specified database.
         """
-
         if server_id is None:
             servers = []
             database = [database for database in Global.DATABASES if database['id'] == database_id]
@@ -2006,8 +2007,11 @@ class StartLocalServerAPI(MethodView):
         """
 
         try:
+            sid = -1
+            if 'id' in request.args:
+                sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server()
+            return server.check_and_start_local_server(sid)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2044,9 +2048,9 @@ class VdmStatus(MethodView):
     @staticmethod
     def get():
         if request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
-            return str(request.args['jsonp']) + '(' + '{\'vdm\': {"running": "true"}}' + ')'
+            return str(request.args['jsonp']) + '(' + '{\'voltdeploy\': {"running": "true"}}' + ')'
         else:
-            return jsonify({'vdm': {"running": "true"}})
+            return jsonify({'voltdeploy': {"running": "true"}})
 
 
 class SyncVdmConfiguration(MethodView):
@@ -2059,10 +2063,10 @@ class SyncVdmConfiguration(MethodView):
         try:
             result = request.json
 
-            databases = result['vdm']['databases']
-            servers = result['vdm']['members']
-            deployments = result['vdm']['deployments']
-            deployment_users = result['vdm']['deployment_users']
+            databases = result['voltdeploy']['databases']
+            servers = result['voltdeploy']['members']
+            deployments = result['voltdeploy']['deployments']
+            deployment_users = result['voltdeploy']['deployment_users']
 
         except Exception, errs:
             print traceback.format_exc()
@@ -2083,17 +2087,17 @@ class VdmConfiguration(MethodView):
 
     @staticmethod
     def get():
-        return get_configuration()
+        return jsonify(get_configuration())
 
     @staticmethod
     def post():
 
         result = get_configuration()
 
-        for member in result['vdm']['members']:
+        for member in result['voltdeploy']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://%s:%u/api/1.0/vdm/sync_configuration/' % (member['hostname'], __PORT__)
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
                 data = result
                 response = requests.post(url, data=json.dumps(data), headers=headers)
             except Exception, errs:
@@ -2215,38 +2219,40 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_stopped = False
         has_run = False
-        if len(database[0]['members']) == 0:
-            return jsonify({'status':'errorNoMembers'})
-        for server_id in database[0]['members']:
+        if not database:
+            return make_response(jsonify({'error': 'Not found'}), 404)
+        else:
+            if len(database[0]['members']) == 0:
+                return jsonify({'status':'errorNoMembers'})
+            for server_id in database[0]['members']:
+                server = [server for server in Global.SERVERS if server['id'] == server_id]
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
+                      (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
+                try:
+                    response = requests.get(url)
+                except Exception, err:
+                    return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
 
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
-                  (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
-            try:
-                response = requests.get(url)
-            except Exception, err:
-                return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
+                if response.json()['status'] == "stalled":
+                    has_stalled = True
+                elif response.json()['status'] == "running":
+                    has_run = True
+                elif response.json()['status'] == "stopped":
+                    has_stopped = True
+                serverDetails.append({server[0]['hostname']: response.json()})
 
-            if response.json()['status'] == "stalled":
-                has_stalled = True
-            elif response.json()['status'] == "running":
-                has_run = True
-            elif response.json()['status'] == "stopped":
-                has_stopped = True
-            serverDetails.append({server[0]['hostname']: response.json()})
+            if has_stalled:
+                status.append({'status': 'stalled'})
+            elif has_run == True and has_stopped:
+                status.append({'status': 'stalled'})
+            elif not has_stalled and not has_stopped and has_run:
+                status.append({'status': 'running'})
+            elif has_stopped and not has_stalled and not has_run:
+                status.append({'status': 'stopped'})
 
-        if has_stalled:
-            status.append({'status': 'stalled'})
-        elif has_run == True and has_stopped:
-            status.append({'status': 'stalled'})
-        elif not has_stalled and not has_stopped and has_run:
-            status.append({'status': 'running'})
-        elif has_stopped and not has_stalled and not has_run:
-            status.append({'status': 'stopped'})
+            isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-        isFreshStart = voltdbserver.check_snapshot_folder(database_id)
-
-        return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
+            return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -2254,29 +2260,37 @@ class StatusDatabaseServerAPI(MethodView):
 
     @staticmethod
     def get(database_id, server_id):
-
-        server = [server for server in Global.SERVERS if server['id'] == server_id]
-        if len(server) != 0:
-            try:
-                client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
-                proc = voltdbclient.VoltProcedure(client, "@Ping")
-                response = proc.call()
-                return jsonify({'status': "running"})
-            except:
-                voltProcess = voltdbserver.VoltDatabase(database_id)
-
-                error = ''
-                try:
-                    error = Log.get_error_log_details()
-                except:
-                    pass
-
-                if voltProcess.Get_Voltdb_Process().isProcessRunning:
-                    return jsonify({'status': "stalled", "details": error})
-                else:
-                    return jsonify({'status': "stopped", "details": error})
-        else:
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
+        else:
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
+            if len(database[0]['members']) == 0:
+                return jsonify({'error':'errorNoMembers'})
+            if not server:
+                return make_response(jsonify({'error': 'Not found'}), 404)
+            elif server_id not in database[0]['members']:
+                return make_response(jsonify({'error': 'Not found'}), 404)
+            else:
+
+                try:
+                    client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+                    proc = voltdbclient.VoltProcedure(client, "@Ping")
+                    response = proc.call()
+                    return jsonify({'status': "running"})
+                except:
+                    voltProcess = voltdbserver.VoltDatabase(database_id)
+                    error = ''
+                    try:
+                        error = Log.get_error_log_details()
+                    except:
+                        pass
+
+                    if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                        return jsonify({'status': "stalled", "details": error})
+                    else:
+                        return jsonify({'status': "stopped", "details": error})
+
 
 
 def main(runner, amodule, config_dir, server):
@@ -2297,7 +2311,7 @@ def main(runner, amodule, config_dir, server):
     global __IP__
     global __PORT__
 
-    config_path = os.path.join(config_dir, 'vdm.xml')
+    config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
     arrServer = {}
     bindIp = "0.0.0.0"
@@ -2361,23 +2375,23 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
     APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-
-
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
-                     view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
-                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
-                     view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+                     view_func=START_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
+
+    # Internal API
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+                     view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+                     view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
 
     APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
                      view_func=DEPLOYMENT_VIEW, methods=['GET'])
@@ -2390,25 +2404,25 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'POST', 'DELETE'])
-    APP.add_url_rule('/api/1.0/vdm/status/',
+    APP.add_url_rule('/api/1.0/voltdeploy/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/vdm/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
 
     if os.path.exists('voltdeploy.log'):
         open('voltdeploy.log', 'w').close()
     handler = RotatingFileHandler('voltdeploy.log')
     handler.setFormatter(logging.Formatter(
-         "%(asctime)s|%(levelname)s|%(message)s|%(pathname)s:%(lineno)d"))
+         "%(asctime)s|%(levelname)s|%(message)s"))
     log = logging.getLogger('werkzeug')
-    log.setLevel(logging.INFO)
+    log.setLevel(logging.NOTSET)
     log.addHandler(handler)
-    sys.stderr.write('* Running on http://%s:%u/ (Press CTRL+C to quit)' %(bindIp, __PORT__))
+
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)
