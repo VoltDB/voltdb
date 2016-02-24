@@ -170,6 +170,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // INLINE LIMIT
     //
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    int limit = CountingPostfilter::NO_LIMIT;
+    int offset = CountingPostfilter::NO_OFFSET;
+    if (limit_node != NULL) {
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    }
+
+    //
+    // POST EXPRESSION
+    //
+    AbstractExpression* post_expression = m_node->getPredicate();
+    if (post_expression != NULL) {
+        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+    }
+
+    // Initialize the postfilter
+    CountingPostfilter postfilter(post_expression, limit, offset);
 
     TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine, this);
@@ -178,7 +194,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_projectionNode != NULL) {
             inputSchema = m_projectionNode->getOutputTable()->schema();
         }
-        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable);
+        temp_tuple = m_aggExec->p_execute_init(params, &pmp, inputSchema, m_outputTable, &postfilter);
     } else {
         temp_tuple = m_outputTable->tempTuple();
     }
@@ -324,14 +340,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
-    //
-    // POST EXPRESSION
-    //
-    AbstractExpression* post_expression = m_node->getPredicate();
-    if (post_expression != NULL) {
-        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
-    }
-
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
     if (initial_expression != NULL) {
@@ -408,15 +416,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         tableIndex->moveToEnd(toStartActually, indexCursor);
     }
 
-    int limit = -1;
-    int offset = -1;
-    if (limit_node != NULL) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
-
-    // Initialize the postfilter
-    CountingPostfilter postfilter(post_expression, limit, offset);
-
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -476,10 +475,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
 void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
     if (m_aggExec != NULL) {
-        if (m_aggExec->p_execute_tuple(tuple)) {
-            // Aggregate has reached the limit
-            postfilter.setAboveLimit();
-        }
+        m_aggExec->p_execute_tuple(tuple);
         return;
     }
     //

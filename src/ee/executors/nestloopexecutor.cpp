@@ -92,7 +92,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     // NULL tuples for left and full joins
-    p_init_null_tuples(node->getInputTable(1), node->getInputTable());
+    p_init_null_tuples(node->getInputTable(), node->getInputTable(1));
 
     return true;
 }
@@ -149,8 +149,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     }
 
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-    int limit = -1;
-    int offset = -1;
+    int limit = CountingPostfilter::NO_LIMIT;
+    int offset = CountingPostfilter::NO_OFFSET;
     if (limit_node) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
@@ -170,7 +170,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     if (m_aggExec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
-        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable);
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable, &postfilter);
     } else {
         join_tuple = m_tmpOutputTable->tempTuple();
     }

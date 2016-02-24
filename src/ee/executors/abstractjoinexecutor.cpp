@@ -54,17 +54,14 @@ using namespace voltdb;
 
 void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
     if (m_aggExec != NULL) {
-        if (m_aggExec->p_execute_tuple(join_tuple)) {
-            // Aggregate has reached the limit
-            postfilter.setAboveLimit();
-        }
+        m_aggExec->p_execute_tuple(join_tuple);
         return;
     }
     m_tmpOutputTable->insertTempTuple(join_tuple);
     pmp.countdownProgress();
 }
 
-void AbstractJoinExecutor::p_init_null_tuples(Table* inner_table, Table* outer_table) {
+void AbstractJoinExecutor::p_init_null_tuples(Table* outer_table, Table* inner_table) {
     if (m_joinType != JOIN_TYPE_INNER) {
         assert(inner_table);
         m_null_inner_tuple.init(inner_table->schema());

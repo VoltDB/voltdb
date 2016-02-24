@@ -51,6 +51,7 @@
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
@@ -95,8 +96,7 @@ struct TupleRangeComparer : std::binary_function<tuple_range, tuple_range, bool>
 void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     std::vector<int64_t>& partitionTupleCounts,
     AbstractExecutor::TupleComparer comp,
-    int limit,
-    int offset,
+    CountingPostfilter& postfilter,
     AggregateExecutorBase* agg_exec,
     TempTable* output_table,
     ProgressMonitorProxy* pmp) {
@@ -126,13 +126,7 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
     std::binary_negate<TupleRangeComparer> reversedTupleRangeComp = std::not2(TupleRangeComparer(comp));
     std::make_heap(partitions.begin(), partitions.end(), reversedTupleRangeComp);
 
-    int tupleCnt = 0;
-    int tupleSkipped = 0;
-
-    while ((limit == -1 || tupleCnt < limit) && !partitions.empty()) {
-        // A sanity check
-        assert(tupleCnt < tuples.size());
-
+    while (postfilter.isUnderLimit() && !partitions.empty()) {
         // Get the first partition from the heap that has the next tuple to be inserted
         range_iterator rangeIt = partitions.begin();
         assert(rangeIt->first != rangeIt->second);
@@ -156,23 +150,18 @@ void MergeReceiveExecutor::merge_sort(const std::vector<TableTuple>& tuples,
             }
         }
 
-        if (tupleSkipped++ < offset) {
-            continue;
-        }
-
-        if (agg_exec != NULL) {
-            if (agg_exec->p_execute_tuple(tuple)) {
-                // Get enough rows for LIMIT
-                break;
+        // Run the postfilter to evaluate the LIMIT/OFFSET
+        if (postfilter.eval(&tuple, NULL)) {
+            if (agg_exec != NULL) {
+                agg_exec->p_execute_tuple(tuple);
+            } else {
+                output_table->insertTempTuple(tuple);
             }
-        } else {
-            output_table->insertTempTuple(tuple);
-        }
 
-        ++tupleCnt;
-        if (pmp != NULL) {
-            // Should only be NULL when unit testing
-            pmp->countdownProgress();
+            if (pmp != NULL) {
+                // Should only be NULL when unit testing
+                pmp->countdownProgress();
+            }
         }
     }
 }
@@ -249,10 +238,20 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
 
     ProgressMonitorProxy pmp(m_engine, this);
 
+    //
+    // OPTIMIZATION: NESTED LIMIT
+    int limit = CountingPostfilter::NO_LIMIT;
+    int offset = CountingPostfilter::NO_OFFSET;
+    if (m_limit_node != NULL) {
+        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    }
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
+
     TableTuple input_tuple;
     if (m_agg_exec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
-        input_tuple = m_agg_exec->p_execute_init(params, &pmp, m_tmpInputTable->schema(), m_tmpOutputTable);
+        input_tuple = m_agg_exec->p_execute_init(params, &pmp, m_tmpInputTable->schema(), m_tmpOutputTable, &postfilter);
     } else {
         input_tuple = m_tmpOutputTable->tempTuple();
     }
@@ -266,17 +265,9 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
         xs.push_back(input_tuple);
     }
 
-    //
-    // OPTIMIZATION: NESTED LIMIT
-    int limit = -1;
-    int offset = 0;
-    if (m_limit_node != NULL) {
-        m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
-
     // Merge Sort
     AbstractExecutor::TupleComparer comp(m_orderby_node->getSortExpressions(), m_orderby_node->getSortDirections());
-    merge_sort(xs, partitionTupleCounts, comp, limit, offset, m_agg_exec, m_tmpOutputTable, &pmp);
+    merge_sort(xs, partitionTupleCounts, comp, postfilter, m_agg_exec, m_tmpOutputTable, &pmp);
 
     VOLT_TRACE("Result of MergeReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 
