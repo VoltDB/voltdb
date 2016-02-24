@@ -955,8 +955,16 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
+    static inline void generateExceptionIfUnexpectedType(ValueType expected, ValueType actual) {
+        if (actual != expected) {
+            throwCastSQLException(actual, expected);
+        }
+    }
+
     GeographyPointValue& getGeographyPointValue() {
-        assert(getValueType() == VALUE_TYPE_POINT);
+        const ValueType valueType = getValueType();
+        assert(valueType == VALUE_TYPE_POINT);
+        generateExceptionIfUnexpectedType(VALUE_TYPE_POINT, valueType);
         return *reinterpret_cast<GeographyPointValue*>(m_data);
     }
 
@@ -965,12 +973,16 @@ private:
         BOOST_STATIC_ASSERT_MSG(sizeof(GeographyPointValue) <= sizeof(m_data),
                                 "Size of Point is too large for NValue m_data");
 
-        assert(getValueType() == VALUE_TYPE_POINT);
+        const ValueType valueType = getValueType();
+        assert(valueType == VALUE_TYPE_POINT);
+        generateExceptionIfUnexpectedType(VALUE_TYPE_POINT, valueType);
         return *reinterpret_cast<const GeographyPointValue*>(m_data);
     }
 
     const GeographyValue getGeographyValue() const {
-        assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+        const ValueType valueType = getValueType();
+        assert(valueType == VALUE_TYPE_GEOGRAPHY);
+        generateExceptionIfUnexpectedType(VALUE_TYPE_GEOGRAPHY, valueType);
 
         if (isNull()) {
             return GeographyValue();
@@ -1599,6 +1611,39 @@ private:
         return retval;
     }
 
+    NValue castAsGeographyValue() const {
+        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        if (isNull()) {
+            retval.setNull();
+            return retval;
+        }
+        const ValueType type = getValueType();
+        // implicit type conversion to Geography Value is
+        // not allowed at present
+        switch (type) {
+            case VALUE_TYPE_VARCHAR:
+            default:
+                throwCastSQLException(type, VALUE_TYPE_GEOGRAPHY);
+        }
+        return retval;
+    }
+
+    NValue castAsGeographyPointValue() const {
+        // implicit type conversion to Geography Point Value is
+        // not allowed at present
+        NValue retval(VALUE_TYPE_POINT);
+        if (isNull()) {
+            retval.setNull();
+            return retval;
+        }
+        const ValueType type = getValueType();
+        switch (type) {
+            case VALUE_TYPE_VARCHAR:
+            default:
+                throwCastSQLException(type, VALUE_TYPE_POINT);
+        }
+        return retval;
+    }
     /**
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided tuple storage area
@@ -3407,6 +3452,10 @@ inline NValue NValue::castAs(ValueType type) const {
         return castAsBinary();
     case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
+    case VALUE_TYPE_GEOGRAPHY:
+        return castAsGeographyValue();
+    case VALUE_TYPE_POINT:
+        return castAsGeographyPointValue();
     default:
         break;
     }
