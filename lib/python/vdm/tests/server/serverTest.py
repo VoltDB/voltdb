@@ -85,7 +85,6 @@ class Server(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            db_data = {'dbId': last_db_id}
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
             response = requests.get(url)
@@ -94,8 +93,8 @@ class Server(unittest.TestCase):
                 server_length = len(value['members'])
                 last_server_id = value['members'][server_length-1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
-                url = url + str(last_server_id)
-                response = requests.delete(url, json=db_data, headers=headers)
+                url += str(last_server_id)
+                response = requests.delete(url)
                 self.assertEqual(response.status_code, 200)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
@@ -285,7 +284,6 @@ class DeleteServer(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            db_data = {'dbId': last_db_id}
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
             response = requests.get(url)
@@ -297,7 +295,7 @@ class DeleteServer(unittest.TestCase):
                 url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
                 url += str(last_server_id)
-                response = requests.delete(url, json=db_data, headers=headers)
+                response = requests.delete(url)
                 self.assertEqual(response.status_code, 200)
 
                 db_url = __db_url__ + str(last_db_id)
