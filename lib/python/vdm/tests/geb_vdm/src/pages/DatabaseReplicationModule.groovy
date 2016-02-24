@@ -32,9 +32,10 @@ import geb.Module
 
 class DatabaseReplicationModule extends Module {
     static content = {
-        editButton          { $("#btnUpdateSource > span") }
+        editButton          { $("#btnUpdateSource") }
         editPopupSave       { $("#btnSaveReplication") }
         delete              { $("#btnDeleteConnection") }
+        addConnectionSource { $("#addConnectionSource") }
 
         enabledCheckbox     { $("#frmDatabaseReplication > div > table > tbody > tr:nth-child(1) > td:nth-child(2) > span:nth-child(1) > div > ins") }
 
