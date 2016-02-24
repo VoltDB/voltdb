@@ -86,7 +86,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBrokenLineParsing() throws IOException {
-        final String simpleSchema1 =
+        final String simpleSchema =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
             "create view v_table1r_el (column2_integer, num_rows) as\n" +
             "select column2_integer as column2_integer,\n" +
@@ -97,32 +97,12 @@ public class TestVoltCompiler extends TestCase {
             "select column2_integer as column2_integer,\n" +
                 "count(*) as num_rows\n" +
             "from table1r_el\n" +
-            "group by column2_integer\n;\n";
+            "group by column2_integer\n;\n" +
+            "create procedure Foo as select * from table1r_el;";
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema1);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from table1r_el;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(simpleSchema);
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("testout.jar"));
         assertTrue(success);
     }
 
@@ -2517,14 +2497,14 @@ public class TestVoltCompiler extends TestCase {
         errorMsg = "Materialized view \"MY_VIEW\" with comparison expression '=' in GROUP BY clause not supported.";
         ddl = "create table t(id integer not null, num integer not null);\n" +
                 "create view my_view as select (id = num) as idNumber, count(*) from t group by (id = num);" +
-                "partition table my_view on column num;";
+                "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
         // count(*) is needed in ddl
         errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).";
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view as select id, wage from t group by id, wage;" +
-                "partition table my_view on column num;";
+                "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
     }
 
@@ -2895,50 +2875,49 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table geogs ( geog geography(1048577) not null );";
         badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*", ddl);
 
-        // GEOGRAPHY columns cannot yet be indexed
-        ddl = "create table geogs ( geog geography not null );\n" +
-              "create index geogidx on geogs( geog );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
-
         // GEOGRAPHY columns cannot use unique/pk constraints which
         // are implemented as indexes.
         ddl = "create table geogs ( geog GEOGRAPHY primary key );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs ( geog geography, " +
                                   " primary key (geog) );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs ( geog geography, " +
                                   " constraint uniq_geog unique (geog) );\n";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         ddl = "create table geogs (geog GEOGRAPHY unique);";
-        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*", ddl);
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
+
+        ddl = "create table geogs (geog GEOGRAPHY); create unique index geogsgeog on geogs(geog);";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
+
+        ddl = "create table pgeogs (geog GEOGRAPHY, partkey int ); " +
+        "partition table pgeogs on column partkey; " +
+        "create assumeunique index pgeogsgeog on pgeogs(geog);";
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as unique index keys.*", ddl);
 
         // index on boolean functions is not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create index geoindex_contains ON geogs (contains(region1, point1) );\n";
-        // error msg: Cannot create index "GEOINDEX_CONTAINS" because it contains function 'CONTAINS(), which is not supported.
-        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains function 'CONTAINS..', " +
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains a BOOLEAN valued function 'CONTAINS', " +
                                   "which is not supported.*", ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create index geoindex_within100000 ON geogs (DWITHIN(region1, point1, 100000) );\n";
-        // error msg: Cannot create index "GEOINDEX_WITHIN100000" because it contains function 'DWITHIN(), which is not supported.
-        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains function 'DWITHIN..', " +
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_WITHIN100000\" because it contains a BOOLEAN valued function 'DWITHIN', " +
                                   "which is not supported.*", ddl);
 
-        // indexing on comparison expression not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL);\n " +
               "create index geoindex_nonzero_distance ON geogs ( distance(region1, point1) = 0 );\n";
-        //error msg: Cannot create index "GEOINDEX_NONZERO_DISTANCE" because it contains comparison expression '=', which is not supported.
         badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_NONZERO_DISTANCE\" because it contains " +
                                   "comparison expression '=', which is not supported.*", ddl);
 
@@ -2956,22 +2935,18 @@ public class TestVoltCompiler extends TestCase {
               "create view geo_view as select count(*), sum(id), sum(distance(region1, point1)) from geogs;\n";
         checkDDLAgainstSimpleSchema(null, ddl);
 
-        // geography type is not supported in group by clause of materialized view
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select region1, count(*) from geogs group by region1;\n";
-        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
                 "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY in GROUP BY clause not supported.",
                 ddl);
 
-        // geography point type is not supported in group by clause of materialized view
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select point1, count(*) from geogs group by point1;\n";
-        // error msg: Materialized view "GEO_VIEW" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
                 "Materialized view \"GEO_VIEW\" with expression of type GEOGRAPHY_POINT in GROUP BY clause not supported.",
                 ddl);
@@ -2980,27 +2955,33 @@ public class TestVoltCompiler extends TestCase {
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select isValid(Region1), count(*) from geogs group by isValid(Region1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function ISVALID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'ISVALID..' in GROUP BY clause not supported.",
+                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'ISVALID' in GROUP BY clause not supported.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Contains(Region1, POINT1), count(*) from geogs group by Contains(Region1, POINT1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'CONTAINS..' in GROUP BY clause not supported.",
+                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'CONTAINS' in GROUP BY clause not supported.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Centroid(Region1), count(*) from geogs group by Centroid(Region1);\n";
-        // error msg: Materialized view "GEO_VIEW" with function CENTROID() in GROUP BY clause not supported.
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with function 'CENTROID..' in GROUP BY clause not supported.",
+                "Materialized view \"GEO_VIEW\" with a GEOGRAPHY_POINT valued function 'CENTROID' in GROUP BY clause not supported.",
+                ddl);
+
+        ddl = "create table geogs ( id integer, " +
+                " region1 geography NOT NULL, " +
+                " point1 geography_point NOT NULL );\n" +
+              "create index COMPOUND_GEO_NOT_SUPPORTED on geogs(id, region1);\n";
+        badDDLAgainstSimpleSchema(
+                "Cannot create index \"COMPOUND_GEO_NOT_SUPPORTED\" " +
+                 "because GEOGRAPHY values must be the only component of an index key: \"REGION1\"",
                 ddl);
     }
 

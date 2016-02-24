@@ -781,62 +781,46 @@ QuantifierType stringToQuantifier(string str )
 string indexLookupToString(IndexLookupType type)
 {
     switch (type) {
-    case INDEX_LOOKUP_TYPE_INVALID: {
+    case INDEX_LOOKUP_TYPE_INVALID:
         return "INVALID";
-    }
-    case INDEX_LOOKUP_TYPE_EQ: {
+    case INDEX_LOOKUP_TYPE_EQ:
         return "EQ";
-    }
-    case INDEX_LOOKUP_TYPE_GT: {
+    case INDEX_LOOKUP_TYPE_GT:
         return "GT";
-    }
-    case INDEX_LOOKUP_TYPE_GTE: {
+    case INDEX_LOOKUP_TYPE_GTE:
         return "GTE";
-    }
-    case INDEX_LOOKUP_TYPE_LT: {
+    case INDEX_LOOKUP_TYPE_LT:
         return "LT";
-    }
-    case INDEX_LOOKUP_TYPE_LTE: {
+    case INDEX_LOOKUP_TYPE_LTE:
         return "LTE";
-    }
-    case INDEX_LOOKUP_TYPE_GT_LT: {
-        return "GT_LT";
-    }
-    case INDEX_LOOKUP_TYPE_GTE_LT: {
-        return "GTE_LT";
-    }
-    case INDEX_LOOKUP_TYPE_GTL_TE: {
-        return "GTL_TE";
-    }
-    case INDEX_LOOKUP_TYPE_GTE_LTE: {
-        return "GTE_LTE";
-    }
+    case INDEX_LOOKUP_TYPE_GEO_CONTAINS:
+        return "GEO_CONTAINS";
     }
     return "INVALID";
 }
 
-IndexLookupType stringToIndexLookup(string str )
+IndexLookupType stringToIndexLookup(string str)
 {
     if (str == "INVALID") {
         return INDEX_LOOKUP_TYPE_INVALID;
-    } else if (str == "EQ") {
+    }
+    if (str == "EQ") {
         return INDEX_LOOKUP_TYPE_EQ;
-    } else if (str == "GT") {
+    }
+    if (str == "GT") {
         return INDEX_LOOKUP_TYPE_GT;
-    }  else if (str == "GTE") {
+    }
+    if (str == "GTE") {
         return INDEX_LOOKUP_TYPE_GTE;
-    }  else if (str == "LT") {
+    }
+    if (str == "LT") {
         return INDEX_LOOKUP_TYPE_LT;
-    }  else if (str == "LTE") {
+    }
+    if (str == "LTE") {
         return INDEX_LOOKUP_TYPE_LTE;
-    } else if (str == "GT_LT") {
-        return INDEX_LOOKUP_TYPE_GT_LT;
-    }  else if (str == "GTE_LT") {
-        return INDEX_LOOKUP_TYPE_GTE_LT;
-    }  else if (str == "GTL_TE") {
-        return INDEX_LOOKUP_TYPE_GTL_TE;
-    }  else if (str == "GTE_LTE") {
-        return INDEX_LOOKUP_TYPE_GTE_LTE;
+    }
+    if (str == "GEO_CONTAINS") {
+        return INDEX_LOOKUP_TYPE_GEO_CONTAINS;
     }
     return INDEX_LOOKUP_TYPE_INVALID;
 }
