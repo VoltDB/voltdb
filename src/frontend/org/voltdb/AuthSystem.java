@@ -347,6 +347,8 @@ public class AuthSystem {
 
     private final InternalImporterUser m_internalImporterUser;
 
+    private final InternalAdminUser m_internalAdminUser;
+
     //Auth system keeps a array of all perms used for auth disabled user not for checking permissions.
     private static String[] m_perm_list;
 
@@ -364,6 +366,7 @@ public class AuthSystem {
         }
 
         m_internalImporterUser = new InternalImporterUser(enabled);
+        m_internalAdminUser = new InternalAdminUser(enabled);
 
         m_enabled = enabled;
         if (!m_enabled) {
@@ -581,6 +584,10 @@ public class AuthSystem {
         return m_internalImporterUser;
     }
 
+    public InternalAdminUser getInternalAdminUser() {
+        return m_internalAdminUser;
+    }
+
     public static class AuthDisabledUser extends AuthUser {
         public AuthDisabledUser() {
             super(null, null, null, null, null);
@@ -615,6 +622,45 @@ public class AuthSystem {
         private final boolean m_authEnabled;
 
         private InternalImporterUser(boolean authEnabled) {
+            super(null, null, null, null, null);
+            m_authEnabled = authEnabled;
+        }
+
+        @Override
+        public boolean hasUserDefinedProcedurePermission(Procedure proc) {
+            return true;
+        }
+
+        @Override
+        public boolean hasPermission(Permission... p) {
+            if (!m_authEnabled) {
+                return true;
+            } else if (p != null && p.length == 1) {
+                return PERMS.contains(p[0]);
+            } else if (p == null || p.length == 0) {
+                return false;
+            } else {
+                return PERMS.containsAll(Arrays.asList(p));
+            }
+        }
+
+        @Override
+        public boolean authorizeConnector(String connectorName) {
+            return true;
+        }
+
+        @Override
+        public boolean isAuthEnabled() {
+            return m_authEnabled;
+        }
+    }
+
+    public static class InternalAdminUser extends AuthUser {
+        final static private EnumSet<Permission> PERMS =
+                EnumSet.<Permission>allOf(Permission.class);
+        private final boolean m_authEnabled;
+
+        private InternalAdminUser(boolean authEnabled) {
             super(null, null, null, null, null);
             m_authEnabled = authEnabled;
         }
