@@ -360,6 +360,8 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     }
 
+    public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
+
     private final FunctionId m_def;
 
     public static FunctionSQL newVoltDBFunction(String token, int tokenType) {
