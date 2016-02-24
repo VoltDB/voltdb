@@ -418,6 +418,9 @@ private:
 
     static TableIndex* createPrimaryKeyIndex(const TupleSchema* schema) {
         std::vector<int32_t> columnIndices;
+        // Note: the static_cast on the following line allows us to
+        // define PK_COL_INDEX as a static constant inside the class
+        // definition.  Without the cast, there are linker errors.
         columnIndices.push_back(static_cast<int32_t>(PK_COL_INDEX));
         std::vector<AbstractExpression*> exprs;
         TableIndexScheme scheme("pk",
@@ -435,6 +438,9 @@ private:
 
     static CoveringCellIndex* createGeospatialIndex(const TupleSchema* schema) {
         std::vector<int32_t> columnIndices;
+        // Note: the static_cast on the following line allows us to
+        // define GEOG_COL_INDEX as a static constant inside the class
+        // definition.  Without the cast, there are linker errors.
         columnIndices.push_back(static_cast<int32_t>(GEOG_COL_INDEX));
         std::vector<AbstractExpression*> exprs;
 
