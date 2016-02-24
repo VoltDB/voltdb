@@ -69,7 +69,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * The message is for holding error messages.  It is inserted into the
      * table.
      */
-    private static class Border {
+    static class Border {
         Border(long pk, String name, String message, GeographyValue region) {
             m_pk = pk;
             m_name = name;
@@ -103,7 +103,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * This is the array of borders we know about. We will insert these
      * borders and then extract them.
      */
-    private static Border borders[] = {
+    static Border borders[] = {
         new Border(0, "Colorado", null,
                    new GeographyValue("POLYGON(("
                                       + "-102.052 41.002, "

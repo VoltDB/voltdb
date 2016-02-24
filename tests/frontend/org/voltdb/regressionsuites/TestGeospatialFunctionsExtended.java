@@ -28,7 +28,11 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.TestGeospatialFunctions.Border;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb_testprocs.regressionsuites.failureprocs.GeoPointProcsWithIncompatibleParameter;
 import org.voltdb_testprocs.regressionsuites.failureprocs.GeographyProcsWithIncompatibleParameter;
 
@@ -51,7 +55,6 @@ public class TestGeospatialFunctionsExtended extends RegressionSuite {
                 + "CREATE TABLE borders (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name VARCHAR(64),\n"
-                + "  message VARCHAR(64),\n"
                 + "  region GEOGRAPHY\n"
                 + ");\n"
                 + "\n"
@@ -62,7 +65,38 @@ public class TestGeospatialFunctionsExtended extends RegressionSuite {
         project.setUseDDLSchema(true);
     }
 
-    public void testPolygonIncompatibleTypes() throws IOException {
+    private static void populatePlaces(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        client.callProcedure("places.Insert", 0, "Denver",
+                GeographyPointValue.fromWKT("POINT(-104.959 39.704)"));
+        client.callProcedure("places.Insert", 1, "Albuquerque",
+                GeographyPointValue.fromWKT("POINT(-106.599 35.113)"));
+        client.callProcedure("places.Insert", 2, "Cheyenne",
+                GeographyPointValue.fromWKT("POINT(-104.813 41.134)"));
+        client.callProcedure("places.Insert", 3, "Fort Collins",
+                GeographyPointValue.fromWKT("POINT(-105.077 40.585)"));
+        client.callProcedure("places.Insert", 4, "San Jose",
+                GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
+        client.callProcedure("places.Insert", 5, "Boston",
+                GeographyPointValue.fromWKT("POINT(-71.069862 42.338100)"));
+
+        // A null-valued point
+        client.callProcedure("places.Insert", 99, "Neverwhere", null);
+    }
+
+    private static void populateBorders(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        for (Border border : TestGeospatialFunctions.borders) {
+            client.callProcedure("borders.Insert",
+                                  border.getPk(),
+                                  border.getName(),
+                                  border.getRegion());
+        }
+    }
+
+    private static void populateTables(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        populatePlaces(client);
+        populateBorders(client);
+    }
+    public void testPolygonIncompatibleTypes() throws NoConnectionsException, IOException, ProcCallException {
         if (isDebug() || isValgrind()) {
             // Can't run the tests in debug/valgrind environment as EE has
             // asserts at different places to validate types
@@ -70,6 +104,7 @@ public class TestGeospatialFunctionsExtended extends RegressionSuite {
         }
 
         Client client = getClient();
+        populateTables(client);
 
         // Supply legal wkt or GeographyValue arg from each test entry. Supplied value will not effect the result except it has to be
         // legal wkt. The stored procedure's execution call uses hard-coded string wkt for parameterized Geography value for negative testing.
@@ -79,7 +114,7 @@ public class TestGeospatialFunctionsExtended extends RegressionSuite {
 
     }
 
-    public void testPointIncompatibleTypes() throws IOException {
+    public void testPointIncompatibleTypes() throws NoConnectionsException, IOException, ProcCallException {
         if (isDebug() || isValgrind()) {
             // Can't run this tests in debug/valgrind environment as EE has
             // asserts at different places to validate types
@@ -87,6 +122,7 @@ public class TestGeospatialFunctionsExtended extends RegressionSuite {
         }
 
         Client client = getClient();
+        populateTables(client);
 
         // Supply legal wkt or GeographyPointValue arg from each test entry. Supplied value will not effect the result except it has to be
         // legal wkt. The stored procedure's execution call uses hard-coded string wkt for parameterized point value for negative testing.
