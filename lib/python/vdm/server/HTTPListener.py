@@ -2241,15 +2241,6 @@ class StatusDatabaseAPI(MethodView):
                     has_stopped = True
                 serverDetails.append({server[0]['hostname']: response.json()})
 
-            # if has_stalled:
-            #     status.append({'status': 'stalled'})
-            # elif has_run == True and has_stopped:
-            #     status.append({'status': 'stalled'})
-            # elif not has_stalled and not has_stopped and has_run:
-            #     status.append({'status': 'running'})
-            # elif has_stopped and not has_stalled and not has_run:
-            #     status.append({'status': 'stopped'})
-
             if has_run == True:
                 status.append({'status': 'running'})
             elif has_stalled == True and not has_run:
