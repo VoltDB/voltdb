@@ -376,7 +376,7 @@ class VoltDatabase:
 
         return create_response(json.dumps(server_status), 200)
 
-    def run_voltdb_cmd(self, cmd, verb, args, outfilename):
+    def run_voltdb_cmd(self, cmd, verb, args, outfilename,server):
         """
         Runs the given voltdb command using admin user, as needed
         """
@@ -390,6 +390,7 @@ class VoltDatabase:
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
 
+        self.add_voltdb_option(server, 'admin-listener', '--host', voltdb_cmd)
 
         shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
@@ -450,7 +451,7 @@ class VoltDatabase:
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,
                 ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
-        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
+        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename,server[0])
 
     def kill_database(self, database_id):
         members = []
