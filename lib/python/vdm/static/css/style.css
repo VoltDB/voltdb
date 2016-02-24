@@ -480,6 +480,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 /******new added*******/
 
 .createDB {float:left; margin-top:7px; cursor:pointer;}
+.errorWrapper{max-height:375px; overflow-y:auto;}
 
 
 /******************************new added Ends***************/
@@ -573,6 +574,8 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	float: left;
 	width: 50%;
 	position: relative;
+	border-right:1px solid #CCC;
+	min-height: 266px;
 }
 
 .startSelect { width:160px; height:100px; margin:0 auto; padding:20px 0 0 0; }
@@ -580,7 +583,6 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 .resetpb {
 	float: right;
 	width: 50%;
-	border-left: 1px solid #CCC;/*border-right:1px solid #CCC;*/
 }
 .ContentServerHead {
 	border-bottom: 1px solid #CCCCCC;
@@ -594,7 +596,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 }
 .ContentServerBody {
 	overflow: auto;
-	height: 266px;
+
 }
 .clusterConfig {
 	background: #e4e4e4;
