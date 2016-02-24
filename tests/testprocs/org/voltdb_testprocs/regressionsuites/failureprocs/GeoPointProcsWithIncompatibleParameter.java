@@ -29,10 +29,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 
 public class GeoPointProcsWithIncompatibleParameter extends VoltProcedure {
-    // Form an enum entry for different for different geo functions that take in GeographyPointValue as argument.
-    // This enum entry stores sql statements with point value as parameter and the legal unique point wkt
-    // string that it uses as input paramter to voltQueueSql() for the given stored procedure to verify
-    // the wkt to geography point value conversion does not happen implicitly.
+    // Form an enum entry for different geo functions that take in GeographyPointValue as argument. This enum
+    // entry stores sql statements that parameterize geography point value and legal unqiue point wkt string 
+    // which is used as input parameter for the given stored procedure to voltQueueSql(). Logic is crafted verify 
+    // the wkt to Geography Point value conversion does not happen implicitly and results in EE exception.
     public final static SQLStmt containsGeo = new SQLStmt("select borders.name from borders "
                 + "  where Contains(borders.region, ?) order by borders.pk;");
 
