@@ -233,4 +233,16 @@ public class DRConsumerDrIdTracker {
     public Map<Long, Long> getDrIdRanges() {
         return m_map;
     }
+
+    @Override
+    public String toString() {
+        if (m_map.isEmpty()) {
+            return "Empty Map";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<Long, Long> entry : m_map.entrySet()) {
+            sb.append(" [" + entry.getKey() + ", " + entry.getValue() + "] ");
+        }
+        return sb.toString();
+    }
 }
