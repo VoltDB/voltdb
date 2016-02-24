@@ -76,7 +76,8 @@ static int64_t addPartitionId(int64_t value) {
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest()
-      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
+        : m_wrapper(64*1024),
+          m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
                                       "localhost", 2, &m_wrapper, NULL, 0))
     {
