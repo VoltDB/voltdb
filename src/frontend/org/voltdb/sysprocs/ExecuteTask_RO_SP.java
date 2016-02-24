@@ -72,11 +72,13 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
             if (producerPartitionMap != null) {
                 tracker = producerPartitionMap.get(producerPartitionId);
                 if (tracker == null) {
-                    tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeEmptyDRId(producerClusterId), Long.MIN_VALUE, Long.MIN_VALUE);
+                    tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeInitialAckDRId(producerClusterId),
+                            Long.MIN_VALUE, Long.MIN_VALUE);
                 }
             }
             else {
-                tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeEmptyDRId(producerClusterId), Long.MIN_VALUE, Long.MIN_VALUE);
+                tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeInitialAckDRId(producerClusterId),
+                        Long.MIN_VALUE, Long.MIN_VALUE);
             }
             JSONStringer stringer = new JSONStringer();
             try {
