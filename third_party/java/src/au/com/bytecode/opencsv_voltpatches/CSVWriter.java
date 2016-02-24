@@ -331,4 +331,8 @@ public class CSVWriter implements Closeable {
         this.resultService = resultService;
     }
 
+    public void resetWriter() {
+        pw = new PrintWriter(rawWriter);
+    }
+
 }
