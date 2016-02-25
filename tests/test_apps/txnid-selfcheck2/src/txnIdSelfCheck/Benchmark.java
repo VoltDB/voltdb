@@ -176,9 +176,6 @@ public class Benchmark {
         String disabledthreads = "none";
         ArrayList<String> disabledThreads = null;
 
-        // @Option(desc = "Add views from persistent and exported tables to the activity mix. ")
-        // boolean useviews = true;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -196,7 +193,6 @@ public class Benchmark {
             if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
             if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
             if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
-            // if (useviews != true && useviews != false) exitWithMessageAndUsage("useviews must be between true and false inclusive");
         }
 
         @Override
