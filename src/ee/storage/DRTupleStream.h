@@ -128,7 +128,7 @@ private:
 
     /**
      * check the paritition key hash of the current record
-     * and return if it is different from the previous hash seen in the txn
+     * and return true if it is different from the previous hash seen in the txn
      * updates m_hashFlag based on the hashes and records the first hash in the txn
      * first hash will be 0 if it is DR stream for replicated table
      * or the first record is TRUNCATE_TABLE

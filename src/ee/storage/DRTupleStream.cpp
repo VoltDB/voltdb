@@ -393,6 +393,10 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_beginTxnUso = m_uso;
      m_uso += io.position();
 
+     if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
+         m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
+     }
+
      m_opened = true;
 }
 
@@ -452,12 +456,12 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     m_uso += io.position();
 
-    size_t txnLength = m_uso - m_beginTxnUso;
+    int32_t txnLength = m_uso - m_beginTxnUso;
     ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
                                   txnLength);
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
     extraio.writeByte(static_cast<int8_t>(m_hashFlag));
-    extraio.writeInt(static_cast<uint32_t>(txnLength));
+    extraio.writeInt(txnLength);
     extraio.writeInt(static_cast<int32_t>(m_firstParHash));
 
     uint32_t crc = vdbcrc::crc32cInit();
@@ -467,9 +471,6 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.writeInt(crc);
 
     m_opened = false;
-    if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
-        m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
-    }
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -534,6 +535,10 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, partitionId);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
 
+        if (flag == TXN_PAR_HASH_SINGLE && partitionKeyValue <= 2) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + ii / 5));
+        }
+
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
@@ -564,5 +569,4 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
-
 }
