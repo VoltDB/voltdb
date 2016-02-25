@@ -1165,7 +1165,7 @@ SnapshotCompletionInterest, Promotable
                 if (remoteRecover != recover) {
                     String msg = "Database actions are not consistent. Remote node action is not 'recover'. " +
                                  "Please enter the same database action on the command-line.";
-                    VoltDB.crashLocalVoltDB(msg, true, null);
+                    VoltDB.crashLocalVoltDB(msg, false, null);
                 }
 
                 JSONArray snapInfos = json.getJSONArray("snapInfos");
