@@ -119,6 +119,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
+        int32_t m_partitionId;
         // ------------------------------------------------------------------
         // OBJECT ACCESS FUNCTIONS
         // ------------------------------------------------------------------
@@ -462,7 +463,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         voltdb::UndoQuantum *m_currentUndoQuantum;
 
         int64_t m_siteId;
-        int32_t m_partitionId;
         int32_t m_clusterIndex;
         boost::scoped_ptr<TheHashinator> m_hashinator;
         size_t m_startOfResultBuffer;

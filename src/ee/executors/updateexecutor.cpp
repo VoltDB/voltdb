@@ -193,7 +193,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
 
         // if there is a partition column for the target table
-        if (m_partitionColumn != -1 && !m_isMaterialized) {
+        if (m_partitionColumn != -1) {
             // check for partition problems
             // get the value for the partition column
             bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));

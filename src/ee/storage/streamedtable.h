@@ -49,7 +49,7 @@ class StreamedTable : public Table {
     friend class StreamedTableStats;
 
   public:
-    StreamedTable(bool exportEnabled);
+    StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
@@ -131,6 +131,8 @@ class StreamedTable : public Table {
         return false;
     }
 
+    int partitionColumn() const { return m_partitionColumn; }
+
     /*
      * For an export table return the sequence number
      */
@@ -152,6 +154,9 @@ private:
     ExecutorContext *m_executorContext;
     ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
+
+    // partition key
+    const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
     std::vector<ExportMaterializedViewMetadata *> m_views;

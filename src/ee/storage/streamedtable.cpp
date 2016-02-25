@@ -32,9 +32,9 @@
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(bool exportEnabled)
+StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
     : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
-      m_sequenceNo(0)
+      m_sequenceNo(0), m_partitionColumn(partitionColumn)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
@@ -44,7 +44,7 @@ StreamedTable::StreamedTable(bool exportEnabled)
 
 StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
     : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
-    m_sequenceNo(0)
+    m_sequenceNo(0), m_partitionColumn(-1)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {

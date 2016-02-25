@@ -89,7 +89,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
     m_isStreamed = (persistentTarget == NULL);
-
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
         if (m_isStreamed) {
@@ -104,6 +103,11 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
+    } else {
+        StreamedTable *streamTarget = dynamic_cast<StreamedTable*>(targetTable);
+        if (streamTarget != NULL) {
+            m_partitionColumn = streamTarget->partitionColumn();
+        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -248,10 +252,14 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         // with partitioned tables, we need to perform the insert on
         // every partition.
         if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
-            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+            bool isLocal;
+            if (m_partitionColumn != -1) {
+                isLocal = m_engine->isLocalSite(templateTuple.getNValue(m_partitionColumn));
+            } else {
+                isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+            }
             if (!isLocal) continue;
         }
-
 
         if (! m_isUpsert) {
             // try to put the tuple into the target table
