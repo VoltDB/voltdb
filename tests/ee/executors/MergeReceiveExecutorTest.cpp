@@ -154,6 +154,7 @@ TEST_F(MergeReceiveExecutorTest, emptyResultSetTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -186,6 +187,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -219,6 +221,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -252,6 +255,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -292,6 +296,7 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -348,6 +353,7 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
