@@ -106,9 +106,6 @@ protected:
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
     bool m_opened;
-    // If no pkHash for a txn exists, the value and the field in endTxn will be LONG_MIN
-    // If multiple pkHash values have been assigned for this txn, the endTxn will be LONG_MAX
-    int64_t m_txnPkHash;
     size_t m_txnRowCount;
 };
 
