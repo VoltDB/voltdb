@@ -106,7 +106,6 @@ size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
  */
 size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                               char *tableHandle,
-                                              int partitionColumn,
                                               int64_t txnId,
                                               int64_t spHandle,
                                               int64_t uniqueId,
@@ -166,7 +165,6 @@ size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
 size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                                      char *tableHandle,
-                                                     int partitionColumn,
                                                      int64_t txnId,
                                                      int64_t spHandle,
                                                      int64_t uniqueId,
@@ -432,19 +430,13 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength >= (m_defaultCapacity - m_headerSpace)) {
-            switch (sb->type()) {
-                case voltdb::NORMAL_STREAM_BLOCK:
-                {
-                    blockSize = m_secondaryCapacity;
-                    break;
-                }
-                case voltdb::LARGE_STREAM_BLOCK:
-                {
-                    blockSize = 0;
-                    break;
-                }
-            }
+        size_t spaceNeeded = m_headerSpace + partialTxnLength + minLength;
+        if (spaceNeeded > m_secondaryCapacity) {
+            // txn larger than the max buffer size, set blockSize to 0 so that caller will abort
+            blockSize = 0;
+        } else if (spaceNeeded > m_defaultCapacity) {
+            blockSize = m_secondaryCapacity;
+
         }
         if (blockSize != 0) {
             uso -= partialTxnLength;
@@ -484,7 +476,7 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
         stream.endTransaction(uid);
         ii += 5;

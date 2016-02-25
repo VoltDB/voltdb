@@ -27,6 +27,7 @@ import geb.*
 import groovy.json.*
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import spock.lang.*
 import vmcTest.pages.*
 
@@ -86,6 +87,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     static Boolean runningVoter = null;
     static Boolean runningGenqa = null;
     static Boolean runningVmcTestSever = null;
+    static Map<String,Object> sqlQueryVariables = [:]
 
     @Shared String tablesFileName = TABLES_FILE
     @Shared String viewsFileName  = VIEWS_FILE
@@ -264,28 +266,32 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             return false
         } else {
             String ddl = 'Create table ' + tableName + ' (\n' +
-                    '  rowid                     BIGINT        NOT NULL,\n' +
-                    '  rowid_group               TINYINT       NOT NULL,\n' +
+                    '  rowid                     BIGINT          NOT NULL,\n' +
+                    '  rowid_group               TINYINT         NOT NULL,\n' +
                     '  type_null_tinyint         TINYINT,\n' +
-                    '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
+                    '  type_not_null_tinyint     TINYINT         NOT NULL,\n' +
                     '  type_null_smallint        SMALLINT,\n' +
-                    '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
+                    '  type_not_null_smallint    SMALLINT        NOT NULL,\n' +
                     '  type_null_integer         INTEGER,\n' +
-                    '  type_not_null_integer     INTEGER       NOT NULL,\n' +
+                    '  type_not_null_integer     INTEGER         NOT NULL,\n' +
                     '  type_null_bigint          BIGINT,\n' +
-                    '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
+                    '  type_not_null_bigint      BIGINT          NOT NULL,\n' +
                     '  type_null_timestamp       TIMESTAMP,\n' +
-                    '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
+                    '  type_not_null_timestamp   TIMESTAMP       NOT NULL,\n' +
                     '  type_null_float           FLOAT,\n' +
-                    '  type_not_null_float       FLOAT         NOT NULL,\n' +
+                    '  type_not_null_float       FLOAT           NOT NULL,\n' +
                     '  type_null_decimal         DECIMAL,\n' +
-                    '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
+                    '  type_not_null_decimal     DECIMAL         NOT NULL,\n' +
                     '  type_null_varchar25       VARCHAR(32),\n' +
-                    '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
+                    '  type_not_null_varchar25   VARCHAR(32)     NOT NULL,\n' +
                     '  type_null_varchar128      VARCHAR(128),\n' +
-                    '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
+                    '  type_not_null_varchar128  VARCHAR(128)    NOT NULL,\n' +
                     '  type_null_varchar1024     VARCHAR(1024),\n' +
-                    '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
+                    '  type_not_null_varchar1024 VARCHAR(1024)   NOT NULL,\n' +
+                    '  type_null_point           GEOGRAPHY_POINT,\n' +
+                    '  type_not_null_point       GEOGRAPHY_POINT NOT NULL,\n' +
+                    '  type_null_polygon         GEOGRAPHY,\n' +
+                    '  type_not_null_polygon     GEOGRAPHY       NOT NULL,\n' +
                     '  PRIMARY KEY (rowid)\n' +
                     ');'
             if (partitionColumn) {
@@ -415,6 +421,11 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                         } else {
                             query += (j > 0 ? ", " : "") + "'z" + i + "'"
                         }
+                    } else if (columns.get(j).contains('geography_point')) {
+                        query += (j > 0 ? ", " : "") + "PointFromText('POINT(-"+i+" "+i+")')"
+                    } else if (columns.get(j).contains('geography')) {
+                        query += (j > 0 ? ", " : "") + "PolygonFromText('POLYGON(("+(-i)+" "+(-i)+
+                                 ", "+(-i+1)+" "+(-i)+", "+(-i)+" "+(-i+1)+", "+(-i)+" "+(-i)+"))')"
                     } else {
                         query += (j > 0 ? ", " : "") + (minIntValue + i)
                     }
@@ -654,6 +665,86 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Takes a <i>parsedText</i> Map returned by the JSON slurper, and does two
+     * things with it. First, if any keys of this Map start with "__", these
+     * are interpreted as variable names, whose values are saved for later use
+     * (in <i>sqlQueryVariables</i>). Second, the value of parsedText.sqlCmd
+     * is returned, with any variable names resolved to their values.
+     * @param parsedText - a Map returned by the JSON slurper.
+     * @return the value of parsedText.sqlCmd, with any variable names resolved
+     * to their values.
+     */
+    static String getQueryWithVariables(Map<String,Object> parsedText) {
+        // Check for any variable definitions (starting with "__") and save
+        // their values, to use in the current query or subsequent ones
+        List<String> unresolvedVariableNames = []
+        for (String key : parsedText.keySet()) {
+            if (key.startsWith("__")) {
+                Object value = resolveVariableValues(parsedText.get(key), false, true)
+                sqlQueryVariables.put(key, value)
+                if (value instanceof String && value.contains("__")) {
+                    unresolvedVariableNames.add(key)
+                }
+            }
+        }
+        // For any variables that were defined using other variables that had
+        // not yet been defined, resolve them now
+        for (String key : unresolvedVariableNames) {
+            sqlQueryVariables.put(key, resolveVariableValues(sqlQueryVariables.get(key)))
+        }
+        return (String) resolveVariableValues(parsedText.sqlCmd)
+    }
+
+    /**
+     * Takes a <i>text</i> Object (usually, but not always, a String), and
+     * returns it, with any variable names resolved to their values.
+     * @param text - normally, the text to be searched, which is then returned
+     * after resolving any unresolved variables; however, may also be a
+     * non-String Object, in which case it is simply returned intact.
+     * @param gettingResult - should be true when resolving variable values in
+     * a result (as opposed to in a query), in which case, a single variable
+     * may be used to represent a non-String Object (typically, a Map), which
+     * will then be returned as said Object; when false, a String will always
+     * be returned (assuming that <i>text</i> is a String).
+     * @param ignoreUnknownVariables - when true, no WARNING message will be
+     * printed, when an unkown variable is encountered (optional, default false).
+     * @return the original <i>text</i>, with any variable names resolved to
+     * their values.
+     */
+    static Object resolveVariableValues(Object text, boolean gettingResult=false,
+                                        boolean ignoreUnknownVariables=false) {
+        if (!(text instanceof String)) {
+            // TODO: at some point, we might want to handle Maps differently,
+            // to allow variables to be defined within a "result" Map; but
+            // for now, that is not supported
+            return text
+        }
+        String result = text
+        // Used to prevent infinite loops via recursive variable definitions
+        int maxCount = 100, count = 0
+        for (Matcher variables = result =~ /(__\w+)/; count++ < maxCount && variables.find(); variables = result =~ /(__\w+)/ ) {
+            String variable = variables.group(1)
+            // Special case, for a result whose entire text consists of one variable
+            if (gettingResult && variable.equals(text)) {
+                return sqlQueryVariables.get(variable)
+            }
+            Object value = sqlQueryVariables.get(variable);
+            if (value == null) {
+                if (!ignoreUnknownVariables) {
+                    println "\nWARNING: Unknown variable '"+variable+"'; so this query or result may fail:\n  " + result
+                }
+                break
+            }
+            result = result.replaceAll(variable, value.toString())
+        }
+        if (count >= maxCount) {
+            println "\nWARNING: this query or result contains an excessively nested, probably recursive, variable definition:\n  " +
+                    text + " (-> " + result + " )"
+        }
+        return result
+    }
+
+    /**
      * Tests all the SQL queries specified in the sqlQueries.txt file.
      */
     @Unroll // performs this method for each test in the SQL Query text file
@@ -662,12 +753,13 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         setup: 'execute the next query (or queries)'
         runQuery(page, query)
 
-        when: 'get the Query Result'
+        when: 'get the Query Result, and Expected Result'
         def qResult = page.getQueryResult()
+        def expectedResult = resolveVariableValues(expectedResponse.result, true)
 
         debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status
-        debugPrint "expect result : " + expectedResponse.result
+        debugPrint "expect result : " + expectedResult
         if (expectedResponse.error != null) {
             debugPrint "expect error  : " + expectedResponse.error
         }
@@ -691,13 +783,13 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         }
 
         and: 'for a non-matching result, check if it is just a trim issue, and print details'
-        if (qResult instanceof Map && expectedResponse.result instanceof Map && qResult != expectedResponse.result) {
+        if (qResult instanceof Map && expectedResult instanceof Map && qResult != expectedResult) {
             println "\nWARNING: query result does not match expected, for column(s):"
             boolean allDiffsCausedByTrim = true
-            def expCols = expectedResponse.result.keySet()
+            def expCols = expectedResult.keySet()
             def actCols = qResult.keySet()
             for (String col: expCols) {
-                def expCol = expectedResponse.result.get(col)
+                def expCol = expectedResult.get(col)
                 def actCol = qResult.get(col)
                 if (!expCol.equals(actCol)) {
                     println "  expected " + col + ": '" + expCol + "'"
@@ -713,7 +805,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             }
             // Check for any columns that occur in the actual, but not expected, results
             for (String col: actCols) {
-                def expCol = expectedResponse.result.get(col)
+                def expCol = expectedResult.get(col)
                 if (expCol == null) {
                     println "  expected " + col + ": '" + expCol + "'"
                     println "  actual   " + col + ": '" + qResult.get(col) + "'"
@@ -729,7 +821,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         }
 
         then: 'check the query result, error status, and error message (if any)'
-        expectedResponse.result == qResult
+        expectedResult == qResult
         expectedResponse.status == status
         expectedResponse.error == null || (error != null && error.contains(expectedResponse.error))
 
@@ -740,13 +832,12 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         line << sqlQueryLines
         iter = slurper.parseText(line)
         sqlQueriesTestName = iter.testName
-        query = iter.sqlCmd
+        query = getQueryWithVariables(iter)
         expectedResponse = iter.response
     }
 
-    //sql queries test for admin-client port
 
-
+    // SQL queries test for admin-client port
     def "Check sqlquery client to admin port switching for cancel popup"() {
 
         when: 'click the SQL Query link (if needed)'

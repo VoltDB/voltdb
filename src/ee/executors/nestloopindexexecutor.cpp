@@ -111,7 +111,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     //
     // Make sure that we actually have search keys
     //
-    int num_of_searchkeys = (int)m_indexNode->getSearchKeyExpressions().size();
+    int num_of_searchkeys = static_cast <int> (m_indexNode->getSearchKeyExpressions().size());
     //nshi commented this out in revision 4495 of the old repo in index scan executor
     VOLT_TRACE ("<Nested Loop Index exec, INIT...> Number of searchKeys: %d \n", num_of_searchkeys);
 
@@ -149,14 +149,15 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
-    NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
-    assert(node);
+    assert(dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    NestLoopIndexPlanNode* node = static_cast<NestLoopIndexPlanNode*>(m_abstractNode);
 
     // output table must be a temp table
     assert(m_tmpOutputTable);
+    // target table is a persistent table
+    assert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
+    PersistentTable* inner_table = static_cast<PersistentTable*>(m_indexNode->getTargetTable());
 
-    PersistentTable* inner_table = dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable());
-    assert(inner_table);
 
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
     assert(index);
@@ -173,7 +174,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     // Substitute parameter to SEARCH KEY Note that the expressions
     // will include TupleValueExpression even after this substitution
     //
-    int num_of_searchkeys = (int)m_indexNode->getSearchKeyExpressions().size();
+    int num_of_searchkeys = static_cast <int> (m_indexNode->getSearchKeyExpressions().size());
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
         VOLT_TRACE("Search Key[%d]:\n%s",
                    ctr, m_indexNode->getSearchKeyExpressions()[ctr]->debug(true).c_str());
@@ -327,7 +328,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
                     // re-throw if not an overflow or underflow
                     // currently, it's expected to always be an overflow or underflow
-                    if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
+                    if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW | SQLException::TYPE_VAR_LENGTH_MISMATCH)) == 0) {
                         throw e;
                     }
 
@@ -362,6 +363,25 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             else {
                                 // don't allow GTE because it breaks null handling
                                 localLookupType = INDEX_LOOKUP_TYPE_GT;
+                            }
+                        }
+                        if (e.getInternalFlags() & SQLException::TYPE_VAR_LENGTH_MISMATCH) {
+                            // shrink the search key and add the updated key to search key table tuple
+                            index_values.shrinkAndSetNValue(ctr, candidateValue);
+                            // search will be performed on shrinked key, so update lookup operation
+                            // to account for it
+                            switch (localLookupType) {
+                                case INDEX_LOOKUP_TYPE_LT:
+                                case INDEX_LOOKUP_TYPE_LTE:
+                                    localLookupType = INDEX_LOOKUP_TYPE_LTE;
+                                    break;
+                                case INDEX_LOOKUP_TYPE_GT:
+                                case INDEX_LOOKUP_TYPE_GTE:
+                                    localLookupType = INDEX_LOOKUP_TYPE_GT;
+                                    break;
+                                default:
+                                    assert(!"IndexScanExecutor::p_execute - can't index on not equals");
+                                    return false;
                             }
                         }
 

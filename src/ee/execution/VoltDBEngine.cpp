@@ -144,7 +144,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedPlanNodeType(PLAN_NODE_TYPE_INVALID),
       m_currentUndoQuantum(NULL),
-      m_partitionId(-1),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_pfCount(0),
@@ -1227,20 +1226,10 @@ void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity
 // MISC FUNCTIONS
 // -------------------------------------------------
 
-bool VoltDBEngine::isLocalSite(const NValue& value) const
+bool VoltDBEngine::isLocalSite(const NValue& value)
 {
-    int32_t index = m_hashinator->hashinate(value);
+    int index = m_hashinator->hashinate(value);
     return index == m_partitionId;
-}
-
-int32_t VoltDBEngine::getPartitionForPkHash(const int32_t pkHash) const
-{
-    return m_hashinator->partitionForToken(pkHash);
-}
-
-bool VoltDBEngine::isLocalSite(const int32_t pkHash) const
-{
-    return getPartitionForPkHash(pkHash) == m_partitionId;
 }
 
 typedef std::pair<std::string, Table*> TablePair;
@@ -1641,17 +1630,13 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
-void VoltDBEngine::setHashinator(TheHashinator* hashinator) {
-    m_hashinator.reset(hashinator);
-}
-
 void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
     switch (type) {
     case HASHINATOR_LEGACY:
-        setHashinator(LegacyHashinator::newInstance(config));
+        m_hashinator.reset(LegacyHashinator::newInstance(config));
         break;
     case HASHINATOR_ELASTIC:
-        setHashinator(ElasticHashinator::newInstance(config, configPtr, numTokens));
+        m_hashinator.reset(ElasticHashinator::newInstance(config, configPtr, numTokens));
         break;
     default:
         throwFatalException("Unknown hashinator type %d", type);

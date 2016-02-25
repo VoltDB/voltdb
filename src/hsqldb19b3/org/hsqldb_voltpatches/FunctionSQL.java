@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -671,6 +672,7 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
+    @Override
     public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
@@ -1219,6 +1221,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1789,6 +1792,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -2078,6 +2082,7 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
@@ -2088,6 +2093,7 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return opType + funcType;
     }
@@ -2095,6 +2101,7 @@ public class FunctionSQL extends Expression {
     /**
      * Returns a String representation of this object. <p>
      */
+    @Override
     public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -2429,7 +2436,26 @@ public class FunctionSQL extends Expression {
             }
             else {
                 exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT));
+            }
+            return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN:
+            Type firstArgType = nodes[0].dataType;
+            Type secondArgType = nodes[1].dataType;
+            Type thirdArgType = nodes[2].dataType;
+
+            // valid first and second arguments are geo types
+            // third argument, distance, is a numeric type
+            // resolveTypes() has logic to perform the type-validity for arguments
+            assert(firstArgType.isGeographyType() || firstArgType.isGeographyPointType());
+            assert(secondArgType.isGeographyPointType());
+            assert(thirdArgType.isNumberType());
+
+            if (firstArgType.isGeographyType()) {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN_POLYGON_POINT));
+            }
+            else {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN_POINT_POINT));
             }
             return exp;
 
@@ -2502,7 +2528,7 @@ public class FunctionSQL extends Expression {
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
-            
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);

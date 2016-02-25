@@ -280,7 +280,7 @@ public class TestExpressionUtil extends TestCase {
 
         AbstractExpression combined_exp = null;
         try {
-            combined_exp = ExpressionUtil.combine(combine_exps);
+            combined_exp = ExpressionUtil.combinePredicates(combine_exps);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -337,7 +337,7 @@ public class TestExpressionUtil extends TestCase {
         }
         AbstractExpression var_combined_exp = null;
         try {
-            var_combined_exp = ExpressionUtil.combine(combine_exps1, combine_exps2, combine_exps3, combine_exps4);
+            var_combined_exp = ExpressionUtil.combinePredicates(combine_exps1, combine_exps2, combine_exps3, combine_exps4);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

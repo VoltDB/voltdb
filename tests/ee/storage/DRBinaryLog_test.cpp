@@ -54,6 +54,9 @@ const int HIDDEN_COLUMN_COUNT = 1;
 const int CLUSTER_ID = 1;
 const int CLUSTER_ID_REPLICA = 2;
 
+const int BUFFER_SIZE = 4096;
+const int LARGE_BUFFER_SIZE = 32768;
+
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
 }
@@ -72,29 +75,6 @@ public:
         return 0;
     }
     std::vector<TableTuple> receivedTuples;
-};
-
-class MockHashinator : public TheHashinator {
-public:
-    static MockHashinator* newInstance() {
-        return new MockHashinator();
-    }
-
-    ~MockHashinator() {}
-
-protected:
-   int32_t hashinate(int64_t value) const {
-       return 0;
-   }
-
-   int32_t hashinate(const char *string, int32_t length) const {
-       return 0;
-   }
-
-   int32_t partitionForToken(int32_t hashCode) const {
-       // partition of VoltDBEngine super of MockVoltDBEngine is 0
-       return -1;
-   }
 };
 
 class MockVoltDBEngine : public VoltDBEngine {
@@ -132,7 +112,6 @@ public:
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                                                                m_exportSchema, exportColumnName,
                                                                m_exportStream, true);
-        setHashinator(MockHashinator::newInstance());
     }
     ~MockVoltDBEngine() {
         delete m_conflictExportTable;
@@ -161,6 +140,9 @@ public:
         m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
         m_engineReplica (new MockVoltDBEngine(false, CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
     {
+        m_drStream.setDefaultCapacity(BUFFER_SIZE);
+        m_drStream.setSecondaryCapacity(LARGE_BUFFER_SIZE);
+
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         m_drStreamReplica.m_enabled = false;
@@ -324,6 +306,13 @@ public:
         return tuple;
     }
 
+    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple) {
+        table->updateTuple(oldTuple, newTuple);
+        TableTuple tuple = table->lookupTupleByValues(newTuple);
+        assert(!tuple.isNullTuple());
+        return tuple;
+    }
+
     void deleteTuple(PersistentTable* table, TableTuple tuple) {
         TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
@@ -409,11 +398,11 @@ public:
         tables[44] = m_otherTableWithoutIndexReplica;
         tables[24] = m_replicatedTableReplica;
 
-        for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
-            boost::shared_ptr<StreamBlock> sb = m_topend.blocks[i - 1];
-            m_topend.blocks.pop_back();
-            boost::shared_array<char> data = m_topend.data[i - 1];
-            m_topend.data.pop_back();
+        while (!m_topend.blocks.empty()) {
+            boost::shared_ptr<StreamBlock> sb = m_topend.blocks.front();
+            m_topend.blocks.pop_front();
+            boost::shared_array<char> data = m_topend.data.front();
+            m_topend.data.pop_front();
 
             size_t startPos = sb->headerSize() - 4;
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
@@ -723,7 +712,7 @@ TEST_F(DRBinaryLogTest, VerifyHiddenColumnLookup) {
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(m_engine, true);
 
-    beginTxn(m_engine, 100, 100, 98, 71);
+    beginTxn(m_engine, 100, 100, 99, 71);
     for (int i = 0; i < 10; i++) {
         insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     }
@@ -737,7 +726,7 @@ TEST_F(DRBinaryLogTest, VerifyHiddenColumnLookup) {
     NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
     EXPECT_EQ(0, expectedTimestamp.compare(drTimestamp));
 
-    beginTxn(m_engine, 101, 101, 99, 72);
+    beginTxn(m_engine, 101, 101, 100, 72);
     deleteTuple(m_table, tuple);
     endTxn(m_engine, true);
 
@@ -781,6 +770,11 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     endTxn(m_engine, true);
 
+    TableTuple existedTuple(m_table->schema());
+    boost::shared_array<char> existedData;
+    existedData = deepCopy(second_tuple, existedTuple, existedData);
+    StackCleaner secondExistingTupleCleaner(existedTuple);
+
     // delete the second row inserted in the last write
     beginTxn(m_engine, 112, 102, 101, 73);
     deleteTuple(m_table, second_tuple);
@@ -801,7 +795,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
     tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(existedTuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
@@ -1803,6 +1797,122 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
     EXPECT_EQ(4, exportStream->receivedTuples.size());
+}
+
+TEST_F(DRBinaryLogTest, InsertOverBufferLimit) {
+    createIndexes();
+    const int total = 400;
+    int spHandle = 1;
+
+    beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+    try {
+        for (int i = 1; i <= total; i++) {
+            insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        }
+    } catch (SerializableEEException e) {
+        endTxn(m_engine, false);
+        spHandle++;
+
+        for (int i = 1; i <= total; i++, spHandle++) {
+            beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+            insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            endTxn(m_engine, true);
+        }
+
+        return;
+    }
+
+    ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, UpdateOverBufferLimit) {
+    createIndexes();
+    const int total = 150;
+    long spHandle = 1;
+
+    for (int i = 0; i < total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle-1);
+
+    // Update all tuples
+    beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+    spHandle++;
+    try {
+        // Update all rows to new values and update them back to the original
+        // values. It would overflow the DR buffer limit and cause the txn to
+        // roll back.
+        for (int i = 0; i < total; i++) {
+            TableTuple newTuple = prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i);
+            TableTuple oldTuple = m_table->lookupTupleByValues(newTuple);
+            newTuple.setNValue(1, ValueFactory::getBigIntValue(i+total));
+            updateTuple(m_table, oldTuple, newTuple);
+        }
+        for (int i = 0; i < total; i++) {
+            TableTuple newTuple = prepareTempTuple(m_table, 42, i+total, "349508345.34583", "a thing", "a totally different thing altogether", i);
+            TableTuple oldTuple = m_table->lookupTupleByValues(newTuple);
+            newTuple.setNValue(1, ValueFactory::getBigIntValue(i));
+            updateTuple(m_table, oldTuple, newTuple);
+        }
+    } catch (SerializableEEException e) {
+        endTxn(m_engine, false);
+
+        // Make sure all changes rolled back
+        for (int i = 0; i < total; i++) {
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_FALSE(tuple.isNullTuple());
+
+            TableTuple tuple2 = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i+total, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_TRUE(tuple2.isNullTuple());
+        }
+
+        return;
+    }
+    ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
+    createIndexes();
+    const int total = 2000;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle - 1);
+
+    beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+    try {
+        // Delete all rows. It would overflow the DR buffer limit and cause the
+        // txn to roll back.
+        for (int i = 1; i <= total; i++) {
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            deleteTuple(m_table, tuple);
+        }
+    } catch (SerializableEEException e) {
+        endTxn(m_engine, false);
+        spHandle++;
+
+        // Make sure all changes rolled back, try to delete each tuple in single
+        // txn to make sure indexes are also correct
+        for (int i = 1; i <= total; i++, spHandle++) {
+            beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+            TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+            ASSERT_FALSE(tuple.isNullTuple());
+
+            deleteTuple(m_table, tuple);
+            endTxn(m_engine, true);
+        }
+
+        return;
+    }
+    ASSERT_TRUE(false);
 }
 
 int main() {

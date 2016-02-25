@@ -271,7 +271,7 @@ public abstract class SubPlanAssembler {
             assert(false);
             return false;
         }
-        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombinePredicate(indexPredicate);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {
@@ -1344,35 +1344,28 @@ public abstract class SubPlanAssembler {
         AccessPath path = tableNode.m_currentAccessPath;
         assert(path != null);
 
-        AbstractPlanNode scanNode = null;
         // if no index, it is a sequential scan
         if (path.index == null) {
-            scanNode = getScanAccessPlanForTable(tableScan, path.otherExprs);
-        } else {
-            scanNode = getIndexAccessPlanForTable(tableScan, path);
+            return getScanAccessPlanForTable(tableScan, path);
         }
-        return scanNode;
+        return getIndexAccessPlanForTable(tableScan, path);
     }
 
     /**
      * Get a sequential scan access plan for a table. For multi-site plans/tables,
-     * scans at all partitions and sends to one partition.
+     * scans at all partitions.
      *
      * @param table The table to scan.
-     * @param exprs The predicate components.
+     * @param path The access path to access the data in the table (index/scan/etc).
      * @return A scan plan node
      */
     private static AbstractScanPlanNode
-    getScanAccessPlanForTable(StmtTableScan tableScan, ArrayList<AbstractExpression> exprs)
+    getScanAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
     {
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode(tableScan);
         // build the predicate
-        AbstractExpression localWhere = null;
-        if ((exprs != null) && ! exprs.isEmpty()){
-            localWhere = ExpressionUtil.combine(exprs);
-            scanNode.setPredicate(localWhere);
-        }
+        scanNode.setPredicate(path.otherExprs);
         return scanNode;
     }
 
@@ -1385,7 +1378,7 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
+    private static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
@@ -1425,11 +1418,11 @@ public abstract class SubPlanAssembler {
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        scanNode.setPredicate(path.otherExprs);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
-        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
+        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;

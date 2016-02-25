@@ -150,6 +150,8 @@ TEST_F(MergeReceiveExecutorTest, emptyResultSetTest)
     AbstractExecutor::TupleComparer comp(keys, dirs);
     int limit = -1;
     int offset = 0;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
@@ -174,13 +176,15 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
     int limit = -1;
     int offset = 0;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
@@ -206,13 +210,15 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
     int limit = 2;
     int offset = 1;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
@@ -238,13 +244,15 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
     int limit = -1;
     int offset = 10;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
@@ -275,15 +283,17 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner1(
+    boost::scoped_array<char> cleaner1(
         addPartitionData(values1, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner2(
+    boost::scoped_array<char> cleaner2(
         addPartitionData(values2, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
     int limit = -1;
     int offset = 0;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
@@ -328,17 +338,19 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner1(
+    boost::scoped_array<char> cleaner1(
         addPartitionData(values1, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner2(
+    boost::scoped_array<char> cleaner2(
         addPartitionData(values2, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner3(
+    boost::scoped_array<char> cleaner3(
         addPartitionData(values3, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
     int limit = -1;
     int offset = 0;
+    // Init the postfilter to evaluate LIMIT/OFFSET conditions
+    CountingPostfilter postfilter(NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
     CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);

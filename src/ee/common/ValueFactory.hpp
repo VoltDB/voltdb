@@ -69,6 +69,10 @@ public:
         return NValue::getTempStringValue(value.c_str(), value.length());
     }
 
+    static NValue getTempStringValue(const char *value, size_t length) {
+        return NValue::getTempStringValue(value, length);
+    }
+
     static NValue getNullStringValue() {
         return NValue::getNullStringValue();
     }

@@ -289,7 +289,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public boolean sequenceForReplay(VoltMessage message)
     {
         boolean canDeliver = false;
-        long sequenceWithTxnId = Long.MIN_VALUE;
+        long sequenceWithUniqueId = Long.MIN_VALUE;
 
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
@@ -305,20 +305,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         assert(!(commandLog && dr));
 
         if (commandLog || sentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
         }
+        //--------------------------------------------
+        // DRv1 path, mark for future removal
         else if (dr) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
+        //--------------------------------------------
 
         if (sequenceForReplay) {
-            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
             if (dupe != null) {
                 // Duplicate initiate task message, send response
                 m_mailbox.send(dupe.getInitiatorHSId(), dupe);
             }
-            else if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage) message)) {
+            else if (!m_replaySequencer.offer(sequenceWithUniqueId, (TransactionInfoBaseMessage) message)) {
                 canDeliver = true;
             }
             else {
@@ -338,10 +342,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else {
             if (replay) {
-                // Update last seen and last polled txnId for replicas
-                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                // Update last seen and last polled uniqueId for replicas
+                m_replaySequencer.updateLastSeenUniqueId(sequenceWithUniqueId,
                         (TransactionInfoBaseMessage) message);
-                m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                m_replaySequencer.updateLastPolledUniqueId(sequenceWithUniqueId,
                         (TransactionInfoBaseMessage) message);
             }
 
@@ -445,13 +449,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (message.isForReplay()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();
-                // ENG-9779
-                if (!m_outstandingTxns.isEmpty()) {
-                    m_replaySequencer.dump(m_mailbox.getHSId());
-                    tmLog.error("Detecting attempt to run SP txn(txnId=" + TxnEgo.txnIdToString(newSpHandle) +
-                            ") while there are outstanding MP txns: " + m_outstandingTxns.keySet() + " " +
-                            TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-                }
             } else if (m_isLeader && !message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
                 newSpHandle = ego.getTxnId();

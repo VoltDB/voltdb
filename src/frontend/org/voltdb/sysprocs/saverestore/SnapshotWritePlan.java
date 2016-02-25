@@ -30,13 +30,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.DevNullSnapshotTarget;
+import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
@@ -137,11 +135,9 @@ public abstract class SnapshotWritePlan
     abstract public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
+            ExtensibleSnapshotDigestData extraSnapshotData,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp);
