@@ -352,18 +352,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void voltdbrootEmptyCheck(VoltDB.Configuration config, File voltDbRoot) {
-        if (voltDbRoot.exists() && voltDbRoot.list().length > 0 && !config.m_isTest) {
-            if (config.m_forceVoltdbrootCreate) {
-                try {
-                    VoltFile.recursivelyDelete(voltDbRoot);
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Unable to delete the contents of voltdbroot.", false, e);
-                }
-            } else if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
-                VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + voltDbRoot.getAbsolutePath() +
-                                        ". Use the recover command to restore the previous database or use create --force " +
-                                        "to delete the directory and create a new database session.");
-            }
+        if (voltDbRoot.exists() && voltDbRoot.list().length > 0 && !config.m_forceStartVoltdb &&
+                config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
+            VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + voltDbRoot.getAbsolutePath() +
+                                    ". Use the recover command to restore the previous database or use create --force " +
+                                    "to delete the directory and create a new database session.");
         }
     }
 
