@@ -247,7 +247,7 @@ protected:
     TupleSchema* m_groupByKeyPartialHashSchema;
 
     // used for inline limit for serial/partial aggregate
-    AggCountingPostfilter m_postfilter;
+    CountingPostfilter m_postfilter;
 
 private:
     TupleSchema* constructGroupBySchema(bool partial);

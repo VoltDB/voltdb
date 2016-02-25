@@ -52,6 +52,7 @@ namespace voltdb {
 
 class AbstractExpression;
 class TableTuple;
+class Table;
 
 // Helper struct to evaluate a postfilter and count the number of tuples that
 // successfully passed the evaluation
@@ -60,47 +61,10 @@ struct CountingPostfilter {
     static const int NO_OFFSET = -1;
     static const int LIMIT = NO_LIMIT + 1;
 
-    CountingPostfilter(const AbstractExpression * wherePredicate, int limit, int offset);
+    CountingPostfilter();
 
-    // Returns true is LIMIT is not reached yet
-    bool isUnderLimit() const {
-        return m_limit == NO_LIMIT || m_tuple_ctr < m_limit;
-    }
-
-    // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-    bool eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple);
-
-    private:
-    friend struct AggCountingPostfilter;
-
-    // Indicate that an inline (child) AggCountingPostfilter associated with this postfilter
-    // has reached its limit
-    void setAboveLimit() {
-        m_tuple_ctr = LIMIT;
-        m_limit = LIMIT;
-        assert(m_tuple_ctr == m_limit && m_limit != NO_LIMIT);
-    }
-
-    const AbstractExpression *m_postfilter;
-    int m_limit;
-    int m_offset;
-
-    int m_tuple_skipped;
-    int m_tuple_ctr;
-};
-
-// Helper struct to evaluate an aggregate executor postfilter. If there is a limit,
-// it's reached when the number of tuples inserted into aggregator's output table equals the LIMIT
-class TempTable;
-
-struct AggCountingPostfilter {
-
-    AggCountingPostfilter();
-
-    // table - Aggregate executor's output table
-    // parentPostfilter - If the Aggregate executor is inlined, this is a pointer to a parent's node postfilter
-    // that needs to be notified when the aggregator's limit is reached
-    AggCountingPostfilter(const TempTable* table, const AbstractExpression * wherePredicate, int limit, int offset, CountingPostfilter* parentPostfilter);
+    CountingPostfilter(const Table* table, const AbstractExpression * wherePredicate, int limit, int offset,
+        CountingPostfilter* parentPostfilter = NULL);
 
     // Returns true is LIMIT is not reached yet
     bool isUnderLimit() const {
@@ -108,12 +72,20 @@ struct AggCountingPostfilter {
     }
 
     // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-    bool eval(const TableTuple* tuple);
+    bool eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple);
 
     private:
-    const TempTable* m_table;
+ 
+    // Indicate that an inline (child) AggCountingPostfilter associated with this postfilter
+    // has reached its limit
+    void setAboveLimit() {
+        m_under_limit = false;
+    }
+
+    const Table *m_table;
     const AbstractExpression *m_postfilter;
     CountingPostfilter* m_parentPostfilter;
+
     int m_limit;
     int m_offset;
 

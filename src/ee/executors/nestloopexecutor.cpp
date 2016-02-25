@@ -164,7 +164,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine, this);
     // Init the postfilter
-    CountingPostfilter postfilter(wherePredicate, limit, offset);
+    CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {

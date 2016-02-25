@@ -223,7 +223,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
     // Init the postfilter
-    CountingPostfilter postfilter(where_expression, limit, offset);
+    CountingPostfilter postfilter(m_tmpOutputTable, where_expression, limit, offset);
 
     //
     // OUTER TABLE ITERATION
