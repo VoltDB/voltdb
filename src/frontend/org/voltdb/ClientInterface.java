@@ -974,6 +974,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return clientResponse.getClass().getName();
         }
 
+        public ClientResponseImpl getClientResponse() {
+            return clientResponse;
+        }
+
         /**
          * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
