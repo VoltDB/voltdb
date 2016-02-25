@@ -193,17 +193,10 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
 
         // if there is a partition column for the target table
-        if (m_partitionColumn != -1) {
+        if (m_partitionColumn != -1 && !m_isMaterialized) {
             // check for partition problems
             // get the value for the partition column
-            NValue value;
-            //If materiliazer is true meaning we are updating stream view
-            if (m_isMaterialized) {
-                value = ValueFactory::getBigIntValue(0);
-            } else {
-                value = tempTuple.getNValue(m_partitionColumn);
-            }
-            bool isLocal = m_engine->isLocalSite(value);
+            bool isLocal = m_engine->isLocalSite(tempTuple.getNValue(m_partitionColumn));
             // if it doesn't map to this site
             if (!isLocal) {
                 throw ConstraintFailureException(
