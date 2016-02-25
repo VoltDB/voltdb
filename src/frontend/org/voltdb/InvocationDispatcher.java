@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.json_voltpatches.JSONException;
@@ -79,6 +80,7 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -104,6 +106,7 @@ public final class InvocationDispatcher {
     private final AtomicReference<Map<Integer,Long>> m_localReplicas = new AtomicReference<>(ImmutableMap.of());
     private final int [] m_allPartitions;
     private final SnapshotDaemon m_snapshotDaemon;
+    private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
@@ -407,7 +410,7 @@ public final class InvocationDispatcher {
                 if (retval != null) {
                     return retval;
                 }
-                if (isSchemaEmpty()) {
+                if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user);
                 }
             }
@@ -936,6 +939,15 @@ public final class InvocationDispatcher {
         return null;
     }
 
+    private final static void transmitResponseMessage(ClientResponse r, Connection ccxn, long handle) {
+        ClientResponseImpl response = ClientResponseImpl.class.cast(r);
+        response.setClientHandle(handle);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf).flip();
+        ccxn.writeStream().enqueue(buf);
+    }
+
     private final ClientResponseImpl useSnapshotCatalogToRestoreSnapshotSchema(
             final StoredProcedureInvocation task,
             final InvocationClientHandler handler, final Connection ccxn,
@@ -953,7 +965,9 @@ public final class InvocationDispatcher {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
             final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
             final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
-            final File catalogFH = new File(path, nonce + ".jar");
+            final File catalogFH = new VoltFile(path, nonce + ".jar");
+
+            log.info("STEBUG catalog file is " + catalogFH.getPath() + ", path is " + path + ", nonce is " + nonce);
 
             final byte[] catalog;
             try {
@@ -971,54 +985,74 @@ public final class InvocationDispatcher {
             catalogUpdateTask.setProcName("@UpdateApplicationCatalog");
             catalogUpdateTask.setParams(catalog,dep);
 
-            final long catalogUpdateConnectionId = VoltProtocolHandler.getNextConnectionId();
-            SimpleClientResponseAdapter catalogUpdateAdapter = new SimpleClientResponseAdapter(
-                    catalogUpdateConnectionId, "Empty database restore catalog update"
+            final long alternateConnectionId = VoltProtocolHandler.getNextConnectionId();
+            SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
+                    alternateConnectionId, "Empty database snapshot restore catalog update"
                     );
-            InvocationClientHandler catalogUpdateHandler = new InvocationClientHandler() {
+            InvocationClientHandler alternateHandler = new InvocationClientHandler() {
                 @Override
                 public boolean isAdmin() {
                     return handler.isAdmin();
                 }
                 @Override
                 public long connectionId() {
-                    return catalogUpdateConnectionId;
+                    return alternateConnectionId;
                 }
             };
 
-            SimpleClientResponseAdapter.SyncCallback catalogUpdateCallback =
-                    new SimpleClientResponseAdapter.SyncCallback();
-            final ListenableFuture<ClientResponse> fut = catalogUpdateCallback.getResponseFuture();
-            fut.addListener(new Runnable() {
+            final long sourceHandle = task.clientHandle;
+            SimpleClientResponseAdapter.SyncCallback restoreCallback =
+                    new SimpleClientResponseAdapter.SyncCallback()
+                    ;
+            final ListenableFuture<ClientResponse> onRestoreComplete =
+                    restoreCallback.getResponseFuture()
+                    ;
+            onRestoreComplete.addListener(new Runnable() {
                 @Override
                 public void run() {
                     ClientResponse r;
                     try {
-                        r = fut.get();
+                        r = onRestoreComplete.get();
+                    } catch (ExecutionException|InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Should never happen", true, e);
+                        return;
+                    }
+                    transmitResponseMessage(r, ccxn, sourceHandle);
+                }
+            },
+            CoreUtils.SAMETHREADEXECUTOR);
+            task.setClientHandle(alternateAdapter.registerCallback(restoreCallback));
+
+            SimpleClientResponseAdapter.SyncCallback catalogUpdateCallback =
+                    new SimpleClientResponseAdapter.SyncCallback()
+                    ;
+            final ListenableFuture<ClientResponse> onCatalogUpdateComplete =
+                    catalogUpdateCallback.getResponseFuture()
+                    ;
+            onCatalogUpdateComplete.addListener(new Runnable() {
+                @Override
+                public void run() {
+                    ClientResponse r;
+                    try {
+                        r = onCatalogUpdateComplete.get();
                     } catch (ExecutionException|InterruptedException e) {
                         VoltDB.crashLocalVoltDB("Should never happen", true, e);
                         return;
                     }
                     if (r.getStatus() != ClientResponse.SUCCESS) {
-                        ClientResponseImpl error = ClientResponseImpl.class.cast(r);
-                        error.setClientHandle(task.clientHandle);
-                        ByteBuffer buf = ByteBuffer.allocate(error.getSerializedSize() + 4);
-                        buf.putInt(buf.capacity() - 4);
-                        error.flattenToBuffer(buf).flip();
-                        ccxn.writeStream().enqueue(buf);
-
+                        transmitResponseMessage(r, ccxn, sourceHandle);
                         log.error("Received error response for updating catalog " + r.getStatusString());
                         return;
                     }
-                    dispatch(task, handler, ccxn, user);
+                    dispatch(task, alternateHandler, alternateAdapter, user);
                 }
             },
             CoreUtils.SAMETHREADEXECUTOR);
-            catalogUpdateTask.setClientHandle(catalogUpdateAdapter.registerCallback(catalogUpdateCallback));
+            catalogUpdateTask.setClientHandle(alternateAdapter.registerCallback(catalogUpdateCallback));
 
-            VoltDB.instance().getClientInterface().bindAdapter(catalogUpdateAdapter, null);
+            VoltDB.instance().getClientInterface().bindAdapter(alternateAdapter, null);
 
-            dispatchUpdateApplicationCatalog(catalogUpdateTask, catalogUpdateHandler, catalogUpdateAdapter, user, false);
+            dispatchUpdateApplicationCatalog(catalogUpdateTask, alternateHandler, alternateAdapter, user, false);
 
         } catch (JSONException e) {
             return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
