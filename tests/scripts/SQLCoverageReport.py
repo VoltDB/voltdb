@@ -279,8 +279,8 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
-                          output_dir, report_all, extra_stats='', cmpdb='HSqlDB',
-                          modified_sql_path=None, cntonly=False):
+                          output_dir, report_invalid, report_all, extra_stats='',
+                          cmpdb='HSqlDB', modified_sql_path=None, cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -298,6 +298,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     crashed = []
     voltdb_npes = []
     cmpdb_npes  = []
+    invalid     = []
     all_results = []
 
     try:
@@ -325,6 +326,8 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             count += 1
             if int(jni["Status"]) != 1:
                 failures += 1
+                if report_invalid:
+                    invalid.append(statement)
 
             statement["jni"] = jni
             statement["cmp"] = cdb
@@ -404,6 +407,9 @@ h2 {text-transform: uppercase}
     if(len(cmpdb_npes) > 0):
         sorted(cmpdb_npes, cmp=cmp, key=key)
         report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb, modified_sql)
+
+    if report_invalid and (len(invalid) > 0):
+        report += print_section("Invalid Statements", invalid, output_dir, cmpdb, modified_sql)
 
     if report_all:
         report += print_section("Total Statements", all_results, output_dir, cmpdb, modified_sql)
