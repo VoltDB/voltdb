@@ -26,6 +26,7 @@
 #include "common/TupleSchema.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
+#include "executors/executorutil.h"
 #include "executors/mergereceiveexecutor.h"
 #include "expressions/tuplevalueexpression.h"
 #include "storage/tablefactory.h"
@@ -151,11 +152,11 @@ TEST_F(MergeReceiveExecutorTest, emptyResultSetTest)
     int offset = 0;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
@@ -182,11 +183,11 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     int offset = 0;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
@@ -214,11 +215,11 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     int offset = 1;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
@@ -246,11 +247,11 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     int offset = 10;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
@@ -285,11 +286,11 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     int offset = 0;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
@@ -340,11 +341,11 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     int offset = 0;
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
-                               limit,
-                               offset,
+                               postfilter,
                                agg_exec,
                                getDstTempTable(),
                                pmp);
