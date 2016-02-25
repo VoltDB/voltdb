@@ -309,6 +309,12 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
+    virtual bool moveToCoveringCell(const TableTuple* searchKey,
+                                    IndexCursor &cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+    }
+
     virtual void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
         throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
