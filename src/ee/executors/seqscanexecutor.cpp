@@ -182,7 +182,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
         // Initialize the postfilter
-        CountingPostfilter postfilter(predicate, limit, offset);
+        CountingPostfilter postfilter(m_tmpOutputTable, predicate, limit, offset);
 
         ProgressMonitorProxy pmp(m_engine, this);
         TableTuple temp_tuple;

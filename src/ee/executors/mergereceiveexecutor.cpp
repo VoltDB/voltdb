@@ -246,7 +246,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
         m_limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(m_tmpOutputTable, NULL, limit, offset);
 
     TableTuple input_tuple;
     if (m_agg_exec != NULL) {
