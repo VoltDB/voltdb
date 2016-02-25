@@ -44,7 +44,7 @@ __db_url__ = 'http://%s:8000/api/1.0/databases/' % \
 
 class Server(unittest.TestCase):
     """
-    test cases for Server
+    Test case for adding and deleting servers
     """
     def setUp(self):
         """
@@ -107,14 +107,115 @@ class Server(unittest.TestCase):
             print "The database list is empty"
 
 
-class StartServer(Server):
+class Cluster(unittest.TestCase):
+    """
+    Test case for adding and deleting servers with ports other than the default ports
+    """
+    def setUp(self):
+        """
+        # Create a db
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        db_data = {'name': 'testDB1'}
+        response = requests.post(__db_url__, json=db_data, headers=headers)
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 404)
+        # Create a server
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test', 'client-listener': '21214', 'admin-listener': '12345'}
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 201:
+                self.assertEqual(response.status_code, 201)
+            else:
+                self.assertEqual(response.status_code, 404)
+        else:
+            print "The database list is empty"
+
+    def tearDown(self):
+        """
+        Delete the server
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be deleted is " + str(last_server_id)
+                url += str(last_server_id)
+                response = requests.delete(url)
+                self.assertEqual(response.status_code, 200)
+                # Delete database
+                db_url = __db_url__ + str(last_db_id)
+                response = requests.delete(db_url)
+                self.assertEqual(response.status_code, 200)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
+
+
+class DefaultStartServer(Server):
     """
     Create Server
     """
 
     def test_start_stop_server(self):
         """
-        ensure GET server list
+        ensure Start and stop server is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/start' % \
+                (__host_or_ip__,last_db_id)
+            print "Starting..."
+            response = requests.put(url)
+            value = response.json()
+            if not value['statusstring']:
+                print "The Server list is empty"
+            elif "Start request sent successfully to servers" in value['statusstring']:
+                self.assertEqual(response.status_code, 200)
+                time.sleep(10)
+                print "Stopping Cluster...."
+                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
+                (__host_or_ip__,last_db_id)
+                response = requests.put(url_stop)
+                value = response.json()
+                if "Connection broken" in value['statusstring']:
+                    self.assertEqual(response.status_code, 200)
+            elif response.status_code == 500:
+                self.assertEqual(response.status_code, 500)
+
+
+class StartServer(Cluster):
+    """
+    Start Server in different port
+    """
+
+    def test_start_stop_server_with_different_ports(self):
+        """
+        ensure Start and stop server is working properly using ports other than default ports
         """
         response = requests.get(__db_url__)
         value = response.json()
@@ -126,12 +227,14 @@ class StartServer(Server):
                 (__host_or_ip__,last_db_id)
 
             response = requests.put(url)
+            print "Starting...."
             value = response.json()
             if not value['statusstring']:
-                print "The Server list is empty"
+                print "error"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(10)
+                print "Stopping...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
@@ -140,9 +243,6 @@ class StartServer(Server):
                     self.assertEqual(response.status_code, 200)
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
-
-
-
 
 
 if __name__ == '__main__':
