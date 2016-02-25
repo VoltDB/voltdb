@@ -2217,7 +2217,6 @@ class StatusDatabaseAPI(MethodView):
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         has_stalled = False
-        has_stopped = False
         has_run = False
         if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
@@ -2237,17 +2236,14 @@ class StatusDatabaseAPI(MethodView):
                     has_stalled = True
                 elif response.json()['status'] == "running":
                     has_run = True
-                elif response.json()['status'] == "stopped":
-                    has_stopped = True
+
                 serverDetails.append({server[0]['hostname']: response.json()})
 
-            if has_stalled:
-                status.append({'status': 'stalled'})
-            elif has_run == True and has_stopped:
-                status.append({'status': 'stalled'})
-            elif not has_stalled and not has_stopped and has_run:
+            if has_run == True:
                 status.append({'status': 'running'})
-            elif has_stopped and not has_stalled and not has_run:
+            elif has_stalled == True:
+                status.append({'status': 'stalled'})
+            elif not has_run and not has_stalled:
                 status.append({'status': 'stopped'})
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
@@ -2274,7 +2270,20 @@ class StatusDatabaseServerAPI(MethodView):
             else:
 
                 try:
-                    client = voltdbclient.FastSerializer(str(server[0]['hostname']), 21212)
+                    if not server[0]['client-listener']:
+                        client_port = 21212
+                        client_host = str(server[0]['hostname'])
+                    else:
+                        client_listener = server[0]['client-listener']
+                        if ":" in client_listener:
+                            arr_client = client_listener.split(':', 2)
+                            client_port = int(arr_client[1])
+                            client_host = str(arr_client[0])
+                        else:
+                            client_port = int(client_listener)
+                            client_host = str(server[0]['hostname'])
+
+                    client = voltdbclient.FastSerializer(client_host, client_port)
                     proc = voltdbclient.VoltProcedure(client, "@Ping")
                     response = proc.call()
                     return jsonify({'status': "running"})
