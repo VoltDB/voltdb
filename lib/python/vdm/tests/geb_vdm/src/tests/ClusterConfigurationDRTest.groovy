@@ -94,10 +94,10 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
         }
-        then: 'Check the box to enable the DR configuration'
+        then: 'Check if id is displayed.'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                dr.enabledCheckbox.click()
+                //dr.enabledCheckbox.click()
                 waitFor { dr.idField.isDisplayed() }
                 break
             } catch(geb.waiting.WaitTimeoutException exception) {
@@ -156,27 +156,8 @@ class ClusterConfigurationDRTest extends TestBase {
             }
         }
         and: ''
-        if(dr.sourceText.text().equals("On")) {
-            println("Connection Source Status Error")
-            assert false
-        }
-        else if(dr.sourceText.text().equals("Off")) {
-            for(count=0; count<numberOfTrials; count++) {
-                try {
-                    dr.sourceCheckBox.click()
-                    waitFor { dr.sourceField.isDisplayed() }
-                    break
-                } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                    println("Stale Element Exception - Retrying")
-                } catch(geb.waiting.WaitTimeoutException e) {
-                    println("")
-                }
-            }
-        }
-        else {
-            println("Unknown Error in Connection Source Status")
-            assert false
-        }
+        waitFor {dr.addConnectionSource.isDisplayed()}
+        dr.addConnectionSource.click()
         then: ''
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -238,6 +219,7 @@ class ClusterConfigurationDRTest extends TestBase {
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
+
 
     def cleanup() { // called after each test
         count = 0
