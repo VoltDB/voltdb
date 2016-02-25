@@ -46,6 +46,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
@@ -305,8 +307,33 @@ public class Collector {
                 }
             }
 
-            collectionFilesList.add("sardata (result of executing \"sar -A\" if sar enabled)");
+            collectionFilesList.add("sardata (result of executing \"LC_ALL=C; sar -A\" if sar enabled)");
             collectionFilesList.add("dmesgdata (result of executing \"/bin/dmesg\")");
+            collectionFilesList.add("iostatdata (result of executing \"iostat -xtz 1 6\")");
+            collectionFilesList.add("netstatsdata (result of executing \"netstat -s\")");
+            collectionFilesList.add("netstatrndata (result of executing \"netstat -rn\")");
+            collectionFilesList.add("psdata (result of executing \"ps -ef\")");
+            collectionFilesList.add("lsofdata (result of executing \"lsof\")");
+            collectionFilesList.add("datedata (result of executing \"date -u & date\")");
+            collectionFilesList.add("dudata (result of executing \"du -h\")");
+            collectionFilesList.add("duvoltdbrootdata (result of executing \"du -h <voltdbroot>\")");
+            collectionFilesList.add("dudroverflowdata (result of executing \"du -h <droverflow>\")");
+            collectionFilesList.add("duexportoverflowdata (result of executing \"du -h <exportoverflow>\")");
+            collectionFilesList.add("envdata (result of executing \"env\")");
+            collectionFilesList.add("unamedata (result of executing \"uname -a\")");
+            collectionFilesList.add("sysctldata (result of executing \"sysctl -a\")");
+            collectionFilesList.add("ulimitdata (result of executing \"ulimit -a\")");
+            collectionFilesList.add("virtwhatdata (result of executing \"sudo virt-what\")");
+            if (System.getProperty("os.name").contains("Mac")) {
+                collectionFilesList.add("topdata (result of executing \"top -l 1 -n 20\")");
+            } else {
+                collectionFilesList.add("vmstatdata (result of executing \"vmstat 1 5\")");
+                collectionFilesList.add("freedata (result of executing \"free -m\")");
+                collectionFilesList.add("topdata (result of executing \"top -b -n 1 | head -30\")");
+                collectionFilesList.add("netstatantplodata (result of executing \"netstat -antplo\")");
+                collectionFilesList.add("iptablesdata (result of executing \"sudo iptables -L\")");
+                collectionFilesList.add("lsbreleasedata (result of executing \"lsb_release -a\")");
+            }
 
             File varlogDir = new File("/var/log");
             if (varlogDir.canRead()) {
@@ -423,11 +450,91 @@ public class Collector {
                 }
             }
 
-            String[] sarCmd = {"bash", "-c", "sar -A"};
+            String[] sarCmd = {"bash", "-c", "LC_ALL=C; sar -A"};
             cmd(zipStream, sarCmd, folderPath + "system_logs" + File.separator, "sardata");
 
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
             cmd(zipStream, dmesgCmd, folderPath + "system_logs" + File.separator, "dmesgdata");
+
+            String[] iostatCmd = {"bash", "-c", "iostat -xtz 1 6"};
+            cmd(zipStream, iostatCmd, folderPath + "system_logs" + File.separator, "iostatdata");
+
+            String[] netstatSCmd = {"bash", "-c", "netstat -s"};
+            cmd(zipStream, netstatSCmd, folderPath + "system_logs" + File.separator, "netstatsdata");
+
+            String[] netstatRnCmd = {"bash", "-c", "netstat -rn"};
+            cmd(zipStream, netstatRnCmd, folderPath + "system_logs" + File.separator, "netstatrndata");
+
+            String[] psCmd = {"bash", "-c", "ps -ef"};
+            cmd(zipStream, psCmd, folderPath + "system_logs" + File.separator, "psdata");
+
+            String[] lsofCmd = {"bash", "-c", "lsof"};
+            cmd(zipStream, lsofCmd, folderPath + "system_logs" + File.separator, "lsofdata");
+
+            String[] dateCmd = {"bash", "-c", "date -u & date"};
+            cmd(zipStream, dateCmd, folderPath + "system_logs" + File.separator, "datedata");
+
+            String[] duCmd = {"bash", "-c", "du -h"};
+            cmd(zipStream, duCmd, folderPath + "system_logs" + File.separator, "dudata");
+
+            String[] duVoltdbrootCmd = {"bash", "-c", "du -h " + m_config.voltdbroot};
+            cmd(zipStream, duVoltdbrootCmd, folderPath + "system_logs" + File.separator, "duvoltdbrootdata");
+
+            String drOverflowPath = m_config.voltdbroot + File.separator + "dr_overflow";
+            String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
+            DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
+            PathsType deploymentPaths = deployment.getPaths();
+            if (deploymentPaths != null) {
+                PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
+                if (drPath != null)
+                    drOverflowPath = drPath.getPath();
+                PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
+                if (exportPath != null)
+                    exportOverflowPath = exportPath.getPath();
+            }
+            String[] duDrOverflowCmd = {"bash", "-c", "du -h " + drOverflowPath};
+            cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
+
+            String[] duExportOverflowCmd = {"bash", "-c", "du -h " + exportOverflowPath};
+            cmd(zipStream, duExportOverflowCmd, folderPath + "system_logs" + File.separator, "duexportoverflowdata");
+
+            String[] envCmd = {"bash", "-c", "env"};
+            cmd(zipStream, envCmd, folderPath + "system_logs" + File.separator, "envdata");
+
+            String[] unameCmd = {"bash", "-c", "uname -a"};
+            cmd(zipStream, unameCmd, folderPath + "system_logs" + File.separator, "unamedata");
+
+            String[] sysctlCmd = {"bash", "-c", "sysctl -a"};
+            cmd(zipStream, sysctlCmd, folderPath + "system_logs" + File.separator, "sysctldata");
+
+            String[] ulimitCmd = {"bash", "-c", "ulimit -a"};
+            cmd(zipStream, ulimitCmd, folderPath + "system_logs" + File.separator, "ulimitdata");
+
+            String[] virtwhatCmd = {"bash", "-c", "sudo virt-what"};
+            cmd(zipStream, virtwhatCmd, folderPath + "system_logs" + File.separator, "virtwhatdata");
+
+            if (System.getProperty("os.name").contains("Mac")) {
+                String[] topCmd = {"bash", "-c", "top -l 1 -n 20"};
+                cmd(zipStream, topCmd, folderPath + "system_logs" + File.separator, "topdata");
+            } else {
+                String[] vmstatCmd = {"bash", "-c", "vmstat 1 5"};
+                cmd(zipStream, vmstatCmd, folderPath + "system_logs" + File.separator, "vmstatdata");
+
+                String[] freeCmd = {"bash", "-c", "free -m"};
+                cmd(zipStream, freeCmd, folderPath + "system_logs" + File.separator, "freedata");
+
+                String[] topCmd = {"bash", "-c", "top -b -n 1 | head -30"};
+                cmd(zipStream, topCmd, folderPath + "system_logs" + File.separator, "topdata");
+
+                String[] netstatAntploCmd = {"bash", "-c", "netstat -antplo"};
+                cmd(zipStream, netstatAntploCmd, folderPath + "system_logs" + File.separator, "netstatantplodata");
+
+                String[] iptablesCmd = {"bash", "-c", "sudo iptables -L"};
+                cmd(zipStream, iptablesCmd, folderPath + "system_logs" + File.separator, "iptablesdata");
+
+                String[] lsbreleaseCmd = {"bash", "-c", "lsb_release -a"};
+                cmd(zipStream, lsbreleaseCmd, folderPath + "system_logs" + File.separator, "lsbreleasedata");
+            }
             zipStream.close();
 
             long sizeInByte = new File(collectionFilePath).length();
