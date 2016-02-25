@@ -146,22 +146,18 @@ public class UpdateBaseProc extends VoltProcedure {
 
         validateCIDData(data, view, getClass().getName());
 
-        // insert to export table done, check corresponding materialized view
         if (usestreamviews) {
+            // insert to export table done, check corresponding materialized view
             validateView(cid, cnt, "insert");
-        }
 
-        // update export materialized view & validate
-        int someData = (int)System.currentTimeMillis();
-        if (usestreamviews) {
-            voltQueueSQL(p_updateExViewData, someData, someData, someData, someData, cid);
-            voltQueueSQL(p_updateExViewShadowData, someData, someData, someData, someData, cid);
+            // update export materialized view & validate
+            int someData = 5; // arbitrary. could use random but really doesn't matter
+            voltQueueSQL(p_updateExViewData, someData, someData+1, someData+2, someData+3, cid);
+            voltQueueSQL(p_updateExViewShadowData, someData, someData+1, someData+2, someData+3, cid);
             voltExecuteSQL();
             validateView(cid, cnt, "update");
-        }
 
-        // delete from export materialized view & validate
-        if (usestreamviews) {
+            // delete from export materialized view & validate
             voltQueueSQL(p_deleteExViewData, cid);
             voltQueueSQL(p_deleteExViewShadowData, cid);
             voltExecuteSQL();
@@ -182,11 +178,6 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(p_getExViewData, cid);
         voltQueueSQL(p_getExViewShadowData, cid);
         VoltTable[] streamresults = voltExecuteSQL();
-//        for (int i = 0; i < 5; i++) {
-//          String n = streamresults[0].getColumnName(i);
-//          VoltType  t = streamresults[0].getColumnType(i);
-//          System.out.println("+++ " + n + ": " + t.toSQLString());
-//        }
         validateStreamData(type, streamresults[0], streamresults[1], cid, cnt);
     }
 

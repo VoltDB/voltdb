@@ -154,7 +154,7 @@ CREATE TABLE partitioned_export
 , value      varbinary(1048576) NOT NULL
 );
 PARTITION TABLE partitioned_export ON COLUMN cid;
-EXPORT TABLE partitioned_export to stream partstream;
+EXPORT TABLE partitioned_export;
 
 CREATE VIEW ex_partview (
     cid,
@@ -193,7 +193,7 @@ CREATE TABLE replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-EXPORT TABLE replicated_export to stream replstream;
+EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
