@@ -452,12 +452,12 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     m_uso += io.position();
 
-    size_t txnLength = m_uso - m_beginTxnUso;
+    int32_t txnLength = m_uso - m_beginTxnUso;
     ExportSerializeOutput extraio(m_currBlock->mutableDataPtr() - txnLength,
                                   txnLength);
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
     extraio.writeByte(static_cast<int8_t>(m_hashFlag));
-    extraio.writeInt(static_cast<uint32_t>(txnLength));
+    extraio.writeInt(txnLength);
     extraio.writeInt(static_cast<int32_t>(m_firstParHash));
 
     uint32_t crc = vdbcrc::crc32cInit();
@@ -533,6 +533,10 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
     for (int ii = 0; ii < 100;) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, partitionId);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
+
+        if (flag == TXN_PAR_HASH_SINGLE) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + i / 5));
+        }
 
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
