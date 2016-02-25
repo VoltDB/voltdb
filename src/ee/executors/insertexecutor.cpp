@@ -234,7 +234,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                if (!m_multiPartition) {
+                if (!m_multiPartition && !m_isStreamed) {
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),
                             templateTuple,
