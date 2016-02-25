@@ -128,7 +128,7 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -174,6 +174,12 @@ class DatabaseTest extends TestBase {
         String deleteId  = page.getIdOfDatabaseDeleteButton(newId.toString())
         for(count=0; count<numberOfTrials; count++) {
             try {
+
+                try {
+                    waitFor(5) { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
                 $(id:editId).click()
                 waitFor { popupEditDatabaseButtonOk.isDisplayed() }
                 break
@@ -209,7 +215,7 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -234,6 +240,8 @@ class DatabaseTest extends TestBase {
                 println("Unable to find the ok button - Retrying")
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element - Retrying")
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Element not visible - Retrying")
             }
         }
         then: 'Verify the New Database is created'
@@ -247,6 +255,11 @@ class DatabaseTest extends TestBase {
         when: 'Click delete for the required database'
         for(count=0; count<numberOfTrials; count++) {
             try {
+                try {
+                    waitFor(5) { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
                 $(id:deleteId).click()
                 waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
                 break
@@ -272,6 +285,8 @@ class DatabaseTest extends TestBase {
                 println("Unable to find the Ok button - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 break
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
             }
         }
         then: 'Assert'

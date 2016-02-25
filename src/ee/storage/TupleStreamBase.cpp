@@ -39,9 +39,9 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(size_t extraHeaderSpace /*= 0*/)
+TupleStreamBase::TupleStreamBase(int defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
     : m_flushInterval(MAX_BUFFER_AGE),
-      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+      m_lastFlush(0), m_defaultCapacity(defaultBufferSize),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
