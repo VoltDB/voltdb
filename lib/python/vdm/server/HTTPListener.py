@@ -2217,7 +2217,6 @@ class StatusDatabaseAPI(MethodView):
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         has_stalled = False
-        has_stopped = False
         has_run = False
         if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
@@ -2237,24 +2236,14 @@ class StatusDatabaseAPI(MethodView):
                     has_stalled = True
                 elif response.json()['status'] == "running":
                     has_run = True
-                elif response.json()['status'] == "stopped":
-                    has_stopped = True
-                serverDetails.append({server[0]['hostname']: response.json()})
 
-            # if has_stalled:
-            #     status.append({'status': 'stalled'})
-            # elif has_run == True and has_stopped:
-            #     status.append({'status': 'stalled'})
-            # elif not has_stalled and not has_stopped and has_run:
-            #     status.append({'status': 'running'})
-            # elif has_stopped and not has_stalled and not has_run:
-            #     status.append({'status': 'stopped'})
+                serverDetails.append({server[0]['hostname']: response.json()})
 
             if has_run == True:
                 status.append({'status': 'running'})
-            elif has_stalled == True and not has_run:
+            elif has_stalled == True:
                 status.append({'status': 'stalled'})
-            elif has_stopped == True and not has_run and not has_stalled:
+            elif not has_run and not has_stalled:
                 status.append({'status': 'stopped'})
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
