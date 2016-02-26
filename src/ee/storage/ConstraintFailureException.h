@@ -27,6 +27,7 @@
 
 namespace voltdb {
 class PersistentTable;
+class StreamedTable;
 class VoltDBEngine;
 
 /*
@@ -53,6 +54,15 @@ public:
      */
     ConstraintFailureException(PersistentTable *table, TableTuple tuple, std::string message);
 
+    /**
+     * Special constructor for partitioning error CFEs only for StreamTable that has views
+     *
+     * @param table Table that the update or insert was performed on
+     * @param tuple Tuple that was being inserted or updated
+     * @param message Description of the partitioning failure.
+     */
+    ConstraintFailureException(StreamedTable *table, TableTuple tuple, std::string message);
+
     virtual const std::string message() const;
     virtual ~ConstraintFailureException();
 
@@ -62,6 +72,7 @@ protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
 
     PersistentTable *m_table;
+    StreamedTable *m_Streamtable;
     TableTuple m_tuple;
     TableTuple m_otherTuple;
     ConstraintType m_type;

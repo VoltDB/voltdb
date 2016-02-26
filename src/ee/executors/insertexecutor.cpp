@@ -88,7 +88,14 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
-    m_isStreamed = (persistentTarget == NULL);
+    StreamedTable *streamTarget = dynamic_cast<StreamedTable*>(targetTable);
+    m_hasStreamView = false;
+    if (streamTarget != NULL) {
+        m_isStreamed = true;
+        //See if we have any views.
+        m_hasStreamView = streamTarget->hasViews();
+        m_partitionColumn = streamTarget->partitionColumn();
+    }
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
         if (m_isStreamed) {
@@ -103,11 +110,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-    } else {
-        StreamedTable *streamTarget = dynamic_cast<StreamedTable*>(targetTable);
-        if (streamTarget != NULL) {
-            m_partitionColumn = streamTarget->partitionColumn();
-        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -234,15 +236,29 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                if (!m_multiPartition && !m_isStreamed) {
-                    throw ConstraintFailureException(
-                            dynamic_cast<PersistentTable*>(targetTable),
-                            templateTuple,
-                            "Mispartitioned tuple in single-partition insert statement.");
+                bool cont = true;
+                if (!m_multiPartition) {
+                    if (!m_isStreamed) {
+                        throw ConstraintFailureException(
+                                dynamic_cast<PersistentTable*>(targetTable),
+                                templateTuple,
+                                "Mispartitioned tuple in single-partition insert statement.");
+                    } else {
+                        if (m_hasStreamView) {
+                            StreamedTable *stable = dynamic_cast<StreamedTable*>(targetTable);
+                            throw ConstraintFailureException(stable,
+                                    templateTuple,
+                                    "Mispartitioned tuple in single-partition insert statement.");
+                        } else {
+                            //Old style export table let is slide.
+                            cont = false;
+                        }
+                    }
                 }
-
-                // don't insert
-                continue;
+                if (cont) {
+                    // don't insert
+                    continue;
+                }
             }
         } else {
             // for multi partition export tables, only insert into one

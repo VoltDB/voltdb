@@ -131,6 +131,7 @@ class StreamedTable : public Table {
         return false;
     }
 
+    bool hasViews() { return (m_views.size() > 0); }
     int partitionColumn() const { return m_partitionColumn; }
 
     /*

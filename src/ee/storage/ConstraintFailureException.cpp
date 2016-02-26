@@ -17,6 +17,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/constraintutil.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 #include "storage/table.h"
 #include <cassert>
 
@@ -45,10 +46,10 @@ ConstraintFailureException::ConstraintFailureException(
         PersistentTable *table,
         TableTuple tuple,
         string message) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
-            message,
-            VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+        SQLException(
+                SQLException::integrity_constraint_violation,
+                message,
+                VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
@@ -58,16 +59,45 @@ ConstraintFailureException::ConstraintFailureException(
     assert(!tuple.isNullTuple());
 }
 
+ConstraintFailureException::ConstraintFailureException(
+        StreamedTable *table,
+        TableTuple tuple,
+        string message) :
+    SQLException(
+            SQLException::integrity_constraint_violation,
+            message,
+            VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+    m_Streamtable(table),
+    m_tuple(tuple),
+    m_otherTuple(TableTuple()),
+    m_type(CONSTRAINT_TYPE_PARTITIONING)
+{
+    assert(m_Streamtable);
+    assert(!tuple.isNullTuple());
+}
+
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
     SQLException::p_serialize(output);
     output->writeInt(m_type);
-    output->writeTextString(m_table->name());
+    if (m_table != NULL) {
+        output->writeTextString(m_table->name());
+    } else if (m_Streamtable != NULL) {
+        output->writeTextString(m_Streamtable->name());
+    }
     size_t tableSizePosition = output->reserveBytes(4);
     TableTuple tuples[] = { m_tuple, m_otherTuple };
-    if (m_otherTuple.isNullTuple()) {
-        m_table->serializeTupleTo(*output, tuples, 1);
-    } else {
-        m_table->serializeTupleTo(*output, tuples, 2);
+    if (m_table != NULL) {
+        if (m_otherTuple.isNullTuple()) {
+            m_table->serializeTupleTo(*output, tuples, 1);
+        } else {
+            m_table->serializeTupleTo(*output, tuples, 2);
+        }
+    } else if (m_Streamtable != NULL) {
+        if (m_otherTuple.isNullTuple()) {
+            m_Streamtable->serializeTupleTo(*output, tuples, 1);
+        } else {
+            m_Streamtable->serializeTupleTo(*output, tuples, 2);
+        }
     }
     output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
 }
@@ -85,12 +115,25 @@ ConstraintFailureException::message() const
     string type_string = constraintutil::getTypeName(m_type);
     msg.append(type_string);
     msg.append("\non table: ");
-    msg.append(m_table->name());
+    if (m_table != NULL) {
+        msg.append(m_table->name());
+    } else if (m_Streamtable != NULL) {
+        msg.append(m_Streamtable->name());
+    }
+
     msg.append("\nNew tuple:\n\t");
-    msg.append(m_tuple.debug(m_table->name()));
+    if (m_table != NULL) {
+        msg.append(m_tuple.debug(m_table->name()));
+    } else if (m_Streamtable != NULL) {
+        msg.append(m_Streamtable->name());
+    }
     if (!m_otherTuple.isNullTuple()) {
         msg.append("\nOriginal tuple:\n\t");
-        msg.append(m_otherTuple.debug(m_table->name()));
+         if (m_table != NULL) {
+            msg.append(m_otherTuple.debug(m_table->name()));
+         } else if (m_Streamtable != NULL) {
+            msg.append(m_Streamtable->name());
+        }
     }
     msg.append("\n");
     return msg;
