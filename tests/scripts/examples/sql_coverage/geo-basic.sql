@@ -2,16 +2,50 @@
 {@cmp = "_eqne"} -- geo types don't do <, >, <=, >= (at least, not in a way that agrees with PostGIS)
 {@star = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), AREA(POLY1)"}
 
--- Define clauses used to ignore points or polygons that demonstrate known differences
--- between VoltDB and PostGIS, which would otherwise cause tests to fail:
-{@ignorepointeqdiffs  = "(ID < 350 OR ID > 360)"} -- ignore known differences with point equality, between VoltDB and PostGIS
-{@ignore2pointeqdiffs = "((A.ID < 308 OR A.ID > 400) AND (B.ID < 308 OR B.ID > 400))"} -- ignore point equality diffs, with a join
+-- Define clauses used to ignore points or polygons that demonstrate known differences between
+-- VoltDB and PostGIS, which would otherwise cause tests to fail. The ID numbers correspond
+-- specifically to values in the hard-coded test data defined below, that were shown to uncover
+-- incompatibilities with PostGIS. These incompatibilities are currently deemed acceptable and
+-- mostly uninteresting.
+-- First, PostGIS, oddly, considers different, but equivalent, representations of the North or
+-- South pole (e.g. 'POINT(0 90)' and 'POINT(90 90)' to be both equal and unequal (see Comments
+-- in ENG-9804; and also ENG-9991, which is a minor VoltDB bug); adding these clauses ignores
+-- certain points at the North and South poles:
+{@ignorepointeqdiffs  = "(ID < 350 OR ID > 360)"} -- ignore known differences with point equality/inequality, between VoltDB and PostGIS
+-- Same as above, for two tables with a join (and for a few more points); plus, PostGIS considers
+-- the points defined below with ID 307 and 308, which are extremely close to each other, to be
+-- equal, but VoltDB does not
+{@ignore2pointeqdiffs = "((A.ID < 340 OR A.ID > 360) AND (B.ID < 340 OR B.ID > 360) AND (B.ID < 307 OR B.ID > 308))"}
+
+-- This just ignores a tiny round-off error, when computing DISTANCE between a point and a polygon
 {@ignoredistroundoff  = "A.ID <> 553"} -- ignore tiny DISTANCE round-off errors, between VoltDB and PostGIS
-{@ignoreisvaliddiffs  = "ID < 800"} -- ignore known differences with IsValid(polygon), between VoltDB and PostGIS
-{@ignorecentroiddiffs = "ID < 500 AND ID > 300"} -- ignore known differences with CENTROID(polygon), between VoltDB and PostGIS
+
+-- PostGIS considers two polygons to be equal if their exterior rings are equal, even if their
+-- interior rings (holes) are different; VoltDB considers two polygons to be equal only if both
+-- their exterior and interior rings are the same; adding this clause causes PostGIS to behave
+-- more like VoltDB, in this regard
+{@ignore2diffnumholes = "NumInteriorRings(A.POLY1) = NumInteriorRings(B.POLY1)"} -- ignore 2 polygons with different numbers of holes, with a join
+
+-- VoltDB and PostGIS have different definitions of validity of a polygon. While they agree in
+-- some cases (e.g., both consider a polygon whose edges cross to be invalid), VoltDB considers
+-- a polygon to be valid only when its exterior ring is defined counter-clockwise, and all
+-- interior rings (if any) are defined clockwise; PostGIS ignores this, and considers clockwise
+-- exterior or counter-clockwise interior rings to be valid. On the other hand, PostGIS considers
+-- any polygon that covers the North pole or the South pole, and some (with interior rings, i.e.,
+-- holes) that cross the Antimeridian (International Date Line), to be invalid; VoltDB considers
+-- all of those to be valid.
+{@ignoreisvaliddiffs = "ID < 800"} -- ignore known differences with IsValid(polygon), between VoltDB and PostGIS
+
+-- Since invalid polygons are not necessarily well-defined (e.g., when their edges cross), calling
+-- functions like DISTANCE, AREA or CONTAINS on them may give unpredictable results, which sometimes
+-- differ between VoltDB and PostGIS
 {@ignoreinvalidpolys  = "ID < 600"} -- ignore polygons that are invalid, according to VoltDB and/or PostGIS
 {@ignore2invalidpolys = "A.ID < 600 AND B.ID < 600"} -- ignore 2 invalid polygons, with a join
-{@ignore2diffnumholes = "NumInteriorRings(A.POLY1) = NumInteriorRings(B.POLY1)"} -- ignore 2 polygons with different numbers of holes, with a join
+
+-- PostGIS's equivalent of VoltDB's CENTROID function, ST_Centroid, is a geometric, not geographic,
+-- function, which essentially means that it assumes a flat Earth; this becomes more and more
+-- inaccurate, the larger a polygon gets, and the further it is from the equator
+{@ignorecentroiddiffs = "ID < 500 AND ID > 300"} -- ignore known differences with CENTROID(polygon), between VoltDB and PostGIS
 
 
 -- Insert some random points & polygons, within certain areas:
@@ -247,9 +281,11 @@ SELECT ID, NumPoints(POLY3) NPoints, NumInteriorRings(POLY3) NHoles from _table 
 
 -- Test polygons and the IsValid function (also using AsText)
 -- (Note: certain polygons avoided here, whose IsValid has known differences between VoltDB & PostGIS)
-SELECT ID,                 AsText(POLY1) from _table G14 WHERE _maybe IsValid(POLY1) AND @ignoreisvaliddiffs
+SELECT ID, AsText(POLY1)                            from _table G14 WHERE _maybe IsValid(POLY1) AND   @ignoreisvaliddiffs
 -- This won't work until IsValid (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, IsValid(POLY1), AsText(POLY1) from _table G15 WHERE                           @ignoreisvaliddiffs
+SELECT ID, AsText(POLY1),           IsValid(POLY1)  from _table G15                             WHERE @ignoreisvaliddiffs
+-- Equivalent query, using a CASE statement
+SELECT ID, AsText(POLY1), CASE WHEN IsValid(POLY1) THEN 'True' ELSE 'False' END from _table G16 WHERE @ignoreisvaliddiffs
 
 -- Test the DISTANCE function, with points & polygons
 SELECT ID, DISTANCE(PT1,  PT2  ) from _table G18 WHERE                                                         @ignorepointeqdiffs
@@ -275,11 +311,17 @@ SELECT ID, DISTANCE(POLY1,PT2  ) from _table G33 WHERE DWithin(POLY1,PT2  , 2000
 -- planner (even when running against the PostGIS backend, which does call the planner)
 SELECT ID, DISTANCE(POLY1,POLY2) from _table G34 WHERE DWithin(POLY1,POLY2, 200000)
 -- These won't work until DWithin (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, DISTANCE(PT1,  PT2  ), DWithin(PT1,  PT2  , 200000) from _table G35
-SELECT ID, DISTANCE(PT1,  POLY1), DWithin(PT1,  POLY1, 200000) from _table G36
-SELECT ID, DISTANCE(POLY1,PT2  ), DWithin(POLY1,PT2  , 200000) from _table G37
+SELECT ID, DISTANCE(PT1,  PT2  ), DWithin(PT1,  PT2  , 200000) from _table G35    WHERE @ignorepointeqdiffs
+SELECT ID, DISTANCE(PT1,  POLY1), DWithin(PT1,  POLY1, 200000) from _table G36    WHERE @ignoreinvalidpolys
+SELECT ID, DISTANCE(POLY1,PT2  ), DWithin(POLY1,PT2  , 200000) from _table G37    WHERE @ignoreinvalidpolys
 -- This fails for both of the reasons above (DISTANCE & DWithin between two polygons and boolean return values)
 SELECT ID, DISTANCE(POLY1,POLY2), DWithin(POLY1,POLY2, 200000) from _table G38
+-- Equivalent queries, using a CASE statement
+SELECT ID, DISTANCE(PT1,  PT2  ), CASE WHEN DWithin(PT1,  PT2  , 200000) THEN 'True' ELSE 'False' END from _table G45 WHERE @ignorepointeqdiffs
+SELECT ID, DISTANCE(PT1,  POLY1), CASE WHEN DWithin(PT1,  POLY1, 200000) THEN 'True' ELSE 'False' END from _table G46 WHERE @ignoreinvalidpolys
+SELECT ID, DISTANCE(POLY1,PT2  ), CASE WHEN DWithin(POLY1,PT2  , 200000) THEN 'True' ELSE 'False' END from _table G47 WHERE @ignoreinvalidpolys
+-- Again, this equivalent query fails because DISTANCE & DWithin between two polygons is not yet supported
+SELECT ID, DISTANCE(POLY1,POLY2), CASE WHEN DWithin(POLY1,POLY2, 200000) THEN 'True' ELSE 'False' END from _table G48
 
 -- Test joins on (and comparisons of) point or polygon columns
 -- (Note: PostGIS considers two geographies to be equal if their 'bounding boxes' are the same, which
@@ -288,21 +330,23 @@ SELECT ID, DISTANCE(POLY1,POLY2), DWithin(POLY1,POLY2, 200000) from _table G38
 --  so such cases have been excluded here, since VoltDB treats them differently, by design. Similarly,
 --  we avoid the use of <, <=, >, >= here, since PostGIS and VoltDB also treat those very differently,
 --  by design.)
-SELECT   ID,     AsText(PT1)      PT1  ,           AsText(PT2)      PT2   FROM _table G40          WHERE   PT1   @cmp   PT2   AND @ignorepointeqdiffs
+SELECT   ID,     AsText(PT1)      PT1  ,           AsText(PT2)      PT2   FROM _table G50          WHERE   PT1   @cmp   PT2   AND @ignorepointeqdiffs
 SELECT A.ID AID, AsText(A.PT1  ) APT1  , B.ID BID, AsText(B.PT1  ) BPT1   FROM _table A JOIN _table B ON A.PT1   @cmp B.PT1   AND @ignore2pointeqdiffs
 SELECT A.ID AID, AsText(A.PT1  ) APT1  , B.ID BID, AsText(B.PT2  ) BPT2   FROM _table A JOIN _table B ON A.PT1   @cmp B.PT2   AND @ignore2pointeqdiffs
-SELECT   ID,     AsText(POLY1)    POLY1,           AsText(POLY2  )  POLY2 FROM _table G43          WHERE   POLY1 @cmp   POLY2
+SELECT   ID,     AsText(POLY1)    POLY1,           AsText(POLY2  )  POLY2 FROM _table G53          WHERE   POLY1 @cmp   POLY2
 SELECT A.ID AID, AsText(A.POLY1) APOLY1, B.ID BID, AsText(B.POLY1) BPOLY1 FROM _table A JOIN _table B ON A.POLY1 @cmp B.POLY1 AND @ignore2diffnumholes AND @ignore2invalidpolys
 
 -- Test polygons and the AREA function (also using AsText, IsValid)
-SELECT ID, POLY1, POLY2, POLY3         from _table G50 WHERE IsValid(POLY3)        AND @ignoreinvalidpolys
-SELECT ID, AREA(POLY1)                 from _table G51 WHERE                           @ignoreinvalidpolys
-SELECT ID, AREA(POLY1)                 from _table G52 WHERE AREA(POLY1) > 2000000 AND @ignoreinvalidpolys
-SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G53 WHERE                           @ignoreinvalidpolys
-SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G54 WHERE AREA(POLY1) > 2000000 AND @ignoreinvalidpolys
-SELECT ID, AREA(POLY1)                 from _table G55 WHERE _maybe IsValid(POLY1) AND @ignoreinvalidpolys
+SELECT ID, POLY1, POLY2, POLY3         from _table G60 WHERE IsValid(POLY3)        AND @ignoreinvalidpolys
+SELECT ID, AREA(POLY1)                 from _table G61 WHERE                           @ignoreinvalidpolys
+SELECT ID, AREA(POLY1)                 from _table G62 WHERE AREA(POLY1) > 2000000 AND @ignoreinvalidpolys
+SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G63 WHERE                           @ignoreinvalidpolys
+SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G64 WHERE AREA(POLY1) > 2000000 AND @ignoreinvalidpolys
+SELECT ID, AREA(POLY1)                 from _table G65 WHERE _maybe IsValid(POLY1) AND @ignoreinvalidpolys
 -- This won't work until IsValid (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, IsValid(POLY1), AREA(POLY1) from _table G56 WHERE                           @ignoreisvaliddiffs
+SELECT ID, AREA(POLY1), IsValid(POLY1) from _table G66 WHERE                           @ignoreinvalidpolys
+-- Equivalent query, using a CASE statement
+SELECT ID, AREA(POLY1), CASE WHEN IsValid(POLY1) THEN 'True' ELSE 'False' END from _table G67 WHERE @ignoreinvalidpolys
 
 -- Test polygons and the CENTROID function (also using AsText, LONGITUDE, LATITUDE)
 -- (Note: certain polygons avoided here, whose CENTROID has known differences between VoltDB & PostGIS)
@@ -326,6 +370,7 @@ SELECT ID, AsText(PT2),    AsText(POLY1) from _table G94 WHERE _maybe CONTAINS(P
 SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G95 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignorecentroiddiffs
 SELECT ID, AsText(PT2),    AsText(POLY2) from _table G96 WHERE _maybe CONTAINS(POLY2,PT2) AND @ignorecentroiddiffs
 
--- These won't work until CONTAINS (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, CONTAINS(POLY1,PT1), LONGITUDE(PT1), LATITUDE(PT1) from _table G97
-SELECT ID, CONTAINS(POLY1,PT1), AsText(PT1),    AsText(POLY1) from _table G98
+-- This won't work until CONTAINS (& boolean return values) is supported in the initial SELECT clause
+SELECT ID, AsText(PT1),    AsText(POLY1), CONTAINS(POLY1,PT1) from _table G98           WHERE @ignoreinvalidpolys
+-- Equivalent query, using a CASE statement
+SELECT ID, AsText(PT1),    AsText(POLY1), CASE WHEN CONTAINS(POLY1,PT1) THEN 'True' ELSE 'False' END from _table G99 WHERE @ignoreinvalidpolys
