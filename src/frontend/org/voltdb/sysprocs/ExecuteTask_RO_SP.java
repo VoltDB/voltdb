@@ -18,13 +18,13 @@
 package org.voltdb.sysprocs;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.DRConsumerDrIdTracker;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
@@ -65,24 +65,24 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
         case SP_JAVA_GET_DRID_TRACKER:
             ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[] { payload });
             int producerClusterId = (int)params.getParam(1);
-            Integer producerPartitionId = (int)params.getParam(2);
-            DRConsumerDrIdTracker tracker;
             Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
+            long lastConsumerUniqueId = ctx.getDrLastAppliedUniqueId();
             Map<Integer, DRConsumerDrIdTracker> producerPartitionMap = drIdTrackers.get(producerClusterId);
-            if (producerPartitionMap != null) {
-                tracker = producerPartitionMap.get(producerPartitionId);
-                if (tracker == null) {
-                    tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeInitialAckDRId(producerClusterId),
-                            Long.MIN_VALUE, Long.MIN_VALUE);
-                }
-            }
-            else {
-                tracker = new DRConsumerDrIdTracker(DRLogSegmentId.makeInitialAckDRId(producerClusterId),
-                        Long.MIN_VALUE, Long.MIN_VALUE);
+            if (producerPartitionMap == null) {
+                producerPartitionMap = new HashMap<Integer, DRConsumerDrIdTracker>();
             }
             JSONStringer stringer = new JSONStringer();
             try {
-                ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(stringer, producerPartitionId, tracker);
+                stringer.key(Integer.toString(producerClusterId));
+                stringer.object();
+                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : producerPartitionMap.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    stringer.key("lastConsumerUniqueId").value(lastConsumerUniqueId);
+                    ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(stringer, e.getValue());
+                    stringer.endObject();
+                }
+                stringer.endObject();
             } catch (JSONException e) {
                 throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
             }
