@@ -196,6 +196,8 @@ class DefaultStartServer(Server):
                 print "The Server list is empty"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
+                time.sleep(5)
+                CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping Cluster...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
@@ -204,6 +206,8 @@ class DefaultStartServer(Server):
                 value = response.json()
                 if "Connection broken" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(10)
+                    CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
@@ -233,6 +237,8 @@ class StartServer(Cluster):
                 print "error"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
+                time.sleep(5)
+                CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
@@ -241,9 +247,24 @@ class StartServer(Cluster):
                 value = response.json()
                 if "Connection broken" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(10)
+                    CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
+
+def CheckServerStatus(self, last_db_id, status):
+    status_url = 'http://%s:8000/api/1.0/databases/%u/status/' % \
+    (__host_or_ip__,last_db_id)
+    print "Checking status..."
+    response = requests.get(status_url)
+    value = response.json()
+    if value['status'] and value['status'][0]['status']:
+        print "Status: " + value['status'][0]['status']
+        self.assertEqual(value['status'][0]['status'], status)
+        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    else:
+        assert False
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
