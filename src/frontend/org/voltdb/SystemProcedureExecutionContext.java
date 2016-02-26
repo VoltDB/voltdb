@@ -89,7 +89,7 @@ public interface SystemProcedureExecutionContext {
 
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 
-    public long getDrLastAppliedUniqueId();
+    public Pair<Long, Long> getDrLastAppliedUniqueIds();
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
