@@ -145,32 +145,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-// There is an identical function in nestloopindexexecutor.cpp.  These
-// two functions should be merged into a common place.  But it's
-// unclear where that would be?
-static inline bool getAnotherTuple(IndexLookupType lookupType,
-                                   TableTuple* tuple,
-                                   TableIndex* index,
-                                   IndexCursor* cursor,
-                                   int activeNumOfSearchKeys) {
-    if (lookupType == INDEX_LOOKUP_TYPE_EQ
-        || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
-        *tuple = index->nextValueAtKey(*cursor);
-        if (! tuple->isNullTuple()) {
-            return true;
-        }
-    }
-
-    if ((lookupType != INDEX_LOOKUP_TYPE_EQ
-         && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
-        || activeNumOfSearchKeys == 0) {
-        *tuple = index->nextValue(*cursor);
-    }
-
-    return ! tuple->isNullTuple();
-}
-
-
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
@@ -448,11 +422,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // We have to different nextValue() methods for different lookup types
     //
     while ((limit == -1 || tuple_ctr < limit) &&
-           getAnotherTuple(localLookupType,
-                           &tuple,
-                           tableIndex,
-                           &indexCursor,
-                           activeNumOfSearchKeys)) {
+           getNextTuple(localLookupType,
+                        &tuple,
+                        tableIndex,
+                        &indexCursor,
+                        activeNumOfSearchKeys)) {
 
         if (tuple.isPendingDelete()) {
             continue;

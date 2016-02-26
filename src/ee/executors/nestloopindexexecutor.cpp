@@ -53,6 +53,7 @@
 
 #include "execution/VoltDBEngine.h"
 #include "executors/aggregateexecutor.h"
+#include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
@@ -149,34 +150,6 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-
-// There is an identical function in indexscanexecutor.cpp.  These two
-// functions should be merged into a common place.  But it's unclear
-// where that would be?
-static inline bool getAnotherTuple(IndexLookupType lookupType,
-                                   TableTuple* tuple,
-                                   TableIndex *index,
-                                   IndexCursor *cursor,
-                                   int numOfSearchKeys) {
-
-    if (lookupType == INDEX_LOOKUP_TYPE_EQ
-        || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
-
-        *tuple = index->nextValueAtKey(*cursor);
-
-        if (! tuple->isNullTuple()) {
-            return true;
-        }
-    }
-
-    if ((lookupType != INDEX_LOOKUP_TYPE_EQ
-         && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
-        || numOfSearchKeys == 0) {
-        *tuple = index->nextValue(*cursor);
-    }
-
-    return ! tuple->isNullTuple();
-}
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
@@ -497,11 +470,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 AbstractExpression* skipNullExprIteration = skipNullExpr;
 
                 while ((limit == -1 || tuple_ctr < limit) &&
-                       getAnotherTuple(localLookupType,
-                                       &inner_tuple,
-                                       index,
-                                       &indexCursor,
-                                       num_of_searchkeys)) {
+                       IndexScanExecutor::getNextTuple(localLookupType,
+                                                       &inner_tuple,
+                                                       index,
+                                                       &indexCursor,
+                                                       num_of_searchkeys)) {
 
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
