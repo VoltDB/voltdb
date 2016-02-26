@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -197,9 +198,7 @@ public class ExtensibleSnapshotDigestData {
     }
 
     static public void serializeConsumerDrIdTrackerToJSON(JSONStringer stringer,
-            Integer partitionId, DRConsumerDrIdTracker tracker)  throws JSONException {
-        stringer.key(partitionId.toString());
-        stringer.object();
+            DRConsumerDrIdTracker tracker)  throws JSONException {
         stringer.key("lastAckedDrId").value(tracker.getLastAckedDrId());
         stringer.key("spUniqueId").value(tracker.getLastSpUniqueId());
         stringer.key("mpUniqueId").value(tracker.getLastMpUniqueId());
@@ -210,7 +209,19 @@ public class ExtensibleSnapshotDigestData {
             stringer.endObject();
         }
         stringer.endArray();
-        stringer.endObject();
+    }
+
+
+    static public DRConsumerDrIdTracker JSON_ToConsumerDrIdTracker(JSONObject consumerPID) throws JSONException {
+        final DRConsumerDrIdTracker tracker = new DRConsumerDrIdTracker(consumerPID.getLong("lastAckedDrId"),
+                consumerPID.getLong("spUniqueId"), consumerPID.getLong("mpUniqueId"));
+        final JSONArray drIdRanges = consumerPID.getJSONArray("drIdRanges");
+        for (int ii = 0; ii < drIdRanges.length(); ii++) {
+            JSONObject obj = drIdRanges.getJSONObject(ii);
+            String startDrIdStr = obj.keys().next();
+            tracker.append(Long.valueOf(startDrIdStr), obj.getLong(startDrIdStr), 0L, 0L);
+        }
+        return tracker;
     }
 
     private void writeConsumerDrIdTracker(JSONStringer stringer) throws IOException {
@@ -223,7 +234,10 @@ public class ExtensibleSnapshotDigestData {
                 stringer.key(e.getKey().toString());
                 stringer.object();
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
-                    serializeConsumerDrIdTrackerToJSON(stringer, e2.getKey(), e2.getValue());
+                    stringer.key(e2.getKey().toString());
+                    stringer.object();
+                    serializeConsumerDrIdTrackerToJSON(stringer, e2.getValue());
+                    stringer.endObject();
                 }
                 stringer.endObject();
             }
