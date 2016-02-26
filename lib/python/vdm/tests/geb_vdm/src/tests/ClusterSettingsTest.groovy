@@ -161,7 +161,6 @@ class ClusterSettingsTest extends TestBase {
                 println("Unable to find edit button - Retrying")
             } catch(geb.waiting.WaitTimeoutException e) {
                 println("Unable to find the edit popup - Retrying")
-                report "123"
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element Exception - Retrying")
             }
@@ -228,110 +227,6 @@ class ClusterSettingsTest extends TestBase {
         }
     }
 
-    def ensureClientListenerIsValid(){
-        println("Test: ensureClientListenerIsValid")
-        boolean status = false
-        int newValue = 1
-
-        int value = 0
-        when: 'Create database'
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
-                println("The index of database " + indexOfNewDatabase)
-                break
-            } catch(Exception e) {
-                //deleteDatabase(create_DatabaseTest_File)
-            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
-                //deleteDatabase(create_DatabaseTest_File)
-            }
-        }
-        then: 'Choose new database'
-        println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
-
-        when:
-        count=1
-        while(count<numberOfTrials) {
-            count++
-            try {
-                waitFor { $(id:page.getIdofDeleteButton(count)).isDisplayed() }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                break
-            }
-        }
-        newValue = count
-        then:
-        println("The count is " + newValue)
-
-        when:
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                waitFor { page.btnAddServerOption.click() }
-                waitFor { page.buttonAddServer.click() }
-                waitFor { page.popupAddServer.isDisplayed() }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("Unable to find Add Server button or popup - Retrying")
-            }
-        }
-
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                waitFor { page.popupAddServerDetails.click() }
-                waitFor { page.popupAddServerClientPortField.isDisplayed() }
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("Unable to expand details - Retrying")
-            }
-        }
-        and:
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                waitFor { popupAddServerNameField.value("new_server") }
-                waitFor { popupAddServerHostNameField.value("new_host") }
-                waitFor { popupAddServerDescriptionField.value("") }
-                waitFor { popupAddServerClientPortField.value("192.168.0.1") }
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("Unable to provide value to the text fields - Retrying")
-            }
-        }
-
-        count = 0
-        then:
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                popupAddServerButtonOk.click()
-                waitFor { !popupAddServerButtonOk.isDisplayed() }
-                errorClientPort.isDisplayed()
-                errorClientPort.text().equals("Please enter a valid value.(e.g, 127.0.0.1:8000 or 8000(1-65535))")
-                status = true
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-                println("Unable to Close Popup - Retrying")
-            } catch(org.openqa.selenium.ElementNotVisibleException e) {
-                try {
-                    waitFor { !popupAddServerButtonOk.isDisplayed() }
-                } catch(geb.waiting.WaitTimeoutException f) {
-                    println("Popup Closed")
-                    break
-                }
-            }
-        }
-        report "next"
-        if(status==true) {
-            println("Test Pass")
-        }
-        else if(status==false) {
-            println("Test Fail")
-            assert false
-        }
-        else {
-            println("Unknown Error")
-            assert false
-        }
-        println()
-    }
-
     def ensureInternalInterfaceIsValid(){
         println("Test: ensureInternalInterfaceIsValid")
         boolean status = false
@@ -374,6 +269,7 @@ class ClusterSettingsTest extends TestBase {
                 waitFor { page.btnAddServerOption.click() }
                 waitFor { page.buttonAddServer.click() }
                 waitFor { page.popupAddServer.isDisplayed() }
+                break
             } catch (geb.waiting.WaitTimeoutException e) {
                 println("Unable to find Add Server button or popup - Retrying")
             }
@@ -389,7 +285,6 @@ class ClusterSettingsTest extends TestBase {
             }
         }
         println("This " + page.popupAddServerDetails.text())
-        report "hello"
         and:
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -402,7 +297,6 @@ class ClusterSettingsTest extends TestBase {
                 println("Unable to provide value to the text fields - Retrying")
             }
         }
-        report "hello_1"
         count = 0
         then:
         for(count=0; count<numberOfTrials; count++) {
@@ -424,7 +318,113 @@ class ClusterSettingsTest extends TestBase {
                 }
             }
         }
-        report "hello_2"
+
+        if(status==true) {
+            println("Test Pass")
+        }
+        else if(status==false) {
+            println("Test Fail")
+            assert false
+        }
+        else {
+            println("Unknown Error")
+            assert false
+        }
+        println()
+    }
+
+
+    def ensureClientListenerIsValid(){
+        println("Test: ensureInternalInterfaceIsValid123")
+        boolean status = false
+        int newValue = 1
+
+        int value = 0
+        when: 'Create database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                println("The index of database " + indexOfNewDatabase)
+                break
+            } catch(Exception e) {
+                //deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                //deleteDatabase(create_DatabaseTest_File)
+            }
+        }
+        then: 'Choose new database'
+        println("The index of database " + indexOfNewDatabase)
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when:
+        count=1
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor { $(id:page.getIdofDeleteButton(count)).isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                break
+            }
+        }
+        newValue = count
+        then:
+        println("The count is " + newValue)
+
+        when:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { page.btnAddServerOption.click() }
+                waitFor { page.buttonAddServer.click() }
+                waitFor { page.popupAddServer.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Unable to find Add Server button or popup - Retrying")
+            }
+        }
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { page.popupAddServerDetails.click() }
+                waitFor { page.popupAddServerClientListenerField.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Unable to expand details - Retrying")
+            }
+        }
+        println("This " + page.popupAddServerDetails.text())
+        and:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_server") }
+                waitFor { popupAddServerHostNameField.value("new_host") }
+                waitFor { popupAddServerDescriptionField.value("") }
+                waitFor { popupAddServerClientListenerField.value("sfdsaf12321") }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to the text fields - Retrying")
+            }
+        }
+        count = 0
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                //waitFor { !popupAddServerButtonOk.isDisplayed() }
+                errorInternalInterface.isDisplayed()
+                errorInternalInterface.text().equals("Please enter a valid value.(e.g, 127.0.0.1:8000 or 8000(1-65535))")
+                status = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to Close Popup - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { !popupAddServerButtonOk.isDisplayed() }
+                } catch(geb.waiting.WaitTimeoutException f) {
+                    println("Popup Closed")
+                    break
+                }
+            }
+        }
 
         if(status==true) {
             println("Test Pass")

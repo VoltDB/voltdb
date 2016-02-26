@@ -179,7 +179,7 @@ class OverviewModule extends Module {
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
         memoryLimitText                 { $("#adminTbl > tbody > tr:nth-child(26) > td.configLabel") }
-        memoryLimitField                { $(id:"txtMemoryLimit") }
+        memoryLimitField                { $("#txtMemoryLimit") }
         memoryLimitType                 { $(id:"selMemoryLimitUnit") }
         memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }
 
