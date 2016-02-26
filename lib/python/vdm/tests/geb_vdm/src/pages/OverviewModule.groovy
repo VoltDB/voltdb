@@ -33,7 +33,7 @@ import geb.Module
 class OverviewModule extends Module {
     static content = {
         // Site Per Host
-        sitePerHostText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(1) > td.configLabel") }
+        sitePerHostText                 { $("#adminTbl > tbody > tr:nth-child(1) > td.configLabel") }
         sitePerHostField                { $(id:"txtSitePerHost") }
 
         // K-Safety
@@ -180,6 +180,8 @@ class OverviewModule extends Module {
 
         memoryLimitText                 { $("#adminTbl > tbody > tr:nth-child(26) > td.configLabel") }
         memoryLimitField                { $(id:"txtMemoryLimit") }
+        memoryLimitType                 { $(id:"selMemoryLimitUnit") }
+        memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }
 
         // security
         securityText               { $("#row-6 > td.configLabel") }
