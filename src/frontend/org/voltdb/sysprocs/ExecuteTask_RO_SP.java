@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -66,7 +67,7 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
             ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[] { payload });
             int producerClusterId = (int)params.getParam(1);
             Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
-            long lastConsumerUniqueId = ctx.getDrLastAppliedUniqueId();
+            Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
             Map<Integer, DRConsumerDrIdTracker> producerPartitionMap = drIdTrackers.get(producerClusterId);
             if (producerPartitionMap == null) {
                 producerPartitionMap = new HashMap<Integer, DRConsumerDrIdTracker>();
@@ -78,7 +79,8 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e : producerPartitionMap.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    stringer.key("lastConsumerUniqueId").value(lastConsumerUniqueId);
+                    stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
+                    stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
                     ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(stringer, e.getValue());
                     stringer.endObject();
                 }
