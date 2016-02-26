@@ -9,13 +9,19 @@
 {_colpred |= "_poly2numfun(_variable[polygon])            _cmp _value[int:0,270000000000]"}  -- AREA, NumPoints, NumInteriorRings
 {_colpred |= "_2geo2numfun(_variable[point],_variable[polygon]) _cmp _value[int:0,20000000]"} --DISTANCE
 {_colpred |= "_2geo2numfun(_variable[polygon],_variable[point]) _cmp _value[int:0,20000000]"} --DISTANCE
--- Once DISTANCE(polygon,polygon) is supported, change to this version (& delete the 2 previous lines, and a similar one in configure-for-geo-polygon.sql):
+-- Once DISTANCE(polygon,polygon) is supported, change to (uncomment) this version
+-- (& delete the 2 previous lines; plus a similar one in configure-for-geo-polygon.sql??):
 --{_colpred |= "_2geo2numfun(_variable[geo],_variable[geo]) _cmp _value[int:0,20000000]"}      -- DISTANCE
 {_colpred |= "_geo2stringfun(_variable[polygon])          _cmp _value[string]"}              -- AsText
 {_colpred |= "_poly2pointfun(_variable[polygon])          @cmp _variable[point]              -- CENTROID
 {_colpred |= "_value[polygon]                             @cmp _variable[polygon]"}          -- PolygonFromText (used in "_value[polygon]")
 {_colpred |= "_poly2boolfun(_variable[polygon])"}                                            -- IsValid
 {_colpred |= "_polypoint2boolfun(_variable[polygon],_variable[point])"}                      -- CONTAINS
+{_colpred |= "_2geonum2boolfun(_variable[point],_variable[polygon],_value[int:0,20000000])"} -- DWithin
+{_colpred |= "_2geonum2boolfun(_variable[polygon],_variable[point],_value[int:0,20000000])"} -- DWithin
+-- Once DWithin(polygon,polygon,number) is supported, change to (uncomment) this version
+-- (& delete the 2 previous lines; plus a similar one in configure-for-geo-polygon.sql??):
+--{_colpred |= "_2geonum2boolfun(_variable[geo],_variable[geo],_value[int:0,20000000])"}       -- DWithin
 {@columnpredicate = "_colpred"}
 {@columntype = "polygon"}
 {@comparabletype = "polygon"}

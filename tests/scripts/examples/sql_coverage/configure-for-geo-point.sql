@@ -10,6 +10,7 @@
 {_colpred |= "_2geo2numfun(_variable[point],_variable[point]) _cmp _value[int:0,20000000]"}  -- DISTANCE
 {_colpred |= "_geo2stringfun(_variable[point])                _cmp _value[string]"}          -- AsText
 {_colpred |= "_value[point]                                   @cmp _variable[point]"}        -- PointFromText (used in "_value[point]")
+{_colpred |= "_2geonum2boolfun(_variable[point],_variable[point],_value[int:0,20000000])"}   -- DWithin
 {@columnpredicate = "_colpred"}
 {@columntype = "point"}
 {@comparabletype = "point"}

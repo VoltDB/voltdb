@@ -38,6 +38,7 @@
 {_poly2numfun |= "NumInteriorRings"}
 {_2geo2numfun |= "DISTANCE"}
 {_polypoint2boolfun |= "CONTAINS"}
+{_2geonum2boolfun |= "DWithin"}
 {_poly2boolfun |= "IsValid"}
 {_poly2pointfun |= "CENTROID"}
 {_geo2stringfun |= "AsText"}
