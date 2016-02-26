@@ -59,7 +59,7 @@ class G:
     log_file = None
     verbose = False
     # Full path glob of virtualenv packages. The latest is chosen based on the parsed version number.
-    virtualenv_package_glob = os.path.join(base_dir, 'third_party', 'python', 'packages', 'voltdeploy', 'virtualenv-*.tar.gz')
+    virtualenv_package_glob = os.path.join(base_dir, 'third_party', 'python', 'packages', 'virtualenv-*.tar.gz')
     virtualenv_parse_re = re.compile('^.*/(virtualenv-([0-9.]+))[.]tar[.]gz$')
 
 
@@ -150,12 +150,9 @@ def _build_virtual_environment(venv_dir, version, packages):
         info('Preparing the %s Python virtual environment:' % G.script_name, [
                     '(an Internet connection is required)',
                     'Folder: %s' % venv_dir])
-        args += ['--clear', '--no-site-packages', sys.platform]
+        args += ['--clear', '--system-site-packages', sys.platform]
         run_cmd(*args)
-        if packages:
-            for package in packages:
-                # info('Installing virtual environment package: %s' % package)
-                run_cmd(pip, '--quiet', 'install', '-r', package)
+        run_cmd(pip, '--quiet', 'install', '-r', packages)
     finally:
         os.chdir(save_dir)
         if save_lc_all is None:
@@ -210,14 +207,11 @@ def start_virtual_environment(arr, verbose=False):
             else:
                 build_venv = venv_version != version
 
-        packages = [os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')]
+        packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
         if build_venv:
             _build_virtual_environment(venv_dir, version, packages)
         else:
-            if packages:
-                for package in packages:
-                    # info('Installing virtual environment package: %s' % package)
-                    run_cmd(os.path.join(venv_dir, 'bin', 'pip'), '--quiet', 'install', '-r', package)
+            run_cmd(os.path.join(venv_dir, 'bin', 'pip'), '--quiet', 'install', '-r', packages)
         venv_complete = True
         # the virtual environment's Python.
         python = os.path.join(venv_dir, 'bin', 'python')
