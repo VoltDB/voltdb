@@ -125,7 +125,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
-    m_isMaterialized = targetTable->isMaterialized();
 
     return true;
 }
