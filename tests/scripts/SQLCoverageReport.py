@@ -49,19 +49,23 @@ def as_html_unicode_string(s):
 
 def generate_table_str(res, key):
 
-    highlights = res.get("highlight")
     source = res[key].get("Result")
     if not source:
         return ""
+    highlights = res.get("highlight")
+    if isinstance(highlights, list):
+        key_highlights = highlights
+    else:
+        key_highlights = res.get("highlight_" + key)
 
     result = []
-    result.append(highlight("column count: %d" % (len(source.columns)), "columns" == highlights))
-    result.append(highlight("row count: %d" % (len(source.tuples)), "tuples" == highlights))
+    result.append(highlight("column count: %d" % (len(source.columns)), "Columns" == highlights))
+    result.append(highlight("row count: %d" % (len(source.tuples)), "Tuples" == highlights))
     result.append("cols: " + ", ".join(map(lambda x: str(x), source.columns)))
     result.append("rows -")
-    if isinstance(highlights, list):
+    if isinstance(key_highlights, list):
         for j in xrange(len(source.tuples)):
-            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in highlights))
+            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in key_highlights))
     else:
         result.extend(map(lambda x: as_html_unicode_string(x), source.tuples))
     tablestr = "<br />".join(result)
@@ -228,7 +232,15 @@ def is_different(x, cntonly):
 
     if len(jniTuples) != len(cmpTuples):
         x["highlight"] = "Tuples"
+        x["highlight_jni"] = []
+        x["highlight_cmp"] = []
         # print "DEBUG is_different -- got different numbers of tuples?"
+        for ii in xrange(len(jniTuples)):
+            if jniTuples[ii] not in cmpTuples:
+                x["highlight_jni"].append(ii)
+        for ii in xrange(len(cmpTuples)):
+            if cmpTuples[ii] not in jniTuples:
+                x["highlight_cmp"].append(ii)
         return True
     # print "DEBUG is_different -- got same numbers of tuples?", len(jniTuples), "namely ", jniTuples
 
