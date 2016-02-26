@@ -174,6 +174,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      *  ReplicaDRGateway on repair
      */
     private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition;
+    private long m_lastLocalUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
 
     // Current topology
     int m_partitionId;
@@ -404,8 +405,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId, DRConsumerDrIdTracker tracker)
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                             long localUniqueId, DRConsumerDrIdTracker tracker)
         {
+            m_lastLocalUniqueId = localUniqueId;
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
                 clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
@@ -426,6 +429,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
             return m_maxSeenDrLogsBySrcPartition;
+        }
+
+        @Override
+        public long getDrLastAppliedUniqueId()
+        {
+            return m_lastLocalUniqueId;
         }
 
         @Override
