@@ -146,7 +146,7 @@ public class TestGeospatialIndexes extends RegressionSuite{
                 + "  id         INTEGER NOT NULL,\n"
                 + "  region     GEOGRAPHY\n"
                 + ");\n"
-                + "CREATE INDEX INDEX_REGION ON INDEXED_BORDERS(Region)\n;"    // Enable this once Geo Indexes are integrated
+                + "CREATE INDEX INDEX_REGION ON INDEXED_BORDERS(Region)\n;"
                 + "CREATE PROCEDURE P_CONTAINS_INDEXED AS "
                 + "  SELECT A.Region FROM INDEXED_BORDERS A \n"
                 + "         WHERE CONTAINS(A.region, ?) ORDER BY A.Region;\n"
