@@ -298,6 +298,25 @@ public class Collector {
                 }
             }
 
+            String systemLogBase;
+            if (System.getProperty("os.name").startsWith("Mac")) {
+                systemLogBase = "system.log";
+            } else {
+                String[] unameCmd = {"bash", "-c", "lsb_release -id"};
+                Process p = Runtime.getRuntime().exec(unameCmd);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String line = reader.readLine();
+                if (line.contains("Ubuntu"))
+                    systemLogBase = "syslog";
+                else
+                    systemLogBase = "messages";
+            }
+            for (File file: new File("/var/log/").listFiles()) {
+                if (file.getName().startsWith(systemLogBase)) {
+                    collectionFilesList.add(file.getCanonicalPath());
+                }
+            }
+
             if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
@@ -415,7 +434,7 @@ public class Collector {
                     entryPath = "voltdb_crashfiles" + File.separator + file.getName();
                 }
                 if (filename.startsWith("syslog") || filename.equals("dmesg") || filename.equals("systemcheck") ||
-                        filename.startsWith("hs_err_pid")) {
+                        filename.startsWith("hs_err_pid") || path.startsWith("/var/log/")) {
                     entryPath = "system_logs" + File.separator + file.getName();
                 }
                 if (filename.equals("deployment.xml") || filename.equals("catalog.jar") || filename.equals("config.json")) {
