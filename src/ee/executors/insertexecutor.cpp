@@ -244,21 +244,16 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 // don't insert
                 continue;
             }
-        }
-
-        // for multi partition export tables, only insert into one
-        // place (the partition with hash(0)), if the data is from a
-        // replicated source.  If the data is coming from a subquery
-        // with partitioned tables, we need to perform the insert on
-        // every partition.
-        if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
-            bool isLocal;
-            if (m_partitionColumn != -1) {
-                isLocal = m_engine->isLocalSite(templateTuple.getNValue(m_partitionColumn));
-            } else {
-                isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+        } else {
+            // for multi partition export tables, only insert into one
+            // place (the partition with hash(0)), if the data is from a
+            // replicated source.  If the data is coming from a subquery
+            // with partitioned tables, we need to perform the insert on
+            // every partition.
+            if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
+                bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+                if (!isLocal) continue;
             }
-            if (!isLocal) continue;
         }
 
         if (! m_isUpsert) {
