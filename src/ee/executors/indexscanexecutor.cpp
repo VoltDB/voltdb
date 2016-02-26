@@ -398,6 +398,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
             }
         }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+            tableIndex->moveToCoveringCell(&searchKey, indexCursor);
+        }
         else {
             return false;
         }
@@ -419,10 +422,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // We have to different nextValue() methods for different lookup types
     //
     while ((limit == -1 || tuple_ctr < limit) &&
-            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                    !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
-                    ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-                            !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
+           getNextTuple(localLookupType,
+                        &tuple,
+                        tableIndex,
+                        &indexCursor,
+                        activeNumOfSearchKeys)) {
+
         if (tuple.isPendingDelete()) {
             continue;
         }

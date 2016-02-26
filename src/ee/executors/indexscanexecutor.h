@@ -49,6 +49,7 @@
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 #include "executors/OptimizedProjector.hpp"
+#include "indexes/tableindex.h"
 
 #include "boost/shared_array.hpp"
 
@@ -78,6 +79,31 @@ public:
         , m_aggExec(NULL)
     {}
     ~IndexScanExecutor();
+
+    /** This is a helper function to get the "next tuple" during an
+     *   index scan, called by p_execute of both this class and
+     *   NestLoopIndexExecutor. */
+    static inline bool getNextTuple(IndexLookupType lookupType,
+                                    TableTuple* tuple,
+                                    TableIndex* index,
+                                    IndexCursor* cursor,
+                                    int activeNumOfSearchKeys) {
+        if (lookupType == INDEX_LOOKUP_TYPE_EQ
+            || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+            *tuple = index->nextValueAtKey(*cursor);
+            if (! tuple->isNullTuple()) {
+                return true;
+            }
+        }
+
+        if ((lookupType != INDEX_LOOKUP_TYPE_EQ
+             && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
+            || activeNumOfSearchKeys == 0) {
+            *tuple = index->nextValue(*cursor);
+        }
+
+        return ! tuple->isNullTuple();
+    }
 
 private:
     bool p_init(AbstractPlanNode*,

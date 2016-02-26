@@ -53,6 +53,7 @@
 
 #include "execution/VoltDBEngine.h"
 #include "executors/aggregateexecutor.h"
+#include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
@@ -148,6 +149,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     m_indexValues.init(index->getKeySchema());
     return true;
 }
+
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
@@ -454,6 +456,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             }
                         }
                     }
+                    else if (localLookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
+                        index->moveToCoveringCell(&index_values, indexCursor);
+                    }
                     else {
                         return false;
                     }
@@ -465,11 +470,12 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 AbstractExpression* skipNullExprIteration = skipNullExpr;
 
                 while ((limit == -1 || tuple_ctr < limit) &&
-                       ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                        !(inner_tuple = index->nextValueAtKey(indexCursor)).isNullTuple()) ||
-                       ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                        !(inner_tuple = index->nextValue(indexCursor)).isNullTuple())))
-                {
+                       IndexScanExecutor::getNextTuple(localLookupType,
+                                                       &inner_tuple,
+                                                       index,
+                                                       &indexCursor,
+                                                       num_of_searchkeys)) {
+
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
                     pmp.countdownProgress();
