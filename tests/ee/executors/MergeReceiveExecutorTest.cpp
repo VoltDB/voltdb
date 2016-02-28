@@ -151,10 +151,9 @@ TEST_F(MergeReceiveExecutorTest, emptyResultSetTest)
     int limit = -1;
     int offset = 0;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -184,10 +183,9 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     int limit = -1;
     int offset = 0;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -218,10 +216,9 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     int limit = 2;
     int offset = 1;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -252,10 +249,9 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     int limit = -1;
     int offset = 10;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -293,10 +289,9 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     int limit = -1;
     int offset = 0;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,
@@ -350,10 +345,9 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     int limit = -1;
     int offset = 0;
     // Init the postfilter to evaluate LIMIT/OFFSET conditions
-    CountingPostfilter postfilter(NULL, limit, offset);
+    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     AggregateExecutorBase* agg_exec = NULL;
     ProgressMonitorProxy* pmp = NULL;
-    CountingPostfilter postfilter(getDstTempTable(), NULL, limit, offset);
     MergeReceiveExecutor::merge_sort(tuples,
                                partitionTupleCounts,
                                comp,

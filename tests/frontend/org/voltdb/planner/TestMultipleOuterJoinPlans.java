@@ -244,6 +244,15 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = n.getChild(1);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
 
+        // The R1-R2 FULL join is an outer node in the top LEFT join - not simplified
+        pn = compile("select * FROM " +
+                "R1 FULL JOIN R2 ON R1.A = R2.A " +
+                    "LEFT JOIN R3 ON R3.A = R2.A");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
+
         // The R3.A = R2.A AND R3.A = R1.A join condition is NULL-rejecting for the FULL join
         // OUTER (R1) and INNER (R1) tables simplifying it to R1 JOIN R2
         pn = compile("select * FROM " +
@@ -256,9 +265,10 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // should be ExpressionType.COMPARE_EQUAL
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
 
+        // The R4 FULL join is an outer node in the R5 FULL join and can not be simplified by the R1.A = R5.A ON expression
         // R1 RIGHT JOIN R2 ON R1.A = R2.A                  R1 JOIN R3 ON R1.A = R3.A
         //      JOIN R3 ON R1.A = R3.A               ==>        JOIN  R2 ON R1.A = R2.A
-        //          FULL JOIN R4 ON R1.A = R4.A                     LEFT JOIN R4 ON R1.A = R4.A
+        //          FULL JOIN R4 ON R1.A = R4.A                     FULL JOIN R4 ON R1.A = R4.A
         //              FULL JOIN R5 ON R1.A = R5.A                     FULL JOIN R5 ON R1.A = R5.A
         pn = compile("select * FROM " +
                 "R1 RIGHT JOIN R2 ON R1.A = R2.A " +
@@ -268,11 +278,25 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = pn.getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN, null, "R5");
         n = n.getChild(0);
-        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R4");
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R4");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.SEQSCAN, null, "R2");
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
+
+        // The R1-R2 RIGHT join is an outer node in the top FULL join - not simplified
+        pn = compile("SELECT * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A FULL JOIN R3 ON R3.A = R1.A");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R2", "R1");
+
+        // The R1-R2 LEFT join is an outer node in the top FULL join - not simplified
+        pn = compile("SELECT * FROM R1 LEFT JOIN R2 ON R1.A = R2.A FULL JOIN R3 ON R3.A = R2.A");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R3");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
     }
 
     public void testMultitableDistributedJoin() {

@@ -2810,9 +2810,8 @@ public class PlanAssembler {
             }
         }
 
-        // Now add this node expression to the list and descend
-        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
-        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
+        // Now add this node expression to the list and descend. Only join expressions need to be considered -
+        // Thw WHERE expressions reside at the root node only and simplifyOuterJoin already added them to he list
         List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
         if (leftNode.getJoinExpression() != null) {
             newExprs.add(leftNode.getJoinExpression());
@@ -2821,15 +2820,18 @@ public class PlanAssembler {
             newExprs.add(rightNode.getJoinExpression());
         }
 
-        if (leftNode.getWhereExpression() != null) {
-            exprs.add(leftNode.getWhereExpression());
-        }
-        if (rightNode.getWhereExpression() != null) {
-            exprs.add(rightNode.getWhereExpression());
-        }
-
-        if (joinNode.getJoinType() == JoinType.INNER || joinNode.getJoinType() == JoinType.FULL) {
+        // In case of outer join, ON expressions can only be NULL rejecting for the inner node.
+        // The outer node does not introduce NULLs
+        if (joinNode.getJoinType() == JoinType.INNER) {
             exprs.addAll(newExprs);
+            if (leftNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
+            }
+            if (rightNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
+            }
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
+            // Both nodes are OUTER
             if (leftNode instanceof BranchNode) {
                 simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
             }
