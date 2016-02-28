@@ -284,6 +284,31 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
 
+        // The R1-R2 LEFT JOIN belongs to the outer node of the top FULL join
+        // and can't be simplified by the R2.A = R4.A ON join condition
+        pn = compile("select * FROM " +
+                "R1 LEFT JOIN R2 ON R1.A = R2.A " +
+                    "JOIN R3 ON R1.A = R3.A " +
+                    "FULL JOIN R4 ON R2.A = R4.A");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.INDEXSCAN, null, "R4");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN, null, "R3");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "R1", "R2");
+
+        // The R2.A > 0 WHERE expression is NULL rejecting for all outer joins
+        pn = compile("select * FROM " +
+                "R1 LEFT JOIN R2 ON R1.A = R2.A " +
+                    "JOIN R3 ON R1.A = R3.A " +
+                    "FULL JOIN R4 ON R1.A = R4.A WHERE R2.A > 0");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.LEFT, null, null, null, PlanNodeType.NESTLOOP, PlanNodeType.INDEXSCAN, null, "R4");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.INNER, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOPINDEX, PlanNodeType.SEQSCAN, null, "R2");
+        n = n.getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.INNER, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
+
         // The R1-R2 RIGHT join is an outer node in the top FULL join - not simplified
         pn = compile("SELECT * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A FULL JOIN R3 ON R3.A = R1.A");
         n = pn.getChild(0).getChild(0);
