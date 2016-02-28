@@ -544,8 +544,9 @@ TEST_F(CoveringCellIndexTest, Simple) {
 
     scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {0, 3});
 
+    std::set<int32_t> emptySet;
     searchKey.tuple().setNValue(0, pointWktToNval("point(-1 -1)"));
-    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
+    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), emptySet);
 
     // Now try to delete a tuple.
     tempTuple.setNValue(PK_COL_INDEX, ValueFactory::getIntegerValue(3));
@@ -570,7 +571,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
 
     // Now tuple 0 should not contain this point.
     searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));
-    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
+    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), emptySet);
 
     // But tuple 0 should contains this one.
     searchKey.tuple().setNValue(0, pointWktToNval("point(10.01 10.01)"));
@@ -578,7 +579,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
 
     // Searching for the null value should return nothing.
     searchKey.tuple().setNValue(0, NValue::getNullValue(VALUE_TYPE_POINT));
-    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), {});
+    scanIndexWithExpectedValues(table.get(), ccIndex, searchKey.tuple(), emptySet);
 
     // Make sure the index is still valid what with all these changes and all.
     std::string msg;
