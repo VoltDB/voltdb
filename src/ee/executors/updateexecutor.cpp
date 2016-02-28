@@ -199,8 +199,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             // if it doesn't map to this site
             if (!isLocal) {
                 throw ConstraintFailureException(
-                         dynamic_cast<PersistentTable*>(targetTable),
-                         tempTuple,
+                         targetTable, tempTuple,
                          "An update to a partitioning column triggered a partitioning error. "
                          "Updating a partitioning column is not supported. Try delete followed by insert.");
             }

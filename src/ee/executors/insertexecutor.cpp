@@ -240,17 +240,18 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 if (!m_multiPartition) {
                     if (!m_isStreamed) {
                         throw ConstraintFailureException(
-                                dynamic_cast<PersistentTable*>(targetTable),
-                                templateTuple,
+                                targetTable, templateTuple,
                                 "Mispartitioned tuple in single-partition insert statement.");
                     } else {
                         if (m_hasStreamView) {
-                            StreamedTable *stable = dynamic_cast<StreamedTable*>(targetTable);
-                            throw ConstraintFailureException(stable,
-                                    templateTuple,
+                            throw ConstraintFailureException(
+                                    targetTable, templateTuple,
                                     "Mispartitioned tuple in single-partition insert statement.");
                         } else {
-                            //Old style export table let is slide.
+                            //when stream table has no views we let this insert slide and execute in
+                            //site where the SP is running. This was behavior when we had only export
+                            //table and no views on it. With views we have to be strict and throw mispartitioned
+                            //tuple see if block above.
                             cont = false;
                         }
                     }
