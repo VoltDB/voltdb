@@ -75,7 +75,7 @@ struct CountingPostfilter {
     bool eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple);
 
     private:
- 
+
     // Indicate that an inline (child) AggCountingPostfilter associated with this postfilter
     // has reached its limit
     void setAboveLimit() {
