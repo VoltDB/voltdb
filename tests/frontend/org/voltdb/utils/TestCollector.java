@@ -114,7 +114,7 @@ public class TestCollector {
                                     });
 
         rootDir = CoreUtils.getHostnameOrAddress() + "_voltlogs_";
-        File collectionFile = new File(voltDbRootPath, rootDir + ".zip");
+        File collectionFile = new File(voltDbRootPath, rootDir + ".zipfile");
         assertTrue(collectionFile.exists());
 
         return new ZipFile(collectionFile);
