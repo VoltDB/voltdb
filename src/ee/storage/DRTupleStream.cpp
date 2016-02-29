@@ -535,7 +535,7 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
 
         if (flag == TXN_PAR_HASH_SINGLE) {
-            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + i / 5));
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + ii / 5));
         }
 
         for (int zz = 0; zz < 5; zz++) {
