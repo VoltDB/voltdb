@@ -76,11 +76,11 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
             try {
                 stringer.key(Integer.toString(producerClusterId));
                 stringer.object();
+                stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
+                stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e : producerPartitionMap.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
-                    stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
                     ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(stringer, e.getValue());
                     stringer.endObject();
                 }
