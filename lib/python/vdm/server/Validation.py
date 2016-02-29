@@ -52,7 +52,7 @@ class Validation(object):
                 try:
                     socket.inet_pton(socket.AF_INET, array[0])
                 except AttributeError:
-                    print traceback.format_exc()
+                    #print traceback.format_exc()
                     try:
                         socket.inet_aton(array[0])
                     except socket.error:
@@ -60,15 +60,15 @@ class Validation(object):
                         raise ValidationError('Invalid IP address')
                     return array[0].count('.') == 3
                 except socket.error:
-                    print traceback.format_exc()
+                    #print traceback.format_exc()
                     raise ValidationError('Invalid IP address')
                 try:
                     val = int(array[1])
                     if val < 1 or val >= 65535:
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                 except ValueError as err:
-                    msg = err.message
-                    print traceback.format_exc()
+                    msg = err.args[0]
+                    #print traceback.format_exc()
                     if msg is 'Port must be greater than 1 and less than 65535':
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                     else:
@@ -81,8 +81,8 @@ class Validation(object):
                 if val < 1 or val > 65536:
                     raise ValidationError('Port must be greater than 1 and less than 65535')
             except ValueError as err:
-                msg = err.message
-                print traceback.format_exc()
+                msg = err.args[0]
+                #print traceback.format_exc()
                 if msg is 'Port must be greater than 1 and less than 65535':
                     raise ValidationError('Port must be greater than 1 and less than 65535')
                 else:

@@ -39,11 +39,6 @@ import sys
 from optparse import OptionParser
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../lib/python/vdm/server'))
 import venv_starter
-import urllib2
-
-array_packages = []
-
-
 
 
 parser = OptionParser(usage="usage: %prog [options] filepath",
@@ -67,19 +62,10 @@ arr = [{
     "server": options.server,
 }]
 
-cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
-base_dir = os.path.dirname(cmd_dir)
-
-with open(os.path.realpath(os.path.join(base_dir, 'lib/python/vdm', 'requirements.txt')), "r") as ins:
-        for line in ins:
-            if line[0] != '#' and line[0] != '\n':
-                package_name = line
-                array_packages.append(package_name)
-
 if options.virtual is not None:
     if str(options.virtual).lower() == 'false':
         venv_starter.main(arr)
     else:
-        venv_starter.start_virtual_environment(arr, array_packages)
+        venv_starter.start_virtual_environment(arr)
 else:
-    venv_starter.start_virtual_environment(arr, array_packages)
+    venv_starter.start_virtual_environment(arr)

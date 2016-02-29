@@ -3,6 +3,7 @@
 -- strings don't do math
 {@aftermath = " "}
 {@agg = "_genericagg"} -- strings don't do SUM or AVG
+{@distinctableagg = "COUNT"} -- strings don't do SUM
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_stringcolumnpredicate"}
@@ -19,6 +20,7 @@
 {@onefun = ""}
 --{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
+{@plus10 = "+ 10"}  -- Addition here is interpreted as concatenation
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "VCHAR"}
