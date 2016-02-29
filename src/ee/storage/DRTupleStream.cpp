@@ -393,6 +393,10 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_beginTxnUso = m_uso;
      m_uso += io.position();
 
+     if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
+         m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
+     }
+
      m_opened = true;
 }
 
@@ -467,9 +471,6 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.writeInt(crc);
 
     m_opened = false;
-    if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
-        m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
-    }
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -568,5 +569,4 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
-
 }
