@@ -2810,14 +2810,21 @@ public class PlanAssembler {
             }
         }
 
-        // Now add this node expression to the list and descend. Only join expressions need to be considered -
-        // Thw WHERE expressions reside at the root node only and simplifyOuterJoin already added them to he list
+        // Now add this node expression to the list and descend. The WHERE expressions
+        // can be added to the global list because they simplify both inner and outer nodes.
+        // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
         List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
         if (leftNode.getJoinExpression() != null) {
             newExprs.add(leftNode.getJoinExpression());
         }
         if (rightNode.getJoinExpression() != null) {
             newExprs.add(rightNode.getJoinExpression());
+        }
+        if (leftNode.getWhereExpression() != null) {
+            exprs.add(leftNode.getWhereExpression());
+        }
+        if (rightNode.getWhereExpression() != null) {
+            exprs.add(rightNode.getWhereExpression());
         }
 
         // In case of outer join, ON expressions can only be NULL rejecting for the inner node.
