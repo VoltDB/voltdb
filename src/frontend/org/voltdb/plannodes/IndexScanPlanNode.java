@@ -541,13 +541,17 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
+            Cluster unusedCluster,
+            Database unusedDb,
+            DatabaseEstimates estimates,
+            ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered otherwise
-        // count non-equality scans as -0.5 coverage
-        // prefer array to hash to tree, all else being equal
+        // otherwise, pick the index with the most columns covered
+        // otherwise, count non-equality scans as -0.5 coverage
+        // prefer hash index to tree, all else being equal
         // prefer partial index, all else being equal
 
         // FYI: Index scores should range between 2 and 800003 (I think)
@@ -561,7 +565,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(keyWidth <= colCount);
 
         // count a range scan as a half covered column
-        if (keyWidth > 0.0 && m_lookupType != IndexLookupType.EQ) {
+        if (keyWidth > 0.0 &&
+                m_lookupType != IndexLookupType.EQ &&
+                m_lookupType != IndexLookupType.GEO_CONTAINS) {
             keyWidth -= 0.5;
         }
         // When there is no start key, count an end-key as a single-column range scan key.
@@ -574,51 +580,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // Estimate the cost of the scan (AND each projection and sort thereafter).
         // This "tuplesToRead" is not strictly speaking an expected count of tuples.
-        // Its multiple uses are explained below.
-        int tuplesToRead = 0;
-
-        // Assign minor priorities for different index types (tiebreakers).
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
-            tuplesToRead = 2;
-        }
-        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
-            tuplesToRead = 3;
-        }
-        assert(tuplesToRead > 0);
-
-        // If not a unique, covering index, favor (discount)
-        // the choice with the most columns pre-filtered by the index.
-        if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts at 90% of a comparable seqscan AND
-            // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
-            // One intentional benchmark is for a single range-covered
-            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
-            // "for ordering purposes only" index scan (keyWidth == 0).
-            // This is to completely compensate for the up to 3X final cost resulting from
-            // the "order by" and non-inlined "projection" nodes that must be added later to the
-            // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
-            // the effective scale factor for a single PARTIALLY covered (range-filtered) column
-            // comes to SQRT(0.1) which is just under 32% FTW!
-            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
-
-            // With all this discounting, make sure that any non-"covering unique" index scan costs more
-            // than any "covering unique" one, no matter how many indexed column filters get piled on.
-            // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
-            // indexed column filters statistically selects fewer (fractional) rows per scan
-            // than a unique index, but we favor the unique index anyway because:
-            // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
-            // -- the per-indexed-column selectivity factors used above are highly fictionalized
-            //    -- actual cardinality for individual components of compound indexes MIGHT be very low,
-            //       making them much less selective than estimated.
-            if (tuplesToRead < 4) {
-                tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
-            }
-        }
-
-        // This tuplesToRead value estimates the number of base table tuples
-        // fetched from the index scan.
         // It's a vague measure of the cost of the scan whose accuracy depends a lot
         // on what kind of post-filtering needs to happen.
         // The tuplesRead value is also used here to estimate the number of RESULT rows.
@@ -632,30 +593,89 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // IndexScanPlanNode costing only ignores post-filters.
         // In any case, it's important to keep this code roughly in synch with any changes to
         // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
-        m_estimatedOutputTupleCount = tuplesToRead;
-        m_estimatedProcessedTupleCount = tuplesToRead;
+        int tuplesToRead = 0;
+
+        // Assign minor priorities for different index types (tiebreakers).
+        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
+            tuplesToRead = 2;
+        }
+        else if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
+                 (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
+            tuplesToRead = 3;
+        }
+        else if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+            // "Covering cell" indexes get further special treatment below that tries to
+            // properly credit their benefit even when they do not actually eliminate
+            // the expensive exact contains post-filter.
+            tuplesToRead = 3;
+        }
+        assert(tuplesToRead > 0);
 
         // special case a unique match for the output count
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
         }
+        else {
+            // If not a unique, covering index, favor (discount)
+            // the choice with the most columns pre-filtered by the index.
+            // Cost starts at 90% of a comparable seqscan AND
+            // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered
+            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
+            // "for ordering purposes only" index scan (keyWidth == 0).
+            // This is to completely compensate for the up to 3X final cost resulting from
+            // the "order by" and non-inlined "projection" nodes that must be added later to the
+            // inconveniently ordered scan result.
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
+            // the effective scale factor for a single PARTIALLY covered (range-filtered) column
+            // comes to SQRT(0.1) which is just under 32% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+            // "Covering cell" indexes get a special adjustment to make them look more favorable
+            // than non-unique range filters in particular.
+            // I can't quite justify that rationally, but it "seems reasonable". --paul
+            if (m_catalogIndex.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+                final double GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR = 0.08;
+                tuplesToRead *= GEO_INDEX_ARTIFICIAL_TUPLE_DISCOUNT_FACTOR;
+            }
+
+            // With all this discounting, make sure that any non-"covering unique" index scan costs more
+            // than any "covering unique" one, no matter how many indexed column filters get piled on.
+            // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
+            // indexed column filters statistically selects fewer (fractional) rows per scan
+            // than a unique index, but we favor the unique index anyway because:
+            // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
+            // -- the per-indexed-column selectivity factors used above are highly fictionalized
+            //    -- actual cardinality for individual components of compound indexes MIGHT be very low,
+            //       making them much less selective than estimated.
+            if (tuplesToRead < 4) {
+                tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
+            }
+            m_estimatedOutputTupleCount = tuplesToRead;
+        }
+
+        m_estimatedProcessedTupleCount = tuplesToRead;
 
         // Apply discounts similar to the keyWidth one for the additional post-filters that get
         // eliminated by exactly matched partial index filters. The existing discounts are not
         // supposed to give a "full refund" of the optimized-out post filters, because there is
-        // an offsetting order log(n) cost to using the index. That offsetting cost will be lower
-        // (order log(smaller n)) for partial indexes, but it's not clear what the typical
+        // an offsetting cost to using the index, typically order log(n). That offset cost will
+        // be lower (order log(smaller n)) for partial indexes, but it's not clear what the typical
         // relative costs are of a partial index with x key components and y partial index predicates
         // vs. a full or partial index with x+n key components and y-m partial index predicates.
         //
-        // Avoid applying the discount to that initial tie-breaker value of  2 or 3
+        double discountFactor = 1.0;
+        // Eliminated filters discount the cost of processing tuples with a rapidly
+        // diminishing effect that ranges from a discount of 0.9 for one skipped filter
+        // to a discount approaching 0.888... (=8/9) for many skipped filters.
+        final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
+        // Avoid applying the discount to an initial tie-breaker value of 2 or 3
         if (!m_eliminatedPostFilterExpressions.isEmpty() && m_estimatedProcessedTupleCount > 3) {
-            double discount = 1.0;
-            // Each eliminated filter gets a scaled down by an additional factor of 0.1 discount.
             for (int i = 0; i < m_eliminatedPostFilterExpressions.size(); ++i) {
-                discount -= Math.pow(0.1, i + 1);
+                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
             }
-            m_estimatedProcessedTupleCount *= discount;
+        }
+        if (discountFactor < 1.0) {
+            m_estimatedProcessedTupleCount *= discountFactor;
             if (m_estimatedProcessedTupleCount < 4) {
                 m_estimatedProcessedTupleCount = 4;
             }
@@ -676,7 +696,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 m_estimatedProcessedTupleCount = limitInt;
             }
         }
-
+        //* enable to debug */ System.out.println("DEBUG: COST ESTIMATED " + m_estimatedOutputTupleCount + "  " + m_estimatedProcessedTupleCount);
+        //* enable to debug */ System.out.println("DEBUG: USING INDEX " + m_catalogIndex.getTypeName());
     }
 
     @Override
@@ -804,6 +825,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 else {
                     usageInfo = "\n" + indent + " scan matches for " + start;
                 }
+            }
+            else if (m_lookupType == IndexLookupType.GEO_CONTAINS) {
+                usageInfo = "\n" + indent + " scan for " + start;
             }
             else {
                 usageInfo = "\n" + indent;

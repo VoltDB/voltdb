@@ -65,6 +65,8 @@ public:
                              0,     // partitionId
                              0,     // hostId
                              "",    // hostname
+                             0,     // drClusterId
+                             1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
                              false, // don't create DR replicated stream
                              95);   // compaction threshold

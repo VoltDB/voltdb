@@ -473,7 +473,6 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
     if (uniqueViolationOutput != NULL) {
         lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
-
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
         target.setActiveTrue();

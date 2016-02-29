@@ -24,19 +24,18 @@
 package txnIdSelfCheck;
 
 import java.io.InterruptedIOException;
-
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -93,7 +92,7 @@ public class ClientThread extends BenchmarkThread {
             try {
                   t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
                   t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
-                  // init the dimension table to have one record for each cid.
+                  // init the di mension table to have one record for each cid.
                   client.callProcedure("PopulateDimension", cid);
                   break;
             }
@@ -120,29 +119,31 @@ public class ClientThread extends BenchmarkThread {
     void runOne() throws Exception {
         // 1/10th of txns roll back
         byte shouldRollback = (byte) (m_random.nextInt(10) == 0 ? 1 : 0);
+        // if we need to disable rollbacks use this:
+        // byte shouldRollback = (byte) 0;
 
         try {
             String procName = null;
-            int expectedTables = 4;
+            int expectedTables = 5;
             switch (m_type) {
             case PARTITIONED_SP:
                 procName = "UpdatePartitionedSP";
                 break;
             case PARTITIONED_MP:
                 procName = "UpdatePartitionedMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case REPLICATED:
                 procName = "UpdateReplicatedMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             case ADHOC_MP:
                 procName = "UpdateReplicatedMPInProcAdHoc";
-                expectedTables = 5;
+                expectedTables = 6;
                 break;
             }
 
@@ -181,8 +182,9 @@ public class ClientThread extends BenchmarkThread {
                         m_cid, procName, results.length, expectedTables), response);
             }
             VoltTable data = results[3];
+            VoltTable view = results[4];
             try {
-                UpdateBaseProc.validateCIDData(data, "ClientThread:" + m_cid);
+                UpdateBaseProc.validateCIDData(data, view, "ClientThread:" + m_cid);
             }
             catch (VoltAbortException vae) {
                 log.error("validateCIDData failed on: " + procName + ", shouldRollback: " +

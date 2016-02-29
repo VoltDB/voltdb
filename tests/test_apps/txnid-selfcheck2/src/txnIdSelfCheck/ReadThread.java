@@ -81,7 +81,7 @@ public class ReadThread extends BenchmarkThread {
             // validate the data
             try {
                 VoltTable data = clientResponse.getResults()[0];
-                UpdateBaseProc.validateCIDData(data, ReadThread.class.getName());
+                UpdateBaseProc.validateCIDData(data, null, ReadThread.class.getName());
             }
             catch (Exception e) {
                 hardStop("ReadThread got a bad response", e);

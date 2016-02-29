@@ -40,7 +40,7 @@ const int METADATA_COL_CNT = 6;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
-    : TupleStreamBase(),
+    : TupleStreamBase(EL_BUFFER_SIZE),
       m_partitionId(partitionId), m_siteId(siteId),
       m_signature(""), m_generation(0)
 {}

@@ -90,6 +90,7 @@ public:
         int m_partitionColumn;
         bool m_multiPartition;
         bool m_isStreamed;
+        bool m_hasStreamView;
         bool m_isUpsert;
         bool m_sourceIsPartitioned;
         bool m_hasPurgeFragment;

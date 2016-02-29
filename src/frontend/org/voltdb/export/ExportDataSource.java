@@ -195,7 +195,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
-        assert(!adFile.exists());
         byte jsonBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
@@ -206,6 +205,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             JSONObject jsObj = new JSONObject(stringer.toString());
             jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
         } catch (JSONException e) {
+            exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
         }
 
@@ -494,10 +494,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 }
                             }, uso, false));
                 } catch (IOException e) {
-                    exportLog.error(e);
-                    if (!deleted.get()) {
-                        cont.discard();
-                    }
+                    VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
             } else {
                 /*
@@ -516,7 +513,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //to a file. @Quiesce or blocking snapshot will do the sync
                 m_committedBuffers.sync(true);
             } catch (IOException e) {
-                exportLog.error(e);
+                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
         pollImpl(m_pollFuture);

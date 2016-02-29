@@ -52,7 +52,7 @@
 using namespace voltdb;
 
 TableIndexScheme::TableIndexScheme(
-    std::string a_name,
+    const std::string &a_name,
     TableIndexType a_type,
     const std::vector<int32_t>& a_columnIndices,
     const std::vector<AbstractExpression*>& a_indexedExpressions,

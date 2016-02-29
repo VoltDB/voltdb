@@ -11,6 +11,7 @@
 -- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
 {@aftermath = " _math _value[int:1,3]"} 
 {@agg = "_numagg"}
+{@distinctableagg = "_distinctableagg"}
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "A._variable[#arg numeric] @cmp _numericvalue"}
@@ -29,6 +30,7 @@
 {@numcol = "NUM"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@plus10 = "+ 10"}
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "NUM"}

@@ -361,7 +361,7 @@ public class Collector {
             String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
                                 CoreUtils.getHostnameOrAddress() + "_voltlogs_" + timestamp;
             String folderPath = folderBase + File.separator;
-            String collectionFilePath = rootpath + File.separator + folderBase + ".zip";
+            String collectionFilePath = rootpath + File.separator + folderBase + ".zipfile";
 
             FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
             ZipOutputStream zipStream = new ZipOutputStream(collectionStream);

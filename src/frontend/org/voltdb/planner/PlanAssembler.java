@@ -179,9 +179,10 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one matview.
      */
-    private static boolean tableListIncludesView(List<Table> tableList) {
+    private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null) {
+            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
                 return true;
             }
         }
@@ -310,7 +311,7 @@ public class PlanAssembler {
         // @TODO
         // Need to use StmtTableScan instead
         // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.m_tableList)) {
+        if (tableListIncludesReadOnlyView(parsedStmt.m_tableList)) {
             throw new PlanningErrorException("Illegal to modify a materialized view.");
         }
 

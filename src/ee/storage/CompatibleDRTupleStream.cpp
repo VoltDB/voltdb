@@ -42,8 +42,8 @@
 using namespace std;
 using namespace voltdb;
 
-CompatibleDRTupleStream::CompatibleDRTupleStream()
-    : AbstractDRTupleStream(),
+CompatibleDRTupleStream::CompatibleDRTupleStream(int defaultBufferSize)
+    : AbstractDRTupleStream(defaultBufferSize),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -430,19 +430,13 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
-        if (partialTxnLength + minLength >= (m_defaultCapacity - m_headerSpace)) {
-            switch (sb->type()) {
-                case voltdb::NORMAL_STREAM_BLOCK:
-                {
-                    blockSize = m_secondaryCapacity;
-                    break;
-                }
-                case voltdb::LARGE_STREAM_BLOCK:
-                {
-                    blockSize = 0;
-                    break;
-                }
-            }
+        size_t spaceNeeded = m_headerSpace + partialTxnLength + minLength;
+        if (spaceNeeded > m_secondaryCapacity) {
+            // txn larger than the max buffer size, set blockSize to 0 so that caller will abort
+            blockSize = 0;
+        } else if (spaceNeeded > m_defaultCapacity) {
+            blockSize = m_secondaryCapacity;
+
         }
         if (blockSize != 0) {
             uso -= partialTxnLength;
@@ -454,7 +448,7 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
 }
 
 int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
-    CompatibleDRTupleStream stream;
+    CompatibleDRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
     stream.configure(42);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',

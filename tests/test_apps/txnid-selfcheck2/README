@@ -23,7 +23,7 @@ The following is a list of features this app has:
 - Secondary tables that get loaded with dummy data to ensure snapshots, rejoins
   and DR syncs are non-trivial.
 - MP and SP read operations that validate data.
-- An export table in the DDL (but no actual inserts into that table)
+- An export table in the DDL with inserts that shadow inserts to persistent tables
 - The app also starts 2 Threads (MP & SP) to do Load*Table transactions. Load*Table
   transaction threads launch CopyAndDelete tasks which periodically copies data
   from Load*Table assigned table to diff tables to sprinkle in other tranasactions.
@@ -38,6 +38,6 @@ Other exceptions/errors may be logged and then the client will continue if possi
 Some threads like the adhoc, read, or loader threads may just stop on failure,
 leaving the primary write transactions still running.
 
-Valid total simulanious thread counts for clients is 127. To run two clients at once,
-set an offset using the command line argunments so two clients don't claim the same
+Valid total simulaneous thread counts for clients is 127. To run two clients at once,
+set an offset using the command line arguments so two clients don't claim the same
 range of [0,127].

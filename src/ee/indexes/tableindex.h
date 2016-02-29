@@ -70,11 +70,13 @@ struct TableIndexScheme {
         tupleSchema = NULL;
     }
 
-    TableIndexScheme(std::string a_name, TableIndexType a_type,
+    TableIndexScheme(const std::string &a_name,
+                     TableIndexType a_type,
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
                      AbstractExpression* a_predicate,
-                     bool a_unique, bool a_countable,
+                     bool a_unique,
+                     bool a_countable,
                      const std::string& a_expressionsAsText,
                      const std::string& a_predicateAsText,
                      const TupleSchema *a_tupleSchema);
@@ -91,10 +93,12 @@ struct TableIndexScheme {
     // This change would eliminate the mostly redundant method for TableIndexScheme-to-indexId conversion.
     // TableIndexScheme construction in most if not all ee tests could provide a dummy (empty or nonce) value
     // for indexId. Index Ids seem only to be of interest in catalog-driven processing.
-    TableIndexScheme(std::string a_name, TableIndexType a_type,
+    TableIndexScheme(const std::string &a_name,
+                     TableIndexType a_type,
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
-                     bool a_unique, bool a_countable,
+                     bool a_unique,
+                     bool a_countable,
                      const TupleSchema *a_tupleSchema) :
       name(a_name),
       type(a_type),
@@ -231,7 +235,7 @@ public:
                                  const TableTuple &originalTuple);
 
     /**
-     * Does the key out-of-line strings or binary data?
+     * Does the key use out-of-line strings or binary data?
      * Used for an optimization when key values are the same.
      */
     virtual bool keyUsesNonInlinedMemory() const = 0;
@@ -305,6 +309,12 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
+    virtual bool moveToCoveringCell(const TableTuple* searchKey,
+                                    IndexCursor &cursor) const
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToCoveringCell which has no implementation");
+    }
+
     virtual void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
         throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
@@ -367,7 +377,9 @@ public:
         throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
     };
 
-    /** retrieves from a primary key index the persistent tuple matching the given temp tuple */
+    /** retrieves from a primary key index the persistent tuple
+     *  matching the given temp tuple.  The tuple's schema should be
+     *  the table's schema, not the index's key schema.  */
     virtual TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const
     {
         throwFatalException("Invoked TableIndex virtual method uniqueMatchingTuple which has no use on a non-unique index");

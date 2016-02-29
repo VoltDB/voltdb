@@ -800,6 +800,16 @@ public enum VoltType {
     public boolean isIndexable() {
         switch(this) {
         case GEOGRAPHY_POINT:
+        case BOOLEAN:
+            return false;
+        default:
+            return true;
+        }
+    }
+
+    public boolean isUniqueIndexable() {
+        switch(this) {
+        case GEOGRAPHY_POINT:
         case GEOGRAPHY:
         case BOOLEAN:
             return false;
@@ -1087,4 +1097,5 @@ public enum VoltType {
 
         return MAX_ROW_SIZE / MAX_COLUMNS;
     }
+
 }
