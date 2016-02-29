@@ -3,6 +3,7 @@
 -- timestamps don't do math
 {@aftermath = " "}
 {@agg = "_genericagg"} -- timestamps don't do SUM or AVG
+{@distinctableagg = "COUNT"} -- timestamps don't do SUM
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_timestampcolumnpredicate"}
@@ -19,6 +20,7 @@
 {@insertvals = "_id, _value[timestamp], _value[timestamp], _value[timestamp], _value[int64]"}
 {@onefun = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@optionalfn = " "} -- There are no handy unary timestamp-to-timestamp functions.
+{@plus10 = " "} -- You cannot add to a timestamp
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "PAST"}

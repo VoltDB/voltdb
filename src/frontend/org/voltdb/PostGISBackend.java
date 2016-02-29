@@ -68,25 +68,25 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     // Captures the use of PointFromText('POINT...
     private static final Pattern pointFromTextQuery = Pattern.compile(
-            "PointFromText\\s*\\('POINT", Pattern.CASE_INSENSITIVE);
+            "PointFromText\\s*\\(", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing a PointFromText('POINT... function,
     // which PostgreSQL/PostGIS does not support, and replaces it with
     // ST_GeographyFromText('POINT..., which is an equivalent that PostGIS
     // does support
     private static final QueryTransformer pointFromTextQueryTransformer
             = new QueryTransformer(pointFromTextQuery)
-            .replacementText("ST_GeographyFromText('POINT").useWholeMatch();
+            .replacementText("ST_GeographyFromText(").useWholeMatch();
 
     // Captures the use of PolygonFromText('POLYGON...
     private static final Pattern polygonFromTextQuery = Pattern.compile(
-            "PolygonFromText\\s*\\('POLYGON", Pattern.CASE_INSENSITIVE);
+            "PolygonFromText\\s*\\(", Pattern.CASE_INSENSITIVE);
     // Modifies a query containing a PointFromText('POINT... function,
     // which PostgreSQL/PostGIS does not support, and replaces it with
     // ST_GeographyFromText('POLYGON..., which is an equivalent that PostGIS
     // does support
     private static final QueryTransformer polygonFromTextQueryTransformer
             = new QueryTransformer(polygonFromTextQuery)
-            .replacementText("ST_GeographyFromText('POLYGON").useWholeMatch();
+            .replacementText("ST_GeographyFromText(").useWholeMatch();
 
 
     // Captures the use of LONGITUDE(columnName)

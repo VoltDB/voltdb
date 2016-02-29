@@ -2299,6 +2299,9 @@ TEST CASES
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
+    <condition property="config_invalid" value="-i" else="">
+        <isset property="sql_coverage_invalid"/>
+    </condition>
     <condition property="config_verbose" value="-r" else="">
         <isset property="sql_coverage_verbose"/>
     </condition>
@@ -2360,6 +2363,7 @@ TEST CASES
         <arg line="${config_postgresql}" />
         <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
+        <arg line="${config_invalid}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
         <arg file="${sqlcov.dir}" />
