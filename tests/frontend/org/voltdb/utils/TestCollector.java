@@ -110,7 +110,8 @@ public class TestCollector {
                                     "--copyToVEM=true",
                                     "--calledFromVEM=true",  // calledFromVem (set to true so that resulting collection can be easily located)
                                     "--fileInfoOnly=false",  // fileInfoOnly
-                                    "--days="+String.valueOf(days)
+                                    "--days="+String.valueOf(days),
+                                    "--libPathForTest="+getWorkingDir(voltDbRootPath)+"/lib"
                                     });
 
         rootDir = CoreUtils.getHostnameOrAddress() + "_voltlogs_";
