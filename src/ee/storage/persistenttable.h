@@ -340,6 +340,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::vector<MaterializedViewMetadata *> views() const {
         return m_views;
     }
+    bool isMaterialized() { return m_isMaterialized; };
 
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
@@ -683,7 +684,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
 
-    //Cache config info, is this a materialized view
+    //Is this a materialized view?
     bool m_isMaterialized;
 
     // is DR enabled

@@ -1,7 +1,13 @@
+LOAD CLASSES txnid.jar;
+
+-- Tell sqlcmd to batch the following commands together,
+-- so that the schema loads quickly.
+file -inlinebatch END_OF_BATCH
+
 -- partitioned table
 CREATE TABLE partitioned
 (
-  txnid      bigint             NOT NULL ASSUMEUNIQUE
+  txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
 , ts         bigint             NOT NULL
 , cid        tinyint            NOT NULL
@@ -20,11 +26,25 @@ CREATE TABLE partitioned
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
+CREATE VIEW partview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM partitioned GROUP BY cid;
+
 -- dimension table
 CREATE TABLE dimension
 (
   cid        tinyint            NOT NULL
-, desc       tinyint            NOT NULL
+, desc         tinyint             NOT NULL
 , CONSTRAINT PK_id_d PRIMARY KEY
   (
     cid
@@ -48,11 +68,25 @@ CREATE TABLE replicated
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_r PRIMARY KEY
   (
-    txnid
+    cid, txnid
   )
 , UNIQUE ( cid, rid )
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
+
+CREATE VIEW replview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM replicated GROUP BY cid;
 
 -- replicated table
 CREATE TABLE adhocr
@@ -105,12 +139,69 @@ CREATE TABLE forDroppedProcedure
 );
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
+-- export tables
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+);
+-- PARTITION TABLE partitioned_export ON COLUMN cid;
+-- EXPORT TABLE partitioned_export;
+
+CREATE VIEW ex_partview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM partitioned_export GROUP BY cid;
+
+CREATE TABLE ex_partview_shadow (
+    cid tinyint not null,
+    entries int,
+    maximum bigint,
+    minimum bigint,
+    summation bigint,
+    primary key(cid)
+);
+PARTITION TABLE ex_partview_shadow ON COLUMN cid;
+
+CREATE STREAM replicated_export
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+);
+EXPORT TABLE replicated_export;
+
 -- For loadsinglepartition
 CREATE TABLE loadp
 (
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forLoadPartitionSP PRIMARY KEY (cid, txnid)
 );
 PARTITION TABLE loadp ON COLUMN cid;
 CREATE TABLE cploadp
@@ -128,6 +219,7 @@ CREATE TABLE loadmp
   cid    BIGINT NOT NULL
 , txnid  BIGINT NOT NULL
 , rowid  BIGINT NOT NULL
+, CONSTRAINT pkey_id_forLoadPartitionMP PRIMARY KEY (cid, txnid)
 );
 CREATE TABLE cploadmp
 (
@@ -153,6 +245,28 @@ CREATE TABLE trup
 );
 PARTITION TABLE trup ON COLUMN p;
 
+CREATE TABLE capr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, tmstmp     timestamp            NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
+, LIMIT PARTITION ROWS 10 EXECUTE (
+    DELETE FROM CAPR WHERE tmstmp < NOW
+) );
+
+CREATE TABLE capp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, tmstmp     timestamp            NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
+, LIMIT PARTITION ROWS 10 EXECUTE (
+    DELETE FROM CAPP WHERE tmstmp < NOW
+) );
+PARTITION TABLE capp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -204,3 +318,10 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPTableInsert;
+PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
+PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
+
+END_OF_BATCH

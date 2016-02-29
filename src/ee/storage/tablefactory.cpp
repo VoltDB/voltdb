@@ -75,7 +75,7 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(exportEnabled);
+        table = new StreamedTable(exportEnabled, partitionColumn);
     }
     else {
         table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit, drEnabled);

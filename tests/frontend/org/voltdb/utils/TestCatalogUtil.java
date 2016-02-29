@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 
+import junit.framework.TestCase;
+
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -58,8 +60,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
-
-import junit.framework.TestCase;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -721,7 +721,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
+                + "        <configuration target='default' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -733,7 +733,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration target='default' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -745,7 +745,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -771,7 +771,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='elasticsearch'>"
+                + "        <configuration target='default' enabled='true' type='elasticsearch'>"
                 + "            <property name=\"endpoint\">http://localhost:9200/index_%t/type_%p</property>"
                 + "        </configuration>"
                 + "    </export>"
@@ -1069,12 +1069,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
+                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration stream='bar' enabled='true' type='file'>"
+                + "        <configuration target='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1086,14 +1086,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='foo' enabled='true' type='file'>"
+                + "        <configuration target='foo' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration stream='foo' enabled='true' type='kafka'>"
+                + "        <configuration target='foo' enabled='true' type='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1107,14 +1107,14 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration stream='default' enabled='true' type='kafka'>"
+                + "        <configuration target='default' enabled='true' type='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1127,13 +1127,13 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' stream='file'>"
-                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "    <export enabled='true' target='file'>"
+                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration stream='bar' enabled='true' type='file'>"
+                + "        <configuration target='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1145,21 +1145,21 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='foo' enabled='true' type='file'>"
+                + "        <configuration target='foo' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration stream='bar' enabled='true' type='file'>"
+                + "        <configuration target='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">nonce</property>"
                 + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
-                + "        <configuration stream='unused' enabled='true' type='file'>"
+                + "        <configuration target='unused' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1173,12 +1173,12 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration target='foo' enabled='true' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
-                + "        <configuration stream='bar' enabled='true' type='file'>"
+                + "        <configuration target='bar' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -1216,9 +1216,10 @@ public class TestCatalogUtil extends TestCase {
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2, bad_grp_deployment, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same stream.");
+            fail("Should not accept a deployment file containing multiple connectors for the same target.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export stream:"));
+            System.out.println(msg);
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
         }
 
         //This is a bad deployment with the same default export stream defined multiple times
@@ -1227,9 +1228,9 @@ public class TestCatalogUtil extends TestCase {
 
         Catalog cat2Def = compiler.compileCatalogFromDDL(x);
         if ((msg = CatalogUtil.compileDeployment(cat2Def, bad_grp_deployment_def, false)) == null) {
-            fail("Should not accept a deployment file containing multiple connectors for the same stream.");
+            fail("Should not accept a deployment file containing multiple connectors for the same target.");
         } else {
-            assertTrue(msg.contains("Multiple connectors can not be assigned to single export stream:"));
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export target:"));
         }
 
         //This is a bad deployment that uses both the old and new syntax
@@ -1780,7 +1781,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
@@ -1903,7 +1904,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "        <configuration target='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
                 + "            <property name=\"type\">csv</property>"
                 + "            <property name=\"nonce\">newNonce</property>"
                 + "        </configuration>"
