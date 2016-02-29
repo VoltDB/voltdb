@@ -21,6 +21,8 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.voltdb.iv2.UniqueIdGenerator;
+
 public class DRConsumerDrIdTracker {
 
     private TreeMap<Long, Long> m_map = new TreeMap<Long, Long>();
@@ -234,15 +236,19 @@ public class DRConsumerDrIdTracker {
         return m_map;
     }
 
-    @Override
-    public String toString() {
+    public String debugInfo() {
         if (m_map.isEmpty()) {
             return "Empty Map";
         }
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<Long, Long> entry : m_map.entrySet()) {
-            sb.append(" [" + entry.getKey() + ", " + entry.getValue() + "] ");
+            sb.append(" [" + DRLogSegmentId.getSequenceNumberFromDRId(entry.getKey()) + ", " +
+                    DRLogSegmentId.getSequenceNumberFromDRId(entry.getValue()) + "] ");
         }
+        sb.append("lastAckPoint " + DRLogSegmentId.getClusterIdFromDRId(m_lastAckedDrId) + ":"
+                + DRLogSegmentId.getSentinelOrSeqNumFromDRId(m_lastAckedDrId));
+        sb.append("lastSpUniqueId " + UniqueIdGenerator.toShortString(m_lastSpUniqueId));
+        sb.append("lastMpUniqueId " + UniqueIdGenerator.toShortString(m_lastMpUniqueId));
         return sb.toString();
     }
 }
