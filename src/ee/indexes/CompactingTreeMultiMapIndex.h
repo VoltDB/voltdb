@@ -95,6 +95,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     /**
      * Update in place an index entry with a new tuple address
+     * (e.g., due to table compaction)
      */
     bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple, const TableTuple &originalTuple)
     {

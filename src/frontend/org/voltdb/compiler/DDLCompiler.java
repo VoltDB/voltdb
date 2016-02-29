@@ -1969,15 +1969,21 @@ public class DDLCompiler {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
-                    // string will will be populated expression details whose value
-                    // type are not indexable
+                    // string will be populated with an expression's details when
+                    // its value type is not indexable
                     StringBuffer exprMsg = new StringBuffer();
                     if (!expr.isValueTypeIndexable(exprMsg)) {
                         // indexing on expression with boolean result is not supported.
                         throw compiler.new VoltCompilerException("Cannot create index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
                     }
-                    // rest of the validity gaurds will be evaluated after collecting all the expressions.
+                    if ((unique || assumeUnique) && !expr.isValueTypeUniqueIndexable(exprMsg)) {
+                        // indexing on expression with boolean result is not supported.
+                        throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
+                                "\" because it contains " + exprMsg + ", which is not supported.");
+                    }
+
+                    // rest of the validity guards will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
                 }
@@ -2000,6 +2006,7 @@ public class DDLCompiler {
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
         boolean has_nonint_col = false;
+        boolean has_geo_col = false;
         String nonint_col_name = null;
 
         for (int i = 0; i < colNames.length; i++) {
@@ -2014,23 +2021,56 @@ public class DDLCompiler {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
 
                 if (! colType.isIndexable()) {
-                    String emsg = colType.getName() + " values are not currently supported as index keys: '" + colNames[i] + "'";
+                    String emsg = "Cannot create index \""+ name + "\" because " +
+                            colType.getName() + " values are not currently supported as index keys: \"" + colNames[i] + "\"";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
+
+                if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
+                    String emsg = "Cannot create index \""+ name + "\" because " +
+                            colType.getName() + " values are not currently supported as unique index keys: \"" + colNames[i] + "\"";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
                 if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
+                    has_geo_col = colType.equals(VoltType.GEOGRAPHY);
+                    if (has_geo_col && colNames.length > 1) {
+                        String emsg = "Cannot create index \""+ name + "\" because " +
+                                colType.getName() + " values must be the only component of an index key: \"" + nonint_col_name + "\"";
+                        throw compiler.new VoltCompilerException(emsg);
+                    }
+
                 }
             }
+
         }
         else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
 
+                if (! colType.isIndexable()) {
+                    String emsg = "Cannot create index \""+ name + "\" because " +
+                                colType.getName() + " valued expressions are not currently supported as index keys.";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
+
+                if ((unique || assumeUnique) && ! colType.isUniqueIndexable()) {
+                    String emsg = "Cannot create index \""+ name + "\" because " +
+                                colType.getName() + " valued expressions are not currently supported as unique index keys.";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
+
                 if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
+                    has_geo_col = colType.equals(VoltType.GEOGRAPHY);
+                    if (has_geo_col && exprs.size() > 1) {
+                        String emsg = "Cannot create index \""+ name + "\" because " +
+                                colType.getName() + " values must be the only component of an index key.";
+                        throw compiler.new VoltCompilerException(emsg);
+                    }
                 }
             }
         }
@@ -2045,10 +2085,11 @@ public class DDLCompiler {
         //   3. it does not have an autogenerated name.
         // We don't think about the column type here, but see
         // below.
-        boolean makeHashable = ( ! indexNameNoCase.contains("tree") ) && indexNameNoCase.contains("hash") &&
-                 ! indexNameNoCase.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX.toLowerCase());
-
-        if (makeHashable) {
+        if (has_geo_col) {
+            index.setType(IndexType.COVERING_CELL_INDEX.getValue());
+        }
+        else if (( ! indexNameNoCase.contains("tree") ) && indexNameNoCase.contains("hash") &&
+                 ! indexNameNoCase.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX.toLowerCase())) {
             // If the column type is not an integer, we cannot
             // make the index a hash.
             if (has_nonint_col) {
@@ -2743,7 +2784,7 @@ public class DDLCompiler {
                     assert(false);
                     return null;
                 }
-                if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
+                if (! SubPlanAssembler.isPartialIndexPredicateCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
                     // partial index does not match MatView where clause, give up this index
                     continue;
                 }
@@ -2926,9 +2967,9 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }
-            // check if the expression return type is not indexable
+            // check if the expression return type is not unique indexable
             StringBuffer exprMsg = new StringBuffer();
-            if (!outcol.expression.isValueTypeIndexable(exprMsg)) {
+            if (!outcol.expression.isValueTypeUniqueIndexable(exprMsg)) {
                 msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }

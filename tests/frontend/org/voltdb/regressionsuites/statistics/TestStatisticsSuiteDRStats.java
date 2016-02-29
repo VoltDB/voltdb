@@ -50,7 +50,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING DRNODE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema2 = new ColumnInfo[7];
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[8];
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -58,6 +58,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         expectedSchema2[4] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
         expectedSchema2[5] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
         expectedSchema2[6] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);
+        expectedSchema2[7] = new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT);
         VoltTable expectedTable2 = new VoltTable(expectedSchema2);
 
         VoltTable[] results = null;
@@ -146,7 +147,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         expectedSchema1[13] = new ColumnInfo("MODE", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
-        ColumnInfo[] expectedSchema2 = new ColumnInfo[7];
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[8];
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -154,6 +155,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         expectedSchema2[4] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
         expectedSchema2[5] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
         expectedSchema2[6] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);
+        expectedSchema2[7] = new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT);
         VoltTable expectedTable2 = new VoltTable(expectedSchema2);
 
         VoltTable[] results = null;

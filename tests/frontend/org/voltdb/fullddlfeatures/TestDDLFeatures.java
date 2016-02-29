@@ -765,7 +765,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testGEOIndex() throws Exception {
         assertTrue(findTableInSystemCatalogResults("GEO"));
         assertTrue(findTableInSystemCatalogResults("T4"));
-        //assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
+
+        assertTrue(findIndexInSystemCatalogResults("GEOINDEX_GEOGRAPHY"));
         assertTrue(findIndexInSystemCatalogResults("GEOINDEX_REASONS"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POINT"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POLYGON"));
@@ -775,8 +776,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
         assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_AREA"));
         // GEO has three index columns.  Two for IDX
-        // and one for the primary key.
-        assertEquals(3, indexedColumnCount("GEO"));
+        // and one for the primary key,
+        // plus a geospatial index on geography column region1.
+        assertEquals(4, indexedColumnCount("GEO"));
     }
 
 }

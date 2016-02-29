@@ -81,6 +81,8 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
+class CoveringCellIndexTest_TableCompaction;
+
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
  * normally-private stuff in PersistentTable.
@@ -197,6 +199,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
+    friend class CoveringCellIndexTest_TableCompaction;
 
   private:
     // no default ctor, no copy, no assignment

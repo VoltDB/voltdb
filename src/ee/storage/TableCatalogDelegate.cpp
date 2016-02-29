@@ -176,6 +176,9 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
         case HASH_TABLE_INDEX:
             retval += "H";
             break;
+        case COVERING_CELL_INDEX:
+            retval += "G"; // C is taken
+            break;
         default:
             // this would need to change if we added index types
             assert(false);
