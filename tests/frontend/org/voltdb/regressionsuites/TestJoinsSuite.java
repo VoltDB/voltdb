@@ -878,7 +878,7 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestLimitOffsetFullNLJoin(client);
         clearSeqTables(client);
         clearIndexTables(client);
-        subtestMultiplFullJoins(client);
+        subtestMultipleFullJoins(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -1359,7 +1359,7 @@ public class TestJoinsSuite extends RegressionSuite {
         });
     }
 
-    private void subtestMultiplFullJoins(Client client)
+    private void subtestMultipleFullJoins(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
         String sql;

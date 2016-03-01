@@ -2811,15 +2811,7 @@ public class PlanAssembler {
         }
 
         // Now add this node expression to the list and descend. The WHERE expressions
-        // can be added to the global list because they simplify both inner and outer nodes.
-        // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
-        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
-        if (leftNode.getJoinExpression() != null) {
-            newExprs.add(leftNode.getJoinExpression());
-        }
-        if (rightNode.getJoinExpression() != null) {
-            newExprs.add(rightNode.getJoinExpression());
-        }
+        // can be combined with the input list because they simplify both inner and outer nodes.
         if (leftNode.getWhereExpression() != null) {
             exprs.add(leftNode.getWhereExpression());
         }
@@ -2827,42 +2819,45 @@ public class PlanAssembler {
             exprs.add(rightNode.getWhereExpression());
         }
 
-        // In case of outer join, ON expressions can only be NULL rejecting for the inner node.
-        // The outer node does not introduce NULLs
-        if (joinNode.getJoinType() == JoinType.INNER) {
-            exprs.addAll(newExprs);
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
-            if (rightNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
-            }
-        } else if (joinNode.getJoinType() == JoinType.FULL) {
-            // Both nodes are OUTER
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
-            if (rightNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
-            }
-        } else if (joinNode.getJoinType() == JoinType.LEFT){
-            if (rightNode instanceof BranchNode) {
-                newExprs.addAll(exprs);
-                simplifyOuterJoinRecursively((BranchNode)rightNode, newExprs);
-            }
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
-        } else {
-            // RIGHT join
-            assert(joinNode.getJoinType() == JoinType.RIGHT);
-            if (rightNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
-            }
-            if (leftNode instanceof BranchNode) {
-                newExprs.addAll(exprs);
-                simplifyOuterJoinRecursively((BranchNode)leftNode, newExprs);
-            }
+        // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
+        List<AbstractExpression> exprsForInnerNode = new ArrayList<AbstractExpression>(exprs);
+        if (leftNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(leftNode.getJoinExpression());
+        }
+        if (rightNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(rightNode.getJoinExpression());
+        }
+
+        List<AbstractExpression> leftNodeExprs;
+        List<AbstractExpression> rightNodeExprs;
+        switch (joinNode.getJoinType()) {
+            case INNER:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case LEFT:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case RIGHT:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprs;
+                break;
+            case FULL:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprs;
+                break;
+            default:
+                // shouldn't get there
+                leftNodeExprs = null;
+                rightNodeExprs = null;
+                assert(false);
+        }
+        if (leftNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)leftNode, leftNodeExprs);
+        }
+        if (rightNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)rightNode, rightNodeExprs);
         }
     }
 
