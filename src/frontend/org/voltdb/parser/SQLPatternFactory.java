@@ -269,6 +269,10 @@ public class SQLPatternFactory
             }
             return retPart;
         }
+
+        public static SQLPatternPart anyColumnFields() {
+            return new SQLPatternPartElement("\\((?:.+?)\\)");
+        }
     }
 
     //===== Private methods

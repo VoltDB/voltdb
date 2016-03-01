@@ -41,9 +41,10 @@ URL = 'http://%s:8000/api/1.0/databases/1/servers/' % \
 (__host_or_ip__)
 __db_url__ = 'http://%s:8000/api/1.0/databases/' % \
              (__host_or_ip__)
+__server_url__ = 'http://%s:8000/api/1.0/databases/{id}/servers/'
 
 
-class Server(unittest.TestCase):
+class ClusterDefault(unittest.TestCase):
     """
     Test case for adding and deleting servers
     """
@@ -173,7 +174,7 @@ class Cluster(unittest.TestCase):
             print "The database list is empty"
 
 
-class DefaultStartServer(Server):
+class DefaultStartServer(ClusterDefault):
     """
     Create Server
     """
@@ -187,30 +188,40 @@ class DefaultStartServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
+            server_url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                         (__host_or_ip__, last_db_id)
+            server_response = requests.get(server_url)
+            server_value = server_response.json()
+            if server_value:
+                server_len = len(server_value['members'])
+                last_server_id = server_value['members'][server_len-1]['id']
 
-            url = 'http://%s:8000/api/1.0/databases/%u/start' % \
-                (__host_or_ip__,last_db_id)
-            print "Starting..."
-            response = requests.put(url)
-            value = response.json()
-            if not value['statusstring']:
-                print "The Server list is empty"
-            elif "Start request sent successfully to servers" in value['statusstring']:
-                self.assertEqual(response.status_code, 200)
-                time.sleep(5)
-                CheckServerStatus(self, last_db_id, 'running')
-                time.sleep(10)
-                print "Stopping Cluster...."
-                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
-                (__host_or_ip__,last_db_id)
-                response = requests.put(url_stop)
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/start' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                print "Starting..."
+                response = requests.put(url)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if not value['statusstring']:
+                    print "The Server list is empty"
+                elif "Success" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(5)
+                    CheckServerStatus(self, last_db_id, last_server_id, 'running')
                     time.sleep(10)
-                    CheckServerStatus(self, last_db_id, 'stopped')
-            elif response.status_code == 500:
-                self.assertEqual(response.status_code, 500)
+                    print "Stopping Cluster...."
+                    url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                    response = requests.put(url_stop)
+                    value = response.text
+                    if "Connection broken" in value:
+                        self.assertEqual(response.status_code, 200)
+                        time.sleep(10)
+                        CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
+                elif 'A VoltDB Server process is already running' in value['statusstring']:
+                    print value['statusstring']
+                    assert True
+                elif response.status_code == 500:
+                    self.assertEqual(response.status_code, 500)
 
 
 class StartServer(Cluster):
@@ -227,85 +238,51 @@ class StartServer(Cluster):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
+            server_url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                         (__host_or_ip__, last_db_id)
+            server_response = requests.get(server_url)
+            server_value = server_response.json()
+            if server_value:
+                server_len = len(server_value['members'])
+                last_server_id = server_value['members'][server_len-1]['id']
 
-            url = 'http://%s:8000/api/1.0/databases/%u/start' % \
-                (__host_or_ip__,last_db_id)
-
-            response = requests.put(url)
-            print "Starting...."
-            value = response.json()
-            if not value['statusstring']:
-                print "error"
-            elif "Start request sent successfully to servers" in value['statusstring']:
-                self.assertEqual(response.status_code, 200)
-                time.sleep(5)
-                CheckServerStatus(self, last_db_id, 'running')
-                time.sleep(10)
-                print "Stopping...."
-                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
-                (__host_or_ip__,last_db_id)
-                response = requests.put(url_stop)
+                url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/start' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                print "Starting..."
+                response = requests.put(url)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if not value['statusstring']:
+                    print "The Server list is empty"
+                elif "Success" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(5)
+                    CheckServerStatus(self, last_db_id, last_server_id, 'running')
                     time.sleep(10)
-                    CheckServerStatus(self, last_db_id, 'stopped')
-            elif response.status_code == 500:
-                self.assertEqual(response.status_code, 500)
-
-class DefaultRecoverServer(Server):
-    """
-    Create Server
-    """
-
-    def test_recover_stop_server(self):
-        """
-        ensure Start and stop server is working properly
-        """
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-
-            url = 'http://%s:8000/api/1.0/databases/%u/recover' % \
-                (__host_or_ip__,last_db_id)
-            print "Recovering..."
-            response = requests.put(url)
-            value = response.json()
-
-            if not value['statusstring']:
-                print "Error"
-            elif "FATAL: VoltDB Community Edition" in value['statusstring']:
-                print "Voltdb recover is only supported in Enterprise Edition"
-            elif "Start request sent successfully to servers" in value['statusstring']:
-                self.assertEqual(response.status_code, 200)
-                time.sleep(5)
-                CheckServerStatus(self, last_db_id, 'running')
-                time.sleep(10)
-                print "Stopping Cluster...."
-                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
-                (__host_or_ip__,last_db_id)
-                response = requests.put(url_stop)
-                value = response.json()
-                if "Connection broken" in value['statusstring']:
-                    self.assertEqual(response.status_code, 200)
-                    time.sleep(10)
-                    CheckServerStatus(self, last_db_id, 'stopped')
-            elif response.status_code == 500:
-                self.assertEqual(response.status_code, 500)
+                    print "Stopping Cluster...."
+                    url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
+                    (__host_or_ip__, last_db_id, last_server_id)
+                    response = requests.put(url_stop)
+                    value = response.text
+                    if "Connection broken" in value:
+                        self.assertEqual(response.status_code, 200)
+                        time.sleep(10)
+                        CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
+                elif 'A VoltDB Server process is already running' in value['statusstring']:
+                    print value['statusstring']
+                    assert True
+                elif response.status_code == 500:
+                    self.assertEqual(response.status_code, 500)
 
 
-def CheckServerStatus(self, last_db_id, status):
-    status_url = 'http://%s:8000/api/1.0/databases/%u/status/' % \
-    (__host_or_ip__,last_db_id)
+def CheckServerStatus(self, last_db_id, last_server_id, status):
+    status_url = 'http://%s:8000/api/1.0/databases/%u/servers/%u/status' % \
+    (__host_or_ip__, last_db_id, last_server_id)
     print "Checking status..."
     response = requests.get(status_url)
     value = response.json()
-    if value['status'] and value['status'][0]['status']:
-        print "Status: " + value['status'][0]['status']
-        self.assertEqual(value['status'][0]['status'], status)
-        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    if value['status'] :
+        print "Status: " + value['status']
+        self.assertEqual(value['status'], status)
     else:
         assert False
 

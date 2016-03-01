@@ -330,6 +330,10 @@ class Table {
         return false;
     }
 
+    virtual bool isMaterialized() {
+        return false;
+    }
+
     /**
      * These metrics are needed by some iterators.
      */

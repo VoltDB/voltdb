@@ -353,6 +353,16 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(getTableType("T25S"), "EXPORT");
     }
 
+    @Test
+    public void testStreamView() throws Exception
+    {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        assertTrue(findTableInSystemCatalogResults("T25N"));
+        assertEquals(getTableType("T25N"), "EXPORT");
+        assertEquals(getTableType("VT25N"), "VIEW");
+    }
+
 //    @Test
 //    public void testImportClass() throws Exception
 //    {

@@ -1256,7 +1256,7 @@ public class VoltCompiler {
                 addExportTableToConnector(targetName, tableName, db);
             }
         }
-
+        ddlcompiler.processMaterializedViewWarnings(db);
         // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
@@ -1695,10 +1695,30 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         }
-        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
+
+        // streams cannot have tuple limits
+        if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
+            throw new VoltCompilerException("Streams cannot have row limits configured");
+        }
+        Column pc = tableref.getPartitioncolumn();
+        //Get views
+        List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
+        if (pc == null && tlist.size() != 0) {
             compilerLog.error("While configuring export, table " + tableName + " is a source table " +
-                    "for a materialized view. Export only tables do not support views.");
-            throw new VoltCompilerException("Export table configured with materialized view.");
+                    "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+            throw new VoltCompilerException("Export table configured with materialized view without partitioned column.");
+        }
+        if (pc != null && pc.getName() != null && tlist.size() != 0) {
+            for (Table t : tlist) {
+                if (t.getColumns().get(pc.getName()) == null) {
+                    compilerLog.error("While configuring export, table " + t + " is a source table " +
+                            "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+                    throw new VoltCompilerException("Export table configured with materialized view without partitioned column in the view.");
+                } else {
+                    //Set partition column of view table to partition column of export table
+                    t.setPartitioncolumn(t.getColumns().get(pc.getName()));
+                }
+            }
         }
         if (tableref.getMaterializer() != null)
         {
@@ -1709,7 +1729,7 @@ public class VoltCompiler {
         if (tableref.getIndexes().size() > 0) {
             compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
                     "Export tables can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Table with indexes configured as an export table");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make

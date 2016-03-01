@@ -1081,7 +1081,7 @@ public class VoltProjectBuilder {
                 exportConfig.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
             }
 
-            exportConfig.setStream((String)exportConnector.get("elGroup"));
+            exportConfig.setTarget((String)exportConnector.get("elGroup"));
 
             Properties config = (Properties)exportConnector.get("elConfig");
             if((config != null) && (config.size() > 0)) {
