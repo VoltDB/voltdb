@@ -184,7 +184,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        m_predicate = ExpressionUtil.cloneAndCombinePredicates(exps);
+        m_predicate = ExpressionUtil.cloneAndCombinePredicates(colExps);
     }
 
     protected void setScanColumns(Collection<SchemaColumn> scanColumns)

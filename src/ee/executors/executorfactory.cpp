@@ -58,6 +58,7 @@
 #include "executors/limitexecutor.h"
 #include "executors/materializeexecutor.h"
 #include "executors/materializedscanexecutor.h"
+#include "executors/mergereceiveexecutor.h"
 #include "executors/nestloopexecutor.h"
 #include "executors/nestloopindexexecutor.h"
 #include "executors/orderbyexecutor.h"
@@ -93,6 +94,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_MERGERECEIVE: return new MergeReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);

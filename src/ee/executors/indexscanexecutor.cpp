@@ -422,21 +422,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // We have to different nextValue() methods for different lookup types
     //
-<<<<<<< 5f01c9c4625370a148d7b7c4a5c7e60e4df45f20
-    while ((limit == -1 || tuple_ctr < limit) &&
+    while (postfilter.isUnderLimit() &&
            getNextTuple(localLookupType,
                         &tuple,
                         tableIndex,
                         &indexCursor,
                         activeNumOfSearchKeys)) {
-
-=======
-    while (postfilter.isUnderLimit() &&
-            ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                    !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
-                    ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-                            !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
->>>>>>> Code review comments implementation
         if (tuple.isPendingDelete()) {
             continue;
         }

@@ -50,9 +50,10 @@
 #include "common/FatalException.hpp"
 
 #include "execution/VoltDBEngine.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
 #include "executors/executorutil.h"
+#include "executors/indexscanexecutor.h"
+#include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
@@ -147,7 +148,6 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
     assert(dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
@@ -226,9 +226,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     }
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, where_expression, limit, offset);
-
-    // Init the postfilter
-    CountingPostfilter postfilter(where_expression, limit, offset);
 
     //
     // OUTER TABLE ITERATION
@@ -582,7 +579,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 outputTuple(postfilter, join_tuple, pmp);
             }
         }
-   }
+    }
 
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_finish();
