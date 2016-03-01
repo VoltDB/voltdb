@@ -2258,6 +2258,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Perform any actions that would have been taken during the ordinary
             // initialization path
             if (createDRConsumerIfNeeded()) {
+                for (Initiator iv2init : m_iv2Initiators.values()) {
+                    iv2init.setConsumerDRGateway(m_consumerDRGateway);
+                }
                 m_consumerDRGateway.initialize(false);
             }
             // 6.2. If we are a DR replica, we may care about a
