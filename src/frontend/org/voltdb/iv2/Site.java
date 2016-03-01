@@ -173,7 +173,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
      */
-    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition;
+    private final  Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
+            new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
     private long m_lastLocalSpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
     private long m_lastLocalMpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
 
