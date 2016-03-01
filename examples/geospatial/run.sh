@@ -106,9 +106,6 @@ function client() {
     adbroker-benchmark
 }
 
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
 function adbroker-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
