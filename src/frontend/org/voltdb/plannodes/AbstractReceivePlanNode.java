@@ -91,7 +91,7 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
-        outputSchema.sortByTveIndex();
+        // output schema for ReceivePlanNode should never be re-sorted
     }
 
 }
