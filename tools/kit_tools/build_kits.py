@@ -234,12 +234,14 @@ if len(sys.argv) == 2:
     createCandidate = False
     proTreeish = sys.argv[1]
     voltdbTreeish = sys.argv[1]
-    rbmqExportTreeish = sys.argv[1]
+    #rbmqbranch always use master 
+    #rbmqExportTreeish = sys.argv[1]
 if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
-    rbmqExportTreeish = sys.argv[2]
+    #rbmq always use master
+    #rbmqExportTreeish = sys.argv[2]
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
 
@@ -289,19 +291,20 @@ except Exception as e:
     print "Coult not build LINUX kit: " + str(e)
     build_errors=True
 
-try:
-# build kits on the mini
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
-except Exception as e:
-    print "Coult not build MAC kit: " + str(e)
-    build_errors=True
+# disabling mac build
+#try:
+## build kits on the mini
+#    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+#        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+#        assert versionCentos == versionMac
+#        buildCommunity()
+#        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#        buildPro()
+#        buildRabbitMQExport(versionMac)
+#        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#except Exception as e:
+#    print "Coult not build MAC kit: " + str(e)
+#    build_errors=True
 
 # build debian kit
 try:

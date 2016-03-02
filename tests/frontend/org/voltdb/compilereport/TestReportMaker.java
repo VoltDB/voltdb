@@ -120,7 +120,10 @@ public class TestReportMaker extends TestCase {
 
         // "Explain Plan" output should also be escaped:
         // (spaces in explain plan are replaced by &nbsp;)
-        assertTrue(report.contains("filter&nbsp;by&nbsp;((I&nbsp;&lt;&nbsp;?0)&nbsp;AND&nbsp;(I&nbsp;&gt;&nbsp;?1))"));
+        assertTrue(report.contains("filter&nbsp;by&nbsp;"));
+        assertTrue(report.contains("(I&nbsp;&gt;&nbsp;?1)"));
+        assertTrue(report.contains("&nbsp;AND&nbsp;"));
+        assertTrue(report.contains("(I&nbsp;&lt;&nbsp;?0)"));
 
         // Warnings in the Overview tab should have escaped ", &, <, >, etc.
         assertTrue(report.contains("To eliminate this warning, specify &quot;VARCHAR(262145 BYTES)&quot;"));
