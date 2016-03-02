@@ -405,11 +405,37 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
         }
+        @Override
+        public boolean isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                long lastReceivedDRId)
+        {
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
+            if (clusterSources == null) {
+                if (lastReceivedDRId == -1L) {
+                    return true;
+                }
+            }
+            else {
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
+                if (targetTracker == null) {
+                    if (lastReceivedDRId == -1L) {
+                        return true;
+                    }
+                }
+                else {
+                    if (targetTracker.getDrIdRanges().lastEntry().getValue() == lastReceivedDRId) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
 
         @Override
         public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                              long localUniqueId, DRConsumerDrIdTracker tracker)
         {
+            assert(tracker.getDrIdRanges().size() > 0);
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(localUniqueId) == MpInitiator.MP_INIT_PID) {
                 m_lastLocalMpUniqueId = localUniqueId;
             }

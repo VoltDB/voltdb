@@ -84,8 +84,11 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
-                                  long localUniqueId, DRConsumerDrIdTracker tracker);
+    public boolean isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                            long lastReceivedDRId);
+
+    public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                         long localUniqueId, DRConsumerDrIdTracker tracker);
 
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 

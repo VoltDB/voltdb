@@ -242,7 +242,6 @@ public abstract class BaseInitiator implements Initiator
         if (m_term != null) {
             // We're the leader, and this consumer gateway is late to the party
             m_consumerDRGateway.beginPromotePartition(m_partitionId, true);
-            m_consumerDRGateway.completePromotePartition(m_partitionId);
         }
     }
 
