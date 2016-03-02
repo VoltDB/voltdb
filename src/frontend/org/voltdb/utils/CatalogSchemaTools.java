@@ -96,7 +96,14 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW " + catalog_tbl.getTypeName() + " (");
         }
         else {
-            table_sb.append("CREATE TABLE " + catalog_tbl.getTypeName() + " (");
+            table_sb.append("CREATE " +
+                    ((isExportTableWithTarget != null) ? "STREAM" : "TABLE") +
+                    catalog_tbl.getTypeName());
+            if (isExportTableWithTarget != null &&
+                !isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+            }
+            table_sb.append(" (");
         }
 
         // Columns
@@ -366,6 +373,7 @@ public abstract class CatalogSchemaTools {
             }
             sb.append(";\n");
         }
+        /*
         if (isExportTableWithTarget != null) {
             sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
             if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
@@ -373,6 +381,7 @@ public abstract class CatalogSchemaTools {
             }
             sb.append(";\n");
         }
+        */
 
         if (catalog_tbl.getIsdred()) {
             sb.append("DR TABLE " + catalog_tbl.getTypeName() + ";\n");
