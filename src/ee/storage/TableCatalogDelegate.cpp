@@ -151,7 +151,7 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
                                indexedExpressions,
                                predicate,
                                catalogIndex.unique(),
-                               true, // support counting indexes (wherever supported)
+                               catalogIndex.countable(),
                                expressionsAsText,
                                predicateAsText,
                                schema);
