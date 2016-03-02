@@ -655,7 +655,7 @@ public class CatalogDiffEngine {
         // ENG-6511 Allow materialized views to change the index they use dynamically.
         if (suspect instanceof IndexRef && field.equals("name"))
             return null;
-        
+
         if (suspect instanceof Deployment && field.equals("export"))
             return null;
 
