@@ -1015,6 +1015,15 @@ public abstract class CatalogUtil {
             catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
+            catDeploy.setExport(false);
+
+            ExportType export = deployment.getExport();
+            if (export != null) {
+                for (ExportConfigurationType exportConfig : export.getConfiguration()) {
+                    if (exportConfig.isEnabled())
+                        catDeploy.setExport(true);
+                }
+            }
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection().isEnabled()) {
