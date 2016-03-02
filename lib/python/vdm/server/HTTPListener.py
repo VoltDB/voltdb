@@ -1385,6 +1385,7 @@ class Global:
     DEPLOYMENT_USERS = []
     PATH = ''
     MODULE_PATH = ''
+    DELETED_HOSTNAME = ''
 
 
 class ServerAPI(MethodView):
@@ -1500,7 +1501,7 @@ class ServerAPI(MethodView):
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
-
+            Global.DELETED_HOSTNAME = server[0]['hostname']
             Global.SERVERS.remove(server[0])
             sync_configuration()
             write_configuration_file()
@@ -2103,6 +2104,18 @@ class VdmConfiguration(MethodView):
                 url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
                 data = result
                 response = requests.post(url, data=json.dumps(data), headers=headers)
+            except Exception, errs:
+                print traceback.format_exc()
+                print str(errs)
+
+        if Global.DELETED_HOSTNAME != '':
+
+            try:
+                headers = {'content-type': 'application/json'}
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
+                data = result
+                response = requests.post(url, data=json.dumps(data), headers=headers)
+                Global.DELETED_HOSTNAME = ''
             except Exception, errs:
                 print traceback.format_exc()
                 print str(errs)
