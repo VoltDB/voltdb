@@ -1706,16 +1706,16 @@ public class VoltCompiler {
         if (pc == null && tlist.size() != 0) {
             compilerLog.error("While configuring export, table " + tableName + " is a source table " +
                     "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-            throw new VoltCompilerException("Export table configured with materialized view without partitioned column.");
+            throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
         }
         if (pc != null && pc.getName() != null && tlist.size() != 0) {
             for (Table t : tlist) {
                 if (t.getColumns().get(pc.getName()) == null) {
                     compilerLog.error("While configuring export, table " + t + " is a source table " +
                             "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-                    throw new VoltCompilerException("Export table configured with materialized view without partitioned column in the view.");
+                    throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
                 } else {
-                    //Set partition column of view table to partition column of export table
+                    //Set partition column of view table to partition column of stream
                     t.setPartitioncolumn(t.getColumns().get(pc.getName()));
                 }
             }
@@ -1723,12 +1723,12 @@ public class VoltCompiler {
         if (tableref.getMaterializer() != null)
         {
             compilerLog.error("While configuring export, table " + tableName + " is a " +
-                                        "materialized view.  A view cannot be an export table.");
-            throw new VoltCompilerException("View configured as an export table");
+                                        "materialized view.  A view cannot be a stream.");
+            throw new VoltCompilerException("View configured as a stream");
         }
         if (tableref.getIndexes().size() > 0) {
             compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
-                    "Export tables can't have indexes (including primary keys).");
+                    "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {

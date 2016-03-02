@@ -787,8 +787,7 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
@@ -1188,10 +1187,8 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data TO STREAM foo;\n"
-                + "CREATE TABLE export_more_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_more_data TO STREAM bar;";
+                "CREATE STREAM export_data EXPORT TO TARGET foo ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "CREATE STREAM export_more_data EXPORT TO TARGET bar( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
@@ -1790,8 +1787,7 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 

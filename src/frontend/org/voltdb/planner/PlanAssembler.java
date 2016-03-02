@@ -279,7 +279,7 @@ public class PlanAssembler {
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
-                "Illegal to read an export table.");
+                "Illegal to read a stream.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
@@ -340,12 +340,12 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to update an export table.");
+                throw new PlanningErrorException("Illegal to update a stream.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to delete from an export table.");
+                throw new PlanningErrorException("Illegal to delete from a stream.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
