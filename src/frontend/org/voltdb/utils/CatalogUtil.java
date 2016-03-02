@@ -2191,7 +2191,6 @@ public abstract class CatalogUtil {
 		    String bPartName = bpc.getName();
 		    Column pc = table.getColumns().get(bPartName);
 		    if (pc != null) {
-		        System.out.println("Adding stream view");
 		        tables.add(table);
 		    }
 	        }
