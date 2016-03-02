@@ -2181,20 +2181,20 @@ public abstract class CatalogUtil {
                 tables.add(table);
                 continue;
             }
-	    //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
-	    //column as part of view.
-	    if ((table.getMaterializer() != null) && !isReplicated &&
-		    (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
-	        //Non partitioned export table are not allowed so it should not get here.
-	        Column bpc = table.getMaterializer().getPartitioncolumn();
-	        if (bpc != null) {
-		    String bPartName = bpc.getName();
-		    Column pc = table.getColumns().get(bPartName);
-		    if (pc != null) {
-		        tables.add(table);
-		    }
-	        }
-	    }
+            //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
+            //column as part of view.
+            if ((table.getMaterializer() != null) && !isReplicated
+                    && (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
+                //Non partitioned export table are not allowed so it should not get here.
+                Column bpc = table.getMaterializer().getPartitioncolumn();
+                if (bpc != null) {
+                    String bPartName = bpc.getName();
+                    Column pc = table.getColumns().get(bPartName);
+                    if (pc != null) {
+                        tables.add(table);
+                    }
+                }
+            }
         }
         return tables;
     }
