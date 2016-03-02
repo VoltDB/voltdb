@@ -710,18 +710,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
     case DR_RECORD_BEGIN_TXN: {
         *uniqueId = taskInfo->readLong();
         int64_t tempSequenceNumber = taskInfo->readLong();
-        if (*sequenceNumber >= 0) {
-            if (tempSequenceNumber < *sequenceNumber) {
-                throwFatalException("Found out of order sequencing inside a binary log segment. Expected %jd but found %jd",
-                                    (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber == *sequenceNumber) {
-                throwFatalException("Found duplicate transaction %jd in a binary log segment",
-                                    (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber > *sequenceNumber + 1) {
-                throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
-                                    (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-            }
-        }
         *sequenceNumber = tempSequenceNumber;
 
         // skip information that is only used in Topend

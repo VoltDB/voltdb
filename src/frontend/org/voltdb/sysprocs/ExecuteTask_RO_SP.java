@@ -54,45 +54,47 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
      *
      * @param ctx  execution context
      * @param partitionParam  key for routing stored procedure to correct site
-     * @param payload  serialized task-specific parameters
-     * @return  results as VoltTable array
+     * @param taskId          type of the task to execute
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] payload)
+    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte taskId)
     {
-        ByteBuffer buffer = ByteBuffer.wrap(payload);
-        int taskId = buffer.getInt();
-        TaskType taskType = TaskType.values()[taskId]; // Param(1) in payload
+        TaskType taskType = TaskType.values()[taskId];
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
-            ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[] { payload });
-            int producerClusterId = (int)params.getParam(1);
             Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
             Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
-            Map<Integer, DRConsumerDrIdTracker> producerPartitionMap = drIdTrackers.get(producerClusterId);
-            if (producerPartitionMap == null) {
-                producerPartitionMap = new HashMap<Integer, DRConsumerDrIdTracker>();
-            }
-            JSONStringer stringer = new JSONStringer();
             try {
-                stringer.key(Integer.toString(producerClusterId));
-                stringer.object();
-                stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
-                stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : producerPartitionMap.entrySet()) {
-                    stringer.key(e.getKey().toString());
-                    stringer.object();
-                    ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(stringer, e.getValue());
-                    stringer.endObject();
-                }
-                stringer.endObject();
+                setAppStatusString(jsonifyTrackedDRData(lastConsumerUniqueIds, drIdTrackers));
             } catch (JSONException e) {
                 throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
             }
-            setAppStatusString(stringer.toString());
 
+            break;
         default:
             throw new VoltAbortException("Unable to find the task associated with the given task id");
         }
     }
 
+    public static String jsonifyTrackedDRData(Pair<Long, Long> lastConsumerUniqueIds,
+                                              Map<Integer, Map<Integer, DRConsumerDrIdTracker>> allProducerTrackers)
+    throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
+        stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
+        stringer.key("trackers").object();
+        if (allProducerTrackers != null) {
+            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterTrackers : allProducerTrackers.entrySet()) {
+                stringer.key(Integer.toString(clusterTrackers.getKey())).object();
+                for (Map.Entry<Integer, DRConsumerDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.value(ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(e.getValue()));
+                }
+                stringer.endObject();
+            }
+        }
+        stringer.endObject();
+        stringer.endObject();
+        return stringer.toString();
+    }
 }

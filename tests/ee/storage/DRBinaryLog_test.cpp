@@ -159,10 +159,10 @@ private:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(64*1024),
-        m_drReplicatedStream(64*1024),
-        m_drStreamReplica(64*1024),
-        m_drReplicatedStreamReplica(64*1024),
+      : m_drStream(42, 64*1024),
+        m_drReplicatedStream(16383, 64*1024),
+        m_drStreamReplica(42, 64*1024),
+        m_drReplicatedStreamReplica(16383, 64*1024),
         m_undoToken(0),
         m_spHandleReplica(0),
         m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
@@ -262,10 +262,6 @@ public:
         m_otherTableWithoutIndex->setDR(true);
         m_otherTableWithIndexReplica->setDR(true);
         m_otherTableWithoutIndexReplica->setDR(true);
-
-        // allocate a new buffer and wrap it
-        m_drStream.configure(42);
-        m_drReplicatedStream.configure(16383);
 
         // create a table with different schema only on the master
         std::vector<ValueType> singleColumnType;

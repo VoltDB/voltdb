@@ -40,15 +40,9 @@ public:
     // Also update DRProducerProtocol.java if version changes
     static const uint8_t PROTOCOL_VERSION = 4;
 
-    DRTupleStream(int defaultBufferSize);
+    DRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~DRTupleStream() {
-    }
-
-    void configure(CatalogId partitionId) {
-        AbstractDRTupleStream::configure(partitionId);
-        m_hashFlag = (partitionId == 16383) ? TXN_PAR_HASH_REPLICATED : TXN_PAR_HASH_PLACEHOLDER;
-        m_firstParHash = 0;
     }
 
     /**
@@ -82,6 +76,7 @@ public:
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
@@ -98,11 +93,7 @@ public:
     }
 
     static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *out);
-protected:
-    DRTxnPartitionHashFlag m_hashFlag;
-    int64_t m_firstParHash;
-    int64_t m_lastParHash;
-    size_t m_beginTxnUso;
+
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
@@ -133,7 +124,13 @@ private:
      * first hash will be 0 if it is DR stream for replicated table
      * or the first record is TRUNCATE_TABLE
      */
-    bool updateParHash(int64_t parHash);
+    bool updateParHash(bool isReplicatedTable, int64_t parHash);
+
+    const DRTxnPartitionHashFlag m_initialHashFlag;
+    DRTxnPartitionHashFlag m_hashFlag;
+    int64_t m_firstParHash;
+    int64_t m_lastParHash;
+    size_t m_beginTxnUso;
 
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
@@ -141,7 +138,7 @@ private:
 
 class MockDRTupleStream : public DRTupleStream {
 public:
-    MockDRTupleStream() : DRTupleStream(1024) {}
+    MockDRTupleStream(int partitionId) : DRTupleStream(partitionId, 1024) {}
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
                            int partitionColumn,
@@ -161,6 +158,7 @@ public:
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) {

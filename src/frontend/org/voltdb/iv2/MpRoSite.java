@@ -238,8 +238,21 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                long lastReceivedDRId)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                              long localUniqueId, DRConsumerDrIdTracker tracker)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -508,6 +521,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
