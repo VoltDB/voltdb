@@ -38,62 +38,216 @@ public class PostGISBackend extends PostgreSQLBackend {
     // Regex pattern for a typical column (or function of a column, etc.),
     // as used in a Geospatial function
     private static final String COLUMN_PATTERN = "(\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(::\\w+)?(\\s*\\)(\\s+(AS|FROM)\\s+\\w+)?)*\\s*";
-    // Captures the use of LONGITUDE(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern longitudeQuery = Pattern.compile(
-            "LONGITUDE\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+
+    // Captures the use of AsText(columnName)
+    private static final Pattern asTextQuery = Pattern.compile(
+            "AsText\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
             Pattern.CASE_INSENSITIVE);
-    // Captures the use of LATITUDE(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern latitudeQuery = Pattern.compile(
-            "LATITUDE\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of CENTROID(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern centroidQuery = Pattern.compile(
-            "CENTROID\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of AREA(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern areaQuery = Pattern.compile(
-            "AREA\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of DISTANCE(column1,column2), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern distanceQuery = Pattern.compile(
-            "DISTANCE\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of CONTAINS(column1,column2), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern containsQuery = Pattern.compile(
-            "CONTAINS\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of NumPoints(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern numPointsQuery = Pattern.compile(
-            "NumPoints\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of NumPoints(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern numInteriorRingsQuery = Pattern.compile(
-            "NumInteriorRings\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of IsValid(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern isValidQuery = Pattern.compile(
-            "IsValid\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of IsInvalidReason(columnName), which PostgreSQL/PostGIS
-    // does not support
-    private static final Pattern isInvalidReasonQuery = Pattern.compile(
-            "IsInvalidReason\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of CAST(columnName AS VARCHAR), which PostgreSQL/PostGIS
-    // handles differently, when the columnName is of type GEOGRAPHY_POINT or
-    // GEOGRAPHY
+    // Modifies a query containing an AsText(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_AsText(columnName), which is an equivalent that PostGIS does support
+    private static final QueryTransformer asTextQueryTransformer
+            = new QueryTransformer(asTextQuery)
+            .prefix("ST_AsText(").groups("column");
+
+    // Captures the use of CAST(columnName AS VARCHAR)
     private static final Pattern castGeoAsVarcharQuery = Pattern.compile(
             "CAST\\s*\\((?<column>"+COLUMN_PATTERN+")\\s*AS\\s*VARCHAR\\)",
             Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a CAST(columnName AS VARCHAR) function,
+    // when <i>columnName</i> is of a Geo type (GEOGRAPHY_POINT or GEOGRAPHY),
+    // for which PostgreSQL returns the WKB (well-known binary) format for
+    // that column value, unlike VoltDB, which returns the WKT (well-known
+    // text) format; so change it to: ST_AsText(columnName).
+    // Note: this needs to be used after asTextQueryTransformer, not before,
+    // or we'll end up with ST_ST_AsText in our queries.
+    private static final QueryTransformer castGeoAsVarcharQueryTransformer
+            = new QueryTransformer(castGeoAsVarcharQuery)
+            .prefix("ST_AsText(").suffix(")").groups("column")
+            .useWholeMatch().columnType(ColumnType.GEO);
+
+    // Captures the use of PointFromText('POINT...
+    private static final Pattern pointFromTextQuery = Pattern.compile(
+            "PointFromText\\s*\\('POINT", Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a PointFromText('POINT... function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_GeographyFromText('POINT..., which is an equivalent that PostGIS
+    // does support
+    private static final QueryTransformer pointFromTextQueryTransformer
+            = new QueryTransformer(pointFromTextQuery)
+            .replacementText("ST_GeographyFromText('POINT").useWholeMatch();
+
+    // Captures the use of PolygonFromText('POLYGON...
+    private static final Pattern polygonFromTextQuery = Pattern.compile(
+            "PolygonFromText\\s*\\('POLYGON", Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a PointFromText('POINT... function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_GeographyFromText('POLYGON..., which is an equivalent that PostGIS
+    // does support
+    private static final QueryTransformer polygonFromTextQueryTransformer
+            = new QueryTransformer(polygonFromTextQuery)
+            .replacementText("ST_GeographyFromText('POLYGON").useWholeMatch();
+
+
+    // Captures the use of LONGITUDE(columnName)
+    private static final Pattern longitudeQuery = Pattern.compile(
+            "LONGITUDE\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a LONGITUDE(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_X(columnName::geometry), which is an equivalent that PostGIS
+    // does support
+    private static final QueryTransformer longitudeQueryTransformer
+            = new QueryTransformer(longitudeQuery)
+            .prefix("ST_X(").suffix("::geometry").groups("column");
+
+    // Captures the use of LATITUDE(columnName)
+    private static final Pattern latitudeQuery = Pattern.compile(
+            "LATITUDE\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a LONGITUDE(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_Y(columnName::geometry), which is an equivalent that PostGIS
+    // does support
+    private static final QueryTransformer latitudeQueryTransformer
+            = new QueryTransformer(latitudeQuery)
+            .prefix("ST_Y(").suffix("::geometry").groups("column");
+
+    // Captures the use of NumPoints(columnName)
+    private static final Pattern numPointsQuery = Pattern.compile(
+            "NumPoints\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a NumPoints(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_NPoints(columnName::geometry), which is an equivalent
+    // that PostGIS does support
+    private static final QueryTransformer numPointsQueryTransformer
+            = new QueryTransformer(numPointsQuery)
+            .prefix("ST_NPoints(").suffix("::geometry").groups("column");
+
+    // Captures the use of NumInteriorRings(columnName)
+    private static final Pattern numInteriorRingsQuery = Pattern.compile(
+            "NumInteriorRings\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a NumInteriorRings(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_NumInteriorRings(columnName::geometry), which is an equivalent
+    // that PostGIS does support
+    private static final QueryTransformer numInteriorRingsQueryTransformer
+            = new QueryTransformer(numInteriorRingsQuery)
+            .prefix("ST_NumInteriorRings(").suffix("::geometry").groups("column");
+
+    // Captures the use of IsValid(columnName)
+    private static final Pattern isValidQuery = Pattern.compile(
+            "IsValid\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing an IsValid(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_IsValid(columnName::geometry), which is an equivalent
+    // that PostGIS does support
+    private static final QueryTransformer isValidQueryTransformer
+            = new QueryTransformer(isValidQuery)
+            .prefix("ST_IsValid(").suffix("::geometry").groups("column");
+
+    // Captures the use of IsInvalidReason(columnName)
+    private static final Pattern isInvalidReasonQuery = Pattern.compile(
+            "IsInvalidReason\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing an IsInvalidReason(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_IsValidReason(columnName::geometry), which is an equivalent
+    // that PostGIS does support
+    private static final QueryTransformer isInvalidReasonQueryTransformer
+            = new QueryTransformer(isInvalidReasonQuery)
+            .prefix("ST_IsValidReason(").suffix("::geometry").groups("column");
+
+
+    // Captures the use of CONTAINS(column1,column2)
+    private static final Pattern containsQuery = Pattern.compile(
+            "CONTAINS\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a CONTAINS(column1,column2) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_COVERS(column1,column2), which is a (spherical Earth) equivalent
+    // that PostGIS does support
+    private static final QueryTransformer containsQueryTransformer
+            = new QueryTransformer(containsQuery)
+            .prefix("ST_COVERS(").groups("columns");
+
+    // Captures the use of DISTANCE(column1,column2)
+    private static final Pattern distanceQuery = Pattern.compile(
+            "DISTANCE\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a DISTANCE(column1,column2) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_DISTANCE(column1,column2,FALSE), which is a (spherical Earth)
+    // equivalent that PostGIS does support
+    private static final QueryTransformer distanceQueryTransformer
+            = new QueryTransformer(distanceQuery)
+            .prefix("ST_DISTANCE(").suffix(",FALSE").groups("columns");
+
+    // Captures the use of AREA(columnName)
+    private static final Pattern areaQuery = Pattern.compile(
+            "AREA\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing an AREA(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_AREA(columnName,FALSE), which is a (spherical Earth) equivalent
+    // that PostGIS does support
+    private static final QueryTransformer areaQueryTransformer
+            = new QueryTransformer(areaQuery)
+            .prefix("ST_AREA(").suffix(",FALSE").groups("column");
+
+    // Captures the use of CENTROID(columnName)
+    private static final Pattern centroidQuery = Pattern.compile(
+            "CENTROID\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a CENTROID(columnName) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_CENTROID(columnName::geometry), which is a (spherical Earth)
+    // equivalent that PostGIS does support
+    private static final QueryTransformer centroidQueryTransformer
+            = new QueryTransformer(centroidQuery)
+            .prefix("ST_CENTROID(").suffix("::geometry").groups("column");
+
+    // Captures the use of DWithin(column1,column2,column3)
+    private static final Pattern dWithinQuery = Pattern.compile(
+            "DWithin\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a DWithin(column1,column2,column3) function,
+    // which PostgreSQL/PostGIS does not support, and replaces it with
+    // ST_DWithin(column1,column2,column3,FALSE), which is a (spherical Earth)
+    // equivalent that PostGIS does support
+    private static final QueryTransformer dWithinQueryTransformer
+            = new QueryTransformer(dWithinQuery)
+            .prefix("ST_DWithin(").suffix(",FALSE").groups("columns");
+
+    // Captures the use of GEOGRAPHY_POINT (in DDL)
+    private static final Pattern geographyPointDdl = Pattern.compile(
+            "(?<point>GEOGRAPHY_POINT)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing GEOGRAPHY_POINT, which
+    // PostgreSQL/PostGIS does not support, and replaces it with
+    // GEOGRAPHY(POINT,4326), which is an equivalent that PostGIS does
+    // support. Note: 4326 is the standard, spheroidal SRIS/EPSG normally
+    // used by PostGIS; we might wish to change this to use a sphere, if
+    // we can find an appropriate SRIS to use, which PostGIS supports
+    // (possibly 3857?)
+    private static final QueryTransformer geographyPointDdlTransformer
+            = new QueryTransformer(geographyPointDdl)
+            .replacementText("GEOGRAPHY(POINT,4326)").useWholeMatch().groups("point");
+
+    // Captures the use of GEOGRAPHY (in DDL)
+    private static final Pattern geographyDdl = Pattern.compile(
+            "(?<polygon>GEOGRAPHY)\\s*(,|\\))", Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing GEOGRAPHY, which PostgreSQL/PostGIS
+    // does not support, and replaces it with GEOGRAPHY(POLYGON,4326), which
+    // is an equivalent that PostGIS does support. Note: 4326 is the standard,
+    // spheroidal SRIS/EPSG normally used by PostGIS; we might wish to change
+    // this to use a sphere, if we can find an appropriate SRIS to use, which
+    // PostGIS supports (possibly 3857?)
+    private static final QueryTransformer geographyDdlTransformer
+            = new QueryTransformer(geographyDdl)
+            .replacementText("GEOGRAPHY(POLYGON,4326)").useWholeMatch().groups("polygon");
 
     static public PostGISBackend initializePostGISBackend(CatalogContext context)
     {
@@ -140,145 +294,29 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  existing database connection. */
     public PostGISBackend(Connection dbconn) {
         super(dbconn);
-//        this.dbconn = dbconn;
         this.m_database_type = "PostGIS";
-    }
-
-    /** Modify a query containing a LONGITUDE(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_X(columnName::geometry), which is an equivalent that PostGIS
-     *  does support. */
-    static private String transformLongitudeQuery(String dml) {
-        return transformQuery(dml, longitudeQuery, "",
-                "ST_X(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing a LATITUDE(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_Y(columnName::geometry), which is an equivalent that PostGIS
-     *  does support. */
-    static private String transformLatitudeQuery(String dml) {
-        return transformQuery(dml, latitudeQuery, "",
-                "ST_Y(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing a CENTROID(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_CENTROID(columnName::geometry), which is an equivalent that PostGIS
-     *  does support. */
-    static private String transformCentroidQuery(String dml) {
-        return transformQuery(dml, centroidQuery, "",
-                "ST_CENTROID(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing an AREA(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_AREA(columnName,FALSE), which is a (spherical Earth) equivalent
-     *  that PostGIS does support. */
-    static private String transformAreaQuery(String dml) {
-        return transformQuery(dml, areaQuery, "",
-                "ST_AREA(", ",FALSE", null, false, null, "column");
-    }
-
-    /** Modify a query containing a DISTANCE(column1,column2) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_DISTANCE(column1,column2,FALSE), which is a (spherical Earth)
-     *  equivalent that PostGIS does support. */
-    static private String transformDistanceQuery(String dml) {
-        return transformQuery(dml, distanceQuery, "",
-                "ST_DISTANCE(", ",FALSE", null, false, null, "columns");
-    }
-
-    /** Modify a query containing a CONTAINS(column1,column2) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_COVERS(column1,column2,FALSE), which is a (spherical Earth)
-     *  equivalent that PostGIS does support. */
-    static private String transformContainsQuery(String dml) {
-        return transformQuery(dml, containsQuery, "",
-                "ST_COVERS(", "", null, false, null, "columns");
-    }
-
-    /** Modify a query containing an NumPoints(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_NPoints(columnName::geometry), which is an equivalent that PostGIS
-     *  does support. */
-    static private String transformNumPointsQuery(String dml) {
-        return transformQuery(dml, numPointsQuery, "",
-                "ST_NPoints(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing an NumInteriorRings(columnName) function,
-     *  which PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_NumInteriorRings(columnName::geometry), which is an equivalent that
-     *  PostGIS does support. */
-    static private String transformNumInteriorRingsQuery(String dml) {
-        return transformQuery(dml, numInteriorRingsQuery, "",
-                "ST_NumInteriorRings(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing an IsValid(columnName) function, which
-     *  PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_IsValid(columnName::geometry), which is an equivalent that PostGIS
-     *  does support. */
-    static private String transformIsValidQuery(String dml) {
-        return transformQuery(dml, isValidQuery, "",
-                "ST_IsValid(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing an IsInvalidReason(columnName) function,
-     *  which PostgreSQL/PostGIS does not support, and replace it with
-     *  ST_IsValidReason(columnName::geometry), which is an equivalent that
-     *  PostGIS does support. */
-    static private String transformIsInvalidReasonQuery(String dml) {
-        return transformQuery(dml, isInvalidReasonQuery, "",
-                "ST_IsValidReason(", "::geometry", null, false, null, "column");
-    }
-
-    /** Modify a query containing a CAST(columnName AS VARCHAR), where
-     *  <i>columnName</i> is of a Geo type (GEOGRAPHY_POINT or GEOGRAPHY),
-     *  for which PostgreSQL returns the WKB (well-known binary) format for
-     *  that column value, unlike VoltDB, which returns the WKT (well-known
-     *  text) format; so change it to: ST_AsText(columnName). */
-    static private String transformCastGeoAsVarcharQuery(String dml) {
-        return transformQuery(dml, castGeoAsVarcharQuery, "",
-                "AsText(", ")", null, false, null, "column");
     }
 
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS with other, similar terms. */
     static public String transformDDL(String ddl) {
-        // 4326 is the standard, spheroidal SRIS/EPSG normally used by PostGIS;
-        // we may wish to change this to use a sphere, if we can find an
-        // appropriate SRIS to use, which PostGIS supports (possibly 3857?)
-        String modified_ddl = PostgreSQLBackend.transformDDL(ddl)
-                // TODO: make these more robust, using regex Patterns??
-                .replace("GEOGRAPHY_POINT", "GEOGRAPHY(POINT,4326)")
-                .replace("GEOGRAPHY,",      "GEOGRAPHY(POLYGON,4326),");
-        return modified_ddl;
+        return transformQuery(PostgreSQLBackend.transformDDL(ddl),
+                geographyPointDdlTransformer, geographyDdlTransformer);
     }
 
-    /** For a SQL query, replace keywords not supported by PostgreSQL/PostGIS,
-     *  or which behave differently in PostgreSQL/PostGIS than in VoltDB, with
-     *  other, similar terms, so that the results will match. */
+    /** For a SQL query, replace (VoltDB) keywords not supported by
+     *  PostgreSQL/PostGIS, or which behave differently in PostgreSQL/PostGIS
+     *  than in VoltDB, with other, similar terms, so that the results will match. */
     static public String transformDML(String dml) {
-        return transformCentroidQuery(
-                transformAreaQuery(
-                    transformDistanceQuery(
-                        transformContainsQuery(
-                            transformLongitudeQuery(
-                                transformLatitudeQuery(
-                                    transformNumPointsQuery(
-                                        transformNumInteriorRingsQuery(
-                                            transformIsValidQuery(
-                                                transformIsInvalidReasonQuery(
-                                                    transformCastGeoAsVarcharQuery(
-                                                        PostgreSQLBackend.transformDML(dml)
-               ))   )   )   )   )   )   )   )   )   )
-                // TODO: make these more robust, using regex Patterns?
-                .replace("pointFromText('POINT",     "ST_GeographyFromText('POINT")
-                .replace("polygonFromText('POLYGON", "ST_GeographyFromText('POLYGON")
-                .replace("AsText",    "ST_AsText")
-                .replace("asText",    "ST_AsText");
+        return transformQuery(PostgreSQLBackend.transformDML(dml),
+                asTextQueryTransformer,        castGeoAsVarcharQueryTransformer,
+                pointFromTextQueryTransformer, polygonFromTextQueryTransformer,
+                longitudeQueryTransformer,     latitudeQueryTransformer,
+                isValidQueryTransformer,       isInvalidReasonQueryTransformer,
+                numPointsQueryTransformer,     numInteriorRingsQueryTransformer,
+                containsQueryTransformer,      distanceQueryTransformer,
+                areaQueryTransformer,          centroidQueryTransformer,
+                dWithinQueryTransformer);
     }
 
     /** Modifies DDL statements in such a way that PostGIS results will match
@@ -287,7 +325,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     @Override
     public void runDDL(String ddl) {
         String modifiedDdl = transformDDL(ddl);
-        debugPrintTransformSql(ddl, modifiedDdl, ddl != null && !ddl.equals(modifiedDdl));
+        printTransformedSql(ddl, modifiedDdl);
         super.runDDL(modifiedDdl, false);
     }
 
@@ -297,7 +335,7 @@ public class PostGISBackend extends PostgreSQLBackend {
     @Override
     public VoltTable runDML(String dml) {
         String modifiedDml = transformDML(dml);
-        debugPrintTransformSql(dml, modifiedDml, dml != null && !dml.equals(modifiedDml));
+        printTransformedSql(dml, modifiedDml);
         return super.runDML(modifiedDml, false);
     }
 
