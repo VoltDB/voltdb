@@ -97,11 +97,11 @@ public abstract class CatalogSchemaTools {
         }
         else {
             table_sb.append("CREATE " +
-                    ((isExportTableWithTarget != null) ? "STREAM" : "TABLE") +
+                    ((isExportTableWithTarget != null) ? "STREAM " : "TABLE ") +
                     catalog_tbl.getTypeName());
             if (isExportTableWithTarget != null &&
                 !isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-                sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+                table_sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
             }
             table_sb.append(" (");
         }
