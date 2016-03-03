@@ -232,7 +232,7 @@ public class DRConsumerDrIdTracker {
         return m_lastMpUniqueId;
     }
 
-    public Map<Long, Long> getDrIdRanges() {
+    public TreeMap<Long, Long> getDrIdRanges() {
         return m_map;
     }
 
