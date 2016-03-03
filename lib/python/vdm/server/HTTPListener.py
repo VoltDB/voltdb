@@ -1366,6 +1366,32 @@ class DictClass(dict):
     pass
 
 
+def json_loads_without_unicode(json_object):
+    json_text = json.dumps(json_object)
+    return remove_unicode(
+        json.loads(json_text, object_hook=remove_unicode),
+        ignore_dicts=True
+    )
+
+
+def remove_unicode(data, ignore_dicts = False):
+    # if this is a unicode string, return its string representation
+    if isinstance(data, unicode):
+        return data.encode('utf-8')
+    # if this is a list of values, return list of byteified values
+    if isinstance(data, list):
+        return [ remove_unicode(item, ignore_dicts=True) for item in data ]
+    # if this is a dictionary, return dictionary of byteified keys and values
+    # but only if we haven't already byteified it
+    if isinstance(data, dict) and not ignore_dicts:
+        return {
+            remove_unicode(key, ignore_dicts=True): remove_unicode(value, ignore_dicts=True)
+            for key, value in data.iteritems()
+        }
+    # if it's anything else, return it in its original form
+    return data
+
+
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = {"databaseid": True, "users": True}
@@ -2302,7 +2328,6 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stalled", "details": error})
                     else:
                         return jsonify({'status': "stopped", "details": error})
-
 
 
 def main(runner, amodule, config_dir, server):
