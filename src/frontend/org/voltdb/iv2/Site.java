@@ -446,6 +446,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (clusterSources == null) {
                 clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
                 clusterSources.put(producerPartitionId, tracker);
+                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
             }
             else {
                 DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
