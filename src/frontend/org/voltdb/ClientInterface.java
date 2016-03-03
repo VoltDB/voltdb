@@ -134,7 +134,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // PerPartition cids
     private static long setBaseValue(int offset) { return offset << 14; }
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + setBaseValue(1);
-    public static final long DR_REPLICATION_BASE_CID    = Long.MIN_VALUE + setBaseValue(2);
+    public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
+    public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
