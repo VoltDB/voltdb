@@ -400,6 +400,7 @@ public class Collector {
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
                     String zipPath = folderPath + entryPath;
+                    System.out.println(zipPath + "...");
                     if (pathCounter.containsKey(zipPath)) {
                         Integer pathCount = pathCounter.get(zipPath);
                         pathCounter.put(zipPath, pathCount + 1);
@@ -517,6 +518,7 @@ public class Collector {
 
     private static void cmd(ZipOutputStream zipStream, String[] command, String folderPath, String resFilename)
             throws IOException, ZipException {
+        System.out.println(folderPath + resFilename + "...");
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
 
