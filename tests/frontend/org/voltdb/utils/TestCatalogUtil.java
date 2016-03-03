@@ -1952,4 +1952,25 @@ public class TestCatalogUtil extends TestCase {
             assertEquals(expected.getSecond(), sig.get(expected.getFirst()));
         }
     }
+
+    public void testGetDRTableNamePartitionColumnMapping() throws Exception {
+        String schema = "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
+                "DR TABLE B; DR TABLE C;\n";
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File file = VoltFile.createTempFile("DRTableNamePartitionColumnMapping", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.compile(file.getPath());
+        Catalog cat = TestCatalogDiffs.catalogForJar(file.getPath());
+
+        file.delete();
+
+        Map<String, Integer> mapping = CatalogUtil.getDRTableNamePartitionColumnMapping(cat.getClusters().get("cluster").getDatabases().get("database"));
+        assertEquals(1, mapping.size());
+        assertEquals(true, mapping.containsKey("B"));
+        assertEquals(0, mapping.get("B").intValue());
+    }
 }
