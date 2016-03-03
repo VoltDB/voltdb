@@ -31,13 +31,13 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
+
+import junit.framework.TestCase;
 
 public class TestHSQLDB extends TestCase {
     class VoltErrorHandler implements ErrorHandler {
@@ -64,33 +64,36 @@ public class TestHSQLDB extends TestCase {
         public int read() throws IOException { return sr.read(); }
     }
 
-    /*public void testCatalogRead() {
-        String ddl = "create table test (cash integer default 23);";
-
+    public void testCatalogRead() {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
         try {
-            hsql.runDDLCommand(ddl);
-        } catch (HSQLInterface.HSQLParseException e1) {
-            assertFalse(true);
+            hsql.runDDLCommand("create table test (cash integer default 23);");
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+            fail();
         }
 
-        String xml = hsql.getXMLFromCatalog();
-
-        assertTrue(xml != null);
-
-        String sql = "select * from test;";
+        VoltXMLElement xml;
+        try {
+            xml = hsql.getXMLFromCatalog();
+            assertNotNull(xml);
+        } catch (HSQLParseException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+            fail();
+        }
 
         try {
-            xml = hsql.getXMLCompiledStatement(sql);
-        } catch (HSQLInterface.HSQLParseException e) {
+            xml = hsql.getXMLCompiledStatement("select * from test;");
+            assertNotNull(xml);
+        } catch (HSQLParseException e) {
             e.printStackTrace();
+            fail();
         }
 
-        //System.out.println(xml);
-
-        assertTrue(xml != null);
-    }*/
+        //* enable to debug */ System.out.println(xml);
+    }
 
     public HSQLInterface setupTPCCDDL() {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -100,21 +103,19 @@ public class TestHSQLDB extends TestCase {
             hsql.runDDLFile(URLDecoder.decode(url.getPath(), "UTF-8"));
         } catch (HSQLParseException e) {
             e.printStackTrace();
-            return null;
+            fail();
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
-            System.exit(-1);
+            fail();
         }
-
         return hsql;
     }
 
     /*public void testWithTPCCDDL() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
-        assertTrue(hsql != null);
 
         String xmlCatalog = hsql.getXMLFromCatalog();
-        System.out.println(xmlCatalog);
+        //* enable to debug *-/ System.out.println(xmlCatalog);
         StringInputStream xmlStream = new StringInputStream(xmlCatalog);
 
         Document doc = null;
@@ -124,16 +125,16 @@ public class TestHSQLDB extends TestCase {
         try {
             DocumentBuilder builder = factory.newDocumentBuilder();
             doc = builder.parse(xmlStream);
+            assertNotNull(doc);
         } catch (Exception e) {
             e.printStackTrace();
+            fail();
         }
 
-        assertTrue(doc != null);
     }
 
     public void testDMLFromTPCCNewOrder() {
         HSQLInterface hsql = setupTPCCDDL();
-        assertFalse(hsql == null);
 
         URL url = getClass().getResource("hsqltest-dml.sql");
 
@@ -141,16 +142,17 @@ public class TestHSQLDB extends TestCase {
         try {
             String dmlPath = URLDecoder.decode(url.getPath(), "UTF-8");
             stmts = HSQLFileParser.getStatements(dmlPath);
+            assertNotNull(stmts);
         } catch (HSQLParseException e) {
             e.printStackTrace();
+            fail();
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
-            System.exit(-1);
+            fail();
         }
-        assertFalse(stmts == null);
 
         for (HSQLFileParser.Statement stmt : stmts) {
-            System.out.println(stmt.statement);
+            //* enable to debug *-/ System.out.println(stmt.statement);
 
             String xml = null;
             try {
@@ -158,9 +160,9 @@ public class TestHSQLDB extends TestCase {
             } catch (HSQLParseException e1) {
                 e1.printStackTrace();
             }
-            assertFalse(xml == null);
+            assertNotNull(xml);
 
-            System.out.println(xml);
+            //* enable to debug *-/ System.out.println(xml);
 
             StringInputStream xmlStream = new StringInputStream(xml);
 
@@ -174,9 +176,9 @@ public class TestHSQLDB extends TestCase {
                 doc = builder.parse(xmlStream);
             } catch (Exception e) {
                 e.printStackTrace();
-                //assertTrue(false);
+                fail();
             }
-            assertFalse(doc == null);
+            assertNotNull(doc);
         }
 
     }*/
@@ -194,10 +196,15 @@ public class TestHSQLDB extends TestCase {
 
     public void testSqlInToXML() throws HSQLParseException {
         HSQLInterface hsql = setupTPCCDDL();
-        assertTrue(hsql != null);
         VoltXMLElement stmt;
 
         // The next few statements should work, also with a trivial test
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order");
+        assertTrue(stmt.toString().contains("NO_W_ID"));
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id = 5");
+        assertTrue(stmt.toString().contains("equal"));
 
         stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (5,7);");
         assertTrue(stmt.toString().contains("vector"));
@@ -223,11 +230,8 @@ public class TestHSQLDB extends TestCase {
         stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
         assertTrue(stmt.toString().contains("vector"));
 
-        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (select w_id from warehouse);");
-        //???assertTrue(stmt.toString().contains("vector"));
-        // not supported yet
-        //stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in ?;");
-        //assertTrue(stmt.toString().contains("vector"));
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in ?;");
+        assertTrue(stmt.toString().contains("vector"));
 
         stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (select w_id from warehouse);");
         assertTrue(stmt.toString().contains("tablesubquery"));
@@ -241,6 +245,11 @@ public class TestHSQLDB extends TestCase {
         // The ones below here should continue to give sensible errors
         expectFailStmt(hsql, "select * from new_order where no_w_id <> (5, 7, 8);",
                 "row column count mismatch");
+
+        // Fixed as ENG-9869 bogus plan when ORDER BY of self-join uses wrong table alias for GROUP BY key
+        expectFailStmt(hsql, "select x.no_w_id from new_order x, new_order y group by x.no_w_id order by y.no_w_id;",
+                "expression not in aggregate or GROUP BY columns");
+
     }
 
     public void testVarbinary() {
@@ -258,35 +267,37 @@ public class TestHSQLDB extends TestCase {
         VoltXMLElement xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
+            fail();
         }
-        assertFalse(xml == null);
-        System.out.println(xml);
+        //* enable to debug */ System.out.println(xml);
 
         sql = "INSERT INTO BT VALUES (?, ?, ?);";
         xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
+            fail();
         }
-        assertFalse(xml == null);
-        System.out.println(xml);
+        //* enable to debug */ System.out.println(xml);
     }
 
     public void testInsertIntoSelectFrom() {
         HSQLInterface hsql = setupTPCCDDL();
-        assertNotNull(hsql);
 
         String sql = "INSERT INTO new_order (NO_O_ID, NO_D_ID, NO_W_ID) SELECT O_ID, O_D_ID+1, CAST(? AS INTEGER) FROM ORDERS;";
         VoltXMLElement xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
+            fail();
         }
-        assertNotNull(xml);
     }
 
     public void testSumStarFails() {
@@ -316,7 +327,6 @@ public class TestHSQLDB extends TestCase {
 
     /*public void testSimpleSQL() {
         HSQLInterface hsql = setupTPCCDDL();
-        assertFalse(hsql == null);
 
         String sql = "SELECT O_ID, O_CARRIER_ID, O_ENTRY_D FROM ORDERS WHERE O_W_ID = ? AND O_D_ID = ? AND O_C_ID = ? ORDER BY O_ID DESC LIMIT 1;";
 
@@ -325,12 +335,12 @@ public class TestHSQLDB extends TestCase {
         String xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(sql);
+            assertNotNull(xml);
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
+            fail();
         }
-        assertFalse(xml == null);
-
-        System.out.println(xml);
+        //* enable to debug *-/ System.out.println(xml);
 
         StringInputStream xmlStream = new StringInputStream(xml);
 
@@ -342,17 +352,16 @@ public class TestHSQLDB extends TestCase {
             DocumentBuilder builder = factory.newDocumentBuilder();
             builder.setErrorHandler(new VoltErrorHandler());
             doc = builder.parse(xmlStream);
+            assertNotNull(doc);
         } catch (Exception e) {
             e.printStackTrace();
-            //assertTrue(false);
+            fail();
         }
-        assertFalse(doc == null);
 
     }*/
 
     /*public void testDeleteIssue() {
         HSQLInterface hsql = setupTPCCDDL();
-        assertFalse(hsql == null);
 
         //String stmt = "delete from NEW_ORDER where NO_O_ID = 1;";
         //String stmt = "delete from NEW_ORDER where NO_O_ID = 1 and NO_D_ID = 1 and NO_W_ID = 1;";
@@ -361,12 +370,12 @@ public class TestHSQLDB extends TestCase {
         String xml = null;
         try {
             xml = hsql.getXMLCompiledStatement(stmt);
+            assertNotNull(xml);
         } catch (HSQLParseException e1) {
             e1.printStackTrace();
+            fail();
         }
-        assertFalse(xml == null);
-
-        System.out.println(xml);
+        //* enable to debug *-/ System.out.println(xml);
     }*/
 
     public static void main(String args[]) {
