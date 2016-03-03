@@ -6,6 +6,7 @@ CLIENT_DIR="./cpp-test-files"
 BUILD=debug
 CLEANUP=YES
 VOLTDB_VERSION=6.1
+DEBUGGER_PORT=8000
 
 function help() {
     echo "Usage: ./run.sh ... arguments ..."
@@ -33,6 +34,9 @@ function help() {
     echo "                       By default this will be ./obj.  After a"
     echo "                       successful generation run this will be"
     echo "                       deleted."
+    echo "  --debug[=port]       Debug the java application which generates"
+    echo "                       the data.  Use the given port, or 8000 if"
+    echo "                       no port is given."
     echo "  --voltdb-version V   Set the voltdb version to the given one."
     echo "  --no-cleanup         Don't clean up the working directory."
     echo "  --help               Print this message and exit."
@@ -125,7 +129,7 @@ function init_database() {
 
 function noserver() {
     echo "Shutting down the server."
-    voltadmin shutdown
+    (cd "$OBJ"; voltadmin shutdown)
 }
 
 # run the client that drives the example
@@ -134,7 +138,11 @@ function client() {
     echo "  Classpath:"
     echo "    $VOLTDB_BASE/voltdb/voltdb-$VOLTDB_VERSION.jar"
     echo "    $VOLTDB_BASE/obj/${BUILD}/test"
-    (set -x ; java -classpath $VOLTDB_BASE/voltdb/voltdb-$VOLTDB_VERSION.jar:$VOLTDB_BASE/obj/${BUILD}/test org.voltdb.GenerateCPPTestFiles --client-dir "$CLIENT_DIR" "$@")
+    if [ -n "$DEBUG" ] ; then
+      echo "   Debugging on port ${DEBUGGER_PORT}."
+      DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=${DEBUGGER_PORT}"
+    fi
+    (set -x ; java $DEBUG_OPTS -classpath $VOLTDB_BASE/voltdb/voltdb-$VOLTDB_VERSION.jar:$VOLTDB_BASE/obj/${BUILD}/test org.voltdb.GenerateCPPTestFiles --client-dir "$CLIENT_DIR" "$@")
 }
 
 function cleanup() {
@@ -205,6 +213,7 @@ while [ -z "$DONE" ]; do
         --build)
             shift
             BUILD="$1"
+            shift
             case "$BUILD" in
                 release|debug)
                     ;;
@@ -223,6 +232,15 @@ while [ -z "$DONE" ]; do
             shift
             CLEANUP=NO
             ;;
+        --debug=*)
+	    DEBUGGER_PORT="$(echo "$1" | sed 's;--debug=;;')"
+            DEBUG=YES
+	    shift
+	    ;;
+	--debug)
+	    DEBUG=YES
+	    shift
+	    ;;
         --help)
             help
             exit 100

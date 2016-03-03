@@ -31,6 +31,8 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientAuthScheme;
@@ -39,6 +41,8 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
 public class GenerateCPPTestFiles {
@@ -54,10 +58,19 @@ public class GenerateCPPTestFiles {
     private final static int    CLUSTER_ROUND_TRIP_TIME = 0x00000004;
     private final static String BUILD_STRING            = "volt_6.1_test_build_string";
 
+    private final static String smallPolyTxt = "polygon((0 0, 1 0, 1 1, 0 1, 0 0), (0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1))";
+    private final static String midPolyTxt   = "polygon((0 0, 10 0, 10 10, 0 10, 0 0), (3 3, 3 7, 7 7, 7 3, 3 3))";
+    private final static String bigPolyTxt   = "polygon((0 0, 45 0, 45 45, 0 45, 0 0), (10 10, 10 30, 30 30, 30 10, 10 10))";
+
+    private final static String smallPointTxt = "point(0.5 0.5)";
+    private final static String midPointTxt   = "point(5   5)";
+    private final static String bigPointTxt   = "point(20 20)";
+    private final static String BIGPointTxt   = "point(60 60)";
     /**
      * @param args
      */
     public static void main(String[] args) throws Exception {
+        boolean generateGeoMessages = true;
         String clientDataDirName    = ".";
         long   clusterStartTime     = CLUSTER_START_TIME;
         int    clusterRoundTripTime = CLUSTER_ROUND_TRIP_TIME;
@@ -81,11 +94,14 @@ public class GenerateCPPTestFiles {
             } else if ("--clusterRoundTripTime".equals(args[idx])) {
                 idx += 1;
                 clusterRoundTripTime = Integer.valueOf(args[idx]);
+            } else if ("--no-geo-messages".equals(args[idx])) {
+                generateGeoMessages = false;
             } else {
                 abend("Unknown command line argument \"%s\"\n",
                       args[idx]);
             }
         }
+        // Make the client data directory if necessary.
         File clientDataDir = new File(clientDataDirName);
         if (clientDataDir.exists() && !clientDataDir.isDirectory()) {
             if (!clientDataDir.isDirectory()) {
@@ -94,6 +110,14 @@ public class GenerateCPPTestFiles {
         } else {
             clientDataDir.mkdirs();
         }
+
+        //
+        // Capture a HASH_SHA256 style authentication message.  We do this by
+        // creating a fake server, then, in a separate thread, creating an ordinary
+        // client which connects to the fake server.  We read the authentication
+        // request from the client, save it, send a faked authentication response,
+        // close the server and join with the created thread.
+        //
         ServerSocketChannel ssc = ServerSocketChannel.open();
         ssc.socket().bind(new InetSocketAddress("localhost", FAKE_SERVER_PORT));
         ClientConfig config = new ClientConfig("hello", "world", (ClientStatusListenerExt )null, ClientAuthScheme.HASH_SHA256);
@@ -122,6 +146,12 @@ public class GenerateCPPTestFiles {
         ssc.close();
         clientThread.join(0);
 
+        //
+        // Now, create a fake server again, and login with the HASH_SHA1 scheme.
+        // We save this authentication request as well.  The client in the
+        // separate thread then sends some procedure invocation messages.  We
+        // save all of these in files and then join with the client thread.
+        //
         ssc = ServerSocketChannel.open();
         ssc.socket().bind(new InetSocketAddress("localhost", FAKE_SERVER_PORT));
         config = new ClientConfig("hello", "world", (ClientStatusListenerExt )null, ClientAuthScheme.HASH_SHA1);
@@ -139,6 +169,29 @@ public class GenerateCPPTestFiles {
 
                     }
                     oclient.callProcedure("Select", "English");
+                    //
+                    // Geo support.
+                    //
+                    // Insert a point and a polygon.
+                    oclient.callProcedure("InsertGeo",
+                                          200,
+                                          GeographyValue.fromWKT(smallPolyTxt),
+                                          GeographyPointValue.fromWKT(smallPointTxt));
+                    // Insert two nulls for points and polygons.
+                    oclient.callProcedure("InsertGeo",
+                                          201,
+                                          null,
+                                          null);
+                    // Select one row with a point and a polygon both.
+                    oclient.callProcedure("SelectGeo", 100);
+                    // Select another row with a different point and polygon.
+                    oclient.callProcedure("SelectGeo", 101);
+                    // Select one row with a null polygon and one non-null point.
+                    oclient.callProcedure("SelectGeo", 102);
+                    // Select one row with a non-null polygon and a null point.
+                    oclient.callProcedure("SelectGeo", 103);
+                    // Select one row with two nulls.
+                    oclient.callProcedure("SelectGeo", 104);
                 } catch (Exception e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -180,25 +233,50 @@ public class GenerateCPPTestFiles {
         // actually respond, so we fake up a response.  But this is good
         // enough for now, and we save the message.
         //
-        ByteBuffer invocationRequestSuccess = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
-        readMessage(invocationRequestSuccess, sc);
-        writeServerCallResponse(sc, getRequestClientData(invocationRequestSuccess));
-        // Set the client data.  The value here is not important, but it
-        // needs to be shared between this and the client unit tests.
-        setRequestClientData(invocationRequestSuccess, clientData);
-        writeDataFile(clientDataDir, "invocation_request_success.msg", invocationRequestSuccess);
+        String[] vanillaFileNames = new String[] {
+                "invocation_request_success.msg",
+                "invocation_request_fail_cv.msg",
+                "invocation_request_select.msg"
+        };
+        Map<String, ByteBuffer> vanillaMessages = new HashMap<String, ByteBuffer>();
+        for (String fileName : vanillaFileNames) {
+            ByteBuffer responseMessage = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+            vanillaMessages.put(fileName, responseMessage);
+            readMessage(responseMessage, sc);
+            writeServerCallResponse(sc, getRequestClientData(responseMessage));
+            // Set the client data.  The value here is not important, but it
+            // needs to be shared between this and the client unit tests.
+            setRequestClientData(responseMessage, clientData);
+            writeDataFile(clientDataDir, fileName, responseMessage);
 
-        ByteBuffer invocationRequestFailCV = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
-        readMessage(invocationRequestFailCV, sc);
-        writeServerCallResponse(sc, getRequestClientData(invocationRequestFailCV));
-        setRequestClientData(invocationRequestFailCV, clientData);
-        writeDataFile(clientDataDir, "invocation_request_fail_cv.msg", invocationRequestFailCV);
+        }
 
-        ByteBuffer invocationRequestSelect = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
-        readMessage(invocationRequestSelect, sc);
-        writeServerCallResponse(sc, getRequestClientData(invocationRequestSelect));
-        setRequestClientData(invocationRequestSelect, clientData);
-        writeDataFile(clientDataDir, "invocation_request_select.msg", invocationRequestSelect);
+        // Note that these names are somewhat stylized.  They name
+        // the file which holds the request.  The response to this
+        // request will be in a similarly named file, but with _request_
+        // replaced by _response_.  So, make sure there is one _request_
+        // substring in the file names.
+        String [] geoFileNames = new String[] {
+                "invocation_request_insert_geo.msg",
+                "invocation_request_insert_geo_nulls.msg",
+                "invocation_request_select_geo_both.msg",
+                "invocation_request_select_geo_both_mid.msg",
+                "invocation_request_select_geo_polynull.msg",
+                "invocation_request_select_geo_ptnull.msg",
+                "invocation_request_select_geo_bothnull.msg"
+        };
+        Map<String, ByteBuffer> geoMessages = new HashMap<String, ByteBuffer>();
+        for (String filename : geoFileNames) {
+            ByteBuffer requestMessage = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
+            // We need to save these for later.
+            geoMessages.put(filename, requestMessage);
+            readMessage(requestMessage, sc);
+            writeServerCallResponse(sc, getRequestClientData(requestMessage));
+            setRequestClientData(requestMessage, clientData);
+            if (generateGeoMessages) {
+                writeDataFile(clientDataDir, filename, requestMessage);
+            }
+        }
 
         oclient.close();
         ssc.close();
@@ -207,12 +285,28 @@ public class GenerateCPPTestFiles {
         // Now, connect to a real server.  We are going to pretend to be a
         // client and write the messages we just read from the client, as we pretended to be
         // a server.  We will then capture the responses in files.
-        SocketChannel voltsc = SocketChannel.open(new InetSocketAddress("localhost", TRUE_SERVER_PORT));
-        voltsc.socket().setTcpNoDelay(true);
-        voltsc.configureBlocking(true);
+        SocketChannel voltsc = null;
+        try {
+            voltsc = SocketChannel.open(new InetSocketAddress("localhost", TRUE_SERVER_PORT));
+            voltsc.socket().setTcpNoDelay(true);
+            voltsc.configureBlocking(true);
+            System.err.printf("Connected.\n");
+        } catch (IOException ex) {
+            abend("Can't connect to a server.  Is there a VoltDB server running?.\n");
+        }
 
         // Write the authentication message and then
-        // read the response.  We need the response.
+        // read the response.  We need the response.  The
+        // Client will engage in witty repartee with the
+        // server, but we neither see nor care about that.
+        //
+        // Note that for each of these responses we need to
+        // set some parameters, so that they will not depend
+        // on the particular context we executed.  This is the
+        // cluster start time, the client data, the leader IP
+        // address and the build string.  The client unit tests
+        // will know these values.
+        //
         ByteBuffer scratch = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE);
         voltsc.write(authReqSHA1);
         readMessage(scratch, voltsc);
@@ -221,25 +315,37 @@ public class GenerateCPPTestFiles {
         setBuildString(scratch, buildString);
         writeDataFile(clientDataDir, "authentication_response.msg", scratch);
 
-        // Write the three procedure messages.
-        voltsc.write(invocationRequestSuccess);
-        readMessage(scratch, voltsc);
-        setResponseClientData(scratch, clientData);
-        setClusterRoundTripTime(scratch, clusterRoundTripTime);
-        writeDataFile(clientDataDir, "invocation_response_success.msg", scratch);
 
-        voltsc.write(invocationRequestFailCV);
-        readMessage(scratch, voltsc);
-        setResponseClientData(scratch, clientData);
-        setClusterRoundTripTime(scratch, clusterRoundTripTime);
-        writeDataFile(clientDataDir, "invocation_response_fail_cv.msg", scratch);
+        for (String filename : vanillaFileNames) {
+            // Write the three procedure messages.
+            ByteBuffer requestMessage = vanillaMessages.get(filename);
+            if (requestMessage == null) {
+                abend("Cannot find request message for file name \"%s\"\n", filename);
+            }
+            voltsc.write(requestMessage);
+            readMessage(scratch, voltsc);
+            setResponseClientData(scratch, clientData);
+            setClusterRoundTripTime(scratch, clusterRoundTripTime);
+            String responseFileName = filename.replaceAll("_request_", "_response_");
+            writeDataFile(clientDataDir, responseFileName, scratch);
+        }
 
-        voltsc.write(invocationRequestSelect);
-        readMessage(scratch, voltsc);
-        setResponseClientData(scratch, clientData);
-        setClusterRoundTripTime(scratch, clusterRoundTripTime);
-        writeDataFile(clientDataDir, "invocation_response_select.msg", scratch);
-
+        if (generateGeoMessages) {
+            for (String filename : geoFileNames) {
+                // Write the three procedure messages.
+                ByteBuffer requestMessage = geoMessages.get(filename);
+                if (requestMessage == null) {
+                    abend("Cannot find request message for file name \"%s\"\n", filename);
+                }
+                voltsc.write(requestMessage);
+                readMessage(scratch, voltsc);
+                setResponseClientData(scratch, clientData);
+                setClusterRoundTripTime(scratch, clusterRoundTripTime);
+                String responseFileName = filename.replaceAll("_request_", "_response_");
+                System.out.printf("Writing Response file \"%s\".\n", responseFileName);
+                writeDataFile(clientDataDir, responseFileName, scratch);
+            }
+        }
         voltsc.close();
         clientThread.join();
 
@@ -301,6 +407,9 @@ public class GenerateCPPTestFiles {
         voltsc.close();
         clientThread.join();
 
+        //
+        // Serialize a message and write it.
+        //
         ColumnInfo columns[] = new ColumnInfo[] {
                 new ColumnInfo("column1", VoltType.TINYINT),
                 new ColumnInfo("column2", VoltType.STRING),
@@ -308,13 +417,18 @@ public class GenerateCPPTestFiles {
                 new ColumnInfo("column4", VoltType.INTEGER),
                 new ColumnInfo("column5", VoltType.BIGINT),
                 new ColumnInfo("column6", VoltType.TIMESTAMP),
-                new ColumnInfo("column7", VoltType.DECIMAL)
+                new ColumnInfo("column7", VoltType.DECIMAL),
+                new ColumnInfo("column8", VoltType.GEOGRAPHY),
+                new ColumnInfo("column9", VoltType.GEOGRAPHY_POINT)
         };
         VoltTable vt = new VoltTable(columns);
-        vt.addRow( null, null, null, null, null, null, null);
-        vt.addRow( 0, "", 2, 4, 5, new TimestampType(44), new BigDecimal("3.1459"));
-        vt.addRow( 0, null, 2, 4, 5, null, null);
-        vt.addRow( null, "woobie", null, null, null, new TimestampType(44), new BigDecimal("3.1459"));
+        GeographyValue poly = GeographyValue.fromWKT(smallPolyTxt);
+        GeographyPointValue pt = GeographyPointValue.fromWKT(smallPointTxt);
+
+        vt.addRow( null, null, null, null, null, null, null, poly, pt);
+        vt.addRow( 0, "", 2, 4, 5, new TimestampType(44), new BigDecimal("3.1459"), poly, pt);
+        vt.addRow( 0, null, 2, 4, 5, null, null, poly, pt);
+        vt.addRow( null, "woobie", null, null, null, new TimestampType(44), new BigDecimal("3.1459"), poly, pt);
         ByteBuffer bb = ByteBuffer.allocate(vt.getSerializedSize());
         vt.flattenToBuffer(bb);
         FastSerializer fs = new FastSerializer(vt.getSerializedSize());
@@ -322,6 +436,7 @@ public class GenerateCPPTestFiles {
         bb.flip();
         writeDataFile(clientDataDir, "serialized_table.bin", bb);
         clientThread.join();
+
     }
 
     private static void writeDataFile(File clientDataDir, String filename, ByteBuffer message) {
@@ -333,6 +448,7 @@ public class GenerateCPPTestFiles {
         FileOutputStream fos = null;
         try {
             datafile = new File(clientDataDir, filename);
+            System.out.printf("Writing data file \"%s\"\n", datafile);
             fos = new FileOutputStream(datafile);
             fos.write(array, 0, len);
         } catch (IOException ex) {
