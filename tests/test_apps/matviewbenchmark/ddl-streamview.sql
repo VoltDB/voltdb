@@ -1,42 +1,32 @@
-CREATE STREAM ids
+CREATE STREAM ids PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id bigint,
   value bigint
 );
 
-CREATE STREAM idsWithMatView
+CREATE STREAM idsWithMatView PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id bigint,
   value bigint
 );
 
-CREATE STREAM idsWithMinMatView
+CREATE STREAM idsWithMinMatView PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id bigint,
   value bigint
 );
 
-CREATE STREAM idsWithMinMatViewOpt
+CREATE STREAM idsWithMinMatViewOpt PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id bigint,
   value bigint
 );
 
-CREATE STREAM idsWith4MinMatView
-(
-  id bigint NOT NULL,
-  group_id bigint,
-  v1 bigint,
-  v2 bigint,
-  v3 bigint,
-  v4 bigint
-);
-
-CREATE STREAM idsWith4MinMatViewOpt
+CREATE STREAM idsWith4MinMatView PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id bigint,
@@ -46,7 +36,17 @@ CREATE STREAM idsWith4MinMatViewOpt
   v4 bigint
 );
 
-CREATE STREAM idsWithMultiGroupsMinMatView
+CREATE STREAM idsWith4MinMatViewOpt PARTITION ON COLUMN id
+(
+  id bigint NOT NULL,
+  group_id bigint,
+  v1 bigint,
+  v2 bigint,
+  v3 bigint,
+  v4 bigint
+);
+
+CREATE STREAM idsWithMultiGroupsMinMatView PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id_1 bigint,
@@ -54,7 +54,7 @@ CREATE STREAM idsWithMultiGroupsMinMatView
   value bigint
 );
 
-CREATE STREAM idsWithMultiGroupsMinMatViewOpt
+CREATE STREAM idsWithMultiGroupsMinMatViewOpt PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id_1 bigint,
@@ -62,23 +62,13 @@ CREATE STREAM idsWithMultiGroupsMinMatViewOpt
   value bigint
 );
 
-CREATE STREAM idsWithMultiGroupsMinMatViewBestOpt
+CREATE STREAM idsWithMultiGroupsMinMatViewBestOpt PARTITION ON COLUMN id
 (
   id bigint NOT NULL,
   group_id_1 bigint,
   group_id_2 bigint,
   value bigint
 );
-
-PARTITION TABLE ids ON COLUMN id;
-PARTITION TABLE idsWithMatView ON COLUMN id;
-PARTITION TABLE idsWithMinMatView ON COLUMN id;
-PARTITION TABLE idsWithMinMatViewOpt ON COLUMN id;
-PARTITION TABLE idsWith4MinMatView ON COLUMN id;
-PARTITION TABLE idsWith4MinMatViewOpt ON COLUMN id;
-PARTITION TABLE idsWithMultiGroupsMinMatView ON COLUMN id;
-PARTITION TABLE idsWithMultiGroupsMinMatViewOpt ON COLUMN id;
-PARTITION TABLE idsWithMultiGroupsMinMatViewBestOpt ON COLUMN id;
 
 --
 -- Procedures that insert rows into the streams

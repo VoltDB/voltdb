@@ -47,13 +47,12 @@ function clean() {
 
 function jars() {
     ant all
-    # javac -source 1.8 -target 1.8 -classpath $APPCLASSPATH -d obj src/matviewbenchmark/*.java
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/matviewbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
