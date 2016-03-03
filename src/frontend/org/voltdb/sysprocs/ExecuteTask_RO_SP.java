@@ -55,17 +55,15 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
      * @param ctx  execution context
      * @param partitionParam  key for routing stored procedure to correct site
      * @param payload  serialized task-specific parameters
-     * @return  results as VoltTable array
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] payload)
+    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte[] payload)
     {
         ByteBuffer buffer = ByteBuffer.wrap(payload);
         int taskId = buffer.getInt();
         TaskType taskType = TaskType.values()[taskId]; // Param(1) in payload
         switch (taskType) {
         case SP_JAVA_GET_DRID_TRACKER:
-            ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[] { payload });
-            int producerClusterId = (int)params.getParam(1);
+            int producerClusterId = buffer.getInt();
             Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drIdTrackers = ctx.getDrAppliedTrackers();
             Pair<Long, Long> lastConsumerUniqueIds = ctx.getDrLastAppliedUniqueIds();
             Map<Integer, DRConsumerDrIdTracker> producerPartitionMap = drIdTrackers.get(producerClusterId);
@@ -74,10 +72,12 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
             }
             JSONStringer stringer = new JSONStringer();
             try {
+                stringer.object();
                 stringer.key(Integer.toString(producerClusterId));
                 stringer.object();
                 stringer.key("lastConsumerSpUniqueId").value(lastConsumerUniqueIds.getFirst());
                 stringer.key("lastConsumerMpUniqueId").value(lastConsumerUniqueIds.getSecond());
+                stringer.key("trackers").object();
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e : producerPartitionMap.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
@@ -85,14 +85,16 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
                     stringer.endObject();
                 }
                 stringer.endObject();
+                stringer.endObject();
+                stringer.endObject();
             } catch (JSONException e) {
                 throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
             }
             setAppStatusString(stringer.toString());
 
+            break;
         default:
             throw new VoltAbortException("Unable to find the task associated with the given task id");
         }
     }
-
 }
