@@ -814,6 +814,17 @@ public class TestCatalogUtil extends TestCase {
         org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
+        boolean foundStream = false;
+        for (Table catalog_tbl : db.getTables()) {
+            if (catalog_tbl.getTypeName().equalsIgnoreCase("export_data")) {
+                StringBuilder sb = new StringBuilder();
+                CatalogSchemaTools.toSchema(sb, catalog_tbl, null, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                assertTrue(sb.toString().startsWith("CREATE STREAM " + catalog_tbl.getTypeName()));
+                foundStream = true;
+            }
+        }
+        assertTrue(foundStream);
+
         assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.CUSTOM);
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
@@ -1188,7 +1199,7 @@ public class TestCatalogUtil extends TestCase {
                 + "</deployment>";
         final String ddl =
                 "CREATE STREAM export_data EXPORT TO TARGET foo ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "CREATE STREAM export_more_data EXPORT TO TARGET bar( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
+                + "CREATE STREAM export_more_data EXPORT TO TARGET bar (id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
