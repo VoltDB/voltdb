@@ -99,9 +99,13 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE " +
                     ((isExportTableWithTarget != null) ? "STREAM " : "TABLE ") +
                     catalog_tbl.getTypeName());
-            if (isExportTableWithTarget != null &&
-                !isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-                table_sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+            if (isExportTableWithTarget != null) {
+                if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
+                    table_sb.append(" PARTITION ON COLUMN " + catalog_tbl.getPartitioncolumn().getTypeName());
+                }
+                if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                    table_sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+                }
             }
             table_sb.append(" (");
         }
@@ -311,7 +315,7 @@ public abstract class CatalogSchemaTools {
         sb.append(table_sb.toString());
 
         // Partition Table
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && isExportTableWithTarget == null) {
             sb.append("PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
                     catalog_tbl.getPartitioncolumn().getTypeName() + ";\n" );
         }
