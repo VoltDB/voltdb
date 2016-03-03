@@ -19,6 +19,7 @@ Variations to Try
 - Try with different replication settings.
 - Change the number of contested keys by editing the run.sh file.
 - Change the operation to be more complex than increment.
+- Alter the default number (currently 8) of partition replicas per host using a deployment.xml file.
 
 A more complex version of this app might populate the base table with billions of rows, but send 99% of updates to a single row. That might be a fun experiment for someone looking to learn VoltDB.
 
