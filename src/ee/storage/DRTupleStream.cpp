@@ -98,6 +98,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 }
 
 int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
+    if (partitionColumn == -1) {
+        return LONG_MAX;
+    }
     return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
 }
 
