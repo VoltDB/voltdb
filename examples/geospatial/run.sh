@@ -84,7 +84,7 @@ function init() {
 
 function server() {
     echo "starting server in background..."
-    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    voltdb create -B -l $LICENSE -H $HOST --force > nohup.log 2>&1 &
     wait_for_startup
 }
 
