@@ -98,7 +98,7 @@ public class AdHocPlannedStatement {
         int size = core.getSerializedSize();
 
         // sql bytes
-        size += 2;
+        size += 4;
         size += sql.length;
 
         // params
@@ -114,7 +114,7 @@ public class AdHocPlannedStatement {
         core.flattenToBuffer(buf);
 
         // sql bytes
-        buf.putShort((short) sql.length);
+        buf.putInt(sql.length);
         buf.put(sql);
 
         // params
@@ -126,9 +126,9 @@ public class AdHocPlannedStatement {
         CorePlan core = CorePlan.fromBuffer(buf);
 
         // sql bytes
-        short sqlLength = buf.getShort();
+        int sqlLength = buf.getInt();
         if (sqlLength < 0) {
-            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Short.MAX_VALUE);
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Integer.MAX_VALUE);
         }
 
         byte[] sql = new byte[sqlLength];
