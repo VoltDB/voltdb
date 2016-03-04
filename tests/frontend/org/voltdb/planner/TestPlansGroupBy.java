@@ -35,9 +35,11 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -95,9 +97,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testInlineSerialAgg_noGroupBy_special() {
       AbstractPlanNode p;
       pns = compileToFragments("SELECT AVG(A1) from T1");
-      for (AbstractPlanNode apn: pns) {
-          //* enable to debug */ System.out.println(apn.toExplainPlanString());
-      }
+      //* enable to debug */ printExplainPlan(pns);
       p = pns.get(0).getChild(0);
       assertTrue(p instanceof ProjectionPlanNode);
       assertTrue(p.getChild(0) instanceof AggregatePlanNode);
@@ -509,6 +509,26 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3");
         checkGroupByOnlyPlan(true, P_AGG, true);
+
+        /**
+         * Regression case
+         */
+        // ENG-9990 Repeating GROUP BY partition key in SELECT corrupts output schema.
+        //* enable to debug */ boolean was = AbstractPlanNode.enableVerboseExplainForDebugging();
+        pns = compileToFragments("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY");
+        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+        //* enable to debug */ AbstractPlanNode.restoreVerboseExplainForDebugging(was);
+        AbstractPlanNode pn = pns.get(0);
+        pn = pn.getChild(0);
+        NodeSchema os = pn.getOutputSchema();
+        // The problem was a mismatch between the output schema
+        // of the coordinator's send node and its feeding receive node
+        // that had incorrectly rearranged its columns.
+        SchemaColumn middleCol = os.getColumns().get(1);
+        System.out.println(middleCol.toString());
+        assertTrue(middleCol.getColumnAlias().equals("C"));
+
     }
 
     private void checkPartialAggregate(boolean twoFragments) {
@@ -1237,18 +1257,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere( aggFilter == null? null: new String[] {aggFilter},
                     scanFilter == null? null: new String[] {scanFilter});
     }
 
     private void checkMVFixWithWhere(String sql, Object aggFilters[]) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere(aggFilters, null);
     }
 
