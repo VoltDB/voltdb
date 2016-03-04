@@ -35,6 +35,7 @@ public class TestMaxSuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {};
     private static int SQL_TEXT_MAX_LENGTH = 100000;
+    private static int SQL_LITERAL_MAX_LENGTH = Short.MAX_VALUE; // literal limit to 65535
     private static String LONG_STRING_TEMPLATE = "This is a long string to test. It will make the client easier "
             + "to generate very long long string.";
     private static int APPEND_TIMES = SQL_TEXT_MAX_LENGTH / LONG_STRING_TEMPLATE.length();
@@ -63,19 +64,20 @@ public class TestMaxSuite extends RegressionSuite {
         Client client = this.getClient();
         StringBuilder stringBuilder = new StringBuilder(
                 "select * from max_in_table where column0 in(");
-        for (int i = 0; i < SQL_TEXT_MAX_LENGTH; i++) {
+
+        for (int i = 0; i < SQL_LITERAL_MAX_LENGTH; i++) {
             stringBuilder.append(i);
-            if (i != SQL_TEXT_MAX_LENGTH - 1) {
+            if (i != SQL_LITERAL_MAX_LENGTH - 1) {
                 stringBuilder.append(",");
             }
         }
         stringBuilder.append(") order by column0;");
-
+        assert(stringBuilder.length() > Short.MAX_VALUE);
         try {
-            client.callProcedure("@AdHoc", stringBuilder.toString());
-            fail();
+            VoltTable result = client.callProcedure("@AdHoc", stringBuilder.toString()).getResults()[0];
+            assertEquals(0, result.getRowCount());
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("AdHoc SQL text exceeds the length limitation 32767"));
+            fail();
         }
     }
 

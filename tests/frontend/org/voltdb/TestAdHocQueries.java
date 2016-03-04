@@ -474,7 +474,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             env.setUp();
             StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
             int i = 0;
-            while (adHocQueryTemp.length() <= Short.MAX_VALUE) {
+            while (adHocQueryTemp.length() <= Short.MAX_VALUE*10) {
                 String randPhone = RandomStringUtils.randomNumeric(10);
                 VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
                 assertEquals(1, result.getRowCount());
@@ -483,7 +483,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 i++;
             }
             adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
+            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
             assert(adHocQueryTemp.length() > Short.MAX_VALUE);
+            assert(i < Short.MAX_VALUE);
             VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
             assertEquals(i, result.getRowCount());
         } catch (Exception e) {
