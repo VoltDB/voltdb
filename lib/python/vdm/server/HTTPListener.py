@@ -2317,7 +2317,6 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stopped", "details": error})
 
 
-
 def main(runner, amodule, config_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
