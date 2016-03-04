@@ -197,7 +197,7 @@ class DefaultStartServer(Server):
                 print "The Server list is empty"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
-                time.sleep(5)
+                time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping Cluster...."
@@ -205,9 +205,9 @@ class DefaultStartServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
-                    time.sleep(10)
+                    time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
@@ -238,7 +238,7 @@ class StartServer(Cluster):
                 print "error"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
-                time.sleep(5)
+                time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping...."
@@ -246,9 +246,9 @@ class StartServer(Cluster):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
-                    time.sleep(10)
+                    time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
@@ -280,7 +280,7 @@ class DefaultRecoverServer(Server):
                 print "Voltdb recover is only supported in Enterprise Edition"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
-                time.sleep(5)
+                time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping Cluster...."
@@ -288,9 +288,9 @@ class DefaultRecoverServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
-                    time.sleep(10)
+                    time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)

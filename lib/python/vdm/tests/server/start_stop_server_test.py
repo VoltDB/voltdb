@@ -205,7 +205,7 @@ class DefaultStartServer(ClusterDefault):
                     print "The Server list is empty"
                 elif "Success" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
-                    time.sleep(5)
+                    time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
                     time.sleep(10)
                     print "Stopping Cluster...."
@@ -213,9 +213,9 @@ class DefaultStartServer(ClusterDefault):
                     (__host_or_ip__, last_db_id, last_server_id)
                     response = requests.put(url_stop)
                     value = response.text
-                    if "Connection broken" in value:
+                    if "Server shutdown successfully." in value:
                         self.assertEqual(response.status_code, 200)
-                        time.sleep(10)
+                        time.sleep(15)
                         CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
                 elif 'A VoltDB Server process is already running' in value['statusstring']:
                     print value['statusstring']
@@ -255,7 +255,7 @@ class StartServer(Cluster):
                     print "The Server list is empty"
                 elif "Success" in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
-                    time.sleep(5)
+                    time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
                     time.sleep(10)
                     print "Stopping Cluster...."
@@ -263,9 +263,9 @@ class StartServer(Cluster):
                     (__host_or_ip__, last_db_id, last_server_id)
                     response = requests.put(url_stop)
                     value = response.text
-                    if "Connection broken" in value:
+                    if "Server shutdown successfully." in value:
                         self.assertEqual(response.status_code, 200)
-                        time.sleep(10)
+                        time.sleep(15)
                         CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
                 elif 'A VoltDB Server process is already running' in value['statusstring']:
                     print value['statusstring']
