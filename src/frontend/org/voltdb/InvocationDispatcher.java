@@ -873,9 +873,8 @@ public final class InvocationDispatcher {
         return pCol.getType();
     }
 
-    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
-            boolean useDdlSchema)
+    final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            boolean isAdmin, Connection ccxn, AuthSystem.AuthUser user, boolean useDdlSchema)
     {
         ParameterSet params = task.getParams();
         final Object [] paramArray = params.toArray();
@@ -902,14 +901,21 @@ public final class InvocationDispatcher {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                    handler.isAdmin(), ccxn, catalogBytes, deploymentString,
+                    task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
+                    isAdmin, ccxn, catalogBytes, deploymentString,
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     useDdlSchema,
                     m_adhocCompletionHandler, user));
 
         m_mailbox.send(m_plannerSiteId, work);
+    }
+
+    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
+            boolean useDdlSchema)
+    {
+        dispatchUpdateApplicationCatalog(task, handler.isAdmin(), ccxn, user, useDdlSchema);
         return null;
     }
 
