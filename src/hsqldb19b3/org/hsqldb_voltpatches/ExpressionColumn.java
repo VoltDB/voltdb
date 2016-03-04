@@ -425,15 +425,19 @@ public class ExpressionColumn extends Expression {
             return;
         }
 
+        int replacementOpType = opType;
         if (tableName == null && rangeVar.variables != null) {
             ColumnSchema column = rangeVar.getColumn(colIndex);
             if (column.getParameterMode()
                     == SchemaObject.ParameterModes.PARAM_OUT) {
                 return;
             }
+            replacementOpType = rangeVar.isVariable ? OpTypes.VARIABLE
+                                                    : OpTypes.PARAMETER;
         }
         RangeVariableColumnReferenceResolution rvRes =
-                new RangeVariableColumnReferenceResolution(rangeVar, colIndex);
+                new RangeVariableColumnReferenceResolution(rangeVar, colIndex,
+                                                           replacementOpType);
         rangeVariableResolutions.put(rvRes.toString(), rvRes);
     }
 
@@ -453,11 +457,14 @@ public class ExpressionColumn extends Expression {
     private static class RangeVariableColumnReferenceResolution {
         final RangeVariable m_rangeVariable;
         final int m_colIndex;
+        final int m_opType;
 
-        RangeVariableColumnReferenceResolution(RangeVariable rangeVariable, int colIndex) {
+        RangeVariableColumnReferenceResolution(RangeVariable rangeVariable,
+                int colIndex, int replacementOpType) {
             assert(rangeVariable != null && 0 <= colIndex);
             m_rangeVariable = rangeVariable;
             m_colIndex = colIndex;
+            m_opType = replacementOpType;
         }
 
         @Override
@@ -483,6 +490,7 @@ public class ExpressionColumn extends Expression {
 
     private void finallyResolve(RangeVariableColumnReferenceResolution res) {
         setAttributesAsColumn(res.m_rangeVariable, res.m_colIndex);
+        opType = res.m_opType;
     }
 
     @Override
