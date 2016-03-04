@@ -1924,10 +1924,7 @@ class StopDatabaseAPI(MethodView):
                 response = server.stop_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
-                if 'Connection broken' in response.data:
-                    return make_response(jsonify({'statusstring': 'Database shutdown successfully.'}))
-                else:
-                    return response
+                return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
@@ -1958,7 +1955,7 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
                 if 'Connection broken' in response.data:
-                    return make_response(jsonify({'statusstring': 'Server shutdown successfully.'}))
+                    return make_response(jsonify({'SUCCESS': 'Server shutdown successfully.'}))
                 else:
                     return response
             except Exception, err:
@@ -1970,7 +1967,7 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
                 if 'Connection broken' in response:
-                    return make_response(jsonify({'statusstring': 'Server shutdown successfully.'}))
+                    return make_response(jsonify({'SUCCESS': 'Server shutdown successfully.'}))
                 else:
                     return response
             except Exception, err:
