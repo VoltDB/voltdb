@@ -34,7 +34,7 @@
     <classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
     <classpathentry kind="lib" path="lib/jsch-0.1.51.jar"/>
     <classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
-    <classpathentry kind="lib" path="third_party/java/jars/mockito-core-1.9.5.jar"/>
+    <classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.10.19.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
     <classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
