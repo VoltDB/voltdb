@@ -43,18 +43,19 @@
 using namespace std;
 using namespace voltdb;
 
-CompatibleDRTupleStream::CompatibleDRTupleStream(int defaultBufferSize)
-    : AbstractDRTupleStream(defaultBufferSize),
+CompatibleDRTupleStream::CompatibleDRTupleStream(int partitionId, int defaultBufferSize)
+    : AbstractDRTupleStream(partitionId, defaultBufferSize),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
 
 size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
-                                                char *tableHandle,
-                                                std::string tableName,
-                                                int64_t txnId,
-                                                int64_t spHandle,
-                                                int64_t uniqueId) {
+                                              char *tableHandle,
+                                              std::string tableName,
+                                              int partitionColumn,
+                                              int64_t txnId,
+                                              int64_t spHandle,
+                                              int64_t uniqueId) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -451,8 +452,7 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
 }
 
 int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, char *outBytes) {
-    CompatibleDRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
-    stream.configure(partitionId);
+    CompatibleDRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
@@ -491,7 +491,7 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int3
 
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, partitionId);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, partitionId);
-    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+    stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
     stream.endTransaction(uid);
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);

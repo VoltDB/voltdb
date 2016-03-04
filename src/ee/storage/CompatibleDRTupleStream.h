@@ -37,7 +37,7 @@ public:
 
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 3;
 
-    CompatibleDRTupleStream(int defaultBufferSize);
+    CompatibleDRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~CompatibleDRTupleStream() {}
 
@@ -72,6 +72,7 @@ public:
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);

@@ -41,8 +41,13 @@
 using namespace std;
 using namespace voltdb;
 
-DRTupleStream::DRTupleStream(int defaultBufferSize)
-    : AbstractDRTupleStream(defaultBufferSize),
+DRTupleStream::DRTupleStream(int partitionId, int defaultBufferSize)
+    : AbstractDRTupleStream(partitionId, defaultBufferSize),
+      m_initialHashFlag(partitionId == 16383 ? TXN_PAR_HASH_REPLICATED : TXN_PAR_HASH_PLACEHOLDER),
+      m_hashFlag(m_initialHashFlag),
+      m_firstParHash(LONG_MAX),
+      m_lastParHash(LONG_MAX),
+      m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -50,6 +55,7 @@ DRTupleStream::DRTupleStream(int defaultBufferSize)
 size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     char *tableHandle,
                                     std::string tableName,
+                                    int partitionColumn,
                                     int64_t txnId,
                                     int64_t spHandle,
                                     int64_t uniqueId) {
@@ -59,7 +65,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     if (!m_enabled) return INVALID_DR_MARK;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(LONG_MAX);
+    bool requireHashDelimiter = updateParHash(partitionColumn == -1, LONG_MAX);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -98,16 +104,24 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 }
 
 int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
-    if (partitionColumn == -1) {
+    if (partitionColumn != -1) {
+        return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
+    } else {
         return LONG_MAX;
     }
-    return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
 }
 
-bool DRTupleStream::updateParHash(int64_t parHash) {
+bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash) {
+    if (isReplicatedTable) {
+        // For replicated table changes, the hash flag should stay the same as
+        // the initial value, which is TXN_PAR_HASH_REPLICATED
+        assert(m_hashFlag == m_initialHashFlag);
+        return false;
+    }
+
     if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {  // initial status, first record
         m_lastParHash = parHash;
-        m_firstParHash = (parHash == LONG_MAX) ? 0 : parHash; // save first hash
+        m_firstParHash = parHash; // save first hash
         // if the first record is TRUNCATE_TABLE, set to SPECIAL, otherwise SINGLE
         m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
         // no delimiter needed for first record
@@ -158,7 +172,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const std::vector<int>* interestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(getParHashForTuple(tuple, partitionColumn));
+    bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(tuple, partitionColumn));
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -224,7 +238,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     const std::vector<int>* dummyInterestingColumns;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
-    bool requireHashDelimiter = (m_hashFlag == TXN_PAR_HASH_REPLICATED) ? false : updateParHash(getParHashForTuple(oldTuple, partitionColumn));
+    bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(oldTuple, partitionColumn));
 
     DRRecordType type = DR_RECORD_UPDATE;
     maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
@@ -396,9 +410,9 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_beginTxnUso = m_uso;
      m_uso += io.position();
 
-     if (m_hashFlag != TXN_PAR_HASH_REPLICATED) {
-         m_hashFlag = TXN_PAR_HASH_PLACEHOLDER;
-     }
+     m_hashFlag = m_initialHashFlag;
+     m_firstParHash = LONG_MAX;
+     m_lastParHash = LONG_MAX;
 
      m_opened = true;
 }
@@ -509,8 +523,7 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
     if (flag == TXN_PAR_HASH_REPLICATED) {
         partitionId = 16383;
     }
-    DRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
-    stream.configure(partitionId);
+    DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
@@ -547,8 +560,8 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
         }
 
         if (flag == TXN_PAR_HASH_REPLICATED || flag == TXN_PAR_HASH_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-            stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
         }
 
         if (flag != TXN_PAR_HASH_SINGLE) {

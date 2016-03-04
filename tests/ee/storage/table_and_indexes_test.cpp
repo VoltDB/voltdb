@@ -89,14 +89,13 @@ private:
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest()
-            : drStream(64*1024),
-              drReplicatedStream(64*1024) {
+            : drStream(44, 64*1024),
+              drReplicatedStream(16383, 64*1024) {
             NValueArray* noParams = NULL;
             mockEngine = new MockVoltDBEngine(false);
             engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
-            drStream.configure(44);
 
             engine->setupForPlanFragments( NULL, 44, 44, 44, 44);
 
