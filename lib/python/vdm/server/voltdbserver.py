@@ -160,7 +160,7 @@ class VoltDatabase:
             return create_response(response.text, 200)
         else:
             return create_response('Start request sent successfully to servers: ' +
-                                   str(HTTPListener.json_loads_without_unicode(server_status)), 200)
+                                   json.dumps(server_status), 200)
 
     def start_server(self, server_id, recover=False):
         """
@@ -498,9 +498,9 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors stopping servers: ' + str(HTTPListener.json_loads_without_unicode(server_status)) ,500)
+            return create_response('There were errors stopping servers: ' + json.dumps(server_status), 500)
         else:
-            return create_response('Stop request sent successfully to servers: ' + str(HTTPListener.json_loads_without_unicode(server_status)), 200)
+            return create_response('Stop request sent successfully to servers: ' + json.dumps(server_status), 200)
 
     def kill_server(self, server_id):
         try:
