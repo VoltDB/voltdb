@@ -218,15 +218,11 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[42] = 8; // row size
 
     // configure DR stream and DR compatible stream
-    m_drStream = new DRTupleStream(defaultDrBufferSize);
-    m_drStream->configure(partitionId);
-    m_compatibleDRStream = new CompatibleDRTupleStream(defaultDrBufferSize);
-    m_compatibleDRStream->configure(partitionId);
+    m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
+    m_compatibleDRStream = new CompatibleDRTupleStream(partitionId, defaultDrBufferSize);
     if (createDrReplicatedStream) {
-        m_drReplicatedStream = new DRTupleStream(defaultDrBufferSize);
-        m_drReplicatedStream->configure(16383);
-        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(defaultDrBufferSize);
-        m_compatibleDRReplicatedStream->configure(16383);
+        m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
+        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(16383, defaultDrBufferSize);
     }
 
     // set the DR version

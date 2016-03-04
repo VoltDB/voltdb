@@ -402,7 +402,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
+        drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId);
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
