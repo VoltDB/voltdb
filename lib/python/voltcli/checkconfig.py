@@ -29,6 +29,8 @@ import platform
 import subprocess
 import sys
 import os.path
+import os
+from voltcli import utility
 
 # Helper functions
 
@@ -149,13 +151,21 @@ def test_ntp(output):
             output['NTP'] = ["WARN", "More then one NTP service is running"]
 
 def test_java_version(output):
-    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java \|openjdk '", stdout=subprocess.PIPE, shell=True).stdout.read()
+    if 'JAVA_HOME' in os.environ:
+        java = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+        jar = os.path.join(os.environ['JAVA_HOME'], 'bin', 'jar')
+    else:
+        java = utility.find_in_path('java')
+        jar = utility.find_in_path('jar')
+    if not java:
+        utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
+    javaVersion = utility.get_java_version(javaHome=java, verbose=True)
     if '1.8.' in javaVersion:
         output['Java'] = ["PASS", javaVersion.strip()]
     elif len(javaVersion) > 0:
-        output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly."]
+        output['Java'] = ["FAIL", "Unsupported " + javaVersion + " Check if Java has been installed properly and JAVA_HOME has been setup correctly."]
     else:
-        output['Java'] = ["FAIL", "Please check if Java has been installed properly."]
+        output['Java'] = ["FAIL", "Please check if Java has been installed properly and JAVA_HOME has been setup correctly."]
 
 def test_python_version(output):
     pythonVersion = "Python " + str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
