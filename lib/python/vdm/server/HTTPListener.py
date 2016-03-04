@@ -1955,7 +1955,7 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
                 if 'Connection broken' in response.data:
-                    return make_response(jsonify({'SUCCESS': 'Server shutdown successfully.'}))
+                    return make_response('SUCCESS: Server shutdown successfully.')
                 else:
                     return response
             except Exception, err:
@@ -1967,7 +1967,7 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
                 if 'Connection broken' in response:
-                    return make_response(jsonify({'SUCCESS': 'Server shutdown successfully.'}))
+                    return make_response('SUCCESS: Server shutdown successfully.')
                 else:
                     return response
             except Exception, err:
