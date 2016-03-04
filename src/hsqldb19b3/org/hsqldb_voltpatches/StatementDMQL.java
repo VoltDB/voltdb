@@ -548,7 +548,6 @@ public abstract class StatementDMQL extends Statement {
 
         int     offset;
         int     idx;
-        boolean hasReturnValue;
 
         offset = 0;
 
@@ -740,14 +739,6 @@ public abstract class StatementDMQL extends Statement {
         return sb;
     }
 
-    private StringBuffer appendSourceTable(StringBuffer sb) {
-
-        sb.append("SOURCE TABLE[").append(sourceTable.getName().name).append(
-            ']');
-
-        return sb;
-    }
-
     private StringBuffer appendColumns(StringBuffer sb, int[] columnMap) {
 
         if (columnMap == null || updateExpressions == null) {
@@ -918,7 +909,8 @@ public abstract class StatementDMQL extends Statement {
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
             return voltGetXMLSpecification(select, parameters, session);
-        } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
+        }
+        if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
                    exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
             VoltXMLElement unionExpr = new VoltXMLElement("union");
@@ -939,7 +931,7 @@ public abstract class StatementDMQL extends Statement {
             }
 
             // Order By
-            if (queryExpr.sortAndSlice.getOrderLength() > 0) {
+            if (queryExpr.sortAndSlice.hasOrder()) {
                 List<Expression> displayCols = getDisplayColumnsForSetOp(queryExpr);
                 java.util.Set<Integer> ignoredColsIndexes = new java.util.HashSet<Integer>();
 
@@ -950,6 +942,7 @@ public abstract class StatementDMQL extends Statement {
                     assert(e.getLeftNode() != null);
                     // Get the display column with a corresponding index
                     int index = e.getLeftNode().queryTableColumnIndex;
+                    assert(index > 0);
                     assert(index < displayCols.size());
                     Expression column = displayCols.get(index);
                     e.setLeftNode(column);

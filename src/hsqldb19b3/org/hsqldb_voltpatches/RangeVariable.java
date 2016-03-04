@@ -273,11 +273,11 @@ final class RangeVariable {
 
         if (variables != null) {
             return variables.getIndex(columnName);
-        } else if (columnAliases != null) {
-            return columnAliases.getIndex(columnName);
-        } else {
-            return rangeTable.findColumn(columnName);
         }
+        if (columnAliases != null) {
+            return columnAliases.getIndex(columnName);
+        }
+        return rangeTable.findColumn(columnName);
     }
 
     ColumnSchema getColumn(String columnName) {

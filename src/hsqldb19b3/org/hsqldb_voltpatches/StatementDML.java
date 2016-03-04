@@ -1321,7 +1321,7 @@ public class StatementDML extends StatementDMQL {
             throw new HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
                     + "non-deterministic results.  Please use an ORDER BY clause.");
         }
-        else if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
+        if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
             // This is harmless, but the order by is meaningless in this case.  Should
             // we let this slide?
             throw new HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
