@@ -288,7 +288,7 @@ class DefaultRecoverServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
