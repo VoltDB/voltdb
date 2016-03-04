@@ -314,7 +314,7 @@ public abstract class CatalogSchemaTools {
         // Append the generated table schema to the canonical DDL StringBuilder
         sb.append(table_sb.toString());
 
-        // Partition Table
+        // Partition Table for regular tables (non-streams)
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && isExportTableWithTarget == null) {
             sb.append("PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
                     catalog_tbl.getPartitioncolumn().getTypeName() + ";\n" );

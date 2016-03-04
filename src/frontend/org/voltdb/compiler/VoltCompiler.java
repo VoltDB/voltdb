@@ -1704,8 +1704,8 @@ public class VoltCompiler {
         //Get views
         List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
         if (pc == null && tlist.size() != 0) {
-            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
-                    "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+            compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
+                    "for a materialized view. Streams support views as long as partitioned column is part of the view.");
             throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
         }
         if (pc != null && pc.getName() != null && tlist.size() != 0) {
@@ -1722,12 +1722,12 @@ public class VoltCompiler {
         }
         if (tableref.getMaterializer() != null)
         {
-            compilerLog.error("While configuring export, table " + tableName + " is a " +
-                                        "materialized view.  A view cannot be a stream.");
-            throw new VoltCompilerException("View configured as a stream");
+            compilerLog.error("While configuring export, " + tableName + " is a " +
+                                        "materialized view.  A view cannot be export source.");
+            throw new VoltCompilerException("View configured as export source");
         }
         if (tableref.getIndexes().size() > 0) {
-            compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
+            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }

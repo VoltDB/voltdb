@@ -1798,7 +1798,8 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n" +
+                "CREATE STREAM export_data_partitioned PARTITION ON COLUMN pgroup ( id BIGINT default 0, pgroup varchar(25) NOT NULL, value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
