@@ -2233,7 +2233,7 @@ class StatusDatabaseAPI(MethodView):
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
+                    return jsonify({'status': 'error', 'hostname': server[0]['hostname']})
 
                 if response.json()['status'] == "stalled":
                     has_stalled = True
