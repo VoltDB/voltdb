@@ -495,8 +495,8 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int3
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
+    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, partitionId);
+    int64_t uid = UniqueId::makeIdFromComponents(100, 0, partitionId);
     stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
     stream.endTransaction(uid);
 
@@ -507,5 +507,4 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int3
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
-
 }
