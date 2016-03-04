@@ -1385,6 +1385,7 @@ class Global:
     DEPLOYMENT_USERS = []
     PATH = ''
     MODULE_PATH = ''
+    DELETED_HOSTNAME = ''
 
 
 class ServerAPI(MethodView):
@@ -1500,7 +1501,7 @@ class ServerAPI(MethodView):
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
-
+            Global.DELETED_HOSTNAME = server[0]['hostname']
             Global.SERVERS.remove(server[0])
             sync_configuration()
             write_configuration_file()
@@ -1954,7 +1955,10 @@ class StopServerAPI(MethodView):
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
-                return response
+                if 'Connection broken' in response.data:
+                    return make_response('SUCCESS: Server shutdown successfully.')
+                else:
+                    return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
@@ -1963,7 +1967,10 @@ class StopServerAPI(MethodView):
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
-                return response
+                if 'Connection broken' in response:
+                    return make_response('SUCCESS: Server shutdown successfully.')
+                else:
+                    return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
@@ -2107,6 +2114,18 @@ class VdmConfiguration(MethodView):
                 print traceback.format_exc()
                 print str(errs)
 
+        if Global.DELETED_HOSTNAME != '':
+
+            try:
+                headers = {'content-type': 'application/json'}
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
+                data = result
+                response = requests.post(url, data=json.dumps(data), headers=headers)
+                Global.DELETED_HOSTNAME = ''
+            except Exception, errs:
+                print traceback.format_exc()
+                print str(errs)
+
         return jsonify({'deployment': response.status_code})
 
 
@@ -2233,7 +2252,7 @@ class StatusDatabaseAPI(MethodView):
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
+                    return jsonify({'status': 'error', 'hostname': server[0]['hostname']})
 
                 if response.json()['status'] == "stalled":
                     has_stalled = True
@@ -2302,7 +2321,6 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stalled", "details": error})
                     else:
                         return jsonify({'status': "stopped", "details": error})
-
 
 
 def main(runner, amodule, config_dir, server):
