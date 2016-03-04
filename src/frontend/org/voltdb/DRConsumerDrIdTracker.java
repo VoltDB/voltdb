@@ -59,7 +59,7 @@ public class DRConsumerDrIdTracker {
     }
 
     public void serialize(ByteBuffer buff) {
-        assert(buff.remaining() > getSerializedSize());
+        assert(buff.remaining() >= getSerializedSize());
         buff.putLong(m_lastAckedDrId);
         buff.putLong(m_lastSpUniqueId);
         buff.putLong(m_lastMpUniqueId);
