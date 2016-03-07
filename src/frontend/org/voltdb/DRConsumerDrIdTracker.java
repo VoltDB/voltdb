@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -59,7 +60,7 @@ public class DRConsumerDrIdTracker {
     }
 
     public void serialize(ByteBuffer buff) {
-        assert(buff.remaining() > getSerializedSize());
+        assert(buff.remaining() >= getSerializedSize());
         buff.putLong(m_lastAckedDrId);
         buff.putLong(m_lastSpUniqueId);
         buff.putLong(m_lastMpUniqueId);
@@ -191,20 +192,14 @@ public class DRConsumerDrIdTracker {
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
     }
 
-    /**
-     * This function does everything mergeTracker() do, it also moves the truncation (ack) point to
-     * the beginning of first gap and truncates to this point
-     * @param tracker
-     */
-    //
-    public void aggregateTracker(DRConsumerDrIdTracker tracker) {
-        doMerge(tracker);
-        if (m_map.firstEntry() != null) {
-            m_lastAckedDrId = m_map.firstEntry().getValue();
+    public long advancedAckPoint() {
+        Entry<Long, Long> firstEntry = m_map.firstEntry();
+        if (firstEntry != null && m_lastAckedDrId+1 == firstEntry.getKey()) {
+            // Advance the ackpoint
+            m_lastAckedDrId = firstEntry.getValue();
+            m_map.remove(firstEntry.getKey());
         }
-        truncate(m_lastAckedDrId);
-        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
-        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
+        return m_lastAckedDrId;
     }
 
     /**
