@@ -2393,7 +2393,7 @@ public abstract class CatalogUtil {
     public static Map<String, Integer> getDRTableNamePartitionColumnMapping(Database db) {
         Map<String, Integer> res = new HashMap<String, Integer>();
         for (Table tb : db.getTables()) {
-            if (tb.getIsdred()) {
+            if (!tb.getIsreplicated() && tb.getIsdred()) {
                 res.put(tb.getTypeName(), tb.getPartitioncolumn().getIndex());
             }
         }

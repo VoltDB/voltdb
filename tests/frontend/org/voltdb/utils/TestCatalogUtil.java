@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 
-import org.junit.Test;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -1954,12 +1953,11 @@ public class TestCatalogUtil extends TestCase {
         }
     }
 
-    @Test
     public void testGetDRTableNamePartitionColumnMapping() throws Exception {
         String schema = "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
                 "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
-                "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
-                "DR TABLE B;\n";
+                "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
+                "DR TABLE B; DR TABLE C;\n";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final File file = VoltFile.createTempFile("DRTableNamePartitionColumnMapping", ".jar", new File(testDir));
 
