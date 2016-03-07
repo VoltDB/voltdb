@@ -72,7 +72,7 @@ else:
     jar = utility.find_in_path('jar')
 if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
-java_version = utility.get_java_version()
+java_version = utility.get_java_version(java)
 java_opts = []
 
 #If this is a large memory system commit the full heap
