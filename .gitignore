@@ -1,6 +1,7 @@
 /.classpath
 /.depcache
 /.project
+/.cproject
 /.settings
 /hs_err_pid*.log
 /last_junit_suite.log
