@@ -144,6 +144,23 @@ function sync-benchmark() {
         --threads=40
 }
 
+function http-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.HTTPBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --threads=40
+}
+
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
