@@ -28,6 +28,7 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
@@ -739,6 +740,27 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                        expected,
                                        actual),
                          vt.getString(2).equals(vt.getString(3)));
+        }
+    }
+
+    public void testPolygonFromValidText() throws Exception {
+        Client client = getClient();
+        populateBorders(client, invalidBorders);
+        // These should all fail.
+        for (Border b : invalidBorders) {
+            String expectedPattern = b.getMessage();
+            String sql = String.format("select polygonfromvalidtext('%s') from borders where pk = 100",
+                                       b.getRegion().toWKT());
+            verifyStmtFails(client, sql, expectedPattern);
+        }
+        // These should all succeed.
+        for (Border b : borders) {
+            if (b.getRegion() != null) {
+                String stmt = String.format("select polygonfromvalidtext('%s') from borders where pk = 100",
+                                            b.getRegion().toWKT());
+                ClientResponse cr = client.callProcedure("@AdHoc", stmt);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            }
         }
     }
 
