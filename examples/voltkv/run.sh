@@ -53,7 +53,7 @@ function jars-ifneeded() {
 
 # run the voltdb server locally
 function server() {
-    voltdb create -H $HOST
+    voltdb create -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures
