@@ -56,7 +56,7 @@ CLIENTCLASSPATH=$CLASSPATH:$({ \
 # a sourcing script may want to add to this path like so:
 # CLIENTCLASSPATH=appname-client.jar:$CLIENTCLASSPATH 
 
-function help() {
+function envhelp() {
     echo
     echo "Usage: voltenv {classpath|clientclasspath|checkpath}"
     echo 
@@ -111,7 +111,16 @@ function checkpath() {
     fi
 }
 
+# if this script is run directly:
 # Run the target passed as the first arg on the command line
 # If no first arg, do nothing
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else checkpath; fi
+if [ "${0}" = "$SOURCE" ]; then
+    if [ $# -gt 1 ]; then 
+        envhelp
+        exit 0
+    elif [ $# = 1 ]; then 
+        $1
+    fi
+else
+    checkpath
+fi
