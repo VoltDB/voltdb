@@ -351,13 +351,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseInformation;
     }
 
-    private void managedPathEmptyCheck(VoltDB.Configuration config, File managedPath) {
+    private void managedPathEmptyCheck(VoltDB.Configuration config, VoltFile managedPath) {
         if (managedPath.exists() && managedPath.list().length > 0 && !config.m_forceStartVoltdb &&
                 config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
             VoltDB.crashLocalVoltDB("Files from a previous database session exist in " + managedPath.getAbsolutePath() +
                                     ". Use the recover command to restore the previous database or use create --force " +
                                     "to delete the directory and create a new database session.");
         }
+    }
+
+    private void defaultPathsEmptyCheck(VoltDB.Configuration config) {
+        managedPathEmptyCheck(config, new VoltFile("voltdbroot", "snapshots"));
+        managedPathEmptyCheck(config, new VoltFile("voltdbroot", "export_overflow"));
+        managedPathEmptyCheck(config, new VoltFile("voltdbroot", "dr_overflow"));
+        managedPathEmptyCheck(config, new VoltFile("voltdbroot", "command_log"));
+        managedPathEmptyCheck(config, new VoltFile("voltdbroot", "command_log_snapshot"));
     }
 
     /**
@@ -377,12 +385,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
-                    managedPathEmptyCheck(config, new VoltFile("voltdbroot", "snapshots"));
-                    managedPathEmptyCheck(config, new VoltFile("voltdbroot", "export_overflow"));
-                    managedPathEmptyCheck(config, new VoltFile("voltdbroot", "dr_overflow"));
-                    managedPathEmptyCheck(config, new VoltFile("voltdbroot", "command_log"));
-                    managedPathEmptyCheck(config, new VoltFile("voltdbroot", "command_log_snapshot"));
-
+                    defaultPathsEmptyCheck(config);
                     config.m_pathToDeployment = setupDefaultDeployment(hostLog);
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
@@ -499,47 +502,56 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             if (!config.m_deploymentDefault) {
                 PathsType paths = m_catalogContext.getDeployment().getPaths();
-                String voltDbRoot;
-                if (paths == null || paths.getVoltdbroot() == null || paths.getVoltdbroot().getPath() == null)
-                    voltDbRoot = "voltdbroot";
-                else
-                    voltDbRoot = paths.getVoltdbroot().getPath();
+                if (paths == null)
+                    defaultPathsEmptyCheck(config);
+                else {
+                    String voltDbRoot;
+                    if (paths.getVoltdbroot() == null)
+                        voltDbRoot = (new PathsType.Voltdbroot()).getPath();
+                    else
+                        voltDbRoot = paths.getVoltdbroot().getPath();
 
-                File managedPath;
-                if (paths != null && paths.getSnapshots() != null && paths.getSnapshots().getPath() != null &&
-                        (new File(paths.getSnapshots().getPath()).isAbsolute()))
-                    managedPath = new VoltFile(paths.getSnapshots().getPath());
-                else
-                    managedPath = new VoltFile(voltDbRoot, "snapshots");
-                managedPathEmptyCheck(config, managedPath);
+                    VoltFile managedPath;
+                    if (paths.getSnapshots() == null)
+                        managedPath = new VoltFile(voltDbRoot, (new PathsType.Snapshots()).getPath());
+                    else if (new File(paths.getSnapshots().getPath()).isAbsolute())
+                        managedPath = new VoltFile(paths.getSnapshots().getPath());
+                    else
+                        managedPath = new VoltFile(voltDbRoot, paths.getSnapshots().getPath());
+                    managedPathEmptyCheck(config, managedPath);
 
-                if (paths != null && paths.getExportoverflow() != null && paths.getExportoverflow().getPath() != null &&
-                        (new File(paths.getExportoverflow().getPath()).isAbsolute()))
-                    managedPath = new VoltFile(paths.getExportoverflow().getPath());
-                else
-                    managedPath = new VoltFile(voltDbRoot, "export_overflow");
-                managedPathEmptyCheck(config, managedPath);
+                    if (paths.getExportoverflow() == null)
+                        managedPath = new VoltFile(voltDbRoot, (new PathsType.Exportoverflow()).getPath());
+                    else if (new File(paths.getExportoverflow().getPath()).isAbsolute())
+                        managedPath = new VoltFile(paths.getExportoverflow().getPath());
+                    else
+                        managedPath = new VoltFile(voltDbRoot, paths.getExportoverflow().getPath());
+                    managedPathEmptyCheck(config, managedPath);
 
-                if (paths != null && paths.getDroverflow() != null && paths.getDroverflow().getPath() != null &&
-                        (new File(paths.getDroverflow().getPath()).isAbsolute()))
-                    managedPath = new VoltFile(paths.getDroverflow().getPath());
-                else
-                    managedPath = new VoltFile(voltDbRoot, "dr_overflow");
-                managedPathEmptyCheck(config, managedPath);
+                    if (paths.getDroverflow() == null)
+                        managedPath = new VoltFile(voltDbRoot, (new PathsType.Droverflow()).getPath());
+                    else if (new File(paths.getDroverflow().getPath()).isAbsolute())
+                        managedPath = new VoltFile(paths.getDroverflow().getPath());
+                    else
+                        managedPath = new VoltFile(voltDbRoot, paths.getDroverflow().getPath());
+                    managedPathEmptyCheck(config, managedPath);
 
-                if (paths != null && paths.getCommandlog() != null && paths.getCommandlog().getPath() != null &&
-                        (new File(paths.getCommandlog().getPath()).isAbsolute()))
-                    managedPath = new VoltFile(paths.getCommandlog().getPath());
-                else
-                    managedPath = new VoltFile(voltDbRoot, "command_log");
-                managedPathEmptyCheck(config, managedPath);
+                    if (paths.getCommandlog() == null)
+                        managedPath = new VoltFile(voltDbRoot, (new PathsType.Commandlog()).getPath());
+                    else if (new File(paths.getCommandlog().getPath()).isAbsolute())
+                        managedPath = new VoltFile(paths.getCommandlog().getPath());
+                    else
+                        managedPath = new VoltFile(voltDbRoot, paths.getCommandlog().getPath());
+                    managedPathEmptyCheck(config, managedPath);
 
-                if (paths != null && paths.getCommandlogsnapshot() != null && paths.getCommandlogsnapshot().getPath() != null &&
-                        (new File(paths.getCommandlogsnapshot().getPath()).isAbsolute()))
-                    managedPath = new VoltFile(paths.getCommandlogsnapshot().getPath());
-                else
-                    managedPath = new VoltFile(voltDbRoot, "command_log_snapshot");
-                managedPathEmptyCheck(config, managedPath);
+                    if (paths.getCommandlogsnapshot() == null)
+                        managedPath = new VoltFile(voltDbRoot, (new PathsType.Commandlogsnapshot()).getPath());
+                    else if (new File(paths.getCommandlogsnapshot().getPath()).isAbsolute())
+                        managedPath = new VoltFile(paths.getCommandlogsnapshot().getPath());
+                    else
+                        managedPath = new VoltFile(voltDbRoot, paths.getCommandlogsnapshot().getPath());
+                    managedPathEmptyCheck(config, managedPath);
+                }
             }
 
             if (!isRejoin && !m_joining) {

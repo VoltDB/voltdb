@@ -80,7 +80,7 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST --force"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
     voltdb create -d deployment.xml -l $LICENSE -H $HOST --force
 }

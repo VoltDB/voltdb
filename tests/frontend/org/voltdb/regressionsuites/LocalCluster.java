@@ -123,7 +123,7 @@ public class LocalCluster implements VoltServerConfig {
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private String m_voltdbroot = "";
-    private File m_filePrefix;
+    private VoltFile m_filePrefix;
 
     private String[] m_versionOverrides = null;
     private String[] m_versionCheckRegexOverrides = null;
@@ -423,7 +423,7 @@ public class LocalCluster implements VoltServerConfig {
         m_compiled = true;
     }
 
-    public void setFilePrefix(File filePrefix) {
+    public void setFilePrefix(VoltFile filePrefix) {
         m_filePrefix = filePrefix;
     }
 
