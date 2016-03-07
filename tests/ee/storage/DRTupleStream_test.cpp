@@ -75,9 +75,10 @@ static int64_t addPartitionId(int64_t value) {
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest()
-      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
-                                      (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                      "localhost", 2, &m_wrapper, NULL, 0))
+        : m_wrapper(42),
+          m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
+                                        (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                        "localhost", 2, &m_wrapper, NULL, 0))
     {
         m_wrapper.m_enabled = true;
         srand(0);
@@ -94,9 +95,6 @@ public:
           TupleSchema::createTupleSchemaForTest(columnTypes,
                                          columnLengths,
                                          columnAllowNull);
-
-        // allocate a new buffer and wrap it
-        m_wrapper.configure(16383);
 
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
@@ -116,7 +114,8 @@ public:
     size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, const std::pair<TableIndex*, int32_t>& index = defaultIndexPair)
     {
         // fill a tuple
-        for (int col = 0; col < COLUMN_COUNT; col++) {
+        m_tuple->setNValue(0, ValueFactory::getIntegerValue(0));
+        for (int col = 1; col < COLUMN_COUNT; col++) {
             int value = rand();
             m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
         }

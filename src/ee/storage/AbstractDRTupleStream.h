@@ -43,7 +43,7 @@ struct DRCommittedInfo{
 
 class AbstractDRTupleStream : public TupleStreamBase {
 public:
-    AbstractDRTupleStream();
+    AbstractDRTupleStream(int partitionId);
 
     virtual ~AbstractDRTupleStream() {}
 
@@ -54,7 +54,6 @@ public:
     virtual void setSecondaryCapacity(size_t capacity);
 
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
-    void configure(CatalogId partitionId) { m_partitionId = partitionId; }
 
     /**
      * write an insert or delete record to the stream
@@ -87,6 +86,7 @@ public:
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) = 0;
