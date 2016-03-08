@@ -40,25 +40,18 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
-import org.voltdb.utils.MiscUtils;
 
 public class HTTPBenchmark {
 
@@ -68,7 +61,7 @@ public class HTTPBenchmark {
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
-    final KVConfig config;
+    static final KVConfig config;
     // Reference to the database connection we will use
     final Client client;
     // Timer for periodic stats printing
@@ -183,7 +176,7 @@ public class HTTPBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public HTTPBenchmark(KVConfig config) {
-        this.config = config;
+        // this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password);
         clientConfig.setReconnectOnConnectionLoss(true);

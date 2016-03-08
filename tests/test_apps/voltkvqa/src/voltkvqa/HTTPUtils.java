@@ -70,12 +70,8 @@ public class HTTPUtils {
     static boolean prehash = true;
 
     static void dumpResponse(Response resp) {
-    	System.out.println("resp.toString(): " + resp.toString());
-    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
+        System.out.println("resp.toString(): " + resp.toString());
+        System.out.println("status: " + resp.status);
     }
 
     static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
@@ -89,6 +85,8 @@ public class HTTPUtils {
     }
 
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
+        //String servers = new String()[];
+        System.out.println("Servers: " + HTTPBenchmark.config.servers + ". Length: " + HTTPBenchmark.config.servers.length());
         URL jsonAPIURL = new URL("http://localhost:8080/api/1.0/");
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -231,29 +229,29 @@ public class HTTPUtils {
         return response;
     }
 
-//	public static void callProcedure(String string, String key, byte[] storeValue) {
-//		ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-//		String resp = callProcOverJSON(string, pset, username, password, prehash);
-//	}
+//    public static void callProcedure(String string, String key, byte[] storeValue) {
+//        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
+//        String resp = callProcOverJSON(string, pset, username, password, prehash);
+//    }
 
-	public static Response callProcedure(String string, String key, byte[] storeValue) throws JSONException, IOException, Exception {
-		ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-		System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
-		String resp = callProcOverJSON(string, pset, username, password, prehash);
-		System.out.println("Response KV resp: " + resp.toString());
-		Response response = responseFromJSON(resp);
-		System.out.println("Response KV: " + response.toString());
-		return response;
-	}
+    public static Response callProcedure(String string, String key, byte[] storeValue) throws JSONException, IOException, Exception {
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
+        System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
+        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        System.out.println("Response KV resp: " + resp.toString());
+        Response response = responseFromJSON(resp);
+        System.out.println("Response KV: " + response.toString());
+        return response;
+    }
 
-	public static Response  callProcedure(String string, String generateRandomKeyForRetrieval) throws JSONException, IOException, Exception {
-		ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
-		System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
-		String resp = callProcOverJSON(string, pset, username, password, prehash);
-		System.out.println("Response K resp: " + resp.toString());
-		Response response = responseFromJSON(resp);
-		System.out.println("Response K: " + response.toString());
-		return response;
-	}
+    public static Response  callProcedure(String string, String generateRandomKeyForRetrieval) throws JSONException, IOException, Exception {
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
+        System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
+        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        System.out.println("Response K resp: " + resp.toString());
+        Response response = responseFromJSON(resp);
+        System.out.println("Response K: " + response.toString());
+        return response;
+    }
 
 }
