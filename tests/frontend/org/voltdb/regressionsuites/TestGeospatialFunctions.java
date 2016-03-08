@@ -760,6 +760,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                             b.getRegion().toWKT());
                 ClientResponse cr = client.callProcedure("@AdHoc", stmt);
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                VoltTable vt = cr.getResults()[0];
+                while (vt.advanceRow()) {
+                    assertEquals(b.getRegion(), vt.getGeographyValue(0));
+                }
             }
         }
     }
