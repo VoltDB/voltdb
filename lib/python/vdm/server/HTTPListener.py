@@ -498,6 +498,41 @@ def get_volt_jar_dir():
     return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
 
 
+def get_port(ip_with_port):
+    if ip_with_port != "":
+        if ":" not in ip_with_port:
+            return ip_with_port
+        else:
+            arr = ip_with_port.split(":")
+            return arr[1]
+
+
+def check_port_valid(port_option, servers):
+    if port_option == "http-listener":
+        default_port = "8080"
+    if port_option == "admin-listener":
+        default_port = "21211"
+    if port_option == "zookeeper-listener":
+        default_port = "7181"
+    if port_option == "replication-listener":
+        default_port = "5555"
+    if port_option == "client-listener":
+        default_port = "21212"
+    if port_option == "internal-listener":
+        default_port = "3021"
+    if port_option not in request.json:
+        port = default_port
+        server_port = get_port(servers[port_option])
+        if server_port is None:
+            server_port = default_port
+    else:
+        port = get_port(request.json[port_option])
+        server_port = get_port(servers[port_option])
+    if port == server_port:
+        return jsonify(success=False, errors="Duplicate %s for same hostname" %port_option)
+
+
+
 def get_configuration():
     deployment_json = {
         'voltdeploy': {
@@ -1442,13 +1477,21 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+        for servers in Global.SERVERS:
+            if servers['hostname'] == request.json['hostname']:
+                for option in arr:
+                    result = check_port_valid(option, servers)
+                    if result != None:
+                        return result
+
         if not Global.SERVERS:
             server_id = 1
         else:
             server_id = Global.SERVERS[-1]['id'] + 1
         server = {
             'id': server_id,
-            'name': request.json['name'].strip(),
+            'name': request.json.get('name', "").strip(),
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
