@@ -24,6 +24,8 @@ import java.util.TreeMap;
 
 import org.voltdb.iv2.UniqueIdGenerator;
 
+import com.google_voltpatches.common.collect.Maps;
+
 public class DRConsumerDrIdTracker {
 
     private TreeMap<Long, Long> m_map = new TreeMap<Long, Long>();
@@ -31,7 +33,7 @@ public class DRConsumerDrIdTracker {
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
 
-    public DRConsumerDrIdTracker(Long initialAckPoint, Long spUniqueId, Long mpUniqueId) {
+    public DRConsumerDrIdTracker(long initialAckPoint, long spUniqueId, long mpUniqueId) {
         m_lastAckedDrId = initialAckPoint;
         m_lastSpUniqueId = spUniqueId;
         m_lastMpUniqueId = mpUniqueId;
@@ -45,14 +47,6 @@ public class DRConsumerDrIdTracker {
         for (int ii=0; ii<mapSize; ii++) {
             m_map.put(buff.getLong(), buff.getLong());
         }
-    }
-
-    // copy constructor
-    public DRConsumerDrIdTracker(DRConsumerDrIdTracker tracker) {
-        m_lastAckedDrId = tracker.m_lastAckedDrId;
-        m_lastSpUniqueId = tracker.m_lastSpUniqueId;
-        m_lastMpUniqueId = tracker.m_lastMpUniqueId;
-        m_map.putAll(tracker.m_map);
     }
 
     public DRConsumerDrIdTracker(byte[] flattened) {
@@ -88,7 +82,7 @@ public class DRConsumerDrIdTracker {
         return m_map.size();
     }
 
-    public void append(Long startDrId, Long endDrId, Long spUniqueId, Long mpUniqueId) {
+    public void append(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
         // There should never be keys past the append point
         assert(startDrId <= endDrId && startDrId > m_lastAckedDrId);
         assert(m_map.size() == 0 || m_map.lastEntry().getValue() < startDrId);
@@ -115,26 +109,30 @@ public class DRConsumerDrIdTracker {
 
         assert (tracker.size() > 0);
         if (m_map.isEmpty()) {
-            m_map = tracker.m_map;
+            m_map = new TreeMap<>(tracker.m_map);
         }
         else {
-            Map.Entry<Long, Long> firstNewEntry = tracker.m_map.firstEntry();
-            Map.Entry<Long, Long> lastOldEntry = m_map.lastEntry();
-            // There should never be keys past the append point
-            assert(lastOldEntry.getValue() < firstNewEntry.getKey());
-            if (lastOldEntry.getValue()+1 == firstNewEntry.getKey()) {
-                // consolidate the two ranges
-                tracker.m_map.remove(firstNewEntry.getKey());
-                m_map.put(lastOldEntry.getKey(), firstNewEntry.getValue());
+            Map.Entry<Long, Long> lastEntry = m_map.lastEntry();
+            for (Entry<Long, Long> newEntry : tracker.m_map.entrySet()) {
+                // There should never be keys past the append point
+                assert(lastEntry.getValue() < newEntry.getKey());
+                if (lastEntry.getValue()+1 == newEntry.getKey()) {
+                    // consolidate the two ranges
+                    m_map.put(lastEntry.getKey(), newEntry.getValue());
+                    lastEntry = Maps.immutableEntry(lastEntry.getKey(), newEntry.getValue());
+                } else {
+                    m_map.put(newEntry.getKey(), newEntry.getValue());
+                    lastEntry = newEntry;
+                }
             }
-            m_map.putAll(tracker.m_map);
         }
+        truncate(tracker.m_lastAckedDrId);
     }
 
-    private void put(Long startDrId, Long endDrId) {
+    private void put(long startDrId, long endDrId) {
         Map.Entry<Long, Long> nextEntry = m_map.higherEntry(endDrId);
         Map.Entry<Long, Long> prevEntry = m_map.lowerEntry(startDrId);
-        assert(!m_map.containsKey(startDrId));
+        assert(!m_map.containsKey(startDrId) && !m_map.containsKey(endDrId));
         if (prevEntry != null && prevEntry.getValue()+1 == startDrId) {
             // This entry can be merged with the previous one
             if (nextEntry!= null && endDrId+1 == nextEntry.getKey()) {
@@ -161,7 +159,7 @@ public class DRConsumerDrIdTracker {
         }
     }
 
-    public void truncate(Long newTruncationPoint) {
+    public void truncate(long newTruncationPoint) {
         assert(newTruncationPoint >= m_lastAckedDrId);
         Map.Entry<Long, Long> firstEntry = m_map.firstEntry();
         while (firstEntry != null && firstEntry.getKey() <= newTruncationPoint) {
@@ -244,14 +242,14 @@ public class DRConsumerDrIdTracker {
             return "Empty Map";
         }
         StringBuilder sb = new StringBuilder();
+        sb.append("lastAckPoint ").append(DRLogSegmentId.getClusterIdFromDRId(m_lastAckedDrId)).append(":")
+          .append(DRLogSegmentId.getSentinelOrSeqNumFromDRId(m_lastAckedDrId)).append(" ");
+        sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
+        sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         for (Map.Entry<Long, Long> entry : m_map.entrySet()) {
-            sb.append(" [" + DRLogSegmentId.getSequenceNumberFromDRId(entry.getKey()) + ", " +
-                    DRLogSegmentId.getSequenceNumberFromDRId(entry.getValue()) + "] ");
+            sb.append("[").append(DRLogSegmentId.getSequenceNumberFromDRId(entry.getKey())).append(", ")
+              .append(DRLogSegmentId.getSequenceNumberFromDRId(entry.getValue())).append("] ");
         }
-        sb.append("lastAckPoint " + DRLogSegmentId.getClusterIdFromDRId(m_lastAckedDrId) + ":"
-                + DRLogSegmentId.getSentinelOrSeqNumFromDRId(m_lastAckedDrId));
-        sb.append("lastSpUniqueId " + UniqueIdGenerator.toShortString(m_lastSpUniqueId));
-        sb.append("lastMpUniqueId " + UniqueIdGenerator.toShortString(m_lastMpUniqueId));
         return sb.toString();
     }
 }
