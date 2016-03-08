@@ -61,7 +61,7 @@ public class HTTPBenchmark {
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
-    static final KVConfig config;
+    final KVConfig config;
     // Reference to the database connection we will use
     final Client client;
     // Timer for periodic stats printing
@@ -176,7 +176,7 @@ public class HTTPBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public HTTPBenchmark(KVConfig config) {
-        // this.config = config;
+        this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password);
         clientConfig.setReconnectOnConnectionLoss(true);
@@ -385,17 +385,17 @@ public class HTTPBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval());
+                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), config.servers);
                     }
-                    catch (Exception e) {}
+                    catch (Exception e) { e.printStackTrace(System.out); }
                 }
                 else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), config.servers);
                     }
-                    catch (Exception e) {}
+                    catch (Exception e) { e.printStackTrace(System.out); }
                 }
             }
 
@@ -405,7 +405,7 @@ public class HTTPBenchmark {
                     // Get a key/value pair, synchronously
                     try {
                         HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
-                                processor.generateRandomKeyForRetrieval());
+                                processor.generateRandomKeyForRetrieval(), config.servers);
 
                         if (response.results[0].advanceRow()) {
 
@@ -424,18 +424,18 @@ public class HTTPBenchmark {
                         }
                     }
                     catch (Exception e) {
-                        failedGets.incrementAndGet();
+                         e.printStackTrace(System.out); failedGets.incrementAndGet();
                     }
                 }
                 else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), config.servers);
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
-                        failedPuts.incrementAndGet();
+                         e.printStackTrace(System.out); failedPuts.incrementAndGet();
                     }
                     networkPutData.addAndGet(pair.getStoreValueLength());
                     rawPutData.addAndGet(pair.getRawValueLength());

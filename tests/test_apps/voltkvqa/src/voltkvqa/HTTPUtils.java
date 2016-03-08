@@ -47,6 +47,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -68,6 +69,8 @@ public class HTTPUtils {
     static String username = null;
     static String password = null;
     static boolean prehash = true;
+    static Random rand = new Random();
+    static String[] servers;
 
     static void dumpResponse(Response resp) {
         System.out.println("resp.toString(): " + resp.toString());
@@ -85,9 +88,9 @@ public class HTTPUtils {
     }
 
     public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
-        //String servers = new String()[];
-        System.out.println("Servers: " + HTTPBenchmark.config.servers + ". Length: " + HTTPBenchmark.config.servers.length());
-        URL jsonAPIURL = new URL("http://localhost:8080/api/1.0/");
+        String server = servers[rand.nextInt(servers.length)];
+        // System.out.println("Server: " + server);
+        URL jsonAPIURL = new URL("http://" + server + ":8080/api/1.0/");
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod("POST");
@@ -175,7 +178,7 @@ public class HTTPUtils {
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
-        //System.out.println(paramsInJSON);
+        // System.out.println(paramsInJSON);
         HashMap<String,String> params = new HashMap<String,String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
@@ -208,7 +211,7 @@ public class HTTPUtils {
         for (int i = 0; i < response.results.length; i++) {
             JSONObject tableJson = resultsJson.getJSONObject(i);
             response.results[i] =  VoltTable.fromJSONObject(tableJson);
-            System.out.println(response.results[i].toString());
+            //System.out.println(response.results[i].toString());
         }
         if (jsonObj.isNull("status") == false) {
             response.status = (byte) jsonObj.getInt("status");
@@ -229,28 +232,25 @@ public class HTTPUtils {
         return response;
     }
 
-//    public static void callProcedure(String string, String key, byte[] storeValue) {
-//        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-//        String resp = callProcOverJSON(string, pset, username, password, prehash);
-//    }
-
-    public static Response callProcedure(String string, String key, byte[] storeValue) throws JSONException, IOException, Exception {
+    public static Response callProcedure(String string, String key, byte[] storeValue, String servers) throws JSONException, IOException, Exception {
+        HTTPUtils.servers = servers.split(",");
         ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-        System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
+        //System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
         String resp = callProcOverJSON(string, pset, username, password, prehash);
-        System.out.println("Response KV resp: " + resp.toString());
+        //System.out.println("Response KV resp: " + resp.toString());
         Response response = responseFromJSON(resp);
-        System.out.println("Response KV: " + response.toString());
+        //System.out.println("Response KV: " + response.toString());
         return response;
     }
 
-    public static Response  callProcedure(String string, String generateRandomKeyForRetrieval) throws JSONException, IOException, Exception {
+    public static Response  callProcedure(String string, String generateRandomKeyForRetrieval, String servers) throws JSONException, IOException, Exception {
+        HTTPUtils.servers = servers.split(",");
         ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
-        System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
+        //System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
         String resp = callProcOverJSON(string, pset, username, password, prehash);
-        System.out.println("Response K resp: " + resp.toString());
+        //System.out.println("Response K resp: " + resp.toString());
         Response response = responseFromJSON(resp);
-        System.out.println("Response K: " + response.toString());
+        //System.out.println("Response K: " + response.toString());
         return response;
     }
 
