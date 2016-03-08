@@ -1230,6 +1230,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
@@ -1278,6 +1279,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);
         }
 
+        if (allConsumerSiteTrackers != null) {
+            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> thisConsumerSiteTrackers =
+                    allConsumerSiteTrackers.get(m_partitionId);
+            if (thisConsumerSiteTrackers != null) {
+                m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
+            }
+        }
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
     }
