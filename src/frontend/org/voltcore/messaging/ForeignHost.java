@@ -122,13 +122,10 @@ public class ForeignHost {
 
     private void setLogRate(long deadHostTimeout) {
         int logRate;
-        if (deadHostTimeout < 30 * 1000) {
-            hostLog.warn("test");
+        if (deadHostTimeout < 30 * 1000)
             logRate = (int) (deadHostTimeout / 3);
-        } else {
-            hostLog.warn("test2");
+        else
             logRate = 10 * 1000;
-        }
         rateLimitedLogger = new RateLimitedLogger(logRate, hostLog, Level.WARN);
         m_logRate = logRate;
     }
