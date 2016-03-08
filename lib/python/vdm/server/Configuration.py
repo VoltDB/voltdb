@@ -105,233 +105,299 @@ def get_deployment(deployment, is_upload=False):
     """
     new_deployment = {}
     for field in deployment:
-        if field == 'export':
-            try:
-                if deployment[field] is not None:
-                    new_deployment[field] = {}
-                    new_deployment[field]['configuration'] = {}
-                    if type(deployment[field]['configuration']) is list:
-                        new_deployment[field]['configuration'] = get_field_from_xml(
-                            deployment[field]['configuration'], 'list', 'export')
-                    else:
-                        new_deployment[field]['configuration'] = get_field_from_xml(
-                            deployment[field]['configuration'], 'dict', 'export')
-                else:
-                    new_deployment[field] = deployment[field]
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
-        elif field == 'import':
-            try:
-                if deployment[field] is not None:
-                    new_deployment[field] = {}
-                    new_deployment[field]['configuration'] = {}
-                    if type(deployment[field]['configuration']) is list:
-                        new_deployment[field]['configuration'] = get_field_from_xml(
-                            deployment[field]['configuration'], 'list', 'export')
-                    else:
-                        new_deployment[field]['configuration'] = get_field_from_xml(
-                            deployment[field]['configuration'], 'dict', 'export')
-                else:
-                    new_deployment[field] = deployment[field]
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+        if field == 'export' or field == 'import':
+            result = set_export_import_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'admin-mode':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]
-                                                                          ['adminstartup'])
-                new_deployment[field]['port'] = int(deployment[field]['port'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_admin_mode_filed(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'cluster':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['hostcount'] = int(deployment[field]['hostcount'])
-                new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
-                new_deployment[field]['sitesperhost'] = int(deployment[field]
-                                                            ['sitesperhost'])
-                new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
-                new_deployment[field]['schema'] = str(deployment[field]['schema'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_cluster_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'commandlog':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
-                                                                     ['enabled'])
-                new_deployment[field]['synchronous'] = parse_bool_string(deployment[field]
-                                                                         ['synchronous'])
-                new_deployment[field]['logsize'] = int(deployment[field]['logsize'])
-                new_deployment[field]['frequency'] = {}
-                new_deployment[field]['frequency']['transactions'] = int(
-                    deployment[field]['frequency']['transactions'])
-                new_deployment[field]['frequency']['time'] = int(deployment[field]
-                                                                 ['frequency']
-                                                                 ['time'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_command_log_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'heartbeat':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['timeout'] = int(deployment[field]['timeout'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_heartbeat_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'httpd':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['port'] = int(deployment[field]['port'])
-                new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
-                                                                     ['enabled'])
-                new_deployment[field]['jsonapi'] = {}
-                new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(
-                    deployment[field]['jsonapi']['enabled'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_httpd_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'partition-detection':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
-                                                                     ['enabled'])
-                new_deployment[field]['snapshot'] = {}
-                new_deployment[field]['snapshot']['prefix'] = deployment[field]['snapshot']['prefix']
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_partition_detection_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'security':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
-                                                                     ['enabled'])
-                new_deployment[field]['provider'] = str(deployment[field]['provider'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_security_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'snapshot':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
-                                                                     ['enabled'])
-                new_deployment[field]['frequency'] = str(deployment[field]['frequency'])
-                new_deployment[field]['prefix'] = str(deployment[field]['prefix'])
-                new_deployment[field]['retain'] = int(deployment[field]['retain'])
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_snapshot_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'systemsettings':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['elastic'] = {}
-                new_deployment[field]['elastic']['duration'] = int(deployment[field]
-                                                                   ['elastic']
-                                                                   ['duration'])
-                new_deployment[field]['elastic']['throughput'] = int(deployment[field]
-                                                                     ['elastic']['throughput'])
-                new_deployment[field]['query'] = {}
-                new_deployment[field]['query']['timeout'] = int(deployment[field]['query']
-                                                                ['timeout'])
-                new_deployment[field]['snapshot'] = {}
-                new_deployment[field]['snapshot']['priority'] = int(deployment[field]
-                                                                    ['snapshot']['priority'])
-                new_deployment[field]['temptables'] = {}
-                new_deployment[field]['temptables']['maxsize'] = int(deployment[field]
-                                                                     ['temptables']['maxsize'])
-                if 'resourcemonitor' not in deployment[field] or \
-                                deployment[field]['resourcemonitor'] is None:
-                    if 'resourcemonitor' in deployment[field]:
-                        new_deployment[field]['resourcemonitor'] = None
-                else:
-                    new_deployment[field]['resourcemonitor'] = {}
-                    if 'memorylimit' in deployment[field]['resourcemonitor']:
-                        new_deployment[field]['resourcemonitor']['memorylimit'] = \
-                        deployment[field]['resourcemonitor']['memorylimit']
-
-                    if 'disklimit' in deployment[field]['resourcemonitor'] and 'feature' in \
-                            deployment[field]['resourcemonitor']['disklimit']:
-                        if type(deployment[field]['resourcemonitor']['disklimit']['feature']) is \
-                                list:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = \
-                                get_field_from_xml(deployment[field]
-                                                   ['resourcemonitor']['disklimit']['feature'],
-                                                   'list', 'disklimit')
-                        else:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = \
-                                get_field_from_xml(deployment[field]['resourcemonitor']
-                                                   ['disklimit']['feature'], 'dict', 'disklimit')
-
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_system_setting_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'dr':
-            try:
-                if deployment[field] is not None:
-                    new_deployment[field] = {}
-                    new_deployment[field]['id'] = int(deployment[field]['id'])
-                    new_deployment[field]['listen'] = parse_bool_string(deployment[field]
-                                                                        ['listen'])
-                    if 'port' in deployment[field]:
-                        new_deployment[field]['port'] = int(deployment[field]['port'])
-                    if 'connection' in deployment[field] and deployment[field]['connection'] \
-                            is not None and 'source' in deployment[field]['connection']:
-                        new_deployment[field]['connection'] = {}
-                        new_deployment[field]['connection']['source'] = str(
-                            deployment[field]['connection']['source'])
-
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_dr_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         elif field == 'users':
-            try:
-                if deployment[field] is not None:
-                    new_deployment[field] = {}
-                    if type(deployment[field]['user']) is list:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_field_from_xml(deployment[field]
-                                                                           ['user'], 'list', 'user')
-                    else:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_field_from_xml(deployment[field]
-                                                                           ['user'], 'dict', 'user')
-            except Exception, err:
-                if is_upload:
-                    return handle_errors(field, err)
-                else:
-                    print_errors(field, err)
+            result = set_users_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         else:
             new_deployment[field] = convert_field_required_format(deployment, field)
     return new_deployment
+
+
+def set_export_import_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        if deployment[field] is not None:
+            new_deployment[field] = {}
+            new_deployment[field]['configuration'] = {}
+            if type(deployment[field]['configuration']) is list:
+                new_deployment[field]['configuration'] = get_field_from_xml(
+                    deployment[field]['configuration'], 'list', 'export')
+            else:
+                new_deployment[field]['configuration'] = get_field_from_xml(
+                    deployment[field]['configuration'], 'dict', 'export')
+        else:
+            new_deployment[field] = deployment[field]
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_admin_mode_filed(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]
+                                                                  ['adminstartup'])
+        new_deployment[field]['port'] = int(deployment[field]['port'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_cluster_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['hostcount'] = int(deployment[field]['hostcount'])
+        new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
+        new_deployment[field]['sitesperhost'] = int(deployment[field]
+                                                    ['sitesperhost'])
+        new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
+        new_deployment[field]['schema'] = str(deployment[field]['schema'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_command_log_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
+                                                             ['enabled'])
+        new_deployment[field]['synchronous'] = parse_bool_string(deployment[field]
+                                                                 ['synchronous'])
+        new_deployment[field]['logsize'] = int(deployment[field]['logsize'])
+        new_deployment[field]['frequency'] = {}
+        new_deployment[field]['frequency']['transactions'] = int(
+            deployment[field]['frequency']['transactions'])
+        new_deployment[field]['frequency']['time'] = int(deployment[field]
+                                                         ['frequency']
+                                                         ['time'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_heartbeat_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['timeout'] = int(deployment[field]['timeout'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_partition_detection_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
+                                                             ['enabled'])
+        new_deployment[field]['snapshot'] = {}
+        new_deployment[field]['snapshot']['prefix'] = deployment[field]['snapshot']['prefix']
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_httpd_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['port'] = int(deployment[field]['port'])
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
+                                                             ['enabled'])
+        new_deployment[field]['jsonapi'] = {}
+        new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(
+            deployment[field]['jsonapi']['enabled'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_security_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
+                                                             ['enabled'])
+        new_deployment[field]['provider'] = str(deployment[field]['provider'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_snapshot_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
+                                                             ['enabled'])
+        new_deployment[field]['frequency'] = str(deployment[field]['frequency'])
+        new_deployment[field]['prefix'] = str(deployment[field]['prefix'])
+        new_deployment[field]['retain'] = int(deployment[field]['retain'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_system_setting_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['elastic'] = {}
+        new_deployment[field]['elastic']['duration'] = int(deployment[field]
+                                                           ['elastic']
+                                                           ['duration'])
+        new_deployment[field]['elastic']['throughput'] = int(deployment[field]
+                                                             ['elastic']['throughput'])
+        new_deployment[field]['query'] = {}
+        new_deployment[field]['query']['timeout'] = int(deployment[field]['query']
+                                                        ['timeout'])
+        new_deployment[field]['snapshot'] = {}
+        new_deployment[field]['snapshot']['priority'] = int(deployment[field]
+                                                            ['snapshot']['priority'])
+        new_deployment[field]['temptables'] = {}
+        new_deployment[field]['temptables']['maxsize'] = int(deployment[field]
+                                                             ['temptables']['maxsize'])
+        if 'resourcemonitor' not in deployment[field] or \
+                        deployment[field]['resourcemonitor'] is None:
+            if 'resourcemonitor' in deployment[field]:
+                new_deployment[field]['resourcemonitor'] = None
+        else:
+            new_deployment[field]['resourcemonitor'] = {}
+            if 'memorylimit' in deployment[field]['resourcemonitor']:
+                new_deployment[field]['resourcemonitor']['memorylimit'] = \
+                deployment[field]['resourcemonitor']['memorylimit']
+
+            if 'disklimit' in deployment[field]['resourcemonitor'] and 'feature' in \
+                    deployment[field]['resourcemonitor']['disklimit']:
+                if type(deployment[field]['resourcemonitor']['disklimit']['feature']) is \
+                        list:
+                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                    new_deployment[field]['resourcemonitor']['disklimit']['feature'] = \
+                        get_field_from_xml(deployment[field]
+                                           ['resourcemonitor']['disklimit']['feature'],
+                                           'list', 'disklimit')
+                else:
+                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                    new_deployment[field]['resourcemonitor']['disklimit']['feature'] = \
+                        get_field_from_xml(deployment[field]['resourcemonitor']
+                                           ['disklimit']['feature'], 'dict', 'disklimit')
+
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_dr_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        if deployment[field] is not None:
+            new_deployment[field] = {}
+            new_deployment[field]['id'] = int(deployment[field]['id'])
+            new_deployment[field]['listen'] = parse_bool_string(deployment[field]
+                                                                ['listen'])
+            if 'port' in deployment[field]:
+                new_deployment[field]['port'] = int(deployment[field]['port'])
+            if 'connection' in deployment[field] and deployment[field]['connection'] \
+                    is not None and 'source' in deployment[field]['connection']:
+                new_deployment[field]['connection'] = {}
+                new_deployment[field]['connection']['source'] = str(
+                    deployment[field]['connection']['source'])
+
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_users_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        if deployment[field] is not None:
+            new_deployment[field] = {}
+            if type(deployment[field]['user']) is list:
+                new_deployment[field]['user'] = []
+                new_deployment[field]['user'] = get_field_from_xml(deployment[field]
+                                                                   ['user'], 'list', 'user')
+            else:
+                new_deployment[field]['user'] = []
+                new_deployment[field]['user'] = get_field_from_xml(deployment[field]
+                                                                   ['user'], 'dict', 'user')
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
 
 
 def get_field_from_xml(xml_content, is_list, type_content=''):
