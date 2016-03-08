@@ -32,7 +32,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package kvbench;
+package voltkvqa;
 
 import java.io.BufferedReader;
 import java.io.IOException;

@@ -60,7 +60,7 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.utils.MiscUtils;
 
-public class SyncBenchmark {
+public class HTTPBenchmark {
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -182,7 +182,7 @@ public class SyncBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public SyncBenchmark(KVConfig config) {
+    public HTTPBenchmark(KVConfig config) {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password);
@@ -411,10 +411,12 @@ public class SyncBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        ClientResponse response = HTTPUtils.callProcedure("Get",
+                        HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
                                 processor.generateRandomKeyForRetrieval());
 
-                        final VoltTable pairData = response.getResults()[0];
+                        if (response.results[0].advanceRow()) {
+
+                        final VoltTable pairData = response.results[0];
                         // Cache miss (Key does not exist)
                         if (pairData.getRowCount() == 0)
                             missedGets.incrementAndGet();
@@ -425,6 +427,7 @@ public class SyncBenchmark {
                             successfulGets.incrementAndGet();
                             networkGetData.addAndGet(pair.getStoreValueLength());
                             rawGetData.addAndGet(pair.getRawValueLength());
+                        }
                         }
                     }
                     catch (Exception e) {
@@ -537,9 +540,9 @@ public class SyncBenchmark {
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
         KVConfig config = new KVConfig();
-        config.parse(SyncBenchmark.class.getName(), args);
+        config.parse(HTTPBenchmark.class.getName(), args);
 
-        SyncBenchmark benchmark = new SyncBenchmark(config);
+        HTTPBenchmark benchmark = new HTTPBenchmark(config);
         benchmark.runBenchmark();
     }
 }
