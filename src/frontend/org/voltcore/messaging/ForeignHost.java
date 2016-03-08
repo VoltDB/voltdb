@@ -44,7 +44,8 @@ import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
+    private static RateLimitedLogger rateLimitedLogger;
+    private static long m_logRate;
 
     final PicoNetwork m_network;
     final FHInputHandler m_handler;
@@ -119,6 +120,16 @@ public class ForeignHost {
         }
     }
 
+    private void setLogRate(long deadHostTimeout) {
+        int logRate;
+        if (deadHostTimeout < 30 * 1000)
+            logRate = (int) (deadHostTimeout / 3);
+        else
+            logRate = 10 * 1000;
+        rateLimitedLogger = new RateLimitedLogger(logRate, hostLog, Level.WARN);
+        m_logRate = logRate;
+    }
+
     /** Create a ForeignHost and install in VoltNetwork */
     ForeignHost(HostMessenger host, int hostId, SocketChannel socket, int deadHostTimeout,
             InetSocketAddress listeningAddress, PicoNetwork network)
@@ -133,6 +144,8 @@ public class ForeignHost {
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
         m_network = network;
+
+        setLogRate(deadHostTimeout);
     }
 
     public void enableRead(Set<Long> verbotenThreads) {
@@ -240,7 +253,7 @@ public class ForeignHost {
          * Try and give some warning when a connection is timing out.
          * Allows you to observe the liveness of the host receiving the heartbeats
          */
-        if (current_delta > 10 * 1000) {
+        if (current_delta > m_logRate) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
                         + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
@@ -394,5 +407,6 @@ public class ForeignHost {
 
     public void updateDeadHostTimeout(int timeout) {
         m_deadHostTimeout = timeout;
+        setLogRate(timeout);
     }
 }
