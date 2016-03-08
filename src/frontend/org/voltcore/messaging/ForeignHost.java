@@ -44,7 +44,7 @@ import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
+    private static RateLimitedLogger rateLimitedLogger;
     private static long m_logRate;
 
     final PicoNetwork m_network;
