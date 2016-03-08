@@ -173,7 +173,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
      */
-    private final  Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
+    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
             new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
     private long m_lastLocalSpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
     private long m_lastLocalMpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
@@ -457,6 +457,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     targetTracker.appendTracker(tracker);
                 }
             }
+        }
+
+        @Override
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        {
+            assert(m_maxSeenDrLogsBySrcPartition.size() == 0);
+            m_maxSeenDrLogsBySrcPartition = trackers;
         }
 
         @Override

@@ -47,6 +47,14 @@ public class DRConsumerDrIdTracker {
         }
     }
 
+    // copy constructor
+    public DRConsumerDrIdTracker(DRConsumerDrIdTracker tracker) {
+        m_lastAckedDrId = tracker.m_lastAckedDrId;
+        m_lastSpUniqueId = tracker.m_lastSpUniqueId;
+        m_lastMpUniqueId = tracker.m_lastMpUniqueId;
+        m_map.putAll(tracker.m_map);
+    }
+
     public DRConsumerDrIdTracker(byte[] flattened) {
         this(ByteBuffer.wrap(flattened));
     }

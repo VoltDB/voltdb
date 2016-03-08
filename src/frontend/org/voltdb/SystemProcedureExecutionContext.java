@@ -90,6 +90,8 @@ public interface SystemProcedureExecutionContext {
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);
 
+    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
+
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 
     public Pair<Long, Long> getDrLastAppliedUniqueIds();

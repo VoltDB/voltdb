@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -38,23 +39,24 @@ public class ExtensibleSnapshotDigestData {
      * m_exportSequenceNumbers and kept until the next snapshot is started in which case they are repopulated.
      * Decoupling them seems like a good idea in case snapshot code is every re-organized.
      */
-    private Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers;
+    private final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers;
 
     /**
      * Same as m_exportSequenceNumbersToLogOnCompletion, but for m_drTupleStreamInfo
      */
-    private Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo;
+    private final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo;
 
     /**
      * Used to pass the last seen unique ids from remote datacenters into the snapshot
      * termination path so it can publish it to ZK where it is extracted by rejoining
      * nodes
      */
-    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_remoteDCLastIds;
+    private final Map<Integer, JSONObject> m_remoteDCLastIds;
 
-    public ExtensibleSnapshotDigestData(Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+    public ExtensibleSnapshotDigestData(
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> remoteDCLastIds) {
+            Map<Integer, JSONObject> remoteDCLastIds) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_remoteDCLastIds = remoteDCLastIds;
@@ -197,18 +199,20 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    static public void serializeConsumerDrIdTrackerToJSON(JSONStringer stringer,
+    static public JSONObject serializeConsumerDrIdTrackerToJSON(
             DRConsumerDrIdTracker tracker)  throws JSONException {
-        stringer.key("lastAckedDrId").value(tracker.getLastAckedDrId());
-        stringer.key("spUniqueId").value(tracker.getLastSpUniqueId());
-        stringer.key("mpUniqueId").value(tracker.getLastMpUniqueId());
-        stringer.key("drIdRanges").array();
+        JSONObject obj = new JSONObject();
+        obj.put("lastAckedDrId", tracker.getLastAckedDrId());
+        obj.put("spUniqueId", tracker.getLastSpUniqueId());
+        obj.put("mpUniqueId", tracker.getLastMpUniqueId());
+        JSONArray drIdRanges = new JSONArray();
         for (Map.Entry<Long, Long> sequenceRange : tracker.getDrIdRanges().entrySet()) {
-            stringer.object();
-            stringer.key(sequenceRange.getKey().toString()).value(sequenceRange.getValue());
-            stringer.endObject();
+            JSONObject range = new JSONObject();
+            range.put(sequenceRange.getKey().toString(), sequenceRange.getValue());
+            drIdRanges.put(range);
         }
-        stringer.endArray();
+        obj.put("drIdRanges", drIdRanges);
+        return obj;
     }
 
 
@@ -224,27 +228,39 @@ public class ExtensibleSnapshotDigestData {
         return tracker;
     }
 
-    private void writeConsumerDrIdTracker(JSONStringer stringer) throws IOException {
-        try {
-            stringer.key("remoteDCLastIds");
-            stringer.object();
-            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : m_remoteDCLastIds.entrySet()) {
-                // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
-                // from the local cluster's partition count (which is not tracked here)
-                stringer.key(e.getKey().toString());
-                stringer.object();
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
-                    stringer.key(e2.getKey().toString());
-                    stringer.object();
-                    serializeConsumerDrIdTrackerToJSON(stringer, e2.getValue());
-                    stringer.endObject();
-                }
-                stringer.endObject();
+    static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> remoteDCLastIds)
+            throws JSONException {
+        JSONObject clusters = new JSONObject();
+        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : remoteDCLastIds.entrySet()) {
+            // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
+            // from the local cluster's partition count (which is not tracked here)
+            JSONObject partitions = new JSONObject();
+            for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
+                partitions.put(e2.getKey().toString(),serializeConsumerDrIdTrackerToJSON(e2.getValue()));
             }
-            stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
+            clusters.put(e.getKey().toString(), partitions);
         }
+        return clusters;
+    }
+
+    static public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> buildConsumerSiteDrIdTrackersFromJSON(JSONObject siteTrackers) throws JSONException {
+        Map<Integer, Map<Integer, DRConsumerDrIdTracker>> perSiteTrackers = new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
+        Iterator<String> clusterKeys = siteTrackers.keys();
+        while (clusterKeys.hasNext()) {
+            Map<Integer, DRConsumerDrIdTracker> perProducerPartitionTrackers = new HashMap<Integer, DRConsumerDrIdTracker>();
+            String clusterIdStr = clusterKeys.next();
+            int clusterId = Integer.valueOf(clusterIdStr);
+            JSONObject producerPartitionInfo = siteTrackers.getJSONObject(clusterIdStr);
+            Iterator<String> producerPartitionKeys = producerPartitionInfo.keys();
+            while (producerPartitionKeys.hasNext()) {
+                String producerPartitionIdStr = producerPartitionKeys.next();
+                int producerPartitionId = Integer.valueOf(producerPartitionIdStr);
+                DRConsumerDrIdTracker producerPartitionTracker = JSON_ToConsumerDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
+                perProducerPartitionTrackers.put(producerPartitionId, producerPartitionTracker);
+            }
+            perSiteTrackers.put(clusterId, perProducerPartitionTrackers);
+        }
+        return perSiteTrackers;
     }
 
     /*
@@ -263,40 +279,29 @@ public class ExtensibleSnapshotDigestData {
             jsonObj.put("remoteDCLastIds", dcIdMap);
         }
 
-        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> dcEntry : m_remoteDCLastIds.entrySet()) {
+        for (Map.Entry<Integer, JSONObject> dcEntry : m_remoteDCLastIds.entrySet()) {
             //Last seen ids for a specific data center
-            JSONObject lastSeenIds;
-            final String dcKeyString = dcEntry.getKey().toString();
-            if (dcIdMap.has(dcKeyString)) {
-                lastSeenIds = dcIdMap.getJSONObject(dcKeyString);
-            } else {
-                lastSeenIds = new JSONObject();
-                dcIdMap.put(dcKeyString, lastSeenIds);
-            }
-
-            for (Map.Entry<Integer, DRConsumerDrIdTracker> partitionEntry : dcEntry.getValue().entrySet()) {
-                final String partitionIdString = partitionEntry.getKey().toString();
-                if (!lastSeenIds.has(partitionIdString)) {
-                    JSONObject ids = new JSONObject();
-                    ids.put("lastAckedDrId", partitionEntry.getValue().getLastAckedDrId());
-                    ids.put("spUniqueId", partitionEntry.getValue().getLastSpUniqueId());
-                    ids.put("mpUniqueId", partitionEntry.getValue().getLastMpUniqueId());
-                    JSONObject drIdRanges = new JSONObject();
-                    for (Map.Entry<Long, Long> sequenceRange : partitionEntry.getValue().getDrIdRanges().entrySet()) {
-                        drIdRanges.put(sequenceRange.getKey().toString(), sequenceRange.getValue());
-                    }
-                    ids.put("drIdRanges", drIdRanges);
-                }
+            final String consumerPartitionString = dcEntry.getKey().toString();
+            if (!dcIdMap.has(consumerPartitionString)) {
+                dcIdMap.put(consumerPartitionString, dcEntry.getValue());
             }
         }
     }
 
-    private void writeDRVersionToSnapshot(JSONStringer stringer) throws IOException {
+    private void writeDRStateToSnapshot(JSONStringer stringer) throws IOException {
         try {
             Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
             if (iter.hasNext()) {
                 stringer.key("drVersion").value(iter.next().getValue().drVersion);
             }
+            writeDRTupleStreamInfoToSnapshot(stringer);
+            stringer.key("remoteDCLastIds");
+            stringer.object();
+            for (Entry<Integer, JSONObject> e : m_remoteDCLastIds.entrySet()) {
+                stringer.key(e.getKey().toString());    // Consumer partitionId
+                stringer.value(e.getValue());           // Trackers from that site
+            }
+            stringer.endObject();
         } catch (JSONException e) {
             throw new IOException(e);
         }
@@ -304,9 +309,7 @@ public class ExtensibleSnapshotDigestData {
 
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
         writeExportSequenceNumbersToSnapshot(stringer);
-        writeDRVersionToSnapshot(stringer);
-        writeDRTupleStreamInfoToSnapshot(stringer);
-        writeConsumerDrIdTracker(stringer);
+        writeDRStateToSnapshot(stringer);
     }
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
