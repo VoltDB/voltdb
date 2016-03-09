@@ -214,6 +214,10 @@ public abstract class VoltTypeUtil {
     }
 
 
+    // broadest type conversion which can happen in EE
+    // from is the type of parameter that is passed in
+    // to is the type of parameter that it can be converted-to
+    //                                   MATRIX
     //  from     |             to
     //--------------------------------------------------------------------------------------------------------
     //           |Tiny  Small  Int   BigInt  Float  Decimal  Timestamp  Varchar  VarBinary GeoPoint  Geography
@@ -239,8 +243,7 @@ public abstract class VoltTypeUtil {
 
         assert(to != from);
 
-        // if the two types are not equal, the remaining case to validate is
-        // if both of the sides are of numeric type or a timestamp
+        // to and from are of different type
         switch (to) {
             case TINYINT:
             case SMALLINT:
