@@ -63,6 +63,7 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTypeUtil;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -371,7 +372,7 @@ public class ProcedureRunner {
             else {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
-                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
+                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, false, paramList);
                     if (getNonVoltDBBackendIfExists() != null) {
                         // Backend handling, such as HSQL or PostgreSQL
                         VoltTable table =
@@ -604,7 +605,7 @@ public class ProcedureRunner {
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
-        queuedSQL.params = getCleanParams(stmt, args);
+        queuedSQL.params = getCleanParams(stmt, true, args);
         queuedSQL.stmt = stmt;
 
         updateCRC(queuedSQL);
@@ -684,7 +685,7 @@ public class ProcedureRunner {
                     throw new VoltAbortException(msg);
                 }
             }
-            queuedSQL.params = getCleanParams(queuedSQL.stmt, argumentParams);
+            queuedSQL.params = getCleanParams(queuedSQL.stmt, false, argumentParams);
 
             updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
@@ -837,7 +838,7 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    private final ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
+    private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
@@ -846,40 +847,79 @@ public class ProcedureRunner {
                     "Number of arguments provided was " + inArgs.length  +
                     " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
+
         for (int ii = 0; ii < numParamTypes; ii++) {
+            VoltType type = VoltType.get(stmtParamTypes[ii]);
             // this handles non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
+                VoltType argType = VoltType.INVALID;
+                boolean failForTypeConversion = false;
+                if (verifyTypeConv) {
+                    final Class<?> argClass = args[ii].getClass();
+                    // is passed in parameter an array of params?
+                    if(argClass.isArray() && type != VoltType.VARBINARY) {
+                        argType = VoltType.typeFromClass(args[ii].getClass().getComponentType());
+                        if (argType == VoltType.TINYINT) {
+                            // array of strings and ints are possible. so validation below will handle it.
+                            // another case is passed in value being varbinary, which will appear as an
+                            // array of bytes - TINYINT. If so, type passed in type is varbinary
+                            argType = VoltType.typeFromClass(args[ii].getClass());
+                        }
+                    }
+                    else {
+                        argType = VoltType.typeFromClass(args[ii].getClass());
+                    }
+                    failForTypeConversion = !VoltTypeUtil.implicitTypeConvFeasible4Insert(argType, type);
+                }
+                if(failForTypeConversion) {
+                    throw new VoltTypeException("Procedure" + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
+                                                 "' to '"+ type.getName() + "' for arg " + ii +
+                                                 " for SQL stmt: " + stmt.getText() + "." +
+                                                 " Try explicitly using a " + type.getName()+ " parameter.");
+                }
                 continue;
             }
+
             // this handles null values
-            VoltType type = VoltType.get(stmtParamTypes[ii]);
-            if (type == VoltType.TINYINT) {
+            switch (type) {
+            case TINYINT:
                 args[ii] = Byte.MIN_VALUE;
-            } else if (type == VoltType.SMALLINT) {
+                break;
+            case SMALLINT:
                 args[ii] = Short.MIN_VALUE;
-            } else if (type == VoltType.INTEGER) {
+                break;
+            case INTEGER:
                 args[ii] = Integer.MIN_VALUE;
-            } else if (type == VoltType.BIGINT) {
+                break;
+            case BIGINT:
                 args[ii] = Long.MIN_VALUE;
-            } else if (type == VoltType.FLOAT) {
+                break;
+            case FLOAT:
                 args[ii] = VoltType.NULL_FLOAT;
-            } else if (type == VoltType.TIMESTAMP) {
+                break;
+            case TIMESTAMP:
                 args[ii] = new TimestampType(Long.MIN_VALUE);
-            } else if (type == VoltType.STRING) {
+                break;
+            case STRING:
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            } else if (type == VoltType.VARBINARY) {
+                break;
+            case VARBINARY:
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            } else if (type == VoltType.DECIMAL) {
+                break;
+            case DECIMAL:
                 args[ii] = VoltType.NULL_DECIMAL;
-            } else if (type == VoltType.GEOGRAPHY_POINT) {
+                break;
+            case GEOGRAPHY_POINT:
                 args[ii] = VoltType.NULL_POINT;
-            } else if (type == VoltType.GEOGRAPHY) {
+                break;
+            case GEOGRAPHY:
                 args[ii] = VoltType.NULL_GEOGRAPHY;
-            } else {
+                break;
+            default:
                 throw new VoltAbortException("Unknown type " + type +
-                        " can not be converted to NULL representation for arg " + ii +
-                        " for SQL stmt: " + stmt.getText());
+                                             " can not be converted to NULL representation for arg " + ii +
+                                             " for SQL stmt: " + stmt.getText());
             }
         }
 
@@ -981,6 +1021,7 @@ public class ProcedureRunner {
             } catch (Exception e1) {
                 // shouldn't throw anything outside of the compiler
                 e1.printStackTrace();
+
                 return;
             }
         }

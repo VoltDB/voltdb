@@ -213,6 +213,136 @@ public abstract class VoltTypeUtil {
                                     left + "' and '" + right + "' types");
     }
 
+
+    //  from     |             to
+    //--------------------------------------------------------------------------------------------------------
+    //           |Tiny  Small  Int   BigInt  Float  Decimal  Timestamp  Varchar  VarBinary GeoPoint  Geography
+    // Tiny      | y     y      y      y       y      y         y        y          x        x          x
+    // Small     | y     y      y      y       y      y         y        y          x        x          x
+    // Int       | y     y      y      y       y      y         y        y          x        x          x
+    // BigInt    | y     y      y      y       y      y         y        y          x        x          x
+    // Float     | y     y      y      y       y      y         y        y          x        x          x
+    // Double    | y     y      y      y       y      y         y        y          x        x          x
+    // Decimal   | y     y      y      y       y      y         y        y          x        x          x
+    // Timestamp | y     y      y      y       y      y         y        y          x        x          x
+    // Varchar   | x     x      x      x       x      x         x        y          x        x          x
+    // VarBinary | x     x      x      x       x      x         x        y          y        x          x
+    // GeoPoint  | x     x      x      x       x      x         x        x          x        y          x
+    // Geography | x     x      x      x       x      x         x        x          x        x          y
+    public static boolean implicitTypeConvFeasible4Insert(VoltType from, VoltType to) {
+        if (to == VoltType.INVALID || from == VoltType.INVALID) {
+            return false;
+        }
+        else if (to == from) {
+            return true;
+        }
+
+        assert(to != from);
+
+        // if the two types are not equal, the remaining case to validate is
+        // if both of the sides are of numeric type or a timestamp
+        switch (to) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+            case TIMESTAMP:
+            case DECIMAL:
+                switch (from) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case FLOAT:
+                    case TIMESTAMP:
+                    case DECIMAL:
+                    case STRING:
+                        return true;
+                    default:
+                        return false;
+                }
+
+            case STRING:
+                // handling separately as conversion from varbinary (byte[]) -> string is allowed
+                switch (from) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case FLOAT:
+                    case TIMESTAMP:
+                    case DECIMAL:
+                    case VARBINARY:
+                        return true;
+                    default:
+                        return false;
+                }
+            case VARBINARY:
+            case GEOGRAPHY:
+            case GEOGRAPHY_POINT:
+            default:
+                return false;
+        }
+    }
+
+    /*
+    //  from     |             to
+    //--------------------------------------------------------------------------------------------------------
+    //           |Tiny  Small  Int   BigInt  Float  Decimal  Timestamp  Varchar  VarBinary GeoPoint  Geography
+    // Tiny      | y     y      y      y       y      y         y        x          x        x          x
+    // Small     | y     y      y      y       y      y         y        x          x        x          x
+    // Int       | y     y      y      y       y      y         y        x          x        x          x
+    // BigInt    | y     y      y      y       y      y         y        x          x        x          x
+    // Float     | y     y      y      y       y      y         y        x          x        x          x
+    // Double    | y     y      y      y       y      y         y        x          x        x          x
+    // Decimal   | y     y      y      y       y      y         y        x          x        x          x
+    // Timestamp | y     y      y      y       y      y         y        x          x        x          x
+    // Varchar   | x     x      x      x       x      x         x        y          x        x          x
+    // VarBinary | x     x      x      x       x      x         x        x          y        x          x
+    // GeoPoint  | x     x      x      x       x      x         x        x          x        y          x
+    // Geography | x     x      x      x       x      x         x        x          x        x          y
+    public static boolean implicitTypeConvFeasible4NonInsert(VoltType from, VoltType to) {
+        if (to == VoltType.INVALID || from == VoltType.INVALID) {
+            return false;
+        }
+        else if (to == from) {
+            return true;
+        }
+
+        assert(to != from);
+
+        // if the two types are not equal, validate the remaining matrix
+        switch (to) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+            case TIMESTAMP:
+            case DECIMAL:
+                switch (from) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case FLOAT:
+                    case TIMESTAMP:
+                    case DECIMAL:
+                        return true;
+                    default:
+                        return false;
+                }
+
+            case STRING:
+            case VARBINARY:
+            case GEOGRAPHY:
+            case GEOGRAPHY_POINT:
+            default:
+                return false;
+        }
+    }
+*/
     /**
      * Returns a casted object of the input value string based on the given type
      * @throws ParseException
