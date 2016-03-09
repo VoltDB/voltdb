@@ -97,6 +97,8 @@ public class HTTPUtils {
         conn.setDoOutput(true);
         conn.connect();
 
+        // System.out.println("varString: " + varString.toString());
+
         OutputStreamWriter out = new OutputStreamWriter(conn.getOutputStream());
         out.write(varString);
         out.flush();
@@ -234,8 +236,10 @@ public class HTTPUtils {
 
     public static Response callProcedure(String string, String key, byte[] storeValue, String servers) throws JSONException, IOException, Exception {
         HTTPUtils.servers = servers.split(",");
-        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-        //System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
+        String hexval = Encoder.hexEncode(storeValue);
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, hexval);
+        //if (string.equals("Put"))
+        //    System.out.println(string + ". key: " + key + ". pset: " + pset.toString());
         String resp = callProcOverJSON(string, pset, username, password, prehash);
         //System.out.println("Response KV resp: " + resp.toString());
         Response response = responseFromJSON(resp);
