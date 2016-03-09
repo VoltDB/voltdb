@@ -1398,7 +1398,7 @@ public abstract class CatalogUtil {
             }
             boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
@@ -1418,7 +1418,6 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
-            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);
