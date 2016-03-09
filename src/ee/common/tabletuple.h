@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
+#include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
 #include "common/ExportSerializeIo.h"
@@ -58,6 +59,10 @@
 #include <iostream>
 #include <vector>
 #include <jsoncpp/jsoncpp.h>
+
+#ifndef NDEBUG
+#include "debuglog.h"
+#endif /* !define(NDEBUG) */
 
 class CopyOnWriteTest_TestTableTupleFlags;
 
@@ -110,7 +115,12 @@ public:
      * backing store
      */
     inline void move(void *address) {
-        assert(m_schema);
+#ifndef  NDEBUG
+        if (m_schema == NULL && address != NULL) {
+            StackTrace::printStackTrace();
+        }
+#endif
+        assert(m_schema != NULL || address == NULL);
         m_data = reinterpret_cast<char*> (address);
     }
 
@@ -204,6 +214,42 @@ public:
             }
         }
         return bytes;
+    }
+
+    /* Utility function to shrink and set given NValue based. Uses data from it's column information to compute
+     * the length to shrink the NValue to. This function operates is intended only to be used on variable length
+     * columns ot type varchar and varbinary.
+     */
+    void shrinkAndSetNValue(const int idx, const voltdb::NValue& value) const {
+        assert(m_schema);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        assert(columnInfo);
+        const ValueType valueType = columnInfo->getVoltType();
+        // shrink is permissible only on variable length column and currently only for varchar and varbinary
+        assert ((valueType == VALUE_TYPE_VARBINARY) || (valueType == VALUE_TYPE_VARCHAR) );
+        bool isColumnLngthInBytes = (valueType == VALUE_TYPE_VARBINARY) ? true : columnInfo->inBytes;
+        uint32_t columnLength = columnInfo->length;
+
+        // For the given NValue, compute the shrink length in bytes to shrink the nvalue based on
+        // current column length. Use the computed shrink length to create new NValue based so that
+        // it can fits in current tuple's column
+
+        int32_t nValueLength = 0;
+        const char* candidateValueBuffPtr = ValuePeeker::peekObject_withoutNull(value, &nValueLength);
+        // compute length for shrinked candidate key
+        int32_t neededLength;
+        if (isColumnLngthInBytes) {
+            neededLength = columnLength;
+        }
+        else {
+            // column length is defined in characters. Obtain the number of bytes needed for those many characters
+            neededLength = static_cast<int32_t> (NValue::getIthCharPosition(candidateValueBuffPtr,
+                                                                            nValueLength,
+                                                                            columnLength + 1) - candidateValueBuffPtr);
+        }
+        // create new nvalue using the computed length
+        NValue shrinkedNValue = ValueFactory::getTempStringValue(candidateValueBuffPtr, neededLength);
+        setNValue(columnInfo, shrinkedNValue, false, NULL);
     }
 
     /*
@@ -350,7 +396,7 @@ public:
     }
 
     /** Copy values from one tuple into another (uses memcpy) */
-    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
+    void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
@@ -374,7 +420,7 @@ public:
                        int colOffset, uint8_t *nullArray,
                        const std::vector<int>* interestingColumns);
 
-    void freeObjectColumns();
+    void freeObjectColumns() const;
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
 
@@ -683,7 +729,8 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 /*
  * With a persistent insert the copy should do an allocation for all uninlinable strings
  */
-inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) {
+inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) const
+{
     assert(m_schema);
     assert(source.m_schema);
     assert(source.m_data);
@@ -1026,7 +1073,7 @@ inline size_t TableTuple::hashCode() const {
 /**
  * Release to the heap any memory allocated for any uninlined columns.
  */
-inline void TableTuple::freeObjectColumns() {
+inline void TableTuple::freeObjectColumns() const {
     const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
     std::vector<char*> oldObjects;
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {

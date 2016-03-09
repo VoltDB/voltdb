@@ -171,6 +171,8 @@ class TempTable : public Table {
         m_data.clear();
     };
 
+    std::vector<uint64_t> getBlockAddresses() const;
+
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;

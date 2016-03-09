@@ -44,17 +44,42 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
-    /**
-     *
-     * @param exps
-     */
-    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
-        if (exps.isEmpty()) {
+    @SafeVarargs
+    public static AbstractExpression cloneAndCombinePredicates(Collection<AbstractExpression>... colExps) {
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps == null) {
+                continue;
+            }
+            for (AbstractExpression expr : exps) {
+                stack.add((AbstractExpression)expr.clone());
+            }
+        }
+        if (stack.isEmpty()) {
             return null;
         }
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        stack.addAll(exps);
+        return combineStack(stack);
+    }
 
+    /**
+     *
+     * @param colExps
+     */
+    @SafeVarargs
+    public static AbstractExpression combinePredicates(Collection<AbstractExpression>... colExps) {
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps != null) {
+                stack.addAll(exps);
+            }
+        }
+        if (stack.isEmpty()) {
+            return null;
+        }
+        return combineStack(stack);
+    }
+
+    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.
@@ -99,7 +124,7 @@ public abstract class ExpressionUtil {
      * @param expr
      * @return
      */
-    public static List<AbstractExpression> uncombine(AbstractExpression expr)
+    public static List<AbstractExpression> uncombinePredicate(AbstractExpression expr)
     {
         if (expr == null) {
             return new ArrayList<AbstractExpression>();
@@ -108,7 +133,7 @@ public abstract class ExpressionUtil {
             ConjunctionExpression conj = (ConjunctionExpression)expr;
             if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                 // Calculate the list for the tree or leaf on the left.
-                List<AbstractExpression> branch = uncombine(conj.getLeft());
+                List<AbstractExpression> branch = uncombinePredicate(conj.getLeft());
                 // Insert the leaf on the right at the head of that list
                 branch.add(0, conj.getRight());
                 return branch;
@@ -294,9 +319,7 @@ public abstract class ExpressionUtil {
             subExprMap.put(subExpr.m_id, subExpr);
         }
         // Now reconstruct the expression
-        ArrayList<AbstractExpression> newList = new ArrayList<AbstractExpression>();
-        newList.addAll(subExprMap.values());
-        return ExpressionUtil.combine(newList);
+        return ExpressionUtil.combinePredicates(subExprMap.values());
     }
 
     /**

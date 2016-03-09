@@ -171,10 +171,13 @@ public class MpScheduler extends Scheduler
         boolean canDeliver = true;
         long sequenceWithTxnId = Long.MIN_VALUE;
 
+        //--------------------------------------------
+        // DRv1 path, mark for future removal
         boolean dr = ((message instanceof TransactionInfoBaseMessage &&
                 ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         if (dr) {
+            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
             InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
                     (TransactionInfoBaseMessage) message);
@@ -184,11 +187,12 @@ public class MpScheduler extends Scheduler
                 m_mailbox.send(dupe.getInitiatorHSId(), dupe);
             }
             else {
-                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                m_replaySequencer.updateLastSeenUniqueId(sequenceWithTxnId,
                         (TransactionInfoBaseMessage) message);
                 canDeliver = true;
             }
         }
+        //--------------------------------------------
         return canDeliver;
     }
 
@@ -237,16 +241,12 @@ public class MpScheduler extends Scheduler
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
                 m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
             }
-        }
-
-        if (message.isForReplay()) {
-            mpTxnId = message.getTxnId();
-            setMaxSeenTxnId(mpTxnId);
-        } else {
-            TxnEgo ego = advanceTxnEgo();
-            mpTxnId = ego.getTxnId();
+        } else  {
             timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
+
+        TxnEgo ego = advanceTxnEgo();
+        mpTxnId = ego.getTxnId();
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);

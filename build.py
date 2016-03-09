@@ -259,8 +259,10 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
+ abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
+ executorfactory.cpp
  executorutil.cpp
  indexcountexecutor.cpp
  indexscanexecutor.cpp
@@ -350,6 +352,7 @@ CTX.INPUT['storage'] = """
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
+ tabletuplefilter.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleStreamBase.cpp
@@ -469,7 +472,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_key_test
      index_scripted_test
      index_test
-     compacting_hash_index
+     CompactingHashIndexTest
      CompactingTreeMultiIndexTest
     """
 

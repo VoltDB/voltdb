@@ -158,6 +158,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 21014;    // polygon to text
         static final int FUNC_VOLT_VALIDATE_POLYGON             = 21015;    // Polygon validation.
         static final int FUNC_VOLT_POLYGON_INVALID_REASON       = 21016;    // Reason a polygon may be invalid.
+        static final int FUNC_VOLT_DWITHIN                      = 21017;    // wrapper id for function that evaluates if two geo objects are within
+                                                                            // certain distance of each other
+        static final int FUNC_VOLT_DWITHIN_POINT_POINT          = 21018;    // if two points are within certain distance of each other
+        static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
 
 
         /*
@@ -286,7 +290,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-             // numinteriorrings() is synonm to numinteriorring()
+             // numinteriorrings is alias of numinteriorring
             new FunctionId("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
@@ -316,6 +320,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
+                    new Type[] { Type.SQL_ALL_TYPES },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
             new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
@@ -324,9 +332,13 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
-                    new Type[] { Type.SQL_ALL_TYPES },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+            new FunctionId("dwithin", Type.SQL_BOOLEAN, FUNC_VOLT_DWITHIN, -1,
+                    new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES, Type.SQL_DOUBLE },
+                    new short[] {  Tokens.OPENBRACKET,
+                                   Tokens.QUESTION, Tokens.COMMA,
+                                   Tokens.QUESTION, Tokens.COMMA,
+                                   Tokens.QUESTION,
+                                   Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -532,13 +544,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         case FunctionId.FUNC_VOLT_DISTANCE:
             // validate the types of argument is valid
-            if ((nodes[0].dataType == null && nodes[0].isParam) ||
-                (nodes[1].dataType == null && nodes[1].isParam)) {
-                // "data type cast needed for parameter or null literal"
-                throw Error.error(ErrorCode.X_42567,
-                        "input type to DISTANCE function is ambiguous");
-            }
-            else if (nodes[0].dataType == null || nodes[1].dataType == null) {
+            if (nodes[0].dataType == null || nodes[1].dataType == null) {
                 // "data type cast needed for parameter or null literal"
                 throw Error.error(ErrorCode.X_42567,
                         "input type to DISTANCE function is ambiguous");
@@ -549,10 +555,12 @@ public class FunctionForVoltDB extends FunctionSQL {
                 throw Error.error(ErrorCode.X_42565,
                         "The DISTANCE function computes distances between POINT-to-POINT, POINT-to-POLYGON " +
                         "and POLYGON-to-POINT only.");
-            } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
+            }
+            else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
                 // distance between two polygons is not supported, flag as an error
                 throw Error.error(ErrorCode.X_42565, "DISTANCE between two POLYGONS not supported");
-            } else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
+            }
+            else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
                 // distance between polygon-to-point and point-to-polygon is symmetric.
                 // So, update the the expression for distance between point and polygon to
                 // distance between polygon and point. This simplifies the logic and have to
@@ -563,6 +571,40 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             break;
 
+        case FunctionId.FUNC_VOLT_DWITHIN:
+            if (nodes[0].dataType == null || nodes[1].dataType == null) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to DWITHIN function is ambiguous");
+            }
+            else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isGeographyPointType()) ||
+                     (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isGeographyPointType())) {
+                // first and second argument should be geography type
+                throw Error.error(ErrorCode.X_42565,
+                        "DWITHIN function evaulates if geographies are within specified distance of one-another for "
+                                + "POINT-to-POINT, POINT-to-POLYGON and POLYGON-to-POINT geographies only.");
+            }
+            else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
+                // "incompatible data type in operation"
+                // distance between two polygons is not supported, flag as an error
+                throw Error.error(ErrorCode.X_42565, "DWITHIN between two POLYGONS not supported");
+            }
+            else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
+                // Distance between polygon-to-point and point-to-polygon is symmetric. Update the
+                // expression for DWITHIN between point and polygon to distance between polygon
+                // and point. This consolidates logic to one case: polygon-to-point
+                Expression tempNode = nodes[0];
+                nodes[0] = nodes[1];
+                nodes[1] = tempNode;
+            }
+
+            if ((nodes[2].dataType != null) &&
+                (!nodes[2].dataType.isNumberType())) {
+                // "incompatible data type in operation"
+                throw Error.error(ErrorCode.X_42565,
+                        "input type DISTANCE to DWITHIN function must be non-negative numeric value");
+            }
+            break;
 
         case FunctionId.FUNC_VOLT_ASTEXT:
             if (nodes[0].dataType == null) {

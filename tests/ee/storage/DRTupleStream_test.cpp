@@ -56,8 +56,7 @@ const int COLUMN_COUNT = 5;
 // total: 39
 const int MAGIC_TUPLE_SIZE = 39;
 const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
-const int MAGIC_END_TRANSACTION_SIZE = 22;
-const int MAGIC_TRANSACTION_SIZE = MAGIC_BEGIN_TRANSACTION_SIZE + MAGIC_END_TRANSACTION_SIZE;
+const int MAGIC_TRANSACTION_SIZE = 36;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
@@ -125,7 +124,7 @@ public:
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
+        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
                                currentSpHandle, currentSpHandle, *m_tuple, type, index);
     }
 
@@ -483,6 +482,45 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
 
     // We shouldn't get any buffer as the exception is thrown.
     ASSERT_FALSE(m_topend.receivedDRBuffer);
+}
+
+/**
+ * Verify that we can roll buffers for back to back large transactions.
+ * Each large transaction fits in one large buffer, but not more than one.
+ */
+TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
+{
+    int tuples_to_fill = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
+    const StreamBlock *firstBlock = m_wrapper.m_currBlock;
+    const StreamBlock *secondBlock = NULL;
+
+    // fill one large buffer
+    for (;;) {
+        appendTuple(0, 1);
+        if (m_wrapper.m_currBlock != firstBlock) {
+            secondBlock = m_wrapper.m_currBlock;
+            EXPECT_EQ(LARGE_STREAM_BLOCK, secondBlock->type());
+            break;
+        }
+    }
+    m_wrapper.endTransaction(addPartitionId(1));
+
+    ASSERT_FALSE(m_topend.receivedDRBuffer);
+
+    // fill the first large buffer, and roll to another large buffer
+    for (int i = 1; i <= tuples_to_fill; i++) {
+        appendTuple(1, 2);
+    }
+    m_wrapper.endTransaction(addPartitionId(2));
+
+    // make sure we rolled, and the new buffer is a large buffer
+    EXPECT_NE(secondBlock, m_wrapper.m_currBlock);
+    EXPECT_EQ(LARGE_STREAM_BLOCK, m_wrapper.m_currBlock->type());
+
+    m_wrapper.periodicFlush(-1, addPartitionId(2));
+
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    EXPECT_EQ(2, m_topend.blocks.size());
 }
 
 /**

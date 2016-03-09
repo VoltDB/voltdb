@@ -50,7 +50,7 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractjoinexecutor.h"
 
 
 namespace voltdb {
@@ -58,10 +58,8 @@ namespace voltdb {
 class NestLoopIndexPlanNode;
 class IndexScanPlanNode;
 class AggregateExecutorBase;
-class PersistentTable;
-class Table;
-class TempTable;
-class TableIndex;
+class ProgressMonitorProxy;
+class TableTuple;
 
 /**
  * Nested loop for IndexScan.
@@ -71,11 +69,11 @@ class TableIndex;
  * This executor is faster than HashMatchJoin and MergeJoin if only one
  * of underlying tables has low selectivity.
  */
-class NestLoopIndexExecutor : public AbstractExecutor
+class NestLoopIndexExecutor : public AbstractJoinExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractJoinExecutor(engine, abstract_node)
         , m_indexNode(NULL)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
     { }
@@ -83,18 +81,16 @@ public:
     ~NestLoopIndexExecutor();
 
 protected:
+
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
-    StandAloneTupleStorage m_null_tuple;
     StandAloneTupleStorage m_indexValues;
-    AggregateExecutorBase* m_aggExec;
 };
 
 }
