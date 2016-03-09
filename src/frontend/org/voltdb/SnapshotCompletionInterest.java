@@ -35,7 +35,7 @@ public interface SnapshotCompletionInterest {
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
-        public final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
+        public final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastIds;
         public final int drVersion;
 
         public SnapshotCompletionEvent(
@@ -48,7 +48,7 @@ public interface SnapshotCompletionInterest {
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
-                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+                final Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastIds,
                 final int drVersion) {
             this.path = path;
             this.nonce = nonce;
