@@ -95,7 +95,7 @@ function clientclasspath() {
 function checkpath() {
     # find voltdb binaries in either installation or distribution directory.
     if [ -n "$PATH_VOLTDB_BIN" ]; then
-        if [ "$PATH_VOLTDB_BIN" -ne "$VOLTDB_BIN" ]; then
+        if [ "$PATH_VOLTDB_BIN" != "$VOLTDB_BIN" ]; then
             echo "Warning: VoltDB exists in your path at:"
             echo "    $PATH_VOLTDB_BIN"
             echo "  But this script is using VoltDB at: "
