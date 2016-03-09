@@ -2024,13 +2024,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
-        System.out.println("int params");
         subTestInWithStringParams();
-        System.out.println("string params");
         subTestInWithStringParamsAdHoc();
-        System.out.println("adhoc params");
         subTestInWithStringParamsAsync();
-        System.out.println("paramas async");
     }
 
 
