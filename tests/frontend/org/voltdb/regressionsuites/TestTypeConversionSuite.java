@@ -98,14 +98,12 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 "2012-12-01", "hi", "10", null, null);
 
         // test different cases of type conversion that are allowed
-        client.callProcedure("ProcToTestTypeConversion", 1, "0", 1,
-                                                null, null, null, null,
-                                                null, null, null, null,
-                                                ProcToTestTypeConversion.TestHCTypeConvAllowed,
-                                                0, 0);
+        client.callProcedure("ProcToTestTypeConversion",
+                             ProcToTestTypeConversion.TestHCTypeConvAllowed,
+                             0, 0);
 
         // use the conversion matrix to test type conversion cases that are allowed and blocked
-        int rowId = 0;          // used to index type to convert
+        int rowId = 0;
         VoltType typeToTest = VoltType.INVALID;
         String errorMsg = null;
         for(boolean[] from: m_typeConversionMatrix) {
@@ -115,11 +113,8 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 if (to) {
                     // type conversion feasible
                     client.callProcedure("ProcToTestTypeConversion",
-                                            1, "0", 1,
-                                            null, null, null, null,
-                                            null, null, null, null,
-                                            ProcToTestTypeConversion.TestTypeConvWithInsertProc,
-                                            colInd, typeToTest.getValue());
+                                         ProcToTestTypeConversion.TestTypeConvWithInsertProc,
+                                         colInd, typeToTest.getValue());
 
                 }
                 else {
@@ -142,9 +137,6 @@ public class TestTypeConversionSuite extends RegressionSuite {
                                     "' for arg " + colInd + " for SQL stmt";
                     }
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
-                                    1, "0", 1,
-                                    null, null, null, null,
-                                    null, null, null, null,
                                     ProcToTestTypeConversion.TestTypeConvWithInsertProc,
                                     colInd, typeToTest.getValue());
                 }

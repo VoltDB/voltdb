@@ -74,7 +74,6 @@ public class ProcToTestTypeConversion extends VoltProcedure {
 
     public final static byte TestHCTypeConvAllowed = 0;
     public final static byte TestTypeConvWithInsertProc = 1;
-    public final static byte TestTypeConvWithoutInsertProc = 2;
 
     private Object[] getUpdatedRowToInsert(int colIndex, byte valueTypeToPopulateWith, boolean strTs) {
         //Object[] rowToInsert = m_defaultRowValue;
@@ -126,10 +125,7 @@ public class ProcToTestTypeConversion extends VoltProcedure {
         return rowToInsert;
     }
 
-    public VoltTable[] run (byte col, short shortInt, int id, long bigInt, double dblVal,
-                            BigDecimal bigDec, TimestampType ts, String str, byte[] bin,
-                            GeographyPointValue point, GeographyValue geography,
-                            int operation, int colIndOfTargetType, byte valueOfTypeToPopulateWith) {
+    public VoltTable[] run (int operation, int colIndOfTargetType, byte valueOfTypeToPopulateWith) {
 
         Object rowToInsert[];
         boolean useStrTs;
@@ -179,14 +175,14 @@ public class ProcToTestTypeConversion extends VoltProcedure {
 
             // Varbinary
             voltQueueSQL(insert, m_byteVal, m_shortVal, m_intVal, m_floatVal, m_bigIntVal, m_bigDecVal,
-                                 ts, m_binVal, m_binVal, m_pt, m_poly);
+                                 m_tsVal, m_binVal, m_binVal, m_pt, m_poly);
 
             // Compare stored proc. comparison expression supports broadest type conversion for select statement
             voltQueueSQL(compare, null, null, null, m_bigIntVal, null, null,
                                   null, null, null, null, null, null);
 
             voltQueueSQL(compare, m_byteVal, m_shortVal, m_intVal, m_floatVal, m_bigIntVal, m_bigDecVal,
-                                  ts, m_strTs, m_binVal, m_pt, m_poly);
+                                  m_tsVal, m_strTs, m_binVal, m_pt, m_poly);
 
             // TinyInt
             voltQueueSQL(compare, m_byteVal, m_byteVal, m_byteVal, m_byteVal, m_byteVal, m_byteVal,
@@ -228,11 +224,6 @@ public class ProcToTestTypeConversion extends VoltProcedure {
             useStrTs = (colIndOfTargetType == colIndOfTimeStamp) ? true : false;
             rowToInsert = getUpdatedRowToInsert(colIndOfTargetType, valueOfTypeToPopulateWith, useStrTs);
             voltQueueSQL(insert, rowToInsert);
-            break;
-        case TestTypeConvWithoutInsertProc:
-            useStrTs = (colIndOfTargetType == colIndOfTimeStamp) ? true : false;
-            rowToInsert = getUpdatedRowToInsert(colIndOfTargetType, valueOfTypeToPopulateWith, useStrTs);
-            voltQueueSQL(compare, rowToInsert);
             break;
         }
         return voltExecuteSQL();

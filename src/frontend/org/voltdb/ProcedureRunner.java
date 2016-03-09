@@ -838,10 +838,35 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
+    private final void typeConversionFeasible(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
+        VoltType argType = VoltType.INVALID;
+
+        // is passed in parameter an array of params?
+        if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
+            argType = VoltType.typeFromClass(argClass.getComponentType());
+            if (argType == VoltType.TINYINT) {
+                // array of strings and ints are possible. so validation below will handle it.
+                // another case is passed in value being varbinary, which will appear as an
+                // array of bytes - TINYINT. If so, type passed in type is varbinary
+                argType = VoltType.typeFromClass(argClass);
+            }
+        }
+        else {
+            argType = VoltType.typeFromClass(argClass);
+        }
+        if (!VoltTypeUtil.implicitTypeConvFeasible(argType, expectedType)) {
+            throw new VoltTypeException("Procedure " + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
+                                         "' to '"+ expectedType.getName() + "' for arg " + argInd +
+                                         " for SQL stmt: " + stmt.getText() + "." +
+                                         " Try explicitly using a " + expectedType.getName()+ " parameter.");
+        }
+    }
+
     private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
+
         if (inArgs.length != numParamTypes) {
             throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
@@ -853,30 +878,8 @@ public class ProcedureRunner {
             // this handles non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
-                VoltType argType = VoltType.INVALID;
-                boolean failForTypeConversion = false;
                 if (verifyTypeConv) {
-                    final Class<?> argClass = args[ii].getClass();
-                    // is passed in parameter an array of params?
-                    if(argClass.isArray() && type != VoltType.VARBINARY) {
-                        argType = VoltType.typeFromClass(args[ii].getClass().getComponentType());
-                        if (argType == VoltType.TINYINT) {
-                            // array of strings and ints are possible. so validation below will handle it.
-                            // another case is passed in value being varbinary, which will appear as an
-                            // array of bytes - TINYINT. If so, type passed in type is varbinary
-                            argType = VoltType.typeFromClass(args[ii].getClass());
-                        }
-                    }
-                    else {
-                        argType = VoltType.typeFromClass(args[ii].getClass());
-                    }
-                    failForTypeConversion = !VoltTypeUtil.implicitTypeConvFeasible4Insert(argType, type);
-                }
-                if(failForTypeConversion) {
-                    throw new VoltTypeException("Procedure" + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
-                                                 "' to '"+ type.getName() + "' for arg " + ii +
-                                                 " for SQL stmt: " + stmt.getText() + "." +
-                                                 " Try explicitly using a " + type.getName()+ " parameter.");
+                    typeConversionFeasible(stmt, args[ii].getClass(), ii, type);
                 }
                 continue;
             }
