@@ -652,7 +652,7 @@ inline void AggregateExecutorBase::initCountingPredicate(const NValueArray& para
     if (inlineLimitNode) {
         inlineLimitNode->getLimitAndOffsetByReference(params, limit, offset);
     }
-    m_postfilter = AggCountingPostfilter(m_tmpOutputTable, m_postPredicate, limit, offset, parentPostfilter);
+    m_postfilter = CountingPostfilter(m_tmpOutputTable, m_postPredicate, limit, offset, parentPostfilter);
 }
 
 /// Helper method responsible for inserting the results of the
@@ -680,7 +680,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
                          m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
     }
 
-    bool needInsert = m_postfilter.eval(&tempTuple);
+    bool needInsert = m_postfilter.eval(&tempTuple, NULL);
     if (needInsert) {
         m_tmpOutputTable->insertTupleNonVirtual(tempTuple);
     }

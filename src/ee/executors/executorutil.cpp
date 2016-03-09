@@ -51,41 +51,10 @@
 
 namespace voltdb {
 
-CountingPostfilter::CountingPostfilter(const AbstractExpression * postfilter, int limit, int offset) :
-    m_postfilter(postfilter),
-    m_limit(limit),
-    m_offset(offset),
-    m_tuple_skipped(0),
-    m_tuple_ctr(0)
-{}
-
-// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
-    if (m_postfilter == NULL || m_postfilter->eval(outer_tuple, inner_tuple).isTrue()) {
-        // Check if we have to skip this tuple because of offset
-        if (m_tuple_skipped < m_offset) {
-            m_tuple_skipped++;
-            return false;
-        }
-        ++m_tuple_ctr;
-        return true;
-    }
-    return false;
-}
-
-AggCountingPostfilter::AggCountingPostfilter() :
-    m_table(NULL),
-    m_postfilter(NULL),
-    m_parentPostfilter(NULL),
-    m_limit(CountingPostfilter::NO_LIMIT),
-    m_offset(CountingPostfilter::NO_OFFSET),
-    m_tuple_skipped(0),
-    m_under_limit(true)
-{}
-
-AggCountingPostfilter::AggCountingPostfilter(const TempTable* table, const AbstractExpression * postfilter, int limit, int offset, CountingPostfilter* parentPostfilter) :
+CountingPostfilter::CountingPostfilter(const TempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
+    CountingPostfilter* parentPostfilter) :
     m_table(table),
-    m_postfilter(postfilter),
+    m_postPredicate(postPredicate),
     m_parentPostfilter(parentPostfilter),
     m_limit(limit),
     m_offset(offset),
@@ -93,20 +62,28 @@ AggCountingPostfilter::AggCountingPostfilter(const TempTable* table, const Abstr
     m_under_limit(true)
 {}
 
+CountingPostfilter::CountingPostfilter() :
+    m_table(NULL),
+    m_postPredicate(NULL),
+    m_parentPostfilter(NULL),
+    m_limit(NO_LIMIT),
+    m_offset(NO_OFFSET),
+    m_tuple_skipped(0),
+    m_under_limit(false)
+{}
+
 // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-bool AggCountingPostfilter::eval(const TableTuple* tuple) {
-    assert(m_table);
-    if (m_postfilter == NULL || m_postfilter->eval(tuple, NULL).isTrue()) {
-        // Verify the OFFSET first
+bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
+    if (m_postPredicate == NULL || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
+        // Check if we have to skip this tuple because of offset
         if (m_tuple_skipped < m_offset) {
-                m_tuple_skipped++;
-                return false;
-            }
-        // LIMIT check
+            m_tuple_skipped++;
+            return false;
+        }
+        // Evaluate LIMIT now
         if (m_limit >= 0) {
-            // If there is an inlined limit for serial aggregate and
-            // it is possible for LIMIT 0.
-            if (m_table->tempTableTupleCount() == m_limit) {
+            assert(m_table != NULL);
+            if (m_table->activeTupleCount() == m_limit) {
                 m_under_limit = false;
                 // Notify a parent that the limit is reached
                 if (m_parentPostfilter) {

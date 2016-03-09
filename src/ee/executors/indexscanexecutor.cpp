@@ -185,7 +185,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     // Initialize the postfilter
-    CountingPostfilter postfilter(post_expression, limit, offset);
+    CountingPostfilter postfilter(m_outputTable, post_expression, limit, offset);
 
     TableTuple temp_tuple;
     ProgressMonitorProxy pmp(m_engine, this);

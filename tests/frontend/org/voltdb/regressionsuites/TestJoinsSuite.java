@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -875,6 +876,9 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestNonEqualityFullJoin(client);
         clearSeqTables(client);
         subtestLimitOffsetFullNLJoin(client);
+        clearSeqTables(client);
+        clearIndexTables(client);
+        subtestMultipleFullJoins(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -1353,7 +1357,74 @@ public class TestJoinsSuite extends RegressionSuite {
                 {1,MINVAL},
                 {10, 5}
         });
-}
+    }
+
+    private void subtestMultipleFullJoins(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(10, 10, 2);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 8);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P2 VALUES(1, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2 VALUES(8, 8);");
+
+        // The R1-R2 FULL join is an inner node in the RIGHT join with P2
+        // The P2.A = R2.A join condition is NULL-rejecting for the R2 table
+        // simplifying the FULL to be R1 RIGHT JOIN R2 which gets converted to R2 LEFT JOIN R1
+        sql = "select * FROM R1 FULL JOIN R2 ON R1.A = R2.A RIGHT JOIN P2 ON P2.A = R1.A " +
+                "ORDER BY P2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {1, 1, 1, 1, 2, 1, 3},
+                {MINVAL, MINVAL, MINVAL, MINVAL, MINVAL, 8, 8}
+        });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(!vt.toString().contains("FULL"));
+        assertEquals(2, StringUtils.countMatches(vt.toString(), "LEFT"));
+
+        // The R1-R2 FULL join is an outer node in the top LEFT join and is not simplified
+        // by the P2.A = R2.A expression
+        sql = "select * FROM R1 FULL JOIN R2 ON R1.A = R2.A LEFT JOIN P2 ON P2.A = R2.A " +
+                "ORDER BY P2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {10, 10, 2, MINVAL, MINVAL, MINVAL, MINVAL},
+                {MINVAL, MINVAL, MINVAL, 3, 8, MINVAL, MINVAL},
+                {1, 1, 1, 1, 2, 1, 3}
+        });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("FULL"));
+
+        // The R1-R2 RIGHT join is an outer node in the top FULL join and is not simplified
+        // by the P2.A = R1.A expression
+        sql = "select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A FULL JOIN P2 ON R1.A = P2.A " +
+                "ORDER BY P2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, MINVAL, 3, 8, MINVAL, MINVAL},
+                {1, 1, 1, 1, 2, 1, 3},
+                {MINVAL, MINVAL, MINVAL, MINVAL, MINVAL, 8, 8}
+        });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("LEFT"));
+
+        // The R1-R2 FULL join is an outer node in the top FULL join and is not simplified
+        // by the P2.A = R1.A expression
+        sql = "select * FROM R1 FULL JOIN R2 ON R1.A = R2.A FULL JOIN P2 ON R1.A = P2.A " +
+                "ORDER BY P2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {10, 10, 2, MINVAL, MINVAL, MINVAL, MINVAL},
+                {MINVAL, MINVAL, MINVAL, 3, 8, MINVAL, MINVAL},
+                {1, 1, 1, 1, 2, 1, 3},
+                {MINVAL, MINVAL, MINVAL, MINVAL, MINVAL, 8, 8}
+        });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(2, StringUtils.countMatches(vt.toString(), "FULL"));
+    }
 
     static public junit.framework.Test suite()
     {
