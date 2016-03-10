@@ -520,14 +520,16 @@ def check_port_valid(port_option, servers):
         default_port = "21212"
     if port_option == "internal-listener":
         default_port = "3021"
+
+    server_port = get_port(servers[port_option])
+    if server_port is None or server_port == "":
+            server_port = default_port
+
     if port_option not in request.json:
         port = default_port
-        server_port = get_port(servers[port_option])
-        if server_port is None:
-            server_port = default_port
     else:
         port = get_port(request.json[port_option])
-        server_port = get_port(servers[port_option])
+
     if port == server_port:
         return jsonify(success=False, errors="Duplicate %s for same hostname" %port_option)
 
@@ -1492,8 +1494,9 @@ class ServerAPI(MethodView):
             value = specified_port_values[0][option]
             for port_values in specified_port_values[0].keys():
                 if option != port_values:
-                    if specified_port_values[0][port_values] == value:
-                        return jsonify(success=False, errors="Duplicate port")
+                    if value != None:
+                        if specified_port_values[0][port_values] == value:
+                            return jsonify(success=False, errors="Duplicate port")
 
         for servers in Global.SERVERS:
             if servers['hostname'] == request.json['hostname']:
