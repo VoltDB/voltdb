@@ -389,8 +389,8 @@ public class HTTPBenchmark {
 
         public KVThread(CloseableHttpClient httpClient, HttpPost httpPost) {
                 m_httpClient = httpClient;
-                m_httpPost = httpPost;
                 m_context = new BasicHttpContext();
+                m_httpPost = httpPost;
         }
 
         @Override

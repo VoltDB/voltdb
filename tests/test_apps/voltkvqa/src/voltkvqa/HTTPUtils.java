@@ -39,15 +39,21 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.json_voltpatches.JSONArray;
@@ -88,70 +94,41 @@ public class HTTPUtils {
         return s;
     }
 
-    public static String callProcOverJSONRaw(String varString, int expectedCode, CloseableHttpClient httpclient,
+    public static String callProcOverJSONRaw(List<NameValuePair> vals, int expectedCode, CloseableHttpClient httpclient,
             HttpPost httppost, HttpContext context) throws Exception {
-        HttpEntity entity;
-        try {
-            System.out.println("About to send request: " + httppost.getURI());
-            CloseableHttpResponse response = httpclient.execute(httppost, context);
-            try {
-                entity = response.getEntity();
-                if (entity != null) {
-                    long len = entity.getContentLength();
-                    if (len != -1 && len < 2048) {
-                        System.out.println(EntityUtils.toString(entity));
-                    }
-                }
-            } finally {
-                    response.close();
+
+        HttpEntity entity = null;
+        String entityStr = null;
+        // StringEntity jsonentity = new StringEntity(varString);
+        //httppost.setEntity(new UrlEncodedFormEntity(varList));
+
+        System.out.println("About to send request: " + httppost.getURI());
+        System.out.println("varString: " + vals.toString());
+
+        httppost.setEntity(new UrlEncodedFormEntity(vals));
+        CloseableHttpResponse httpResponse = httpclient.execute(httppost, context);
+        // entity = httpResponse.getEntity();
+        // if (entity != null) {
+            //long len = entity.getContentLength();
+            //System.out.println("Entity length: " + len);
+            //System.out.println(EntityUtils.toString(entity));
+            //
+        System.out.println("POST Response Status:: "
+            + httpResponse.getStatusLine().getStatusCode());
+         
+            BufferedReader reader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+             
+            String inputLine;
+            StringBuffer response = new StringBuffer();
+     
+            while ((inputLine = reader.readLine()) != null) {
+                response.append(inputLine);
             }
-        } catch (Exception e) {
-            System.out.println("Error in callProcOverJSONRaw");
-            e.printStackTrace(System.out);
-        }
+        //} else
+        //    System.out.println("Entity is null");
 
 
-//        BufferedReader in = null;
-//        try {
-//            if(conn.getInputStream()!=null){
-//                in = new BufferedReader(
-//                        new InputStreamReader(
-//                        conn.getInputStream(), "UTF-8"));
-//            }
-//        } catch(IOException e){
-//            if(conn.getErrorStream()!=null){
-//                in = new BufferedReader(
-//                        new InputStreamReader(
-//                        conn.getErrorStream(), "UTF-8"));
-//            }
-//        }
-//        if(in==null) {
-//            throw new Exception("Unable to read response from server");
-//        }
-//
-//        StringBuffer decodedString = new StringBuffer();
-//        String line;
-//        while ((line = in.readLine()) != null) {
-//            decodedString.append(line);
-//        }
-//        in.close();
-//        in = null;
-//        // get result code
-//        int responseCode = conn.getResponseCode();
-//
-//        String response = decodedString.toString();
-//
-//        try {
-//            conn.getInputStream().close();
-//            conn.disconnect();
-//        }
-//        // ignore closing problems here
-//        catch (Exception e) {}
-//        conn = null;
-
-        //System.err.println(response);
-
-        return EntityUtils.toString(entity);
+        return response.toString();
         //return response;
     }
 
@@ -192,29 +169,30 @@ public class HTTPUtils {
             int expectedCode, CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
+
         // System.out.println(paramsInJSON);
-        HashMap<String,String> params = new HashMap<String,String>();
-        params.put("Procedure", procName);
-        params.put("Parameters", paramsInJSON);
+        List<NameValuePair> params = new ArrayList<NameValuePair>();
+        params.add(new BasicNameValuePair("Procedure", procName));
+        params.add(new BasicNameValuePair("Parameters", paramsInJSON));
         if (username != null) {
-            params.put("User", username);
+            params.add(new BasicNameValuePair("User", username));
         }
         if (password != null) {
             if (preHash) {
-                params.put("Hashedpassword", getHashedPasswordForHTTPVar(password));
+                params.add(new BasicNameValuePair("Hashedpassword", getHashedPasswordForHTTPVar(password)));
             } else {
-                params.put("Password", password);
+                params.add(new BasicNameValuePair("Password", password));
             }
         }
         if (admin) {
-            params.put("admin", "true");
+            params.add(new BasicNameValuePair("admin", "true"));
         }
 
-        String varString = getHTTPVarString(params);
+        //String varString = getHTTPVarString(params);
 
-        varString = getHTTPVarString(params);
+        //varString = getHTTPVarString(params);
 
-        return callProcOverJSONRaw(varString, expectedCode, httpclient, httppost, context);
+        return callProcOverJSONRaw(params, expectedCode, httpclient, httppost, context);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
