@@ -806,7 +806,7 @@ public class TestDDLCompiler extends TestCase {
         tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
     }
 
-    public void testIndexExpresions() throws Exception {
+    public void testIndexExpressions() throws Exception {
         File jarOut = new File("indexExpressions.jar");
         jarOut.deleteOnExit();
 
