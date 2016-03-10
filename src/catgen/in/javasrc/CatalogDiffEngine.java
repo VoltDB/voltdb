@@ -656,9 +656,6 @@ public class CatalogDiffEngine {
         if (suspect instanceof IndexRef && field.equals("name"))
             return null;
 
-        if (suspect instanceof Deployment && field.equals("export"))
-            return null;
-
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
