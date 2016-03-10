@@ -90,7 +90,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
-        cl.m_forceStartVoltdb = m_forceStartVoltdb;
+        cl.m_newVoltdb = m_newVoltdb;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -390,9 +390,9 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine force(boolean forceStartVoltdb)
+    public CommandLine newVoltdb(boolean newVoltdb)
     {
-        m_forceStartVoltdb = forceStartVoltdb;
+        m_newVoltdb = newVoltdb;
         return this;
     }
 
@@ -615,9 +615,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
-        if (m_forceStartVoltdb)
+        if (m_newVoltdb)
         {
-            cmdline.add("force");
+            cmdline.add("new");
         }
 
         if (m_isEnterprise) {

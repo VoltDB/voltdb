@@ -55,7 +55,7 @@ function jars-ifneeded() {
 
 # run the voltdb server locally
 function server() {
-    voltdb create -H $STARTUPLEADERHOST
+    voltdb create -H $STARTUPLEADERHOST --new
 }
 
 # load schema and procedures
@@ -64,30 +64,6 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-<<<<<<< HEAD
-# wait for backgrounded server to start up
-function wait_for_startup() {
-    until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
-    do
-        sleep 2
-        echo " ... Waiting for VoltDB to start"
-        if [[ $SECONDS -gt 60 ]]
-        then
-            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2; exit 1;
-        fi
-    done
-}
-
-# startup server in background and load schema
-function background_server_andload() {
-    # run the server in the background
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST --force > nohup.log 2>&1 &
-    wait_for_startup
-    init
-}
-
-=======
->>>>>>> master
 # run the client that drives the example
 function client() {
     async-benchmark

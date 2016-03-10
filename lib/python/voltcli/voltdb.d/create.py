@@ -34,7 +34,7 @@
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True,
-                                force_voltdbroot_create=True),
+                                new_voltdb_instance=True),
     options = (
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),

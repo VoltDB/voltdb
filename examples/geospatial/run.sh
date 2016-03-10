@@ -62,7 +62,7 @@ function init() {
 
 # run the voltdb server locally
 function server() {
-    voltdb create -H $STARTUPLEADERHOST
+    voltdb create -H $STARTUPLEADERHOST --new
 }
 
 # run this target to see what command line options the client offers

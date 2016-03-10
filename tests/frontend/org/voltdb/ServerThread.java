@@ -51,7 +51,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-        m_config.m_forceStartVoltdb = true;
+        m_config.m_newVoltdb = true;
 
         setName("ServerThread");
     }
@@ -69,7 +69,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-        m_config.m_forceStartVoltdb = true;
+        m_config.m_newVoltdb = true;
 
         setName("ServerThread");
     }
@@ -88,7 +88,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-        m_config.m_forceStartVoltdb = true;
+        m_config.m_newVoltdb = true;
 
         if (!m_config.validate()) {
             System.exit(-1);
@@ -126,7 +126,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-        m_config.m_forceStartVoltdb = true;
+        m_config.m_newVoltdb = true;
 
         if (!m_config.validate()) {
             System.exit(-1);
