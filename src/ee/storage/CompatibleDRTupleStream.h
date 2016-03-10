@@ -37,7 +37,7 @@ public:
 
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 3;
 
-    CompatibleDRTupleStream();
+    CompatibleDRTupleStream(int defaultBufferSize);
 
     virtual ~CompatibleDRTupleStream() {}
 

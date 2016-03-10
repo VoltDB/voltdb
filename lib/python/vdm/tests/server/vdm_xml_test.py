@@ -216,7 +216,7 @@ class Server(unittest.TestCase):
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
             url = URL + str(last_db_id) + '/servers/'
-            data = {'description': 'test', 'hostname': 'test', 'name': 'test'}
+            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 201:
                 self.assertEqual(response.status_code, 201)

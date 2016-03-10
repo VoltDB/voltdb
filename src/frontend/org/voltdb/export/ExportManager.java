@@ -249,8 +249,8 @@ public class ExportManager
                         oldProcessor = m_processor.getAndSet(newProcessor);
                     }
                 } else {
-                    //We deleted last of the generation as we dropped the last export table.
-                    exportLog.info("Last export table dropped processor will be removed: " + m_loaderClass);
+                    //We deleted last of the generation as we dropped the last stream
+                    exportLog.info("Last stream dropped processor will be removed: " + m_loaderClass);
                     oldProcessor = m_processor.getAndSet(null);
                 }
             } catch (Exception e) {
@@ -604,7 +604,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            exportLog.info("First export table created processor will be initialized: " + m_loaderClass);
+            exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
             createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
         }
     }

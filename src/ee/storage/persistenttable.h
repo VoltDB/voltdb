@@ -81,6 +81,8 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
+class CoveringCellIndexTest_TableCompaction;
+
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
  * normally-private stuff in PersistentTable.
@@ -197,6 +199,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
+    friend class CoveringCellIndexTest_TableCompaction;
 
   private:
     // no default ctor, no copy, no assignment
@@ -337,6 +340,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::vector<MaterializedViewMetadata *> views() const {
         return m_views;
     }
+    bool isMaterialized() { return m_isMaterialized; };
 
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
@@ -507,6 +511,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
+
+  protected:
+    std::vector<uint64_t> getBlockAddresses() const;
 
   private:
 
@@ -680,7 +687,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
 
-    //Cache config info, is this a materialized view
+    //Is this a materialized view?
     bool m_isMaterialized;
 
     // is DR enabled

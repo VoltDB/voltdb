@@ -1257,15 +1257,40 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
 
     /**
-     * Servicer function for expression which returns true if the expression return
-     * is indexable else false. If expression is not indexable, expression information
-     * gets populated in msg string buffer passed in.
+     * Returns true iff the expression is indexable.
+     * If the expression is not indexable, expression information
+     * gets populated in the msg string buffer passed in.
      * @param msg
      * @return
      */
     public boolean isValueTypeIndexable(StringBuffer msg) {
-        if(!m_valueType.isIndexable()) {
-            msg.append("expression of type " + getValueType().getName());
+        if (!m_valueType.isIndexable()) {
+            msg.append("expression of type " + m_valueType.getName());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Returns true iff the expression is indexable in a unique index.
+     * If the expression is not indexable, expression information
+     * gets populated in the msg string buffer passed in.
+     * @param msg
+     * @return
+     */
+    public boolean isValueTypeUniqueIndexable(StringBuffer msg) {
+        // This call to isValueTypeIndexable is needed because
+        // all comparison, all conjunction, and some operator expressions
+        // need to refine it to compensate for their false claims that
+        // their value types (actually non-indexable boolean) is BIGINT.
+        // that their value type is actually boolean.
+        // If they were fixed, isValueTypeIndexable and
+        // isValueTypeUniqueIndexable could be replaced by VoltType functions.
+        if (!isValueTypeIndexable(msg)) {
+            return false;
+        }
+        if (!m_valueType.isUniqueIndexable()) {
+            msg.append("expression of type " + m_valueType.getName());
             return false;
         }
         return true;

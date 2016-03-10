@@ -24,7 +24,7 @@ CREATE INDEX P_CIDINDEX ON partitioned (cid);
 CREATE TABLE dimension
 (
   cid        tinyint            NOT NULL
-, desc	     tinyint     		NOT NULL
+, desc       tinyint            NOT NULL
 , CONSTRAINT PK_id_d PRIMARY KEY
   (
     cid

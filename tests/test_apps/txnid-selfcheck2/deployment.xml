@@ -5,10 +5,16 @@
         <jsonapi enabled="true" />
     </httpd>
 
-    <export enabled="true" target="file">
-        <configuration>
+    <export>
+        <configuration enabled="true" type="file" stream="partstream">
             <property name="type">csv</property>
-            <property name="nonce">MyExport</property>
+            <property name="nonce">PartStream</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" stream="replstream">
+            <property name="type">csv</property>
+            <property name="nonce">ReplStream</property>
+            <property name="skipinternals">true</property>
         </configuration>
     </export>
 </deployment>

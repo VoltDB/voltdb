@@ -98,6 +98,14 @@ public:
         return value.getDecimal();
     }
 
+    static const GeographyValue peekGeographyValue(const NValue& value) {
+        return value.getGeographyValue();
+    }
+
+    static const GeographyPointValue peekGeographyPointValue(const NValue& value) {
+        return value.getGeographyPointValue();
+    }
+
     // exists for test.
     static std::string peekDecimalString(const NValue& value) {
         return value.createStringFromDecimal();

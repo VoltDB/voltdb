@@ -554,7 +554,7 @@ public enum VoltType {
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
             throw new RuntimeException(
-                    "Asking for fixed size for non-fixed or unknown type.");
+                    "Asking for fixed size for non-fixed or unknown type:" + name());
 
         }
         return m_lengthInBytes;
@@ -798,6 +798,16 @@ public enum VoltType {
     }
 
     public boolean isIndexable() {
+        switch(this) {
+        case GEOGRAPHY_POINT:
+        case BOOLEAN:
+            return false;
+        default:
+            return true;
+        }
+    }
+
+    public boolean isUniqueIndexable() {
         switch(this) {
         case GEOGRAPHY_POINT:
         case GEOGRAPHY:
@@ -1087,4 +1097,5 @@ public enum VoltType {
 
         return MAX_ROW_SIZE / MAX_COLUMNS;
     }
+
 }

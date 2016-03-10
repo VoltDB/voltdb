@@ -44,6 +44,7 @@ class ClusterSettingsPage extends Page {
 
         // Add Server Popup
         popupAddServer                          { $("#addServer > div > div") }
+        popupAddServerDetails                   { $("#accordion > div > div.panel-heading > h4 > a") }
         popupAddServerNameField                 { $("#serverName") }
         popupAddServerHostNameField             { $("#txtHostName") }
         popupAddServerDescriptionField          { $("#txtDescription") }
@@ -95,9 +96,6 @@ class ClusterSettingsPage extends Page {
         overview        { module OverviewModule }
         directories     { module DirectoriesModule }
         dr              { module DatabaseReplicationModule }
-
-        // trial
-        trialerror      { $("#serverList > tbody > tr > td:nth-child(1)") }
     }
 
     static at = {
@@ -218,8 +216,13 @@ class ClusterSettingsPage extends Page {
 
         for (count = 0; count < numberOfTrials; count++) {
             try {
+                try {
+                    waitFor { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
                 popupAddDatabaseNameField.value(nameValue)
-                popupAddDatabaseDeploymentField.value(deploymentValue)
+                //popupAddDatabaseDeploymentField.value(deploymentValue)
                 break
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the text fields - Retrying")
@@ -331,7 +334,7 @@ class ClusterSettingsPage extends Page {
         for (count = 0; count < numberOfTrials; count++) {
             try {
                 $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
-                waitFor(60) { currentDatabase.text().equals(newDatabaseName) }
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
                 return true
             } catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
@@ -339,7 +342,7 @@ class ClusterSettingsPage extends Page {
                 println("Stale Element exception - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException exception) {
                 try {
-                    waitFor(60) { currentDatabase.text().equals(newDatabaseName) }
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
                     return true
                 } catch (geb.waiting.WaitTimeoutException exc) {
                     println("Waiting - Retrying")
@@ -385,7 +388,6 @@ class ClusterSettingsPage extends Page {
                     }
                 }
                 else if(count==0) {
-                    println("new")
                     try {
                         waitFor(30) { !saveStatus.isDisplayed() }
                     } catch (geb.waiting.WaitTimeoutException exc) {

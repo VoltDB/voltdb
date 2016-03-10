@@ -31,6 +31,8 @@ import java.io.BufferedReader
 import java.io.FileNotFoundException
 import java.io.FileReader
 import java.io.IOException
+import org.openqa.selenium.WebElement
+import org.openqa.selenium.Keys
 
 class ClusterConfigurationTest extends TestBase {
     static String sitePerHost = "Site per host"
@@ -115,7 +117,7 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifySitePerHost() {
         println("Test: verifySitePerHost")
-        String oldVariable = overview.sitePerHostField.value()
+       // String oldVariable = overview.sitePerHostField.value()
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
@@ -1018,8 +1020,10 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Heartbeat Timeout in Advanced'
+        overview.heartbeatTimeoutField.value("0")
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
+        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Heartbeat Timeout in Advanced has changed'
@@ -1032,8 +1036,10 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Query Timeout in Advanced'
+        overview.queryTimeoutField.value("0")
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
+        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Query Timeout in Advanced has changed'
@@ -1046,8 +1052,10 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Max Temp Table Memory in Advanced'
+        overview.maxTempTableMemoryField.value("0")
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
+        report 'hello1'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Temp Table Memory in Advanced has changed'
@@ -1060,6 +1068,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Snapshot Priority in Advanced'
+        overview.snapshotPriorityField.value("0")
         overview.snapshotPriorityField.value("10")
         overview.snapshotPriorityText.click()
         and: 'Check Save Message'
@@ -1074,8 +1083,14 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Memory Limit in Advanced'
+/*        overview.memoryLimitType.click()
+        report 'old1'
+        overview.memoryLimitOptionGB.click()*/
+
+        overview.memoryLimitField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
+
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Memory Limit in Advanced has changed'
@@ -1500,13 +1515,6 @@ class ClusterConfigurationTest extends TestBase {
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
-    }
-
-    def gebSampleTest(){
-        when: "test"
-        println("Test")
-        then: "test"
-        println("Test")
     }
 
     def cleanup() { // called after each test

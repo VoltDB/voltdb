@@ -259,8 +259,10 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
+ abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
+ executorfactory.cpp
  executorutil.cpp
  indexcountexecutor.cpp
  indexscanexecutor.cpp
@@ -327,9 +329,10 @@ CTX.INPUT['plannodes'] = """
 """
 
 CTX.INPUT['indexes'] = """
+ CoveringCellIndex.cpp
+ IndexStats.cpp
  tableindex.cpp
  tableindexfactory.cpp
- IndexStats.cpp
 """
 
 CTX.INPUT['storage'] = """
@@ -341,6 +344,7 @@ CTX.INPUT['storage'] = """
  TableStreamer.cpp
  ElasticScanner.cpp
  MaterializedViewMetadata.cpp
+ ExportMaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
  StreamedTableStats.cpp
@@ -350,6 +354,7 @@ CTX.INPUT['storage'] = """
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
+ tabletuplefilter.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleStreamBase.cpp
@@ -471,6 +476,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_test
      CompactingHashIndexTest
      CompactingTreeMultiIndexTest
+     CoveringCellIndexTest
     """
 
 if whichtests in ("${eetestsuite}", "storage"):

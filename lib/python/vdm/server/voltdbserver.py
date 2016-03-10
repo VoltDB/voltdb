@@ -159,7 +159,8 @@ class VoltDatabase:
             response = requests.get(url)
             return create_response(response.text, 200)
         else:
-            return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Start request sent successfully to servers: ' +
+                                   json.dumps(server_status), 200)
 
     def start_server(self, server_id, recover=False):
         """
@@ -182,8 +183,8 @@ class VoltDatabase:
         if recover:
             action = 'recover'
         try:
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
-                              (server[0]['hostname'], HTTPListener.__PORT__, self.database_id, action)
+            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u') % \
+                              (server[0]['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id)
             response = requests.put(url)
             return create_response(json.loads(response.text)['statusstring'], response.status_code)
         except Exception, err:
@@ -376,7 +377,7 @@ class VoltDatabase:
 
         return create_response(json.dumps(server_status), 200)
 
-    def run_voltdb_cmd(self, cmd, verb, args, outfilename):
+    def run_voltdb_cmd(self, cmd, verb, args, outfilename, server):
         """
         Runs the given voltdb command using admin user, as needed
         """
@@ -390,6 +391,16 @@ class VoltDatabase:
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
 
+        admin_listener = server['admin-listener']
+
+        if server['admin-listener'] != "":
+            if ":" in admin_listener:
+                self.add_voltdb_option(server, 'admin-listener', '--host', voltdb_cmd)
+            else:
+                opt_val = admin_listener
+                if opt_val != None and len(opt_val) > 0:
+                    voltdb_cmd.append('--host')
+                    voltdb_cmd.append(server['hostname'] + ":"+ admin_listener)
 
         shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         (output, error) = shutdown_proc.communicate()
@@ -450,7 +461,7 @@ class VoltDatabase:
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.join(HTTPListener.Global.PATH,
                 ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
-        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename)
+        return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename, server[0])
 
     def kill_database(self, database_id):
         members = []
@@ -487,9 +498,9 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors stopping servers: ' + str(server_status) ,500)
+            return create_response('There were errors stopping servers: ' + json.dumps(server_status), 500)
         else:
-            return create_response('Stop request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Stop request sent successfully to servers: ' + json.dumps(server_status), 200)
 
     def kill_server(self, server_id):
         try:

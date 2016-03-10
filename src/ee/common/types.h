@@ -351,6 +351,8 @@ enum QuantifierType {
 enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
+    BTREE_INDEX             = 3, // unused
+    COVERING_CELL_INDEX     = 4
 };
 
 // ------------------------------------------------------------------
@@ -363,10 +365,7 @@ enum IndexLookupType {
    INDEX_LOOKUP_TYPE_GTE     = 3,
    INDEX_LOOKUP_TYPE_LT      = 4,
    INDEX_LOOKUP_TYPE_LTE     = 5,
-   INDEX_LOOKUP_TYPE_GT_LT   = 6,
-   INDEX_LOOKUP_TYPE_GTE_LT  = 7,
-   INDEX_LOOKUP_TYPE_GTL_TE  = 8,
-   INDEX_LOOKUP_TYPE_GTE_LTE = 9
+   INDEX_LOOKUP_TYPE_GEO_CONTAINS = 6,
 };
 
 // ------------------------------------------------------------------

@@ -11,6 +11,7 @@
 
 {@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
+{@distinctableagg = "_distinctableagg"}
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
 {@columnpredicate = "_variable[#arg int16] @cmp _value[int16]"}
@@ -21,6 +22,7 @@
 {@dmlcolumnpredicate = "_variable[int] @cmp _value[int]"}
 {@idcol = "V_G1"}
 {@numcol = "V_SUM_AGE"}
+{@plus10 = "+ 10"}
 {@star = "*"}
 {@lhsstar = "*"}
 

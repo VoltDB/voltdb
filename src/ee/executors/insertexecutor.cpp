@@ -88,8 +88,14 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
-    m_isStreamed = (persistentTarget == NULL);
-
+    StreamedTable *streamTarget = dynamic_cast<StreamedTable*>(targetTable);
+    m_hasStreamView = false;
+    if (streamTarget != NULL) {
+        m_isStreamed = true;
+        //See if we have any views.
+        m_hasStreamView = streamTarget->hasViews();
+        m_partitionColumn = streamTarget->partitionColumn();
+    }
     if (m_isUpsert) {
         VOLT_TRACE("init Upsert Executor actually");
         if (m_isStreamed) {
@@ -230,28 +236,42 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
+                bool cont = true;
                 if (!m_multiPartition) {
-                    throw ConstraintFailureException(
-                            dynamic_cast<PersistentTable*>(targetTable),
-                            templateTuple,
-                            "Mispartitioned tuple in single-partition insert statement.");
+                    if (!m_isStreamed) {
+                        throw ConstraintFailureException(
+                                targetTable, templateTuple,
+                                "Mispartitioned tuple in single-partition insert statement.");
+                    } else {
+                        if (m_hasStreamView) {
+                            throw ConstraintFailureException(
+                                    targetTable, templateTuple,
+                                    "Mispartitioned tuple in single-partition insert statement.");
+                        } else {
+                            //when stream table has no views we let this insert slide and execute in
+                            //site where the SP is running. This was behavior when we had only export
+                            //table and no views on it. With views we have to be strict and throw mispartitioned
+                            //tuple see if block above.
+                            cont = false;
+                        }
+                    }
                 }
-
-                // don't insert
-                continue;
+                if (cont) {
+                    // don't insert
+                    continue;
+                }
+            }
+        } else {
+            // for multi partition export tables, only insert into one
+            // place (the partition with hash(0)), if the data is from a
+            // replicated source.  If the data is coming from a subquery
+            // with partitioned tables, we need to perform the insert on
+            // every partition.
+            if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
+                bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+                if (!isLocal) continue;
             }
         }
-
-        // for multi partition export tables, only insert into one
-        // place (the partition with hash(0)), if the data is from a
-        // replicated source.  If the data is coming from a subquery
-        // with partitioned tables, we need to perform the insert on
-        // every partition.
-        if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
-            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
-            if (!isLocal) continue;
-        }
-
 
         if (! m_isUpsert) {
             // try to put the tuple into the target table

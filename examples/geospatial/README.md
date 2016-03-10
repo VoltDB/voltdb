@@ -38,10 +38,13 @@ is `GetHighestBidForLocation`, which invokes this SQL statement:
 ```
 
 The parameter (`?`) in this query is the location of the device as a
-point in terms of longitude and latitude.  This query makes use of
-the CONTAINS function, also new in version 6.0.  The net effect of
-this query is to find the bids where the mobile device is inside the
-bid's polygon, and return the bid with the highest dollar amount.
+point in terms of longitude and latitude.  This query makes use of the
+CONTAINS function, also new in version 6.0.  In order to avoid having
+to examine each row in the bids table to determine which regions
+contain the device, a geospatial index is used to find relevant
+regions quickly.  The net effect of this query is to find the bids
+where the mobile device is inside the bid's polygon, and return the
+bid with the highest dollar amount.
 
 In addition to using a geospatial query to find matching bids, `GetHighestBidForLocation`
 also stores info about winning bids (and unmet ad requests) in the table
@@ -65,6 +68,11 @@ To achieve the deletion of unneeded data, we define a class called `NibbleDelete
 https://voltdb.com/blog/aging-out-data-voltdb
 
 ## Performance
-We've rate-limited the number of transactions in this application to 10,000/s.  At any given time there are 100 active bids, so we're doing about one million CONTAINS operations per second, with each ad request being completed with sub-millisecond latency on average.  Naturally, these figures are for the hardware upon which we developed this app, and your mileage may vary.
-
-Currently, each ad request must scan many rows of the bids table to find matching bids.  In future versions of VoltDB, geospatial indexes will provide a many-fold increase to throughput, allowing us to handle many more active bids, and more frequent ad requests with ease.
+The DDL for this example creates a geospatial index called `bid_area`
+which allows for fast evaluation of the CONTAINS predicate in the key
+query of the demo.  In addition, the stored procedure executing this
+query, `GetHighestBidForLocation`, can be run on just a single
+partition of the database, allowing execution on multiple threads at
+the same time.  On the desktop machine used to develop this example,
+it was easy to achieve up to 150,000 transactions per second where the
+bulk of the workload is doing point-in-polygon evaluation.

@@ -274,7 +274,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void testcomplexGroupbySuite() throws IOException, ProcCallException, ParseException{
+    public void testComplexGroupbySuite() throws IOException, ProcCallException, ParseException{
         complexGroupby();
         complexGroupbyDistinctLimit();
         complexGroupbyOrderbySuite();

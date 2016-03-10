@@ -59,8 +59,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
-    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
-    public static void enableVerboseExplainForDebugging() { m_verboseExplainForDebugging = true; }
+    protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! KEEP false on master!
+    public static boolean enableVerboseExplainForDebugging()
+    {
+        boolean was = m_verboseExplainForDebugging;
+        m_verboseExplainForDebugging = true;
+        return was;
+    }
     public static boolean disableVerboseExplainForDebugging()
     {
         boolean was = m_verboseExplainForDebugging;
