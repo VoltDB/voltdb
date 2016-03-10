@@ -162,6 +162,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                                                                             // certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POINT_POINT          = 21018;    // if two points are within certain distance of each other
         static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
+        static final int FUNC_VOLT_POLYGONFROMVALIDTEXT         = 21020;    // list polygonFromText, but validates after construction
 
 
         /*
@@ -339,6 +340,9 @@ public class FunctionForVoltDB extends FunctionSQL {
                                    Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION,
                                    Tokens.CLOSEBRACKET }),
+            new FunctionId("polygonfromvalidtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMVALIDTEXT, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();

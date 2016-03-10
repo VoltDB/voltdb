@@ -277,6 +277,7 @@ static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 21016;     // Reason a 
 static const int FUNC_VOLT_DWITHIN                     = 21017;     // wrapper id for DWithin function
 static const int FUNC_VOLT_DWITHIN_POINT_POINT         = 21018;     // if two points are within certain distance of each other
 static const int FUNC_VOLT_DWITHIN_POLYGON_POINT       = 21019;     // if a polygon and a point are within certain distance of each other
+static const int FUNC_VOLT_POLYGONFROMVALIDTEXT        = 21020;     // like polygonfromtext, but also validates the result
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

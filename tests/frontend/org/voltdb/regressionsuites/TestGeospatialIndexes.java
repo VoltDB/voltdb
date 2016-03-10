@@ -136,6 +136,7 @@ public class TestGeospatialIndexes extends RegressionSuite{
                 + "  id         INTEGER NOT NULL,\n"
                 + "  loc        GEOGRAPHY_POINT\n"
                 + ");\n"
+                + "PARTITION TABLE PLACES ON COLUMN ID;\n"
                 + "CREATE TABLE BORDERS(\n"
                 + "  id         INTEGER NOT NULL,\n"
                 + "  region     GEOGRAPHY\n"
@@ -145,7 +146,7 @@ public class TestGeospatialIndexes extends RegressionSuite{
                 + "  id         INTEGER NOT NULL,\n"
                 + "  region     GEOGRAPHY\n"
                 + ");\n"
-                //+ "CREATE INDEX INDEX_REGION ON INDEXED_BORDERS(Region)\n;"    // Enable this once Geo Indexes are integrated
+                + "CREATE INDEX INDEX_REGION ON INDEXED_BORDERS(Region)\n;"
                 + "CREATE PROCEDURE P_CONTAINS_INDEXED AS "
                 + "  SELECT A.Region FROM INDEXED_BORDERS A \n"
                 + "         WHERE CONTAINS(A.region, ?) ORDER BY A.Region;\n"
@@ -421,11 +422,18 @@ public class TestGeospatialIndexes extends RegressionSuite{
             boolean success;
 
             setupGeoSchema(project);
-            config = new LocalCluster("geography-indexes.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             project.setUseDDLSchema(true);
+
+            config = new LocalCluster("geography-indexes.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
+
+            config = new LocalCluster("geography-indexes.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
+
         } catch (IOException except) {
             assert(false);
         }

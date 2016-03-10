@@ -47,13 +47,14 @@ import voltdbserver
 import glob
 import psutil
 import Log
-
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
 import voltdbclient
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
+import Configuration
+
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -498,814 +499,12 @@ def get_volt_jar_dir():
     return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
 
 
-def get_configuration():
-    deployment_json = {
-        'voltdeploy': {
-            'databases': Global.DATABASES,
-            'members': Global.SERVERS,
-            'deployments': Global.DEPLOYMENT,
-            'deployment_users': Global.DEPLOYMENT_USERS
-        }
-    }
-    return deployment_json
-
-
-def write_configuration_file():
-    main_header = make_configuration_file()
-
-    try:
-        path = os.path.join(Global.PATH, 'voltdeploy.xml')
-        f = open(path, 'w')
-        f.write(main_header)
-        f.close()
-
-    except Exception, err:
-        print str(err)
-
-
-def make_configuration_file():
-    main_header = Element('voltdeploy')
-    db_top = SubElement(main_header, 'databases')
-    server_top = SubElement(main_header, 'members')
-    deployment_top = SubElement(main_header, 'deployments')
-    i = 0
-    while i < len(Global.DATABASES):
-        db_elem = SubElement(db_top, 'database')
-        for key, value in Global.DATABASES[i].iteritems():
-            if isinstance(value, bool):
-                if value == False:
-                    db_elem.attrib[key] = "false"
-                else:
-                    db_elem.attrib[key] = "true"
-            else:
-                db_elem.attrib[key] = str(value)
-        i += 1
-
-    i = 0
-    while i < len(Global.SERVERS):
-        server_elem = SubElement(server_top, 'member')
-        for key, value in Global.SERVERS[i].iteritems():
-            if isinstance(value, bool):
-                if value == False:
-                    server_elem.attrib[key] = "false"
-                else:
-                    server_elem.attrib[key] = "true"
-            else:
-                server_elem.attrib[key] = str(value)
-        i += 1
-
-    i = 0
-    while i < len(Global.DEPLOYMENT):
-        Global.DEPLOYMENT[i]['users'] = {}
-        Global.DEPLOYMENT[i]['users']['user'] = []
-        deployment_user = filter(lambda t: t['databaseid'] == Global.DEPLOYMENT[i]['databaseid'],
-                                 Global.DEPLOYMENT_USERS)
-        if len(deployment_user) == 0:
-            Global.DEPLOYMENT[i]['users'] = None
-        for user in deployment_user:
-            Global.DEPLOYMENT[i]['users']['user'].append({
-                'name': user['name'],
-                'roles': user['roles'],
-                'plaintext': user['plaintext'],
-                'password': user['password'],
-                'databaseid': user['databaseid']
-            })
-
-        deployment_elem = SubElement(deployment_top, 'deployment')
-        for key, value in Global.DEPLOYMENT[i].iteritems():
-            if type(value) is dict:
-                DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
-            elif type(value) is list:
-                DeploymentConfig.handle_deployment_list(deployment_elem, key, value)
-            else:
-                if value is not None:
-                    deployment_elem.attrib[key] = str(value)
-        i += 1
-    return tostring(main_header, encoding='UTF-8')
-
-
 def sync_configuration():
     headers = {'content-type': 'application/json'}
     url = 'http://%s:%u/api/1.0/voltdeploy/configuration/' % \
           (__IP__,__PORT__)
     response = requests.post(url, headers=headers)
     return response
-
-
-def convert_xml_to_json(config_path):
-    with open(config_path) as f:
-        xml = f.read()
-    o = XML(xml)
-    xml_final = json.loads(json.dumps(etree_to_dict(o)))
-    if type(xml_final['voltdeploy']['members']['member']) is dict:
-        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'dict')
-    else:
-        member_json = get_member_from_xml(xml_final['voltdeploy']['members']['member'], 'list')
-
-    if type(xml_final['voltdeploy']['databases']['database']) is dict:
-        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'dict')
-    else:
-        db_json = get_db_from_xml(xml_final['voltdeploy']['databases']['database'], 'list')
-
-    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
-        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
-    else:
-        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
-    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
-        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'dict')
-    else:
-        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'], 'list')
-
-    Global.DATABASES = db_json
-
-    Global.SERVERS = member_json
-
-    Global.DEPLOYMENT = deployment_json
-
-    Global.DEPLOYMENT_USERS = user_json
-
-
-def get_db_from_xml(db_xml, is_list):
-    new_database = {}
-    db = []
-    if is_list is 'list':
-        for database in db_xml:
-            new_database = {}
-            for field in database:
-                new_database[field] = convert_db_field_required_format(database, field)
-            db.append(new_database)
-    else:
-        for field in db_xml:
-            new_database[field] = convert_db_field_required_format(db_xml, field)
-        db.append(new_database)
-    return db
-
-
-def convert_db_field_required_format(database, field):
-    if field == 'id':
-        modified_field = int(database[field])
-    elif field == 'members':
-        modified_field = ast.literal_eval(database[field])
-    else:
-        modified_field = database[field]
-    return modified_field
-
-
-def get_member_from_xml(member_xml, is_list):
-    new_member = {}
-    members = []
-    if is_list is 'list':
-        for member in member_xml:
-            new_member = {}
-            for field in member:
-                new_member[field] = convert_server_field_required_format(member, field)
-            members.append(new_member)
-    else:
-        for field in member_xml:
-            new_member[field] = convert_server_field_required_format(member_xml, field)
-        members.append(new_member)
-    return members
-
-
-def convert_server_field_required_format(server, field):
-    if field == 'id':
-        modified_field = int(server[field])
-    else:
-        modified_field = server[field]
-    return modified_field
-
-
-def get_deployment_from_xml(deployment_xml, is_list):
-    new_deployment = {}
-    deployments = []
-    if is_list is 'list':
-        for deployment in deployment_xml:
-            new_deployment = {}
-            for field in deployment:
-                if field == 'export':
-                    if deployment[field] is not None:
-                        if type(deployment[field]['configuration']) is list:
-                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'],
-                                                                                'list')
-                        else:
-                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'],
-                                                                                'dict')
-                    else:
-                        new_deployment[field] = deployment[field]
-                elif field == 'import':
-                    if deployment[field] is not None:
-                        if type(deployment[field]['configuration']) is list:
-                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'],
-                                                                                'list')
-                        else:
-                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'],
-                                                                                'dict')
-                    else:
-                        new_deployment[field] = deployment[field]
-                elif field == 'admin-mode':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]['adminstartup'])
-                        new_deployment[field]['port'] = int(deployment[field]['port'])
-                    except Exception, err:
-                        print 'Failed to get deployment: ' % str(err)
-                        print traceback.format_exc()
-                elif field == 'cluster':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['hostcount'] = int(deployment[field]['hostcount'])
-                        new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
-                        new_deployment[field]['sitesperhost'] = int(deployment[field]['sitesperhost'])
-                        new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
-                        new_deployment[field]['schema'] = str(deployment[field]['schema'])
-                    except Exception, err:
-                        print str(err)
-                        print traceback.format_exc()
-                elif field == 'commandlog':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
-                        new_deployment[field]['synchronous'] = parse_bool_string(deployment[field]['synchronous'])
-                        new_deployment[field]['logsize'] = int(deployment[field]['logsize'])
-                        new_deployment[field]['frequency'] = {}
-                        new_deployment[field]['frequency']['transactions'] = int(
-                            deployment[field]['frequency']['transactions'])
-                        new_deployment[field]['frequency']['time'] = int(deployment[field]['frequency']['time'])
-                    except Exception, err:
-                        print str(err)
-                        print traceback.format_exc()
-                elif field == 'heartbeat':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['timeout'] = int(deployment[field]['timeout'])
-                    except Exception, err:
-                        print str(err)
-                        print traceback.format_exc()
-                elif field == 'httpd':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['port'] = int(deployment[field]['port'])
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
-                        new_deployment[field]['jsonapi'] = {}
-                        new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(
-                            deployment[field]['jsonapi']['enabled'])
-                    except Exception, err:
-                        print str(err)
-                elif field == 'partition-detection':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
-                        new_deployment[field]['snapshot'] = {}
-                        new_deployment[field]['snapshot']['prefix'] = deployment[field]['snapshot']['prefix']
-                    except Exception, err:
-                        print str(err)
-                elif field == 'security':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
-                        new_deployment[field]['provider'] = str(deployment[field]['provider'])
-                    except Exception, err:
-                        print str(err)
-                elif field == 'snapshot':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
-                        new_deployment[field]['frequency'] = str(deployment[field]['frequency'])
-                        new_deployment[field]['prefix'] = str(deployment[field]['prefix'])
-                        new_deployment[field]['retain'] = int(deployment[field]['retain'])
-                    except Exception, err:
-                        print str(err)
-                elif field == 'systemsettings':
-                    try:
-                        new_deployment[field] = {}
-                        new_deployment[field]['elastic'] = {}
-                        new_deployment[field]['elastic']['duration'] = int(deployment[field]['elastic']['duration'])
-                        new_deployment[field]['elastic']['throughput'] = int(deployment[field]['elastic']['throughput'])
-                        new_deployment[field]['query'] = {}
-                        new_deployment[field]['query']['timeout'] = int(deployment[field]['query']['timeout'])
-                        new_deployment[field]['snapshot'] = {}
-                        new_deployment[field]['snapshot']['priority'] = int(deployment[field]['snapshot']['priority'])
-                        new_deployment[field]['temptables'] = {}
-                        new_deployment[field]['temptables']['maxsize'] = int(deployment[field]['temptables']['maxsize'])
-                        if 'resourcemonitor' not in deployment[field] or deployment[field]['resourcemonitor'] is None:
-                            if 'resourcemonitor' in deployment[field]:
-                                new_deployment[field]['resourcemonitor'] = None
-                        else:
-                            new_deployment[field]['resourcemonitor'] = {}
-                            if 'memorylimit' in deployment[field]['resourcemonitor']:
-                                new_deployment[field]['resourcemonitor']['memorylimit'] = \
-                                deployment[field]['resourcemonitor']['memorylimit']
-
-                            if 'disklimit' in deployment[field]['resourcemonitor'] and 'feature' in \
-                                    deployment[field]['resourcemonitor']['disklimit']:
-                                if type(deployment[field]['resourcemonitor']['disklimit']['feature']) is list:
-                                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                                    new_deployment[field]['resourcemonitor']['disklimit'][
-                                        'feature'] = get_deployment_properties(
-                                        deployment[field]['resourcemonitor']['disklimit']['feature'], 'list')
-                                else:
-                                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                                    new_deployment[field]['resourcemonitor']['disklimit'][
-                                        'feature'] = get_deployment_properties(
-                                        deployment[field]['resourcemonitor']['disklimit']['feature'], 'dict')
-
-                    except Exception, err:
-                        print str(err)
-                        print traceback.format_exc()
-                elif field == 'dr':
-                    try:
-                        if deployment[field] is not None:
-                            new_deployment[field] = {}
-                            new_deployment[field]['id'] = int(deployment[field]['id'])
-                            new_deployment[field]['listen'] = parse_bool_string(deployment[field]['listen'])
-                            if 'port' in deployment[field]:
-                                new_deployment[field]['port'] = int(deployment[field]['port'])
-                            if 'connection' in deployment[field] and deployment[field][
-                                'connection'] is not None and 'source' in deployment[field]['connection']:
-                                new_deployment[field]['connection'] = {}
-                                new_deployment[field]['connection']['source'] = str(
-                                    deployment[field]['connection']['source'])
-
-                    except Exception, err:
-                        print 'dr:' + str(err)
-                        print traceback.format_exc()
-                elif field == 'users':
-                    if deployment[field] is not None:
-                        new_deployment[field] = {}
-                        if type(deployment[field]['user']) is list:
-                            new_deployment[field]['user'] = []
-                            new_deployment[field]['user'] = get_deployment_properties(deployment[field]['user'], 'list')
-                        else:
-                            new_deployment[field]['user'] = []
-                            new_deployment[field]['user'] = get_deployment_properties(deployment[field]['user'], 'dict')
-                else:
-                    new_deployment[field] = convert_deployment_field_required_format(deployment, field)
-
-            deployments.append(new_deployment)
-    else:
-        for field in deployment_xml:
-            if field == 'export':
-                if deployment_xml[field] is not None:
-                    if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
-                                                                            'list')
-                    else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
-                                                                            'dict')
-                else:
-                    new_deployment[field] = deployment_xml[field]
-            elif field == 'import':
-                if deployment_xml[field] is not None:
-                    if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
-                                                                            'list')
-                    else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
-                                                                            'dict')
-                else:
-                    new_deployment[field] = deployment_xml[field]
-            elif field == 'admin-mode':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['adminstartup'] = parse_bool_string(deployment_xml[field]['adminstartup'])
-                    new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'cluster':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['hostcount'] = int(deployment_xml[field]['hostcount'])
-                    new_deployment[field]['kfactor'] = int(deployment_xml[field]['kfactor'])
-                    new_deployment[field]['sitesperhost'] = int(deployment_xml[field]['sitesperhost'])
-                    new_deployment[field]['elastic'] = str(deployment_xml[field]['elastic'])
-                    new_deployment[field]['schema'] = str(deployment_xml[field]['schema'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'commandlog':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                    new_deployment[field]['synchronous'] = parse_bool_string(deployment_xml[field]['synchronous'])
-                    new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
-                    new_deployment[field]['frequency'] = {}
-                    new_deployment[field]['frequency']['transactions'] = int(
-                        deployment_xml[field]['frequency']['transactions'])
-                    new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'heartbeat':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['timeout'] = int(deployment_xml[field]['timeout'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'httpd':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                    new_deployment[field]['jsonapi'] = {}
-                    new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(
-                        deployment_xml[field]['jsonapi']['enabled'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'partition-detection':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                    new_deployment[field]['snapshot'] = {}
-                    new_deployment[field]['snapshot']['prefix'] = deployment_xml[field]['snapshot']['prefix']
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'security':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                    new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'snapshot':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                    new_deployment[field]['frequency'] = str(deployment_xml[field]['frequency'])
-                    new_deployment[field]['prefix'] = str(deployment_xml[field]['prefix'])
-                    new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'systemsettings':
-                try:
-                    new_deployment[field] = {}
-                    new_deployment[field]['elastic'] = {}
-                    new_deployment[field]['elastic']['duration'] = int(deployment_xml[field]['elastic']['duration'])
-                    new_deployment[field]['elastic']['throughput'] = int(deployment_xml[field]['elastic']['throughput'])
-                    new_deployment[field]['query'] = {}
-                    new_deployment[field]['query']['timeout'] = int(deployment_xml[field]['query']['timeout'])
-                    new_deployment[field]['snapshot'] = {}
-                    new_deployment[field]['snapshot']['priority'] = int(deployment_xml[field]['snapshot']['priority'])
-                    new_deployment[field]['temptables'] = {}
-                    new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
-
-                    if 'resourcemonitor' not in deployment_xml[field] or deployment_xml[field][
-                        'resourcemonitor'] is None:
-                        if 'resourcemonitor' in deployment_xml[field]:
-                            new_deployment[field]['resourcemonitor'] = None
-                    else:
-                        new_deployment[field]['resourcemonitor'] = {}
-                        if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
-                            new_deployment[field]['resourcemonitor']['memorylimit'] = \
-                            deployment_xml[field]['resourcemonitor']['memorylimit']
-
-                        if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in \
-                                deployment_xml[field]['resourcemonitor']['disklimit']:
-                            if type(deployment_xml[field]['resourcemonitor']['disklimit']['feature']) is list:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                                new_deployment[field]['resourcemonitor']['disklimit'][
-                                    'feature'] = get_deployment_properties(
-                                    deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
-                            else:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                                new_deployment[field]['resourcemonitor']['disklimit'][
-                                    'feature'] = get_deployment_properties(
-                                    deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'dr':
-                try:
-                    if deployment_xml[field] is not None:
-                        new_deployment[field] = {}
-                        new_deployment[field]['id'] = int(deployment_xml[field]['id'])
-                        new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
-                        if 'port' in deployment_xml[field]:
-                            new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                        if 'connection' in deployment_xml[field] and deployment_xml[field][
-                            'connection'] is not None and 'source' in deployment_xml[field]['connection']:
-                            new_deployment[field]['connection'] = {}
-                            new_deployment[field]['connection']['source'] = str(
-                                deployment_xml[field]['connection']['source'])
-
-                except Exception, err:
-                    print str(err)
-                    print traceback.format_exc()
-            elif field == 'users':
-                if deployment_xml[field] is not None:
-                    new_deployment[field] = {}
-                    if type(deployment_xml[field]['user']) is list:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'list')
-                    else:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'dict')
-            else:
-                new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
-
-        deployments.append(new_deployment)
-    return deployments
-
-
-def get_deployment_for_upload(deployment_xml, is_list):
-    new_deployment = {}
-    deployments = []
-    for field in deployment_xml:
-        if field == 'export':
-            try:
-                if deployment_xml[field] is not None:
-                    if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
-                    else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
-                else:
-                    new_deployment[field] = deployment_xml[field]
-            except Exception, exp:
-                return {'error': 'Export: ' + str(exp)}
-        elif field == 'import':
-            try:
-                if deployment_xml[field] is not None:
-                    if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
-                    else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
-                else:
-                    new_deployment[field] = deployment_xml[field]
-            except Exception, exp:
-                return {'error': 'Import: ' + str(exp)}
-        elif field == 'admin-mode':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['adminstartup'] = parse_bool_string(deployment_xml[field]['adminstartup'])
-                new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-            except Exception, err:
-                return {'Error': 'Admin-mode: ' + str(err)}
-        elif field == 'cluster':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['hostcount'] = int(deployment_xml[field]['hostcount'])
-                new_deployment[field]['kfactor'] = int(deployment_xml[field]['kfactor'])
-                new_deployment[field]['sitesperhost'] = int(deployment_xml[field]['sitesperhost'])
-                new_deployment[field]['elastic'] = str(deployment_xml[field]['elastic'])
-                new_deployment[field]['schema'] = str(deployment_xml[field]['schema'])
-            except Exception, err:
-                return {'error': 'Cluster: ' + str(err)}
-        elif field == 'commandlog':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                new_deployment[field]['synchronous'] = parse_bool_string(deployment_xml[field]['synchronous'])
-                new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
-                new_deployment[field]['frequency'] = {}
-                new_deployment[field]['frequency']['transactions'] = int(deployment_xml[field]['frequency']['transactions'])
-                new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
-            except Exception, err:
-                return {'error': 'Commandlog: ' + str(err)}
-        elif field == 'heartbeat':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['timeout'] = int(deployment_xml[field]['timeout'])
-            except Exception, err:
-                return {'error': 'Heartbeat: ' + str(err)}
-        elif field == 'httpd':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                new_deployment[field]['jsonapi'] = {}
-                new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment_xml[field]['jsonapi']['enabled'])
-            except Exception, err:
-                return {'error': 'HTTPD: ' + str(err)}
-        elif field == 'partition-detection':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                new_deployment[field]['snapshot'] = {}
-                new_deployment[field]['snapshot']['prefix'] = deployment_xml[field]['snapshot']['prefix']
-            except Exception, err:
-                return {'error': 'Partition-Detection: ' + str(err)}
-        elif field == 'security':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
-            except Exception, err:
-                return {'error': 'Security: ' + str(err)}
-        elif field == 'snapshot':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
-                new_deployment[field]['frequency'] = str(deployment_xml[field]['frequency'])
-                new_deployment[field]['prefix'] = str(deployment_xml[field]['prefix'])
-                new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
-            except Exception, err:
-                return {'error': 'Snapshot: ' + str(err)}
-        elif field == 'systemsettings':
-            try:
-                new_deployment[field] = {}
-                new_deployment[field]['elastic'] = {}
-                new_deployment[field]['elastic']['duration'] = int(deployment_xml[field]['elastic']['duration'])
-                new_deployment[field]['elastic']['throughput'] = int(deployment_xml[field]['elastic']['throughput'])
-                new_deployment[field]['query'] = {}
-                new_deployment[field]['query']['timeout'] = int(deployment_xml[field]['query']['timeout'])
-                new_deployment[field]['snapshot'] = {}
-                new_deployment[field]['snapshot']['priority'] = int(deployment_xml[field]['snapshot']['priority'])
-                new_deployment[field]['temptables'] = {}
-                new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
-
-                if 'resourcemonitor' not in deployment_xml[field] or deployment_xml[field]['resourcemonitor'] is None:
-                    if 'resourcemonitor'  in deployment_xml[field]:
-                        new_deployment[field]['resourcemonitor'] = None
-                else:
-                    new_deployment[field]['resourcemonitor'] = {}
-                    if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
-                        new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
-
-                    if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in deployment_xml[field]['resourcemonitor']['disklimit']:
-                        if type(deployment_xml[field]['resourcemonitor']['disklimit']['feature']) is list:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
-                        else:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
-            except Exception, err:
-                return {'error': 'SystemSettings: ' + str(err)}
-        elif field == 'dr':
-            try:
-                if deployment_xml[field] is not None:
-                    new_deployment[field] = {}
-                    new_deployment[field]['id'] = int(deployment_xml[field]['id'])
-                    new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
-                    if 'port' in deployment_xml[field]:
-                        new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                    if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']:
-                        new_deployment[field]['connection'] = {}
-                        new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
-
-            except Exception, err:
-                return {'error': 'DR: ' + str(err)}
-        elif field == 'users':
-            try:
-                if deployment_xml[field] is not None:
-                    new_deployment[field] = {}
-                    if type(deployment_xml[field]['user']) is list:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'list')
-                    else:
-                        new_deployment[field]['user'] = []
-                        new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'dict')
-            except Exception, err:
-                return {'error': 'Users: ' + str(err)}
-        else:
-            new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
-
-    deployments.append(new_deployment)
-    return deployments
-
-
-def get_deployment_export_field(export_xml, is_list):
-    new_export = {}
-    exports = []
-    if is_list is 'list':
-        for export in export_xml:
-            new_export = {}
-            for field in export:
-                if field == 'property':
-                    if type(export['property']) is list:
-                        new_export['property'] = get_deployment_properties(export['property'], 'list')
-                    else:
-                        new_export['property'] = get_deployment_properties(export['property'], 'dict')
-                elif field == 'enabled':
-                    new_export[field] = parse_bool_string(export[field])
-                else:
-                    new_export[field] = export[field]
-            exports.append(new_export)
-    else:
-        for field in export_xml:
-            if field == 'property':
-                if type(export_xml['property']) is list:
-                    new_export['property'] = get_deployment_properties(export_xml['property'], 'list')
-                else:
-                    new_export['property'] = get_deployment_properties(export_xml['property'], 'dict')
-            elif field == 'enabled':
-                new_export[field] = parse_bool_string(export_xml[field])
-            else:
-                new_export[field] = export_xml[field]
-        exports.append(new_export)
-    return {'configuration': exports}
-
-
-def get_deployment_import_field(export_xml, is_list):
-    new_export = {}
-    exports = []
-    if is_list is 'list':
-        for export in export_xml:
-            new_export = {}
-            for field in export:
-                new_export[field] = export[field]
-            exports.append(new_export)
-    else:
-        for field in export_xml:
-            if field == 'property':
-                if type(export_xml['property']) is list:
-                    new_export['property'] = get_deployment_properties(export_xml['property'], 'list')
-                else:
-                    new_export['property'] = get_deployment_properties(export_xml['property'], 'dict')
-            else:
-                new_export[field] = export_xml[field]
-        exports.append(new_export)
-    return {'configuration': exports}
-
-
-def get_deployment_properties(export_xml, is_list):
-    new_export = {}
-    exports = []
-    if is_list is 'list':
-        for export in export_xml:
-            new_export = {}
-            for field in export:
-                if field == 'plaintext':
-                    new_export[field] = parse_bool_string(export[field])
-                else:
-                    new_export[field] = export[field]
-            exports.append(new_export)
-    else:
-        for field in export_xml:
-            if field == 'plaintext':
-                new_export[field] = parse_bool_string(export_xml[field])
-            else:
-                new_export[field] = export_xml[field]
-        exports.append(new_export)
-    return exports
-
-
-def get_users_from_xml(deployment_xml, is_list):
-    users = []
-    if is_list is 'list':
-        for deployment in deployment_xml:
-            for field in deployment:
-                if field == 'users':
-                    if deployment[field] is not None:
-                        if type(deployment[field]['user']) is list:
-                            for user in deployment[field]['user']:
-                                users.append(convert_user_required_format(user))
-                        else:
-                            users.append(convert_user_required_format(deployment[field]['user']))
-    else:
-        for field in deployment_xml:
-            if field == 'users':
-                if deployment_xml[field] is not None:
-                    if type(deployment_xml[field]['user']) is list:
-                        for user in deployment_xml[field]['user']:
-                            users.append(convert_user_required_format(user))
-                    else:
-                        users.append(convert_user_required_format(deployment_xml[field]['user']))
-    return users
-
-
-def convert_user_required_format(user):
-    for field in user:
-        if field == 'databaseid':
-            user[field] = int(user[field])
-    return user
-
-
-def convert_deployment_field_required_format(deployment, field):
-    if field == 'databaseid':
-        modified_field = int(deployment[field])
-    else:
-        modified_field = deployment[field]
-    return modified_field
-
-
-def etree_to_dict(t):
-    d = {t.tag: {} if t.attrib else None}
-    children = list(t)
-    if children:
-        dd = defaultdict(list)
-        for dc in map(etree_to_dict, children):
-            for k, v in dc.iteritems():
-                dd[k].append(v)
-        # d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.iteritems()}}
-        aa = {}
-        for k, v in dd.iteritems():
-            aa[k] = v[0] if len(v) == 1 else v
-        d = {t.tag: aa}
-    if t.attrib:
-        d[t.tag].update((k, v) for k, v in t.attrib.iteritems())
-    if t.text:
-        text = t.text.strip()
-        if children or t.attrib:
-            if text:
-                d[t.tag]['value'] = text
-        else:
-            d[t.tag] = text
-    return d
 
 
 def replace_last(source_string, replace_what, replace_with):
@@ -1332,10 +531,6 @@ def check_size_value(value, key):
             return jsonify({'status':'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
-
-
-def parse_bool_string(bool_string):
-    return bool_string.upper() == 'TRUE'
 
 
 def is_pro_version(deployment):
@@ -1385,6 +580,7 @@ class Global:
     DEPLOYMENT_USERS = []
     PATH = ''
     MODULE_PATH = ''
+    DELETED_HOSTNAME = ''
 
 
 class ServerAPI(MethodView):
@@ -1474,7 +670,7 @@ class ServerAPI(MethodView):
         current_database[0]['members'].append(server_id)
 
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'server': server, 'status': 1,
                         'members': current_database[0]['members']}), 201
 
@@ -1500,10 +696,10 @@ class ServerAPI(MethodView):
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
-
+            Global.DELETED_HOSTNAME = server[0]['hostname']
             Global.SERVERS.remove(server[0])
             sync_configuration()
-            write_configuration_file()
+            Configuration.write_configuration_file()
             return jsonify({'result': True})
         else:
             return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
@@ -1561,7 +757,7 @@ class ServerAPI(MethodView):
             current_server[0]['placement-group'] = \
                 request.json.get('placement-group', current_server[0]['placement-group'])
             sync_configuration()
-            write_configuration_file()
+            Configuration.write_configuration_file()
             return jsonify({'server': current_server[0], 'status': 1})
         else:
             return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
@@ -1601,7 +797,7 @@ class DatabaseAPI(MethodView):
         """
         sync_configuration()
 
-        write_configuration_file()
+        Configuration.write_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -1632,7 +828,7 @@ class DatabaseAPI(MethodView):
 
         sync_configuration()
 
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'database': database, 'status': 1}), 201
 
     @staticmethod
@@ -1654,7 +850,7 @@ class DatabaseAPI(MethodView):
 
         current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'database': current_database[0], 'status': 1})
 
     @staticmethod
@@ -1694,7 +890,7 @@ class DatabaseAPI(MethodView):
 
         Global.DEPLOYMENT.remove(deployment[0])
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'result': True})
 
 
@@ -1760,7 +956,7 @@ class deploymentAPI(MethodView):
 
         deployment = map_deployment(request, database_id)
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'deployment': deployment, 'status': 1})
 
 
@@ -1815,7 +1011,7 @@ class deploymentUserAPI(MethodView):
         })
 
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
 
     @staticmethod
@@ -1840,7 +1036,7 @@ class deploymentUserAPI(MethodView):
         current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
         current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
         sync_configuration()
-        write_configuration_file()
+        Configuration.write_configuration_file()
         return jsonify({'user': current_user[0], 'status': 1, 'statusstring': "User Updated"})
 
     @staticmethod
@@ -1954,7 +1150,10 @@ class StopServerAPI(MethodView):
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
-                return response
+                if 'Connection broken' in response.data:
+                    return make_response('SUCCESS: Server shutdown successfully.')
+                else:
+                    return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
@@ -1963,7 +1162,10 @@ class StopServerAPI(MethodView):
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
-                return response
+                if 'Connection broken' in response:
+                    return make_response('SUCCESS: Server shutdown successfully.')
+                else:
+                    return response
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'statusstring': str(err)}),
@@ -2032,8 +1234,11 @@ class RecoverServerAPI(MethodView):
         """
 
         try:
+            sid = -1
+            if 'id' in request.args:
+                sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(True)
+            return server.check_and_start_local_server(sid,True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2087,12 +1292,12 @@ class VdmConfiguration(MethodView):
 
     @staticmethod
     def get():
-        return jsonify(get_configuration())
+        return jsonify(Configuration.get_configuration())
 
     @staticmethod
     def post():
 
-        result = get_configuration()
+        result = Configuration.get_configuration()
 
         for member in result['voltdeploy']['members']:
             try:
@@ -2100,6 +1305,18 @@ class VdmConfiguration(MethodView):
                 url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
                 data = result
                 response = requests.post(url, data=json.dumps(data), headers=headers)
+            except Exception, errs:
+                print traceback.format_exc()
+                print str(errs)
+
+        if Global.DELETED_HOSTNAME != '':
+
+            try:
+                headers = {'content-type': 'application/json'}
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
+                data = result
+                response = requests.post(url, data=json.dumps(data), headers=headers)
+                Global.DELETED_HOSTNAME = ''
             except Exception, errs:
                 print traceback.format_exc()
                 print str(errs)
@@ -2124,12 +1341,12 @@ class DatabaseDeploymentAPI(MethodView):
             try:
                 content = file.read()
                 o = XML(content)
-                xml_final = json.loads(json.dumps(etree_to_dict(o)))
+                xml_final = json.loads(json.dumps(Configuration.etree_to_dict(o)))
                 if 'deployment' not in xml_final:
                     return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
                 else:
                     if type(xml_final['deployment']) is dict:
-                        deployment_data = get_deployment_for_upload(xml_final['deployment'], 'dict')
+                        deployment_data = Configuration.get_deployment_for_upload(xml_final['deployment'])
                         if type(deployment_data) is dict:
                             if 'error' in deployment_data:
                                 return jsonify({'error': deployment_data['error']})
@@ -2185,7 +1402,7 @@ class DatabaseDeploymentAPI(MethodView):
                                     }
                                 )
                         sync_configuration()
-                        write_configuration_file()
+                        Configuration.write_configuration_file()
                         return jsonify({'status': 'success'})
                     else:
                         return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
@@ -2203,7 +1420,7 @@ class VdmAPI(MethodView):
 
     @staticmethod
     def get():
-        vdm_content = make_configuration_file()
+        vdm_content = Configuration.make_configuration_file()
         return Response(vdm_content, mimetype='text/xml')
 
 
@@ -2230,7 +1447,7 @@ class StatusDatabaseAPI(MethodView):
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({'status': 'error', 'errorDetails': err, 'hostname': server[0]['hostname']})
+                    return jsonify({'status': 'error', 'hostname': server[0]['hostname']})
 
                 if response.json()['status'] == "stalled":
                     has_stalled = True
@@ -2301,7 +1518,6 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stopped", "details": error})
 
 
-
 def main(runner, amodule, config_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
@@ -2340,7 +1556,7 @@ def main(runner, amodule, config_dir, server):
         __PORT__ = int(8000)
 
     if os.path.exists(config_path):
-        convert_xml_to_json(config_path)
+        Configuration.convert_xml_to_json(config_path)
     else:
         is_pro_version(deployment)
 
@@ -2353,7 +1569,7 @@ def main(runner, amodule, config_dir, server):
                                'zookeeper-listener': "", 'placement-group': ""})
         Global.DATABASES.append({'id': 1, 'name': "Database", "members": [1]})
 
-    write_configuration_file()
+    Configuration.write_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')

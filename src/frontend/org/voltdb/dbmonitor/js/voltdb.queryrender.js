@@ -317,7 +317,7 @@ function QueryUI(queryString, userName) {
             for (var k = 0; k < table.data[j].length; k++) {
                 var val = table.data[j][k];
                 var typ = table.schema[k].type;
-                if (typ == 11) {
+                if (typ == 11 && val) {
                     var us = val % 1000;
                     var dt = new Date(val / 1000);
                     val = lPadZero(dt.getUTCFullYear(), 4) + "-"

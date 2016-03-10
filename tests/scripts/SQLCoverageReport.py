@@ -49,19 +49,23 @@ def as_html_unicode_string(s):
 
 def generate_table_str(res, key):
 
-    highlights = res.get("highlight")
     source = res[key].get("Result")
     if not source:
         return ""
+    highlights = res.get("highlight")
+    if isinstance(highlights, list):
+        key_highlights = highlights
+    else:
+        key_highlights = res.get("highlight_" + key)
 
     result = []
-    result.append(highlight("column count: %d" % (len(source.columns)), "columns" == highlights))
-    result.append(highlight("row count: %d" % (len(source.tuples)), "tuples" == highlights))
+    result.append(highlight("column count: %d" % (len(source.columns)), "Columns" == highlights))
+    result.append(highlight("row count: %d" % (len(source.tuples)), "Tuples" == highlights))
     result.append("cols: " + ", ".join(map(lambda x: str(x), source.columns)))
     result.append("rows -")
-    if isinstance(highlights, list):
+    if isinstance(key_highlights, list):
         for j in xrange(len(source.tuples)):
-            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in highlights))
+            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in key_highlights))
     else:
         result.extend(map(lambda x: as_html_unicode_string(x), source.tuples))
     tablestr = "<br />".join(result)
@@ -228,7 +232,15 @@ def is_different(x, cntonly):
 
     if len(jniTuples) != len(cmpTuples):
         x["highlight"] = "Tuples"
+        x["highlight_jni"] = []
+        x["highlight_cmp"] = []
         # print "DEBUG is_different -- got different numbers of tuples?"
+        for ii in xrange(len(jniTuples)):
+            if jniTuples[ii] not in cmpTuples:
+                x["highlight_jni"].append(ii)
+        for ii in xrange(len(cmpTuples)):
+            if cmpTuples[ii] not in jniTuples:
+                x["highlight_cmp"].append(ii)
         return True
     # print "DEBUG is_different -- got same numbers of tuples?", len(jniTuples), "namely ", jniTuples
 
@@ -279,8 +291,8 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
-                          output_dir, report_all, extra_stats='', cmpdb='HSqlDB',
-                          modified_sql_path=None, cntonly=False):
+                          output_dir, report_invalid, report_all, extra_stats='',
+                          cmpdb='HSqlDB', modified_sql_path=None, cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -298,6 +310,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     crashed = []
     voltdb_npes = []
     cmpdb_npes  = []
+    invalid     = []
     all_results = []
 
     try:
@@ -325,6 +338,8 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             count += 1
             if int(jni["Status"]) != 1:
                 failures += 1
+                if report_invalid:
+                    invalid.append(statement)
 
             statement["jni"] = jni
             statement["cmp"] = cdb
@@ -404,6 +419,9 @@ h2 {text-transform: uppercase}
     if(len(cmpdb_npes) > 0):
         sorted(cmpdb_npes, cmp=cmp, key=key)
         report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb, modified_sql)
+
+    if report_invalid and (len(invalid) > 0):
+        report += print_section("Invalid Statements", invalid, output_dir, cmpdb, modified_sql)
 
     if report_all:
         report += print_section("Total Statements", all_results, output_dir, cmpdb, modified_sql)

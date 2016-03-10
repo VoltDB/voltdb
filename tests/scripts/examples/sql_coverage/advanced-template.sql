@@ -4,6 +4,8 @@
 -- Required preprocessor macros (with example values):
 -- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
 -- {@aftermath = " _math _value[int:1,3]"}
+-- {@agg = "_numagg"}
+-- {@distinctableagg = "_distinctableagg"}
 -- {@cmp = "_cmp"} -- all comparison operators (=, <>, !=, <, >, <=, >=)
 -- {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 -- {@columntype = "decimal"}
@@ -13,6 +15,7 @@
 -- {@dmltable = "_table"}
 -- {@fromtables = "_table"}
 -- {@optionalfn = "_numfun"}
+-- {@plus10 = "+ 10"}
 -- {@star = "*"}
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
@@ -73,11 +76,11 @@ SELECT @optionalfn(A._variable[#order1 @columntype]) AS Q13, @optionalfn(A._vari
 SELECT @optionalfn(A._variable[@columntype]) AS Q14, @optionalfn(A._variable[@columntype]), @star FROM @fromtables A ORDER BY 1 _sortorder, 2 _sortorder
 
 -- additional aggregation fun
-SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                              AS Q15 FROM @fromtables A
+SELECT     @distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                              AS Q15 FROM @fromtables A
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     ))                                              AS Q16 FROM @fromtables A WHERE @columnpredicate
 -- These test that the fixed issue eng-909 -- combining DISTINCT and non-DISTINCT aggs has not regressed.
-SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
-SELECT     _distinctableagg(DISTINCT                     A._variable[@columntype]      ), @agg(@optionalfn(A._variable[@columntype])) AS Q19 FROM @fromtables A
+SELECT     @distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
+SELECT     @distinctableagg(DISTINCT                     A._variable[@columntype]      ), @agg(@optionalfn(A._variable[@columntype])) AS Q19 FROM @fromtables A
 SELECT 20,                                               A._variable[#GB @columntype]   , @agg(@optionalfn(A._variable[@columntype]))        FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT 21,                           @optionalfn(        A._variable[#GB @columntype] ) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT 22,                           @optionalfn(@onefun(A._variable[#GB @columntype])) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY @onefun(A.__[#GB])
@@ -107,9 +110,9 @@ SELECT DISTINCT   A._variable[#GB1 @columntype], A._variable[#GB2 @comparabletyp
 SELECT DISTINCT   A._variable[#GB1 @columntype], A._variable[#GB2 @comparabletype],  @agg(     A._variable)         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
 
 -- AGG DISTINCT
-SELECT   A._variable[#GB @columntype],  _distinctableagg(DISTINCT  A._variable[@comparabletype]  ) AS Q60 FROM @fromtables A  GROUP BY         A.__[#GB]
-SELECT   A._variable[#GB1 @columntype],  A._variable[#GB2 @comparabletype]   , _distinctableagg( DISTINCT A._variable)  AS Q61       FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
-SELECT   A._variable[#GB1 @columntype],  @optionalfn(        A._variable[@comparabletype]     ) as GB2_alias   , _distinctableagg( DISTINCT A._variable)  AS Q62         FROM @fromtables A GROUP BY         A.__[#GB1],  GB2_alias
+SELECT   A._variable[#GB @columntype],  @distinctableagg(DISTINCT  A._variable[@comparabletype]  ) AS Q60 FROM @fromtables A  GROUP BY         A.__[#GB]
+SELECT   A._variable[#GB1 @columntype],  A._variable[#GB2 @comparabletype]   , @distinctableagg( DISTINCT A._variable)  AS Q61       FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
+SELECT   A._variable[#GB1 @columntype],  @optionalfn(        A._variable[@comparabletype]     ) as GB2_alias   , @distinctableagg( DISTINCT A._variable)  AS Q62         FROM @fromtables A GROUP BY         A.__[#GB1],  GB2_alias
 
 -- update
 -- compare two cols
@@ -144,12 +147,12 @@ SELECT @star FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '
 --- argument type(s). You might need to add explicit type casts", which suggests that the comparison
 --- operators are given higher precedence than the concatenation operator. In contrast, VoltDB and
 --- HSQL behave the same, with or without the parens.
-SELECT @star FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] @cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END @cmp (@comparableconstant + 10)
-SELECT @star FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] @cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END @cmp (@comparableconstant + 10)
+SELECT @star FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] @cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END @cmp (@comparableconstant @plus10)
+SELECT @star FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] @cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END @cmp (@comparableconstant @plus10)
 SELECT __[#numone]            Q36,      CASE WHEN   A._variable[#arg @columntype] @cmp @comparableconstant THEN   A._variable[#numone @columntype]            ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q37,      CASE WHEN   A._variable[#arg @columntype] @cmp @comparableconstant THEN   A.__[#arg]                                                               END FROM @fromtables A WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END @cmp (@comparableconstant + 10)
-SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant + 10)
+SELECT @star FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END @cmp (@comparableconstant @plus10)
+SELECT @star FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END @cmp (@comparableconstant @plus10)
 SELECT __[#numone]            Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]               Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate

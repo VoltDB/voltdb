@@ -353,6 +353,16 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(getTableType("T25S"), "EXPORT");
     }
 
+    @Test
+    public void testStreamView() throws Exception
+    {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        assertTrue(findTableInSystemCatalogResults("T25N"));
+        assertEquals(getTableType("T25N"), "EXPORT");
+        assertEquals(getTableType("VT25N"), "VIEW");
+    }
+
 //    @Test
 //    public void testImportClass() throws Exception
 //    {
@@ -755,7 +765,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testGEOIndex() throws Exception {
         assertTrue(findTableInSystemCatalogResults("GEO"));
         assertTrue(findTableInSystemCatalogResults("T4"));
-        //assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
+
+        assertTrue(findIndexInSystemCatalogResults("GEOINDEX_GEOGRAPHY"));
         assertTrue(findIndexInSystemCatalogResults("GEOINDEX_REASONS"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POINT"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POLYGON"));
@@ -765,8 +776,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
         assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_AREA"));
         // GEO has three index columns.  Two for IDX
-        // and one for the primary key.
-        assertEquals(3, indexedColumnCount("GEO"));
+        // and one for the primary key,
+        // plus a geospatial index on geography column region1.
+        assertEquals(4, indexedColumnCount("GEO"));
     }
 
 }

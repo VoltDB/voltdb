@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -48,6 +46,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.utils.CatalogUtil;
+
+import junit.framework.TestCase;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -640,6 +640,79 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
+    public void testCreateStream() {
+        File jarOut = new File("createStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // create stream w/o export
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n",
+
+                // create stream w/ export
+                "CREATE STREAM FOO EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n",
+
+                // create stream w/ and w/o group
+                "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+                "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = false;
+            try {
+                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            }
+            catch (Exception e) {
+                // do nothing
+            }
+            assertTrue(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
+    public void testCreateStreamNegative() throws Exception {
+        File jarOut = new File("createStream.jar");
+        jarOut.deleteOnExit();
+
+        String schema[] = {
+                // with primary key
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT PK_TEST1 PRIMARY KEY (D1));\n",
+                // unique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 UNIQUE (D1));\n",
+                // assumeunique index
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "CONSTRAINT IDX_TEST1 ASSUMEUNIQUE (D1));\n",
+                // with limit
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100);\n",
+                // with limit and execute
+                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
+                "LIMIT PARTITION ROWS 100 EXECUTE (\n" +
+                "  DELETE FROM FOO WHERE D1 > 100));\n",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+    }
+
     public void testExportDRTable() {
         File jarOut = new File("exportDrTables.jar");
         jarOut.deleteOnExit();
@@ -731,6 +804,32 @@ public class TestDDLCompiler extends TestCase {
         tester.testFailure("create table an_unquoted_table (\"a_quoted_column_without_spaces\" integer)");
         tester.testFailure("create table an_unquoted_table (\"a quoted column with spaces\" integer)");
         tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
+    }
+
+    public void testIndexExpressions() throws Exception {
+        File jarOut = new File("indexExpressions.jar");
+        jarOut.deleteOnExit();
+
+        String tableCreation = "CREATE TABLE GEO ( ID INTEGER, REGION GEOGRAPHY ); ";
+
+        String schema[] = {
+                "CREATE INDEX POLY ON GEO ( POLYGONFROMTEXT( REGION ) );",
+                "CREATE INDEX POLY ON GEO ( POLYGONFROMVALIDTEXT( REGION ) );",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableCreation + schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+
     }
 
     public void testAutogenDRConflictTable() {

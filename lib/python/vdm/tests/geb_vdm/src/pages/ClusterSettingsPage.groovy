@@ -44,6 +44,7 @@ class ClusterSettingsPage extends Page {
 
         // Add Server Popup
         popupAddServer                          { $("#addServer > div > div") }
+        popupAddServerDetails                   { $("#accordion > div > div.panel-heading > h4 > a") }
         popupAddServerNameField                 { $("#serverName") }
         popupAddServerHostNameField             { $("#txtHostName") }
         popupAddServerDescriptionField          { $("#txtDescription") }
@@ -95,9 +96,6 @@ class ClusterSettingsPage extends Page {
         overview        { module OverviewModule }
         directories     { module DirectoriesModule }
         dr              { module DatabaseReplicationModule }
-
-        // trial
-        trialerror      { $("#serverList > tbody > tr > td:nth-child(1)") }
     }
 
     static at = {

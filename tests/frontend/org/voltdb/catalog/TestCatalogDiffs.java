@@ -27,6 +27,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import junit.framework.TestCase;
+
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -38,8 +40,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestCatalogDiffs extends TestCase {
 
@@ -1297,6 +1297,61 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
+    public void testExportConfigStreamTargetAttribute() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final String ddl =
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+
+        String depXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "exporttarget1.jar");
+        Catalog cat = catalogForJar(testDir + File.separator + "exporttarget1.jar");
+        File file = VoltProjectBuilder.writeStringToTempFile(depXml);
+        DeploymentType deployment = CatalogUtil.getDeployment(new FileInputStream(file));
+
+        String msg = CatalogUtil.compileDeployment(cat, deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        depXml =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='default' target='newtarget' enabled='true' type='file'>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+
+        builder.compile(testDir + File.separator + "exporttarget2.jar");
+        cat = catalogForJar(testDir + File.separator + "exporttarget2.jar");
+        file = VoltProjectBuilder.writeStringToTempFile(depXml);
+        deployment = CatalogUtil.getDeployment(new FileInputStream(file));
+
+        msg = CatalogUtil.compileDeployment(cat, deployment, false);
+        assertTrue("Must fail when both 'stream' and 'target' attributes are specified",
+                msg.contains("Only one of 'target' or 'stream' attribute must be specified"));
+    }
+
     public void testConnectorPropertiesChanges() throws Exception {
         if (!MiscUtils.isPro()) { return; } // not supported in community
 
@@ -1313,7 +1368,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
@@ -1335,7 +1390,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
@@ -1358,7 +1413,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">TSV</property>"
                 + "            <property name=\"with-schema\">true</property>"
                 + "            <property name=\"nonce\">pre-fix-other</property>"
@@ -1380,7 +1435,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration target='default' enabled='false' type='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"

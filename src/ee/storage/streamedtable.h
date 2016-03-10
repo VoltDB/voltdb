@@ -25,12 +25,17 @@
 #include "storage/StreamedTableStats.h"
 #include "storage/TableStats.h"
 
+namespace catalog {
+class MaterializedViewInfo;
+}
+
 namespace voltdb {
 
 // forward decl.
 class Topend;
 class ExecutorContext;
 class ExportTupleStream;
+class ExportMaterializedViewMetadata;
 
 /**
  * A streamed table does not store data. It may not be read. It may
@@ -44,12 +49,14 @@ class StreamedTable : public Table {
     friend class StreamedTableStats;
 
   public:
-    StreamedTable(bool exportEnabled);
+    StreamedTable(bool exportEnabled, int partitionColumn = -1);
     StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
     bool enableStream();
+    //Add mat view on export table.
+    void addMaterializedView(ExportMaterializedViewMetadata *view);
 
     virtual ~StreamedTable();
 
@@ -85,6 +92,14 @@ class StreamedTable : public Table {
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
 
+    void dropMaterializedView(ExportMaterializedViewMetadata *targetView);
+    void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
+                                    std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
+                                    std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
+                                    std::vector<ExportMaterializedViewMetadata*> &survivingViewsOut,
+                                    std::vector<ExportMaterializedViewMetadata*> &obsoleteViewsOut);
+    void updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo);
+
     virtual std::string tableType() const {
         return "StreamedTable";
     }
@@ -112,11 +127,24 @@ class StreamedTable : public Table {
         return true;
     }
 
+    bool isMaterialized() {
+        return false;
+    }
+
+    bool hasViews() { return (m_views.size() > 0); }
+    int partitionColumn() const { return m_partitionColumn; }
+
     /*
      * For an export table return the sequence number
      */
     virtual int64_t activeTupleCount() const {
         return m_sequenceNo;
+    }
+
+protected:
+    // No Op
+    std::vector<uint64_t> getBlockAddresses() const {
+        return std::vector<uint64_t>();
     }
 
 private:
@@ -133,6 +161,13 @@ private:
     ExecutorContext *m_executorContext;
     ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
+
+    // partition key
+    const int m_partitionColumn;
+
+    // list of materialized views that are sourced from this table
+    std::vector<ExportMaterializedViewMetadata *> m_views;
+
 };
 
 }

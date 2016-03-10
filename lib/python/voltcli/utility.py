@@ -840,18 +840,27 @@ def merge_java_options(*opts):
     return ret_opts
 
 #===============================================================================
-def get_java_version():
+def get_java_version(javaHome="java", verbose=False):
 #===============================================================================
     """
     Assumes caller has already run "find_in_path(java)" so we know it can be checked.
     """
     try:
-        proc = subprocess.Popen(['java', '-version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        out, err = proc.communicate()
+        version = subprocess.Popen([javaHome, '-version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        grep = subprocess.Popen(['grep', 'java \|openjdk'], stdin=version.stdout, stdout=subprocess.PIPE)
+        version.stdout.close()
+        out, err = grep.communicate()
+        version.wait()
         if "1.8" in out:
-            return "1.8"
+            if verbose:
+                return out
+            else:
+                return "1.8"
         elif "1.7" in out:
-            return "1.7"
+            if verbose:
+                return out
+            else:
+                return "1.7"
         else:
             return ""
     except (OSError):

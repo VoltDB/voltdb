@@ -334,6 +334,9 @@ public class Tokens {
     static final String        T_SYMMETRIC         = "SYMMETRIC";
     static final String        T_SYSTEM            = "SYSTEM";
     static final String        T_SYSTEM_USER       = "SYSTEM_USER";
+    // A VoltDB extension STREAM
+    static final String        T_STREAM = "STREAM";
+    // End of VoltDB extension
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
     static final String        T_THEN              = "THEN";
@@ -1092,6 +1095,9 @@ public class Tokens {
     public static final int SYMMETRIC                        = 273;
     public static final int SYSTEM                           = 274;
     public static final int SYSTEM_USER                      = 275;
+    // A VoltDB extension STREAM
+    public static final int STREAM                           = 1305;
+    // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
     public static final int THEN                             = 278;
@@ -1890,6 +1896,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SYMMETRIC, SYMMETRIC);
         reservedKeys.put(Tokens.T_SYSTEM, SYSTEM);
         reservedKeys.put(Tokens.T_SYSTEM_USER, SYSTEM_USER);
+        // A VoltDB extension STREAM
+        reservedKeys.put(Tokens.T_STREAM, STREAM);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_TABLE, TABLE);
         reservedKeys.put(Tokens.T_TABLESAMPLE, TABLESAMPLE);
         reservedKeys.put(Tokens.T_THEN, THEN);
@@ -2270,6 +2279,9 @@ public class Tokens {
             // End of VoltDB extension
             // A VoltDB extension APPROX_COUNT_DISTINCT
             APPROX_COUNT_DISTINCT,
+            // End of VoltDB extension
+            // A VoltDB extension STREAM
+            STREAM,
             // End of VoltDB extension
         };
 

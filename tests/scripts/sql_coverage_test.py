@@ -210,8 +210,9 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
-    subversion_generation, submit_verbosely, ascii_only, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed,
+               report_invalid, report_all, generate_only, subversion_generation,
+               submit_verbosely, ascii_only, args, testConfigKit):
 
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
@@ -351,8 +352,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     try:
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
-                                  jni_path, output_dir, report_all, extraStats, comparison_database,
-                                  modified_sql_path)
+                                  jni_path, output_dir, report_invalid, report_all, extraStats,
+                                  comparison_database, modified_sql_path)
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
@@ -656,9 +657,12 @@ if __name__ == "__main__":
     parser.add_option("-a", "--ascii-only", action="store_true",
                       dest="ascii_only", default=False,
                       help="include only ASCII values in randomly generated string constants")
+    parser.add_option("-i", "--report-invalid", action="store_true",
+                      dest="report_invalid", default=False,
+                      help="report invalid SQL statements, not just mismatches")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
-                      help="report all attempted SQL statements rather than mismatches")
+                      help="report all attempted SQL statements, not just mismatches")
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
@@ -734,7 +738,8 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
+        result = run_config(config_name, config, basedir, report_dir, seed,
+                            options.report_invalid, options.report_all,
                             options.generate_only, options.subversion_generation,
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]

@@ -29,8 +29,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -39,6 +41,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -110,11 +113,12 @@ public class TestCollector {
                                     "--copyToVEM=true",
                                     "--calledFromVEM=true",  // calledFromVem (set to true so that resulting collection can be easily located)
                                     "--fileInfoOnly=false",  // fileInfoOnly
-                                    "--days="+String.valueOf(days)
+                                    "--days="+String.valueOf(days),
+                                    "--libPathForTest="+getWorkingDir(voltDbRootPath)+"/lib"
                                     });
 
         rootDir = CoreUtils.getHostnameOrAddress() + "_voltlogs_";
-        File collectionFile = new File(voltDbRootPath, rootDir + ".zip");
+        File collectionFile = new File(voltDbRootPath, rootDir + ".zipfile");
         assertTrue(collectionFile.exists());
 
         return new ZipFile(collectionFile);
@@ -283,13 +287,23 @@ public class TestCollector {
         ZipEntry systemCheck = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + "systemcheck");
         assertNotNull(systemCheck);
 
-        ZipEntry dmesgdata = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + "dmesgdata");
-        assertNotNull(dmesgdata);
-
         List<String> logPaths = getLogPaths(voltDbRootPath);
         for (String path : logPaths) {
             ZipEntry logFile = collectionZip.getEntry(subFolderPath + "voltdb_logs" + File.separator + new File(path).getName());
             assertNotNull(logFile);
+        }
+
+        InputStream systemStatsIS;
+        if (System.getProperty("os.name").contains("Mac"))
+            systemStatsIS = new FileInputStream(getWorkingDir(voltDbRootPath)+"/lib/macstats.properties");
+        else
+            systemStatsIS = new FileInputStream(getWorkingDir(voltDbRootPath)+"/lib/linuxstats.properties");
+        assertNotNull(systemStatsIS);
+        Properties systemStats = new Properties();
+        systemStats.load(systemStatsIS);
+        for (String fileName : systemStats.stringPropertyNames()) {
+            ZipEntry statdata = collectionZip.getEntry(subFolderPath + "system_logs" + File.separator + fileName);
+            assertNotNull(statdata);
         }
 
         Enumeration<? extends ZipEntry> e = collectionZip.entries();

@@ -159,7 +159,8 @@ class VoltDatabase:
             response = requests.get(url)
             return create_response(response.text, 200)
         else:
-            return create_response('Start request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Start request sent successfully to servers: ' +
+                                   json.dumps(server_status), 200)
 
     def start_server(self, server_id, recover=False):
         """
@@ -182,8 +183,8 @@ class VoltDatabase:
         if recover:
             action = 'recover'
         try:
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s') % \
-                              (server[0]['hostname'], HTTPListener.__PORT__, self.database_id, action)
+            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u') % \
+                              (server[0]['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id)
             response = requests.put(url)
             return create_response(json.loads(response.text)['statusstring'], response.status_code)
         except Exception, err:
@@ -497,9 +498,9 @@ class VoltDatabase:
                 server_status[curr['hostname']] = str(err)
 
         if failed:
-            return create_response('There were errors stopping servers: ' + str(server_status) ,500)
+            return create_response('There were errors stopping servers: ' + json.dumps(server_status), 500)
         else:
-            return create_response('Stop request sent successfully to servers: ' + str(server_status), 200)
+            return create_response('Stop request sent successfully to servers: ' + json.dumps(server_status), 200)
 
     def kill_server(self, server_id):
         try:

@@ -32,6 +32,7 @@ import requests
 import xmlrunner
 import socket
 import time
+import json
 
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
@@ -196,14 +197,18 @@ class DefaultStartServer(Server):
                 print "The Server list is empty"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping Cluster...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
@@ -233,17 +238,76 @@ class StartServer(Cluster):
                 print "error"
             elif "Start request sent successfully to servers" in value['statusstring']:
                 self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
                 time.sleep(10)
                 print "Stopping...."
                 url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Connection broken" in value['statusstring']:
+                if "Server shutdown successfully." in value['statusstring']:
                     self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
+class DefaultRecoverServer(Server):
+    """
+    Create Server
+    """
+
+    def test_recover_stop_server(self):
+        """
+        ensure Start and stop server is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/recover' % \
+                (__host_or_ip__,last_db_id)
+            print "Recovering..."
+            response = requests.put(url)
+            value = response.json()
+
+            if not value['statusstring']:
+                print "Error"
+            elif "FATAL: VoltDB Community Edition" in value['statusstring']:
+                print "Voltdb recover is only supported in Enterprise Edition"
+            elif "Start request sent successfully to servers" in value['statusstring']:
+                self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
+                time.sleep(10)
+                print "Stopping Cluster...."
+                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
+                (__host_or_ip__,last_db_id)
+                response = requests.put(url_stop)
+                value = response.json()
+                if "Server shutdown successfully." in value['statusstring']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
+            elif response.status_code == 500:
+                self.assertEqual(response.status_code, 500)
+
+
+def CheckServerStatus(self, last_db_id, status):
+    status_url = 'http://%s:8000/api/1.0/databases/%u/status/' % \
+    (__host_or_ip__,last_db_id)
+    print "Checking status..."
+    response = requests.get(status_url)
+    value = response.json()
+    if value['status'] and value['status'][0]['status']:
+        print "Status: " + value['status'][0]['status']
+        self.assertEqual(value['status'][0]['status'], status)
+        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    else:
+        assert False
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
