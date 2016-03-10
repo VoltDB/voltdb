@@ -2448,7 +2448,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
 
-    log_file = os.path.join(Global.PATH, 'voltdeploy.log')
+    log_file = os.path.join(Global.VOLT_ROOT_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
         open(log_file, 'w').close()
     handler = RotatingFileHandler(log_file)
