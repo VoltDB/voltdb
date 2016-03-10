@@ -229,9 +229,9 @@ private:
             newLng = 0.0;
         }
 
-        // For longitudes within epsilon of the antimeridian
-        // (on the east side), canonicalize to 180.0.
-        if (180.0 + m_longitude < epsilon()) {
+        // If point is not at the poles, evaluate longitudes within epsilon
+        // of the antimeridian (on the east side), canonicalize to 180.0.
+        else if (180.0 + m_longitude < epsilon()) {
             newLng = 180.0;
         }
 
