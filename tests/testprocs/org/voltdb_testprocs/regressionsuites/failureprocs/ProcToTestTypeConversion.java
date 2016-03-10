@@ -72,12 +72,15 @@ public class ProcToTestTypeConversion extends VoltProcedure {
     public final static SQLStmt insert = new SQLStmt ("Insert into T "
                                             + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    public final static byte TestHCTypeConvAllowed = 0;
+    // flag to indicate run test that queues insert and select statements above and
+    // tests the verifies conversion for insert and select is not allowed
+    public final static byte TestAllAllowedTypeConv = 0;
+    // flag to indicate run test that constructs values along with a value of type specified by
+    // user for particular column. Used to test cases for which type conversion is feasible and
+    // for which it's blocked at voltqueuesql level.
     public final static byte TestTypeConvWithInsertProc = 1;
 
     private Object[] getUpdatedRowToInsert(int colIndex, byte valueTypeToPopulateWith, boolean strTs) {
-        //Object[] rowToInsert = m_defaultRowValue;
-        // this should match with the numbers of columns and values with it's type of table T
         Object[] rowToInsert = {m_byteVal, m_shortVal, m_intVal, m_bigIntVal, m_doubleVal, m_bigDecVal, m_tsVal, m_strTs, m_binVal, m_pt, m_poly};
         assert(colIndex < rowToInsert.length);
         VoltType toType = VoltType.get(valueTypeToPopulateWith);
@@ -121,7 +124,6 @@ public class ProcToTestTypeConversion extends VoltProcedure {
                 rowToInsert[colIndex] = VoltTypeUtil.getRandomValue(toType);
                 break;
         }
-
         return rowToInsert;
     }
 
@@ -130,8 +132,8 @@ public class ProcToTestTypeConversion extends VoltProcedure {
         Object rowToInsert[];
         boolean useStrTs;
         switch(operation) {
-        case TestHCTypeConvAllowed:
-
+        case TestAllAllowedTypeConv:
+            // queues insert and select statements for which type conversion is allowed
             voltQueueSQL(insert, null, null, null, m_bigIntVal, null, null,
                                  null, null, null, null, null, null);
 
@@ -221,6 +223,8 @@ public class ProcToTestTypeConversion extends VoltProcedure {
 
             break;
         case TestTypeConvWithInsertProc:
+            // if column to test is of timestamp (ts) type, use ts string for string value
+            // which can be used for inserting into ts column
             useStrTs = (colIndOfTargetType == colIndOfTimeStamp) ? true : false;
             rowToInsert = getUpdatedRowToInsert(colIndOfTargetType, valueOfTypeToPopulateWith, useStrTs);
             voltQueueSQL(insert, rowToInsert);
@@ -228,5 +232,4 @@ public class ProcToTestTypeConversion extends VoltProcedure {
         }
         return voltExecuteSQL();
     }
-
 }

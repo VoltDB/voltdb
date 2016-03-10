@@ -99,7 +99,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
 
         // test different cases of type conversion that are allowed
         client.callProcedure("ProcToTestTypeConversion",
-                             ProcToTestTypeConversion.TestHCTypeConvAllowed,
+                             ProcToTestTypeConversion.TestAllAllowedTypeConv,
                              0, 0);
 
         // use the conversion matrix to test type conversion cases that are allowed and blocked

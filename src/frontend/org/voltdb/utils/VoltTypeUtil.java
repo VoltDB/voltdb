@@ -221,18 +221,18 @@ public abstract class VoltTypeUtil {
     //  from     |             to
     //--------------------------------------------------------------------------------------------------------
     //           |Tiny  Small  Int   BigInt  Float  Decimal  Timestamp  Varchar  VarBinary GeoPoint  Geography
-    // Tiny      | y     y      y      y       y      y         y        y          x        x          x
-    // Small     | y     y      y      y       y      y         y        y          x        x          x
-    // Int       | y     y      y      y       y      y         y        y          x        x          x
-    // BigInt    | y     y      y      y       y      y         y        y          x        x          x
-    // Float     | y     y      y      y       y      y         y        y          x        x          x
-    // Double    | y     y      y      y       y      y         y        y          x        x          x
-    // Decimal   | y     y      y      y       y      y         y        y          x        x          x
-    // Timestamp | y     y      y      y       y      y         y        y          x        x          x
-    // Varchar   | x     x      x      x       x      x         x        y          x        x          x
-    // VarBinary | x     x      x      x       x      x         x        y          y        x          x
-    // GeoPoint  | x     x      x      x       x      x         x        x          x        y          x
-    // Geography | x     x      x      x       x      x         x        x          x        x          y
+    // Tiny      | y     y      y      y       y      y         y        y          .        .          .
+    // Small     | y     y      y      y       y      y         y        y          .        .          .
+    // Int       | y     y      y      y       y      y         y        y          .        .          .
+    // BigInt    | y     y      y      y       y      y         y        y          .        .          .
+    // Float     | y     y      y      y       y      y         y        y          .        .          .
+    // Double    | y     y      y      y       y      y         y        y          .        .          .
+    // Decimal   | y     y      y      y       y      y         y        y          .        .          .
+    // Timestamp | y     y      y      y       y      y         y        y          .        .          .
+    // Varchar   | y     y      y      y       y      y         y        y          .        .          .
+    // VarBinary | .     .      .      .       .      .         .        y          y        .          .
+    // GeoPoint  | .     .      .      .       .      .         .        .          .        y          .
+    // Geography | .     .      .      .       .      .         .        .          .        .          y
     public static boolean implicitTypeConvFeasible(VoltType from, VoltType to) {
         if (to == VoltType.INVALID || from == VoltType.INVALID) {
             return false;

@@ -34,8 +34,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb_testprocs.regressionsuites.failureprocs.GeoPointProcsWithIncompatibleParameter;
-import org.voltdb_testprocs.regressionsuites.failureprocs.GeographyProcsWithIncompatibleParameter;
 
 public class TestGeospatialFunctions extends RegressionSuite {
     /*
@@ -993,29 +991,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         verifyStmtFails(client, sql, expectedMsg);
     }
 
-    public void testPolygonIncompatibleTypes() throws NoConnectionsException, IOException, ProcCallException {
-        Client client = getClient();
-        populateTables(client);
-
-        // Supply legal wkt or GeographyValue arg from each test entry. Supplied value will not effect the result except it has to be
-        // legal wkt. The stored procedure's execution call uses hard-coded string wkt for parameterized Geography value for negative testing.
-        for (GeographyProcsWithIncompatibleParameter.TestEntries entry : GeographyProcsWithIncompatibleParameter.TestEntries.values()) {
-            verifyProcFails(client, entry.getFailureMsg(), "GeographyProcsWithIncompatibleParameter", entry.getParam());
-        }
-
-    }
-
-    public void testPointIncompatibleTypes() throws NoConnectionsException, IOException, ProcCallException {
-        Client client = getClient();
-        populateTables(client);
-
-        // Supply legal wkt or GeographyPointValue arg from each test entry. Supplied value will not effect the result except it has to be
-        // legal wkt. The stored procedure's execution call uses hard-coded string wkt for parameterized point value for negative testing.
-        for (GeoPointProcsWithIncompatibleParameter.TestEntries entry : GeoPointProcsWithIncompatibleParameter.TestEntries.values()) {
-            verifyProcFails(client, entry.getFailureMsg(), "GeoPointProcsWithIncompatibleParameter", entry.getParam());
-        }
-    }
-
     static public junit.framework.Test suite() {
         MultiConfigSuiteBuilder builder =
                 new MultiConfigSuiteBuilder(TestGeospatialFunctions.class);
@@ -1027,8 +1002,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
             setUpSchema(project);
             config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            project.addProcedures(GeographyProcsWithIncompatibleParameter.class);
-            project.addProcedures(GeoPointProcsWithIncompatibleParameter.class);
             project.setUseDDLSchema(true);
             success = config.compile(project);
             assertTrue(success);

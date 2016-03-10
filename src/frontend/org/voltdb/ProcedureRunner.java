@@ -838,7 +838,7 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    private final void typeConversionFeasible(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
+    private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
         VoltType argType = VoltType.INVALID;
 
         // is passed in parameter an array of params?
@@ -879,7 +879,7 @@ public class ProcedureRunner {
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
                 if (verifyTypeConv) {
-                    typeConversionFeasible(stmt, args[ii].getClass(), ii, type);
+                    throwIfInfeasibleTypeConversion(stmt, args[ii].getClass(), ii, type);
                 }
                 continue;
             }
