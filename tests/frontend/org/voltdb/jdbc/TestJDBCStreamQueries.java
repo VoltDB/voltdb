@@ -123,14 +123,14 @@ public class TestJDBCStreamQueries {
                 { "3", "Meghan Trainor", "MA" },
         };
         Map<String, Integer> countByState = populateStream(data);
-        
+
         // select, update and delete on streams should fail
         runQueryExpectFailure("select * from stream1");
         runQueryExpectFailure(String.format("UPDATE stream1 SET name='%s' WHERE id=1", "cashed"));
         runQueryExpectFailure("DELETE FROM stream1 WHERE id=1");
-        
+
         verifyStreamViewSelect(countByState);
-        
+
         // update stream view
         String query = "UPDATE count_by_state SET count_value=0 WHERE state=?";
         String state = "TN";
@@ -141,11 +141,11 @@ public class TestJDBCStreamQueries {
         assertEquals(1, count);
         countByState.put(state, 0);
         verifyStreamViewSelect(countByState);
-        
+
         // now insert and see if count matches
         insertToStream(new String[] { "4",  "Miley Cyrus", "TN" }, countByState);
         verifyStreamViewSelect(countByState);
-        
+
         // delete and verify
         query = "DELETE FROM count_by_state WHERE state=?";
         stmt = conn.prepareStatement(query);
@@ -155,12 +155,12 @@ public class TestJDBCStreamQueries {
         assertEquals(1, count);
         countByState.remove(state);
         verifyStreamViewSelect(countByState);
-        
+
         // one more insert
         insertToStream(new String[] { "5",  "Blake Shelton", "TN" }, countByState);
         verifyStreamViewSelect(countByState);
     }
-    
+
     private void verifyStreamViewSelect(Map<String, Integer> countByState) throws Exception
     {
         String query = "SELECT state, count_value FROM count_by_state";
@@ -175,17 +175,17 @@ public class TestJDBCStreamQueries {
         }
         assertEquals(countByState.size(), foundCount);
     }
-    
+
     private Map<String, Integer> populateStream(String[][] data) throws Exception
     {
         Map<String, Integer> countByState = new HashMap<>();
         for (String[] row : data) {
             insertToStream(row, countByState);
         }
-        
+
         return countByState;
     }
-    
+
     private void insertToStream(String[] row, Map<String, Integer> countByState) throws Exception
     {
         PreparedStatement stmt = conn.prepareStatement("insert into stream1 values(?, ?, ?)");
@@ -202,7 +202,7 @@ public class TestJDBCStreamQueries {
         }
         stmt.close();
     }
-    
+
     private void runQueryExpectFailure(String query) throws Exception
     {
         PreparedStatement stmt = conn.prepareStatement(query);
