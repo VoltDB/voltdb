@@ -1478,11 +1478,28 @@ class ServerAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+
+        specified_port_values = [{
+            "http-listener": get_port(request.json.get('http-listener', "")),
+            "admin-listener": get_port(request.json.get('admin-listener', "")),
+            "replication-listener": get_port(request.json.get('replication-listener', "")),
+            "client-listener": get_port(request.json.get('client-listener', "")),
+            "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
+            "internal-listener": get_port(request.json.get('internal-listener', ""))
+        }];
+
+        for option in arr:
+            value = specified_port_values[0][option]
+            for port_values in specified_port_values[0].keys():
+                if option != port_values:
+                    if specified_port_values[0][port_values] == value:
+                        return jsonify(success=False, errors="Duplicate port")
+
         for servers in Global.SERVERS:
             if servers['hostname'] == request.json['hostname']:
                 for option in arr:
                     result = check_port_valid(option, servers)
-                    if result != None:
+                    if result is not None:
                         return result
 
         if not Global.SERVERS:
