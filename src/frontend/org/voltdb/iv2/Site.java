@@ -406,29 +406,47 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
         @Override
-        public boolean isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                long lastReceivedDRId)
+        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                             long lastReceivedDRId)
         {
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
+                // Don't have a tracker for this cluster
                 if (lastReceivedDRId == -1L) {
-                    return true;
+                    return (byte)0;
                 }
             }
             else {
                 DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
                 if (targetTracker == null) {
+                    // Don't have a tracker for this partition
                     if (lastReceivedDRId == -1L) {
-                        return true;
+                        return (byte)0;
                     }
                 }
                 else {
-                    if (targetTracker.getDrIdRanges().lastEntry().getValue() == lastReceivedDRId) {
-                        return true;
+                    Map.Entry<Long, Long> lastTrackerEntry = targetTracker.getDrIdRanges().lastEntry();
+                    if (lastTrackerEntry == null) {
+                        if (lastReceivedDRId == -1L) {
+                            return (byte)0;
+                        }
+                        else {
+                            // Never advance if we expect a previous entry
+                            return (byte)1;
+                        }
+                    }
+
+                    if (lastTrackerEntry.getValue() == lastReceivedDRId) {
+                        // This is what we expected
+                        return (byte)0;
+                    }
+                    if (lastTrackerEntry.getValue() > lastReceivedDRId) {
+                        // This is a duplicate
+                        return (byte)-1;
                     }
                 }
             }
-            return false;
+            return (byte)1;
         }
 
         @Override
