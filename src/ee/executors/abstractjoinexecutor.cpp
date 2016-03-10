@@ -42,37 +42,53 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "abstractjoinexecutor.h"
+#include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
+#include "execution/ProgressMonitorProxy.h"
+#include "plannodes/abstractjoinnode.h"
+#include "storage/table.h"
 
-#ifndef HSTORESEQSCANEXECUTOR_H
-#define HSTORESEQSCANEXECUTOR_H
+using namespace std;
+using namespace voltdb;
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
-#include "execution/VoltDBEngine.h"
-
-namespace voltdb
-{
-    class AggregateExecutorBase;
-    struct CountingPostfilter;
-
-    class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-            , m_aggExec(NULL)
-        {}
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-
-    private:
-
-        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
-
-        AggregateExecutorBase* m_aggExec;
-    };
+void AbstractJoinExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& join_tuple, ProgressMonitorProxy& pmp) {
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_tuple(join_tuple);
+        return;
+    }
+    m_tmpOutputTable->insertTempTuple(join_tuple);
+    pmp.countdownProgress();
 }
 
-#endif
+void AbstractJoinExecutor::p_init_null_tuples(Table* outer_table, Table* inner_table) {
+    if (m_joinType != JOIN_TYPE_INNER) {
+        assert(inner_table);
+        m_null_inner_tuple.init(inner_table->schema());
+        if (m_joinType == JOIN_TYPE_FULL) {
+            assert(outer_table);
+            m_null_outer_tuple.init(outer_table->schema());
+        }
+    }
+}
+
+bool AbstractJoinExecutor::p_init(AbstractPlanNode* abstract_node,
+                              TempTableLimits* limits)
+{
+    VOLT_TRACE("Init AbstractJoinExecutor Executor");
+
+    AbstractJoinPlanNode* node = dynamic_cast<AbstractJoinPlanNode*>(abstract_node);
+    assert(node);
+
+    m_joinType = node->getJoinType();
+    assert(m_joinType == JOIN_TYPE_INNER || m_joinType == JOIN_TYPE_LEFT || m_joinType == JOIN_TYPE_FULL);
+
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits);
+    assert(m_tmpOutputTable);
+
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
+
+    return true;
+}

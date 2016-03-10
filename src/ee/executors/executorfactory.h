@@ -43,36 +43,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESEQSCANEXECUTOR_H
-#define HSTORESEQSCANEXECUTOR_H
+#ifndef HSTOREEXECUTORFACTORY_H
+#define HSTOREEXECUTORFACTORY_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
-#include "execution/VoltDBEngine.h"
+namespace voltdb {
 
-namespace voltdb
-{
-    class AggregateExecutorBase;
-    struct CountingPostfilter;
+class AbstractExecutor;
+class AbstractPlanNode;
+class VoltDBEngine;
 
-    class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-            , m_aggExec(NULL)
-        {}
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-
-    private:
-
-        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
-
-        AggregateExecutorBase* m_aggExec;
-    };
+AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 }
 
 #endif

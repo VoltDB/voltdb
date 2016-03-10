@@ -79,6 +79,7 @@
 {_jointype |= " INNER "}
 {_jointype |= " LEFT "}
 {_jointype |= " RIGHT "}
+{_jointype |= " FULL "}
 
 {_setop |= " UNION "}
 {_setop |= " INTERSECT "}

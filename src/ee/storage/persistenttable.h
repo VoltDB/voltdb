@@ -512,6 +512,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
+  protected:
+    std::vector<uint64_t> getBlockAddresses() const;
+
   private:
 
     // Zero allocation size uses defaults.
