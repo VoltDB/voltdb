@@ -34,13 +34,8 @@
 
 package voltkvqa;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -49,6 +44,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.protocol.HttpContext;
+import org.apache.http.util.EntityUtils;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -87,66 +88,71 @@ public class HTTPUtils {
         return s;
     }
 
-    public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
-        String server = servers[rand.nextInt(servers.length)];
-        // System.out.println("Server: " + server);
-        URL jsonAPIURL = new URL("http://" + server + ":8080/api/1.0/");
-
-        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.connect();
-
-        // System.out.println("varString: " + varString.toString());
-
-        OutputStreamWriter out = new OutputStreamWriter(conn.getOutputStream());
-        out.write(varString);
-        out.flush();
-        out.close();
-        out = null;
-        conn.getOutputStream().close();
-
-        BufferedReader in = null;
+    public static String callProcOverJSONRaw(String varString, int expectedCode, CloseableHttpClient httpclient,
+            HttpPost httppost, HttpContext context) throws Exception {
+        HttpEntity entity;
         try {
-            if(conn.getInputStream()!=null){
-                in = new BufferedReader(
-                        new InputStreamReader(
-                        conn.getInputStream(), "UTF-8"));
+            System.out.println("About to send request: " + httppost.getURI());
+            CloseableHttpResponse response = httpclient.execute(httppost, context);
+            try {
+                entity = response.getEntity();
+                if (entity != null) {
+                    long len = entity.getContentLength();
+                    if (len != -1 && len < 2048) {
+                        System.out.println(EntityUtils.toString(entity));
+                    }
+                }
+            } finally {
+                    response.close();
             }
-        } catch(IOException e){
-            if(conn.getErrorStream()!=null){
-                in = new BufferedReader(
-                        new InputStreamReader(
-                        conn.getErrorStream(), "UTF-8"));
-            }
-        }
-        if(in==null) {
-            throw new Exception("Unable to read response from server");
+        } catch (Exception e) {
+            System.out.println("Error in callProcOverJSONRaw");
+            e.printStackTrace(System.out);
         }
 
-        StringBuffer decodedString = new StringBuffer();
-        String line;
-        while ((line = in.readLine()) != null) {
-            decodedString.append(line);
-        }
-        in.close();
-        in = null;
-        // get result code
-        int responseCode = conn.getResponseCode();
 
-        String response = decodedString.toString();
-
-        try {
-            conn.getInputStream().close();
-            conn.disconnect();
-        }
-        // ignore closing problems here
-        catch (Exception e) {}
-        conn = null;
+//        BufferedReader in = null;
+//        try {
+//            if(conn.getInputStream()!=null){
+//                in = new BufferedReader(
+//                        new InputStreamReader(
+//                        conn.getInputStream(), "UTF-8"));
+//            }
+//        } catch(IOException e){
+//            if(conn.getErrorStream()!=null){
+//                in = new BufferedReader(
+//                        new InputStreamReader(
+//                        conn.getErrorStream(), "UTF-8"));
+//            }
+//        }
+//        if(in==null) {
+//            throw new Exception("Unable to read response from server");
+//        }
+//
+//        StringBuffer decodedString = new StringBuffer();
+//        String line;
+//        while ((line = in.readLine()) != null) {
+//            decodedString.append(line);
+//        }
+//        in.close();
+//        in = null;
+//        // get result code
+//        int responseCode = conn.getResponseCode();
+//
+//        String response = decodedString.toString();
+//
+//        try {
+//            conn.getInputStream().close();
+//            conn.disconnect();
+//        }
+//        // ignore closing problems here
+//        catch (Exception e) {}
+//        conn = null;
 
         //System.err.println(response);
 
-        return response;
+        return EntityUtils.toString(entity);
+        //return response;
     }
 
     public static String getHashedPasswordForHTTPVar(String password) {
@@ -169,15 +175,21 @@ public class HTTPUtils {
         return retval;
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */);
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash, CloseableHttpClient httpclient,
+            HttpPost httppost, HttpContext context) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */,  httpclient,  httppost,  context);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */);
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash, boolean admin,
+            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */,  httpclient,  httppost,  context);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash, boolean admin,
+            int expectedCode, CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         // System.out.println(paramsInJSON);
@@ -202,7 +214,7 @@ public class HTTPUtils {
 
         varString = getHTTPVarString(params);
 
-        return callProcOverJSONRaw(varString, expectedCode);
+        return callProcOverJSONRaw(varString, expectedCode, httpclient, httppost, context);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -234,24 +246,26 @@ public class HTTPUtils {
         return response;
     }
 
-    public static Response callProcedure(String string, String key, byte[] storeValue, String servers) throws JSONException, IOException, Exception {
-        HTTPUtils.servers = servers.split(",");
+    public static Response callProcedure(String string, String key, byte[] storeValue,
+            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context)
+                    throws JSONException, IOException, Exception {
         String hexval = Encoder.hexEncode(storeValue);
         ParameterSet pset = ParameterSet.fromArrayNoCopy(key, hexval);
         //if (string.equals("Put"))
         //    System.out.println(string + ". key: " + key + ". pset: " + pset.toString());
-        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
         //System.out.println("Response KV resp: " + resp.toString());
         Response response = responseFromJSON(resp);
         //System.out.println("Response KV: " + response.toString());
         return response;
     }
 
-    public static Response  callProcedure(String string, String generateRandomKeyForRetrieval, String servers) throws JSONException, IOException, Exception {
-        HTTPUtils.servers = servers.split(",");
+    public static Response  callProcedure(String string, String generateRandomKeyForRetrieval,
+            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context)
+                    throws JSONException, IOException, Exception {
         ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
         //System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
-        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
         //System.out.println("Response K resp: " + resp.toString());
         Response response = responseFromJSON(resp);
         //System.out.println("Response K: " + response.toString());

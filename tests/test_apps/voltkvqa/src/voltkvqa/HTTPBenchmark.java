@@ -43,6 +43,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HttpContext;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -377,6 +383,15 @@ public class HTTPBenchmark {
      *
      */
     class KVThread implements Runnable {
+        private final CloseableHttpClient m_httpClient;
+        private final HttpPost m_httpPost;
+        private final HttpContext m_context;
+
+        public KVThread(CloseableHttpClient httpClient, HttpPost httpPost) {
+                m_httpClient = httpClient;
+                m_httpPost = httpPost;
+                m_context = new BasicHttpContext();
+        }
 
         @Override
         public void run() {
@@ -385,7 +400,7 @@ public class HTTPBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), config.servers);
+                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost, m_context);
                     }
                     catch (Exception e) { e.printStackTrace(System.out); }
                 }
@@ -393,7 +408,7 @@ public class HTTPBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), config.servers);
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost, m_context);
                     }
                     catch (Exception e) { e.printStackTrace(System.out); }
                 }
@@ -405,7 +420,7 @@ public class HTTPBenchmark {
                     // Get a key/value pair, synchronously
                     try {
                         HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
-                                processor.generateRandomKeyForRetrieval(), config.servers);
+                                processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost, m_context);
 
                         if (response.results[0].advanceRow()) {
 
@@ -431,7 +446,7 @@ public class HTTPBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), config.servers);
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost, m_context);
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
@@ -476,10 +491,17 @@ public class HTTPBenchmark {
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        // setup the HTTP connection pool that will be used by the threads
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
+        cm.setMaxTotal(100);
+        CloseableHttpClient httpclient = HttpClients.custom().setConnectionManager(cm).build();
+        String[] servers = config.servers.split(",");
+
         // create/start the requested number of threads
         Thread[] kvThreads = new Thread[config.threads];
         for (int i = 0; i < config.threads; ++i) {
-            kvThreads[i] = new Thread(new KVThread());
+            HttpPost httppost = new HttpPost("http://" + servers[i%servers.length] + ":8080/api/1.0/");
+            kvThreads[i] = new Thread(new KVThread(httpclient, httppost));
             kvThreads[i].start();
         }
 
