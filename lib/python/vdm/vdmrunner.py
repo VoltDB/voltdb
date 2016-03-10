@@ -100,13 +100,15 @@ if __name__ == '__main__':
   path = options[0]['filepath']
   server = options[0]['server']
 
+org_wd = os.getcwd()
+
 app_root = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.normpath(app_root))
 
 if path is None:
     home = expanduser("~")
     path = os.path.join(home, '.voltdb')
-    data_path = os.path.join(os.getcwd(), 'voltdeployroot')
+    data_path = os.path.join(org_wd, 'voltdeployroot')
 else:
     data_path = os.path.join(path, 'voltdeployroot')
     path = os.path.join(path, '.voltdb')
