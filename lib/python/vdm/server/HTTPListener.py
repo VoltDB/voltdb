@@ -906,12 +906,8 @@ class deploymentAPI(MethodView):
         Returns:
             List of deployment information with specified database.
         """
-        if database_id is None:
-            # return a list of users
-            return jsonify({'deployment': [make_public_deployment(x) for x in Global.DEPLOYMENT]})
-        else:
-            deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
-            return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
+        deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+        return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
 
     @staticmethod
     def put(database_id):
@@ -1617,10 +1613,6 @@ def main(runner, amodule, config_dir, server):
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-
-    APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
-                     view_func=DEPLOYMENT_VIEW, methods=['GET'])
-
     APP.add_url_rule('/api/1.0/deployment/<int:database_id>', view_func=DEPLOYMENT_VIEW, methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
