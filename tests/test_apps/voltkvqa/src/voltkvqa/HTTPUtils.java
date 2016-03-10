@@ -102,8 +102,8 @@ public class HTTPUtils {
         // StringEntity jsonentity = new StringEntity(varString);
         //httppost.setEntity(new UrlEncodedFormEntity(varList));
 
-        System.out.println("About to send request: " + httppost.getURI());
-        System.out.println("varString: " + vals.toString());
+        // System.out.println("About to send request: " + httppost.getURI());
+        // System.out.println("varString: " + vals.toString());
 
         httppost.setEntity(new UrlEncodedFormEntity(vals));
         CloseableHttpResponse httpResponse = httpclient.execute(httppost, context);
@@ -113,8 +113,7 @@ public class HTTPUtils {
             //System.out.println("Entity length: " + len);
             //System.out.println(EntityUtils.toString(entity));
             //
-        System.out.println("POST Response Status:: "
-            + httpResponse.getStatusLine().getStatusCode());
+        //System.out.println("POST Response Status:: " + httpResponse.getStatusLine().getStatusCode());
          
             BufferedReader reader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
              
