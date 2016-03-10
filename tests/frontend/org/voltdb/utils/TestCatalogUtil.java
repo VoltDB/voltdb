@@ -364,6 +364,60 @@ public class TestCatalogUtil extends TestCase {
         assertNull(joe.getGroups().get("dontexist"));
     }
 
+    public void testBadUserPasswordRoles() throws Exception {
+        final String badUsername = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "<security enabled=\"true\"/>" +
+            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "<httpd port='0'>" +
+            "<jsonapi enabled='true'/>" +
+            "</httpd>" +
+            "<users> " +
+            "<user name=\"fancy pants\" password=\"admin\" roles=\"administrator\"/>" +
+            "</users>" +
+            "</deployment>";
+
+        final String badPassword = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "<security enabled=\"true\"/>" +
+                "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                "<httpd port='0'>" +
+                "<jsonapi enabled='true'/>" +
+                "</httpd>" +
+                "<users> " +
+                "<user name=\"fancy$pants\" password=\"ad min\" roles=\"admin:!\"/>" +
+                "</users>" +
+                "</deployment>";
+
+        final String badRoles = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "<security enabled=\"true\"/>" +
+                "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                "<httpd port='0'>" +
+                "<jsonapi enabled='true'/>" +
+                "</httpd>" +
+                "<users> " +
+                "<user name=\"fancypants\" password=\"admin\" roles=\"lo uno\"/>" +
+                "</users>" +
+                "</deployment>";
+
+        File tmpRole = VoltProjectBuilder.writeStringToTempFile(badUsername);
+        String res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertTrue(res.contains("Error parsing deployment"));
+
+        tmpRole = VoltProjectBuilder.writeStringToTempFile(badPassword);
+        res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertFalse(res.contains("Error parsing deployment"));
+
+        catalog_db.getGroups().add("lo uno");
+        tmpRole = VoltProjectBuilder.writeStringToTempFile(badRoles);
+        res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertTrue(res.contains("Error parsing deployment"));
+    }
+
     public void testScrambledPasswords() throws Exception {
         final String depRole = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
