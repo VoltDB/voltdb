@@ -404,13 +404,12 @@ public abstract class AbstractParsedStmt {
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
             VoltType vt = VoltType.typeFromString(type);
-            int size = VoltType.MAX_VALUE_LENGTH;
             assert(vt != VoltType.VOLTTABLE);
 
-            if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
-                if (vt == VoltType.NULL) size = 0;
-                else size = vt.getLengthInBytesForFixedTypes();
-            }
+            int size = (vt == VoltType.NULL) ? 0 :
+                vt.isVariableLength() ?
+                        VoltType.MAX_VALUE_LENGTH :
+                            vt.getLengthInBytesForFixedTypes();
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
             cve.setValueSize(size);
