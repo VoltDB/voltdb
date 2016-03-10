@@ -1558,19 +1558,28 @@ class ServerAPI(MethodView):
             members = database[0]['members']
         if server_id in members:
             # delete a single server
+
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(server) == 0:
                 return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
-            # remove the server from given database member list
-            current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-            current_database[0]['members'].remove(server_id)
-            Global.DELETED_HOSTNAME = server[0]['hostname']
-            Global.SERVERS.remove(server[0])
-            sync_configuration()
-            write_configuration_file()
-            return jsonify({'result': True})
+
+            url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/status' % \
+                  (server[0]['hostname'], __PORT__, database_id, server_id)
+            response = requests.get(url)
+
+            if response.json()['status'] == "running":
+                return make_response(jsonify({'error': 'Cannot delete a running server'}), 404)
+            else:
+                # remove the server from given database member list
+                current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+                current_database[0]['members'].remove(server_id)
+                Global.DELETED_HOSTNAME = server[0]['hostname']
+                Global.SERVERS.remove(server[0])
+                sync_configuration()
+                write_configuration_file()
+                return jsonify({'result': True})
         else:
-            return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
+            return make_response(jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}), 404)
 
     @staticmethod
     def put(database_id, server_id):
