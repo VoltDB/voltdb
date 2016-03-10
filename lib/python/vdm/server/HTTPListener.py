@@ -1384,8 +1384,10 @@ class Global:
     DEPLOYMENT = []
     DEPLOYMENT_USERS = []
     PATH = ''
+    VOLT_ROOT_PATH = ''
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
+    VOLT_DATA_PATH = ''
 
 
 class ServerAPI(MethodView):
@@ -2323,7 +2325,7 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stopped", "details": error})
 
 
-def main(runner, amodule, config_dir, server):
+def main(runner, amodule, config_dir, data_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
     except KeyError:
@@ -2338,6 +2340,7 @@ def main(runner, amodule, config_dir, server):
     json_data = open(depjson).read()
     deployment = json.loads(json_data)
     Global.PATH = config_dir
+    Global.VOLT_ROOT_PATH = data_dir
     global __IP__
     global __PORT__
 
@@ -2445,9 +2448,10 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
 
-    if os.path.exists('voltdeploy.log'):
-        open('voltdeploy.log', 'w').close()
-    handler = RotatingFileHandler('voltdeploy.log')
+    log_file = os.path.join(Global.PATH, 'voltdeploy.log')
+    if os.path.exists(log_file):
+        open(log_file, 'w').close()
+    handler = RotatingFileHandler(log_file)
     handler.setFormatter(logging.Formatter(
          "%(asctime)s|%(levelname)s|%(message)s"))
     log = logging.getLogger('werkzeug')
