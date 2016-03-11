@@ -200,10 +200,12 @@ public class QuerySpecification extends QueryExpression {
         isGrouped         = true;
     }
 
+    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
+    @Override
     public void resolveReferences(Session session) {
 
         finaliseRangeVariables();
@@ -649,6 +651,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -789,6 +792,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean areColumnsResolved() {
         return unresolvedExpressions == null
                || unresolvedExpressions.isEmpty();
@@ -807,6 +811,7 @@ public class QuerySpecification extends QueryExpression {
 //        queryCondition = null;
     }
 
+    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -829,6 +834,7 @@ public class QuerySpecification extends QueryExpression {
         return;
     }
 
+    @Override
     void resolveTypesPartOne(Session session) {
 
         resolveExpressionTypes(session);
@@ -841,6 +847,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void resolveTypesPartTwo(Session session) {
 
         resolveGroups();
@@ -918,6 +925,15 @@ public class QuerySpecification extends QueryExpression {
             }
 
             for (int i = 0; i < indexLimitVisible; i++) {
+                if (!exprColumns[i].isComposedOf(
+                        exprColumns, indexLimitVisible,
+                        indexLimitVisible + groupByColumnCount,
+                        Expression.subqueryAggregateExpressionSet)) {
+                    tempSet.add(exprColumns[i]);
+                }
+            }
+
+            for (int i = indexStartOrderBy; i < indexStartAggregates; i++) {
                 if (!exprColumns[i].isComposedOf(
                         exprColumns, indexLimitVisible,
                         indexLimitVisible + groupByColumnCount,
@@ -1207,6 +1223,7 @@ public class QuerySpecification extends QueryExpression {
      * Positive values limit the size of the result set.
      * @return the result of executing this Select
      */
+    @Override
     Result getResult(Session session, int maxrows) {
 
         Result r;
@@ -1240,7 +1257,7 @@ public class QuerySpecification extends QueryExpression {
     private Result buildResult(Session session, int limitcount) {
 
         RowSetNavigatorData navigator = new RowSetNavigatorData(session,
-            (QuerySpecification) this);
+            this);
         Result result = Result.newResult(navigator);
 
         result.metaData = resultMetaData;
@@ -1385,7 +1402,7 @@ public class QuerySpecification extends QueryExpression {
 
         if (havingCondition != null) {
             while (navigator.hasNext()) {
-                Object[] data = (Object[]) navigator.getNext();
+                Object[] data = navigator.getNext();
 
                 if (!Boolean.TRUE.equals(
                         data[indexLimitVisible + groupByColumnCount])) {
@@ -1477,6 +1494,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createTable(Session session) {
 
         createResultTable(session);
@@ -1513,6 +1531,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void createResultTable(Session session) {
 
         HsqlName       tableName;
@@ -1612,15 +1631,11 @@ public class QuerySpecification extends QueryExpression {
         if (sortAndSlice.hasOrder()) {
             limit = indexStartOrderBy + sortAndSlice.getOrderLength();
 
-            sb.append(' ').append(Tokens.T_ORDER).append(Tokens.T_BY).append(
-                ' ');
-
+            sb.append(' ').append(Tokens.T_ORDER).append(' ').append(Tokens.T_BY);
+            String sep = " ";
             for (int i = indexStartOrderBy; i < limit; i++) {
-                sb.append(exprColumns[i].getSQL());
-
-                if (i < limit - 1) {
-                    sb.append(',');
-                }
+                sb.append(sep).append(exprColumns[i].getSQL());
+                sep = ",";
             }
         }
 
@@ -1631,10 +1646,12 @@ public class QuerySpecification extends QueryExpression {
         return sb.toString();
     }
 
+    @Override
     public ResultMetaData getMetaData() {
         return resultMetaData;
     }
 
+    @Override
     public String describe(Session session) {
 
         StringBuffer sb;
@@ -1817,10 +1834,12 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public Table getBaseTable() {
         return baseTable;
     }
 
+    @Override
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {
 
@@ -1835,6 +1854,7 @@ public class QuerySpecification extends QueryExpression {
                                          stopAtTypeSet);
     }
 
+    @Override
     public void collectObjectNames(Set set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -1936,6 +1956,7 @@ public class QuerySpecification extends QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
+    @Override
     public void setAsTopLevel() {
 
         setReturningResultSet();
@@ -1944,15 +1965,18 @@ public class QuerySpecification extends QueryExpression {
         isTopLevel       = true;
     }
 
+    @Override
     void setReturningResultSet() {
         persistenceScope = TableBase.SCOPE_SESSION;
         columnMode       = TableBase.COLUMNS_UNREFERENCED;
     }
 
+    @Override
     public boolean isSingleColumn() {
         return indexLimitVisible == 1;
     }
 
+    @Override
     public String[] getColumnNames() {
 
         String[] names = new String[indexLimitVisible];
@@ -1964,6 +1988,7 @@ public class QuerySpecification extends QueryExpression {
         return names;
     }
 
+    @Override
     public Type[] getColumnTypes() {
 
         if (columnTypes.length == indexLimitVisible) {
@@ -1977,18 +2002,22 @@ public class QuerySpecification extends QueryExpression {
         return types;
     }
 
+    @Override
     public int getColumnCount() {
         return indexLimitVisible;
     }
 
+    @Override
     public int[] getBaseTableColumnMap() {
         return columnMap;
     }
 
+    @Override
     public Expression getCheckCondition() {
         return queryCondition;
     }
 
+    @Override
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {
@@ -2021,10 +2050,13 @@ public class QuerySpecification extends QueryExpression {
      * transforms its data structures during parsing.  For example,
      * place call to this method at the beginning and end of
      * resolveGroups() to see what it does.
+     * Since it has no callers in the production code, declaring
+     * it private causes a warning, so it is arbitrarily declared
+     * protected.
      *
      * @param header    A string to be prepended to output
      */
-    private void dumpExprColumns(String header){
+    protected void dumpExprColumns(String header){
         System.out.println("\n\n*********************************************");
         System.out.println(header);
         try {

@@ -4255,14 +4255,25 @@ public class TestVoltCompiler extends TestCase {
                 "export table books;"
                 );
 
-        badDDLAgainstSimpleSchema("Export table configured with materialized view.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table view_source;"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as an export table.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
+                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as export source.*",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
+                "export table my_view;"
+                );
+
+        badDDLAgainstSimpleSchema("View configured as export source.*",
+                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
                 );
@@ -4340,7 +4351,7 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as an export table.*",
+        badDDLAgainstSimpleSchema("View configured as export source.*",
                 "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"

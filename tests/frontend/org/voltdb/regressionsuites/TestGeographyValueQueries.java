@@ -382,10 +382,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
         fillTable(client, "t", 0);
 
         verifyStmtFails(client, "select pk, poly + poly from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data types in combination");
 
         verifyStmtFails(client, "select pk, poly + 1 from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data types in combination");
     }
 
     // The shell is 5 fixed but arbitrarily selected points.
@@ -455,6 +455,60 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // are valid.
         VoltTable vt = client.callProcedure("@AdHoc", "select t.pk from t where not isValid(t.poly) order by t.pk").getResults()[0];
         assertTrue("fillCheesyTable: " + vt.getRowCount() + " invalid polygons.", vt.getRowCount() == 0);
+    }
+
+    // This is mostly a planner test, as the planner had problems recognizing that geo types
+    // were compatible with themselves in CASE expressions and that geography was a valid
+    // variable-length type.
+    public void testCaseWhenElseENG9983ENG9984() throws Exception {
+        final double EPSILON = 1.0e-13;
+        Client client = getClient();
+        fillCheesyTable(client);
+        // ENG-9983 CASE WHEN THEN ELSE on geography type.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select CASE WHEN area(t.poly) < area(alt_t.poly) THEN t.poly ELSE alt_t.poly END" +
+                " from t, t alt_t where t.pk + 1 = alt_t.pk and t.pk >= 100 order by t.pk;"
+                ).getResults()[0];
+        assertEquals("Expected (N-1) rows.", 3, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyValue cheesyRoundTripper1 = vt.getGeographyValue(0);
+
+        vt = client.callProcedure("@AdHoc",
+                "select CASE WHEN area(t.poly) < area(alt_t.poly) THEN t.poly ELSE alt_t.poly END" +
+                " from t, t alt_t where t.pk >= 100 and alt_t.pk >= 100 order by t.pk;"
+                ).getResults()[0];
+        assertEquals("Expected (N^2) rows.", 16, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyValue cheesyRoundTripper2 = vt.getGeographyValue(0);
+        assertApproximatelyEquals("Expected Equivalent Round Trip Polygons", cheesyRoundTripper1, cheesyRoundTripper2, EPSILON);
+
+        // ENG-9983 CASE WHEN THEN ELSE on geography point type.
+        vt = client.callProcedure("@AdHoc",
+                "select CASE WHEN longitude(l.loc_point) <= longitude(alt_l.loc_point) THEN l.loc_point ELSE alt_l.loc_point END" +
+                " from location l, location alt_l where l.pk + 1 = alt_l.pk and l.pk >= 300 order by l.pk;"
+                ).getResults()[0];
+        assertEquals("Expected (N-1) rows.", 3, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyPointValue cheesyRoundTripper3 = vt.getGeographyPointValue(0);
+        vt = client.callProcedure("@AdHoc",
+                "select CASE WHEN longitude(l.loc_point) <= longitude(alt_l.loc_point) THEN l.loc_point ELSE alt_l.loc_point END" +
+                " from location l, location alt_l where l.pk >= 300 and alt_l.pk >= 300 order by l.pk;"
+                ).getResults()[0];
+        assertEquals("Expected (N^2) rows.", 16, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyPointValue cheesyRoundTripper4 = vt.getGeographyPointValue(0);
+        assertApproximatelyEquals("Expected Equivalent Round Trip Points", cheesyRoundTripper3, cheesyRoundTripper4, EPSILON);
+
+        // ENG-9984 CASE WHEN THEN no ELSE on geography type.
+        vt = client.callProcedure("@AdHoc",
+                "select CASE WHEN area(t.poly) <= area(alt_t.poly) THEN t.poly END" +
+                " from t, t alt_t where t.pk >= 100 and alt_t.pk >= 100 order by t.pk;"
+                ).getResults()[0];
+        assertEquals("Expected (N^2) rows.", 16, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyValue cheesyRoundTripper5 = vt.getGeographyValue(0);
+        assertFalse(vt.wasNull());
+        assertApproximatelyEquals("Expected Equivalent Round Trip Polygons", cheesyRoundTripper1, cheesyRoundTripper5, EPSILON);
     }
 
     public void testLoopOrderInCheesyPolygon() throws Exception {

@@ -2066,10 +2066,16 @@ public class DDLCompiler {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                     has_geo_col = colType.equals(VoltType.GEOGRAPHY);
-                    if (has_geo_col && exprs.size() > 1) {
-                        String emsg = "Cannot create index \""+ name + "\" because " +
-                                colType.getName() + " values must be the only component of an index key.";
-                        throw compiler.new VoltCompilerException(emsg);
+                    if (has_geo_col) {
+                        if (exprs.size() > 1) {
+                            String emsg = "Cannot create index \""+ name + "\" because " +
+                                        colType.getName() + " values must be the only component of an index key.";
+                            throw compiler.new VoltCompilerException(emsg);
+                        } else if (!(expression instanceof TupleValueExpression)) {
+                            String emsg = "Cannot create index \"" + name + "\" because " +
+                                        colType.getName() + " expressions must be simple column expressions.";
+                            throw compiler.new VoltCompilerException(emsg);
+                        }
                     }
                 }
             }

@@ -280,7 +280,7 @@ public class TestExpressionUtil extends TestCase {
 
         AbstractExpression combined_exp = null;
         try {
-            combined_exp = ExpressionUtil.combine(combine_exps);
+            combined_exp = ExpressionUtil.combinePredicates(combine_exps);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -294,7 +294,7 @@ public class TestExpressionUtil extends TestCase {
         // sure that all of our sub-trees are contained within the new tree and that their
         // structure has not changed
         //
-        new TestExpressionTreeWalker() {
+        TestExpressionTreeWalker treeWalker = new TestExpressionTreeWalker() {
             @Override
             public void callback(AbstractExpression exp) {
                 //
@@ -319,7 +319,31 @@ public class TestExpressionUtil extends TestCase {
                     assertNotNull(exp.getRight());
                 }
             }
-        }.traverse(combined_exp);
+        };
+        treeWalker.traverse(combined_exp);
+
+        //
+        // Test  variadic combine
+        //
+        final List<AbstractExpression> combine_exps1 = new ArrayList<AbstractExpression>();
+        final List<AbstractExpression> combine_exps2 = new ArrayList<AbstractExpression>();
+        final List<AbstractExpression> combine_exps3 = new ArrayList<AbstractExpression>();
+        final List<AbstractExpression> combine_exps4 = null;
+        for (int ctr = 0; ctr < num_of_subtrees/2; ctr++) {
+            combine_exps1.add(combine_exps.get(ctr));
+        }
+        for (int ctr = num_of_subtrees/2; ctr < num_of_subtrees; ctr++) {
+            combine_exps2.add(combine_exps.get(ctr));
+        }
+        AbstractExpression var_combined_exp = null;
+        try {
+            var_combined_exp = ExpressionUtil.combinePredicates(combine_exps1, combine_exps2, combine_exps3, combine_exps4);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        assertNotNull(var_combined_exp);
+        assertEquals(var_combined_exp.getExpressionType(), ExpressionType.CONJUNCTION_AND);
+        treeWalker.traverse(var_combined_exp);
     }
 
     // This is basically just a check that the rules in

@@ -409,7 +409,8 @@ class ServerBundle(JavaBundle):
                  daemon_description=None,
                  daemon_output=None,
                  supports_multiple_daemons=False,
-                 check_environment_config=False):
+                 check_environment_config=False,
+                 new_voltdb_instance=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -422,6 +423,7 @@ class ServerBundle(JavaBundle):
         self.daemon_output = daemon_output
         self.supports_multiple_daemons = supports_multiple_daemons
         self.check_environment_config = check_environment_config
+        self.new_voltdb_instance = new_voltdb_instance
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -464,6 +466,10 @@ class ServerBundle(JavaBundle):
                     cli.IntegerOption('-I', '--instance', 'instance',
                                   #'specify an instance number for multiple servers on the same host'))
                                   None))
+        if self.new_voltdb_instance:
+            verb.add_options(
+                cli.BooleanOption('-n', '--new', 'new',
+                                  'Start a new, empty database even if the VoltDB managed directories contain files from a previous session.'))
 
     def go(self, verb, runner):
         if self.check_environment_config:
@@ -531,6 +537,9 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
+        if self.subcommand in ('create'):
+            if runner.opts.new:
+                final_args.extend(['new'])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}

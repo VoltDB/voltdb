@@ -226,10 +226,14 @@ public class TestGeographyPointValue extends RegressionSuite {
         client.callProcedure("t.Insert", i++, "northPole1", new GeographyPointValue( 50.0, 90.0));
         client.callProcedure("t.Insert", i++, "northPole2", new GeographyPointValue(-70.0, 90.0));
         client.callProcedure("t.Insert", i++, "northPole3", new GeographyPointValue( 10.0, 90.0 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "northPole4", new GeographyPointValue( 180.0, 90.0 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "northPole5", new GeographyPointValue( -180.0, 90.0 - lessThanEps));
         client.callProcedure("t.Insert", i++, "notNorthPole", new GeographyPointValue( 10.0, 90.0 - moreThanEps));
         client.callProcedure("t.Insert", i++, "southPole1", new GeographyPointValue( 50.0, -90.0));
         client.callProcedure("t.Insert", i++, "southPole2", new GeographyPointValue(-70.0, -90.0));
         client.callProcedure("t.Insert", i++, "southPole3", new GeographyPointValue( 10.0, -90.0 + lessThanEps));
+        client.callProcedure("t.Insert", i++, "southPole4", new GeographyPointValue( 180.0, -90.0 + lessThanEps));
+        client.callProcedure("t.Insert", i++, "southPole5", new GeographyPointValue( -180.0, -90.0 + lessThanEps));
         client.callProcedure("t.Insert", i++, "notSouthPole", new GeographyPointValue( 10.0, -90.0 + moreThanEps));
         client.callProcedure("t.Insert", i++, "onAntimeridianNeg1", new GeographyPointValue(-180.0              , 37.0));
         client.callProcedure("t.Insert", i++, "onAntimeridianNeg2", new GeographyPointValue(-180.0 + lessThanEps, 37.0));
@@ -263,14 +267,18 @@ public class TestGeographyPointValue extends RegressionSuite {
         assertContentOfTable(new Object[][] {
                 {"northPole1"},
                 {"northPole2"},
-                {"northPole3"}},
+                {"northPole3"},
+                {"northPole4"},
+                {"northPole5"}},
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "southPole1").getResults()[0];
         assertContentOfTable(new Object[][] {
                 {"southPole1"},
                 {"southPole2"},
-                {"southPole3"}},
+                {"southPole3"},
+                {"southPole4"},
+                {"southPole5"}},
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "onAntimeridianNeg1").getResults()[0];
@@ -352,11 +360,11 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         verifyStmtFails(client,
                 "select pk, pt + pt from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data type in combination");
 
         verifyStmtFails(client,
                 "select pk, pt + 1 from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data type in combination");
     }
 
     public void testPointNotNull() throws Exception {

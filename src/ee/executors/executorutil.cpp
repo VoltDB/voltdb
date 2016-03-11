@@ -45,67 +45,58 @@
 
 #include "executorutil.h"
 
-#include "common/debuglog.h"
-#include "common/FatalException.hpp"
-
-#include "executors/aggregateexecutor.h"
-#include "executors/deleteexecutor.h"
-#include "executors/indexcountexecutor.h"
-#include "executors/indexscanexecutor.h"
-#include "executors/insertexecutor.h"
-#include "executors/limitexecutor.h"
-#include "executors/materializedscanexecutor.h"
-#include "executors/materializeexecutor.h"
-#include "executors/mergereceiveexecutor.h"
-#include "executors/nestloopexecutor.h"
-#include "executors/nestloopindexexecutor.h"
-#include "executors/orderbyexecutor.h"
-#include "executors/projectionexecutor.h"
-#include "executors/receiveexecutor.h"
-#include "executors/sendexecutor.h"
-#include "executors/seqscanexecutor.h"
-#include "executors/tablecountexecutor.h"
-#include "executors/tuplescanexecutor.h"
-#include "executors/unionexecutor.h"
-#include "executors/updateexecutor.h"
-
-#include <cassert>
+#include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
+#include "storage/temptable.h"
 
 namespace voltdb {
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
-                                 AbstractPlanNode* abstract_node) {
-    PlanNodeType type = abstract_node->getPlanNodeType();
-    switch (type) {
-    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_PARTIALAGGREGATE: return new AggregatePartialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INVALID:
-        VOLT_ERROR( "INVALID plan node type %d", (int) type);
-        return NULL;
-    case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MERGERECEIVE: return new MergeReceiveExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TUPLESCAN: return new TupleScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-    // default: Don't provide a default, let the compiler enforce complete coverage.
+CountingPostfilter::CountingPostfilter(const TempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
+    CountingPostfilter* parentPostfilter) :
+    m_table(table),
+    m_postPredicate(postPredicate),
+    m_parentPostfilter(parentPostfilter),
+    m_limit(limit),
+    m_offset(offset),
+    m_tuple_skipped(0),
+    m_under_limit(true)
+{}
+
+CountingPostfilter::CountingPostfilter() :
+    m_table(NULL),
+    m_postPredicate(NULL),
+    m_parentPostfilter(NULL),
+    m_limit(NO_LIMIT),
+    m_offset(NO_OFFSET),
+    m_tuple_skipped(0),
+    m_under_limit(false)
+{}
+
+// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
+bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
+    if (m_postPredicate == NULL || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
+        // Check if we have to skip this tuple because of offset
+        if (m_tuple_skipped < m_offset) {
+            m_tuple_skipped++;
+            return false;
+        }
+        // Evaluate LIMIT now
+        if (m_limit >= 0) {
+            assert(m_table != NULL);
+            if (m_table->activeTupleCount() == m_limit) {
+                m_under_limit = false;
+                // Notify a parent that the limit is reached
+                if (m_parentPostfilter) {
+                    m_parentPostfilter->setAboveLimit();
+                }
+                return false;
+            }
+        }
+        // LIMIT/OFFSET are satisfied
+        return true;
     }
-    VOLT_ERROR( "Undefined plan node type %d", (int) type);
-    return NULL;
+    // Predicate is not NULL and was evaluated to FALSE
+    return false;
 }
 
 }
