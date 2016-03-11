@@ -104,7 +104,7 @@ function async-benchmark() {
         voltkvqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=60 \
-        --servers=localhost \
+        --servers=volt3e,volt3g,volt3f \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.9 \
@@ -149,8 +149,8 @@ function http-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.HTTPBenchmark \
         --displayinterval=5 \
-        --duration=60 \
-        --servers=volt3f \
+        --duration=300 \
+        --servers=volt3e,volt3g,volt3f \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -158,7 +158,8 @@ function http-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-        --threads=40
+        --warmup=15 \
+        --threads=250
 }
 
 # Use this target for argument help

@@ -339,41 +339,41 @@ public class HTTPBenchmark {
                 (successfulGets.get()+successfulPuts.get())/(double)config.duration);
 
         // 2. Performance statistics
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Client Workload Statistics");
-        System.out.println(HORIZONTAL_RULE);
+//      System.out.print(HORIZONTAL_RULE);
+//      System.out.println(" Client Workload Statistics");
+//      System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
-        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
-        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
-        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
-        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
-        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
-        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
-        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
-        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
+//      System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
+//      System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
+//      System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+//      System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+//      System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+//      System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+//      System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+//      System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+//      System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+//      System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+//      System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.println(HORIZONTAL_RULE);
+//      System.out.print("\n" + HORIZONTAL_RULE);
+//      System.out.println(" System Server Statistics");
+//      System.out.println(HORIZONTAL_RULE);
 
-        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
+//      System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" Latency Histogram");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(stats.latencyHistoReport());
+//      System.out.print("\n" + HORIZONTAL_RULE);
+//      System.out.println(" Latency Histogram");
+//      System.out.println(HORIZONTAL_RULE);
+//      System.out.println(stats.latencyHistoReport());
 
-        // 3. Affinity stats
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" Client Affinity Statistics");
-        System.out.print(HORIZONTAL_RULE + "\n");
-        Map<Integer, ClientAffinityStats> affinityStats = fullStatsContext.fetch().getAffinityStats();
-        for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
-            System.out.println(e.getValue());
-        }
+//      // 3. Affinity stats
+//      System.out.print("\n" + HORIZONTAL_RULE);
+//      System.out.println(" Client Affinity Statistics");
+//      System.out.print(HORIZONTAL_RULE + "\n");
+//      Map<Integer, ClientAffinityStats> affinityStats = fullStatsContext.fetch().getAffinityStats();
+//      for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
+//          System.out.println(e.getValue());
+//      }
 
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
@@ -387,12 +387,10 @@ public class HTTPBenchmark {
     class KVThread implements Runnable {
         private final CloseableHttpClient m_httpClient;
         private final HttpPost m_httpPost;
-        private final HttpContext m_context;
 
         // constructor  --  each thread gets its http connection
         public KVThread(CloseableHttpClient httpClient, HttpPost httpPost) {
                 m_httpClient = httpClient;
-                m_context = new BasicHttpContext();
                 m_httpPost = httpPost;
         }
 
@@ -403,7 +401,7 @@ public class HTTPBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost, m_context);
+                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
                     }
                     catch (Exception e) { e.printStackTrace(System.out); }
                 }
@@ -411,7 +409,7 @@ public class HTTPBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost, m_context);
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
                     }
                     catch (Exception e) { e.printStackTrace(System.out); }
                 }
@@ -423,7 +421,7 @@ public class HTTPBenchmark {
                     // Get a key/value pair, synchronously
                     try {
                         HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
-                                processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost, m_context);
+                                processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
 
                         if (response.results[0].advanceRow()) {
 
@@ -449,7 +447,7 @@ public class HTTPBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost, m_context);
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost );
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
@@ -496,7 +494,8 @@ public class HTTPBenchmark {
 
         // setup the HTTP connection pool that will be used by the threads
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
-        cm.setMaxTotal(100);
+        cm.setMaxTotal(config.threads*2);
+        cm.setDefaultMaxPerRoute(config.threads);
         CloseableHttpClient httpclient = HttpClients.custom().setConnectionManager(cm).build();
         String[] servers = config.servers.split(",");
 

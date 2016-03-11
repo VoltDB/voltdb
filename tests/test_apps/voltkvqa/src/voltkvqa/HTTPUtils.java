@@ -83,24 +83,14 @@ public class HTTPUtils {
         System.out.println("status: " + resp.status);
     }
 
-    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
-        String s = "";
-        for (Entry<String, String> e : params.entrySet()) {
-            String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
-            s += "&"+ e.getKey() + "=" + encodedValue;
-        }
-        s = s.substring(1);
-        return s;
-    }
-
     public static String callProcOverJSONRaw(List<NameValuePair> vals, CloseableHttpClient httpclient,
-            HttpPost httppost, HttpContext context) throws Exception {
+            HttpPost httppost) throws Exception {
 
         HttpEntity entity = null;
         String entityStr = null;
 
         httppost.setEntity(new UrlEncodedFormEntity(vals));
-        CloseableHttpResponse httpResponse = httpclient.execute(httppost, context);
+        CloseableHttpResponse httpResponse = httpclient.execute(httppost);
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
 
@@ -136,13 +126,13 @@ public class HTTPUtils {
 
     public static String callProcOverJSON(String procName, ParameterSet pset,
             String username, String password, boolean preHash, CloseableHttpClient httpclient,
-            HttpPost httppost, HttpContext context) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, httpclient,  httppost,  context);
+            HttpPost httppost) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, false, httpclient,  httppost);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset,
             String username, String password, boolean preHash, boolean admin,
-            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
+            CloseableHttpClient httpclient, HttpPost httppost) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
 
@@ -164,7 +154,7 @@ public class HTTPUtils {
             params.add(new BasicNameValuePair("admin", "true"));
         }
 
-        return callProcOverJSONRaw(params, httpclient, httppost, context);
+        return callProcOverJSONRaw(params, httpclient, httppost);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -197,20 +187,20 @@ public class HTTPUtils {
     }
 
     public static Response callProcedure(String string, String key, byte[] storeValue,
-            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context)
+            CloseableHttpClient httpclient, HttpPost httppost)
                     throws JSONException, IOException, Exception {
         String hexval = Encoder.hexEncode(storeValue);
         ParameterSet pset = ParameterSet.fromArrayNoCopy(key, hexval);
-        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
+        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost);
         Response response = responseFromJSON(resp);
         return response;
     }
 
     public static Response  callProcedure(String string, String generateRandomKeyForRetrieval,
-            CloseableHttpClient httpclient, HttpPost httppost, HttpContext context)
+            CloseableHttpClient httpclient, HttpPost httppost)
                     throws JSONException, IOException, Exception {
         ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
-        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
+        String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost);
         Response response = responseFromJSON(resp);
         return response;
     }
