@@ -51,6 +51,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -492,7 +493,7 @@ public class SystemInformation extends VoltSystemProcedure
                 break;
             }
         }
-        results.addRow("export", Boolean.toString(deploy.getExport()));
+        results.addRow("export", Boolean.toString(CatalogUtil.isExportEnabled()));
 
         String partition_detect_enabled = "false";
         if (cluster.getNetworkpartition())
