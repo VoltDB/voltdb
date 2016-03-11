@@ -537,8 +537,9 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
-        if runner.opts.new:
-            final_args.extend(['new'])
+        if self.subcommand in ('create'):
+            if runner.opts.new:
+                final_args.extend(['new'])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}
