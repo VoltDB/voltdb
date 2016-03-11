@@ -80,10 +80,16 @@ public class TestGeographyPointValue extends TestCase {
         GeographyPointValue northPole1 = new GeographyPointValue( 50.0, 90.0);
         GeographyPointValue northPole2 = new GeographyPointValue(-70.0, 90.0);
         GeographyPointValue northPole3 = new GeographyPointValue( 10.0, 90.0 - lessThanEps);
+        GeographyPointValue northPole4 = new GeographyPointValue( 180.0, 90.0 - lessThanEps);
+        GeographyPointValue northPole5 = new GeographyPointValue( -180.0, 90.0);
         assertTrue(northPole1.equals(northPole2));
         assertTrue(northPole2.equals(northPole1));
         assertTrue(northPole1.equals(northPole3));
         assertTrue(northPole3.equals(northPole1));
+        assertTrue(northPole1.equals(northPole4));
+        assertTrue(northPole4.equals(northPole1));
+        assertTrue(northPole3.equals(northPole5));
+        assertTrue(northPole5.equals(northPole3));
 
         GeographyPointValue notNorthPole = new GeographyPointValue( 10.0, 90.0 - moreThanEps);
         assertFalse(notNorthPole.equals(northPole1));
@@ -92,11 +98,16 @@ public class TestGeographyPointValue extends TestCase {
         GeographyPointValue southPole1 = new GeographyPointValue( 50.0, -90.0);
         GeographyPointValue southPole2 = new GeographyPointValue(-70.0, -90.0);
         GeographyPointValue southPole3 = new GeographyPointValue( 10.0, -90.0 + lessThanEps);
+        GeographyPointValue southPole4 = new GeographyPointValue( 180.0, -90.0);
+        GeographyPointValue southPole5 = new GeographyPointValue( -180.0, -90.0 + lessThanEps);
         assertTrue(southPole1.equals(southPole2));
         assertTrue(southPole2.equals(southPole1));
         assertTrue(southPole1.equals(southPole3));
         assertTrue(southPole3.equals(southPole1));
-        assertTrue(southPole3.equals(southPole1));
+        assertTrue(southPole3.equals(southPole5));
+        assertTrue(southPole5.equals(southPole4));
+        assertTrue(southPole3.equals(southPole5));
+        assertTrue(southPole1.equals(southPole4));
 
         GeographyPointValue notSouthPole = new GeographyPointValue( 10.0, -90.0 + moreThanEps);
         assertFalse(notSouthPole.equals(southPole1));
