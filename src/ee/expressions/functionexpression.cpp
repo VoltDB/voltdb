@@ -382,8 +382,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_POLYGON_INVALID_REASON:
             ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
             break;
-        case FUNC_VOLT_POLYGONFROMVALIDTEXT:
-            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGONFROMVALIDTEXT>((*arguments)[0]);
+        case FUNC_VOLT_VALIDPOLYGONFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDPOLYGONFROMTEXT>((*arguments)[0]);
             break;
         default:
             return NULL;
