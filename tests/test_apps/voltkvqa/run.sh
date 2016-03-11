@@ -75,7 +75,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H `hostname` $APPNAME.jar
 }
 
 function exportserver() {
@@ -149,8 +149,8 @@ function http-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.HTTPBenchmark \
         --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
+        --duration=60 \
+        --servers=volt3f \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \

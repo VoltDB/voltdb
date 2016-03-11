@@ -34,7 +34,9 @@
 
 package voltkvqa;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
@@ -44,8 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -55,7 +55,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HttpContext;
-import org.apache.http.util.EntityUtils;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -94,41 +93,25 @@ public class HTTPUtils {
         return s;
     }
 
-    public static String callProcOverJSONRaw(List<NameValuePair> vals, int expectedCode, CloseableHttpClient httpclient,
+    public static String callProcOverJSONRaw(List<NameValuePair> vals, CloseableHttpClient httpclient,
             HttpPost httppost, HttpContext context) throws Exception {
 
         HttpEntity entity = null;
         String entityStr = null;
-        // StringEntity jsonentity = new StringEntity(varString);
-        //httppost.setEntity(new UrlEncodedFormEntity(varList));
-
-        // System.out.println("About to send request: " + httppost.getURI());
-        // System.out.println("varString: " + vals.toString());
 
         httppost.setEntity(new UrlEncodedFormEntity(vals));
         CloseableHttpResponse httpResponse = httpclient.execute(httppost, context);
-        // entity = httpResponse.getEntity();
-        // if (entity != null) {
-            //long len = entity.getContentLength();
-            //System.out.println("Entity length: " + len);
-            //System.out.println(EntityUtils.toString(entity));
-            //
-        //System.out.println("POST Response Status:: " + httpResponse.getStatusLine().getStatusCode());
-         
-            BufferedReader reader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
-             
-            String inputLine;
-            StringBuffer response = new StringBuffer();
-     
-            while ((inputLine = reader.readLine()) != null) {
-                response.append(inputLine);
-            }
-        //} else
-        //    System.out.println("Entity is null");
 
+        BufferedReader reader = new BufferedReader(new InputStreamReader(httpResponse.getEntity().getContent()));
+
+        String inputLine;
+        StringBuffer response = new StringBuffer();
+
+        while ((inputLine = reader.readLine()) != null) {
+            response.append(inputLine);
+        }
 
         return response.toString();
-        //return response;
     }
 
     public static String getHashedPasswordForHTTPVar(String password) {
@@ -154,18 +137,12 @@ public class HTTPUtils {
     public static String callProcOverJSON(String procName, ParameterSet pset,
             String username, String password, boolean preHash, CloseableHttpClient httpclient,
             HttpPost httppost, HttpContext context) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */,  httpclient,  httppost,  context);
+        return callProcOverJSON(procName, pset, username, password, preHash, false, httpclient,  httppost,  context);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset,
             String username, String password, boolean preHash, boolean admin,
             CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */,  httpclient,  httppost,  context);
-    }
-
-    public static String callProcOverJSON(String procName, ParameterSet pset,
-            String username, String password, boolean preHash, boolean admin,
-            int expectedCode, CloseableHttpClient httpclient, HttpPost httppost, HttpContext context) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
 
@@ -187,11 +164,7 @@ public class HTTPUtils {
             params.add(new BasicNameValuePair("admin", "true"));
         }
 
-        //String varString = getHTTPVarString(params);
-
-        //varString = getHTTPVarString(params);
-
-        return callProcOverJSONRaw(params, expectedCode, httpclient, httppost, context);
+        return callProcOverJSONRaw(params, httpclient, httppost, context);
     }
 
     public static Response responseFromJSON(String jsonStr) throws JSONException, IOException {
@@ -228,12 +201,8 @@ public class HTTPUtils {
                     throws JSONException, IOException, Exception {
         String hexval = Encoder.hexEncode(storeValue);
         ParameterSet pset = ParameterSet.fromArrayNoCopy(key, hexval);
-        //if (string.equals("Put"))
-        //    System.out.println(string + ". key: " + key + ". pset: " + pset.toString());
         String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
-        //System.out.println("Response KV resp: " + resp.toString());
         Response response = responseFromJSON(resp);
-        //System.out.println("Response KV: " + response.toString());
         return response;
     }
 
@@ -241,11 +210,8 @@ public class HTTPUtils {
             CloseableHttpClient httpclient, HttpPost httppost, HttpContext context)
                     throws JSONException, IOException, Exception {
         ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
-        //System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
         String resp = callProcOverJSON(string, pset, username, password, prehash, httpclient, httppost, context);
-        //System.out.println("Response K resp: " + resp.toString());
         Response response = responseFromJSON(resp);
-        //System.out.println("Response K: " + response.toString());
         return response;
     }
 

@@ -314,6 +314,7 @@ public class HTTPBenchmark {
                          "         %,9d MB in uncompressed application data\n" +
                          "         Network Throughput: %6.3f Gbps*\n" +
                          " - Total Network Throughput: %6.3f Gbps*\n\n" +
+                         " - Transactions/second (GET+PUT): %6.3f TPS*\n\n" +
                          "* Figure includes key & value traffic but not database protocol overhead.\n\n";
 
         double oneGigabit = (1024 * 1024 * 1024) / 8;
@@ -334,7 +335,8 @@ public class HTTPBenchmark {
                 networkPutData.get() / oneMB,
                 rawPutData.get() / oneMB,
                 putThroughput,
-                getThroughput + putThroughput);
+                getThroughput + putThroughput,
+                (successfulGets.get()+successfulPuts.get())/(double)config.duration);
 
         // 2. Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -387,6 +389,7 @@ public class HTTPBenchmark {
         private final HttpPost m_httpPost;
         private final HttpContext m_context;
 
+        // constructor  --  each thread gets its http connection
         public KVThread(CloseableHttpClient httpClient, HttpPost httpPost) {
                 m_httpClient = httpClient;
                 m_context = new BasicHttpContext();
@@ -512,13 +515,13 @@ public class HTTPBenchmark {
         // signal to threads to end the warmup phase
         warmupComplete.set(true);
 
-        // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
-
-        // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
+//        // reset the stats after warmup
+//        fullStatsContext.fetchAndResetBaseline();
+//        periodicStatsContext.fetchAndResetBaseline();
+//
+//        // print periodic statistics to the console
+//        benchmarkStartTS = System.currentTimeMillis();
+//        schedulePeriodicStats();
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
@@ -528,7 +531,7 @@ public class HTTPBenchmark {
         benchmarkComplete.set(true);
 
         // cancel periodic stats printing
-        timer.cancel();
+        // timer.cancel();
 
         // block until all outstanding txns return
         client.drain();
