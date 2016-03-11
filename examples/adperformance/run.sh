@@ -1,117 +1,83 @@
 #!/usr/bin/env bash
 
-# VoltDB variables
-APPNAME="adperformance"
-HOST=localhost
-DEPLOYMENT=deployment.xml
+# leader host for startup purposes only
+# (once running, all nodes are the same -- no leaders)
+STARTUPLEADERHOST="localhost"
+# list of cluster nodes separated by commas in host:[port] format
+SERVERS="localhost"
 
 # WEB SERVER variables
 WEB_PORT=8081
 
-# CLIENT variables
-SERVERS=localhost
-
-
-# Get the PID from PIDFILE if we don't have one yet.
-if [[ -z "${PID}" && -e web/http.pid ]]; then
-  PID=$(cat web/http.pid);
+# find voltdb binaries
+if [ -e ../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+elif [ -n "$(which voltdb 2> /dev/null)" ]; then
+    # assume we're using voltdb from the path
+    VOLTDB_BIN=$(dirname "$(which voltdb)")
+else
+    echo "Unable to find VoltDB installation."
+    echo "Please add VoltDB's bin directory to your path."
+    exit -1
 fi
 
-# This script assumes voltdb/bin is in your path
-VOLTDB_HOME=$(dirname $(dirname "$(which voltdb)"))
+# call script to set up paths, including
+# java classpaths and binary paths
+source $VOLTDB_BIN/voltenv
 
-LICENSE="$VOLTDB_HOME/voltdb/license.xml"
-
-
-# remove non-source files
+# remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot statement-plans log catalog-report.html
+    rm -rf voltdbroot log procedures/adperformance/*.class client/adperformance/*.class
     rm -f web/http.log web/http.pid
     rm -rf db/obj db/$APPNAME.jar db/nohup.log
     rm -rf client/obj client/log
 }
 
-function start_web() {
-    if [[ -z "${PID}" ]]; then
-        cd web
-        nohup python -m SimpleHTTPServer $WEB_PORT > http.log 2>&1 &
-        echo $! > http.pid
-        cd ..
-        echo "started http server"
-    else
-        echo "http server is already running (PID: ${PID})"
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    clean
+    rm -rf adperformance-procs.jar adperformance-client.jar
+}
+
+function webserver() {
+    cd web; python -m SimpleHTTPServer $WEB_PORT
+}
+
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    # compile java source
+    javac -classpath $APPCLASSPATH procedures/adperformance/*.java
+    javac -classpath $CLIENTCLASSPATH client/adperformance/*.java
+    # build procedure and client jars
+    jar cf adperformance-procs.jar -C procedures adperformance
+    jar cf adperformance-client.jar -C client adperformance
+    # remove compiled .class files
+    rm -rf procedures/adperformance/*.class client/adperformance/*.class
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+        jars;
     fi
-}
-
-function stop_web() {
-  if [[ -z "${PID}" ]]; then
-    echo "http server is not running (missing PID)."
-  else
-      kill ${PID}
-      rm web/http.pid
-      echo "stopped http server (PID: ${PID})."
-  fi
-}
-
-# compile any java stored procedures
-function compile_procedures() {
-    mkdir -p db/obj
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    SRC=`find db/src -name "*.java"`
-    if [ ! -z "$SRC" ]; then
-	javac -classpath $CLASSPATH -d db/obj $SRC
-        # stop if compilation fails
-        if [ $? != 0 ]; then exit; fi
-    fi
-}
-
-# build an application catalog
-function catalog() {
-    compile_procedures
-    voltdb compile --classpath db/obj -o db/$APPNAME.jar db/ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
 }
 
 # run the voltdb server locally
 function server() {
-    nohup_server
-    echo "------------------------------------"
-    echo "|  Ctrl-C to stop tailing the log  |"
-    echo "------------------------------------"
-    tail -f db/nohup.log
+    voltdb create -H $STARTUPLEADERHOST
 }
 
-function nohup_server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f db/$APPNAME.jar ]; then catalog; fi
-    # run the server
-    nohup voltdb create -d db/$DEPLOYMENT -l $LICENSE -H $HOST db/$APPNAME.jar > db/nohup.log 2>&1 &
-}
-
-function cluster-server() {
-    export DEPLOYMENT=deployment-cluster.xml
-    server
-}
-
-# update catalog on a running database
-function update() {
-    catalog
-    voltadmin update db/$APPNAME.jar db/deployment.xml
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 function client() {
-    # if the class files don't exist, compile the client
-    if [ ! -d client/obj ]; then compile-client; fi
-
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    CLASSPATH="$CLASSPATH:`ls -1 $VOLTDB_HOME/lib/commons-cli-*.jar`"
-
-    cd client
-
-    echo "running benchmark..."
-    java -classpath obj:$CLASSPATH -Dlog4j.configuration=file://$VOLTDB_HOME/voltdb/log4j.xml \
-         client.AdTrackingBenchmark \
+    jars-ifneeded
+    java -classpath adperformance-client.jar:$CLIENTCLASSPATH \
+         adperformance.AdTrackingBenchmark \
          --displayinterval=5 \
          --warmup=0 \
          --duration=1800 \
@@ -124,43 +90,17 @@ function client() {
          --advertisers=20 \
          --campaignsperadvertiser=5 \
          --creativespercampaign=5
-
-    cd ..
-}
-
-function compile-client() {
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    CLASSPATH="$CLASSPATH:`ls -1 $VOLTDB_HOME/lib/commons-cli-*.jar`"
-
-    pushd client
-    # compile client
-    mkdir -p obj
-    SRC=`find src -name "*.java"`
-    javac -Xlint:unchecked -classpath $CLASSPATH -d obj $SRC
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-    popd
-}
-
-# compile the catalog and client code
-function demo-compile() {
-    catalog
-    compile-client
-}
-
-function demo() {
-    export DEPLOYMENT=deployment-demo.xml
-    nohup_server
-    echo "starting client..."
-    sleep 10
-    client
 }
 
 function help() {
-    echo "Usage: ./run.sh {demo|server|client|catalog|clean}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
 }
 
-# Run the target passed as the first arg on the command line
+# Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+if [ $# -eq 0 ]; then server; exit; fi
+for arg in "$@"
+do
+    echo "${0}: Performing $arg..."
+    $arg
+done
