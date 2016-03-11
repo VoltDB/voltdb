@@ -103,7 +103,8 @@ PARTITION PROCEDURE last_asks_symbol ON TABLE last_ticks COLUMN symbol PARAMETER
 
 END_BATCH
 
-load classes procedures.jar;
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES nbbo-procs.jar;
 
-CREATE PROCEDURE FROM CLASS procedures.ProcessTick;
+CREATE PROCEDURE FROM CLASS nbbo.ProcessTick;
 PARTITION PROCEDURE ProcessTick ON TABLE ticks COLUMN symbol PARAMETER 0;

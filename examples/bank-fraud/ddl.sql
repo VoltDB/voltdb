@@ -2,7 +2,7 @@
 -- CREATE TABLE example_of_types (
 --   id              INTEGER NOT NULL, -- java int, 4-byte signed integer, -2,147,483,647 to 2,147,483,647
 --   name            VARCHAR(40),      -- java String
---   data            VARBINARY(256),   -- java byte array 
+--   data            VARBINARY(256),   -- java byte array
 --   status          TINYINT,          -- java byte, 1-byte signed integer, -127 to 127
 --   type            SMALLINT,         -- java short, 2-byte signed integer, -32,767 to 32,767
 --   pan             BIGINT,           -- java long, 8-byte signed integer, -9,223,372,036,854,775,807 to 9,223,372,036,854,775,807
@@ -14,11 +14,11 @@
 -- PARTITION TABLE example_of_types ON COLUMN id;
 -- CREATE INDEX idx_example_pan ON example_of_types (pan);
 --
--- CREATE VIEW view_example AS 
+-- CREATE VIEW view_example AS
 --  SELECT type, COUNT(*) AS records, SUM(balance)
 --  FROM example_of_types
 --  GROUP BY type;
--- 
+--
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
 -- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
@@ -92,11 +92,11 @@ PARTITION TABLE account_fraud ON COLUMN acc_no;
 
 CREATE VIEW transaction_vw (
   acc_no,
-  txn_dt,  
+  txn_dt,
   threshold,
   total_txn_amt
 ) AS
-SELECT 
+SELECT
   acc_no,
   TRUNCATE(DAY,txn_ts),
   COUNT(*),
@@ -107,7 +107,10 @@ GROUP BY acc_no,TRUNCATE(DAY,txn_ts);
 
 --------- PROCEDURES ----------------------
 
-CREATE PROCEDURE FROM CLASS procedures.DetectFraud;
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES bankfraud-procs.jar;
+
+CREATE PROCEDURE FROM CLASS bankfraud.DetectFraud;
 PARTITION PROCEDURE DetectFraud ON TABLE transaction COLUMN acc_no PARAMETER 1;
 
 CREATE PROCEDURE FraudFirst50 AS

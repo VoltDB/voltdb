@@ -2,7 +2,7 @@
 -- CREATE TABLE example_of_types (
 --   id              INTEGER NOT NULL, -- java int, 4-byte signed integer, -2,147,483,647 to 2,147,483,647
 --   name            VARCHAR(40),      -- java String
---   data            VARBINARY(256),   -- java byte array 
+--   data            VARBINARY(256),   -- java byte array
 --   status          TINYINT,          -- java byte, 1-byte signed integer, -127 to 127
 --   type            SMALLINT,         -- java short, 2-byte signed integer, -32,767 to 32,767
 --   pan             BIGINT,           -- java long, 8-byte signed integer, -9,223,372,036,854,775,807 to 9,223,372,036,854,775,807
@@ -14,11 +14,11 @@
 -- PARTITION TABLE example_of_types ON COLUMN id;
 -- CREATE INDEX idx_example_pan ON example_of_types (pan);
 --
--- CREATE VIEW view_example AS 
+-- CREATE VIEW view_example AS
 --  SELECT type, COUNT(*) AS records, SUM(balance)
 --  FROM example_of_types
 --  GROUP BY type;
--- 
+--
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
 -- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
@@ -112,10 +112,13 @@ GROUP BY TRUNCATE(SECOND,offer_ts);
 
 --------- PROCEDURES ----------------------
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES bankoffers-procs.jar;
+
 CREATE PROCEDURE recent_offer_totals AS
 SELECT * FROM total_offers ORDER BY offer_ts DESC LIMIT 60;
 
-CREATE PROCEDURE FROM CLASS procedures.CheckForOffers;
+CREATE PROCEDURE FROM CLASS bankoffers.CheckForOffers;
 PARTITION PROCEDURE CheckForOffers ON TABLE activity COLUMN acc_no PARAMETER 1;
 
 CREATE PROCEDURE RecentOffersList AS
@@ -123,6 +126,6 @@ SELECT og.offer_ts, c.cust_first_name, c.cust_last_name, og.offer_text, avt.acc_
 FROM offers_given og
 INNER JOIN acct_vendor_totals avt on avt.acc_no = og.acc_no AND avt.vendor_id = og.vendor_id
 INNER JOIN account a on avt.acc_no = a.acc_no
-INNER JOIN customer c on a.cust_id = c.cust_id 
+INNER JOIN customer c on a.cust_id = c.cust_id
 ORDER BY og.offer_ts desc
 LIMIT 10;
