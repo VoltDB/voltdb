@@ -21,7 +21,7 @@ CREATE TABLE nfl_contest_large (
 CREATE TABLE fantasy_user (
   user_id      INTEGER      NOT NULL,
   name             VARCHAR(30)  NOT NULL,
-  PRIMARY KEY (user_id)  
+  PRIMARY KEY (user_id)
 );
 PARTITION TABLE fantasy_user ON COLUMN user_id;
 
@@ -55,10 +55,10 @@ PARTITION TABLE user_contest_roster ON COLUMN user_id;
 CREATE INDEX idx_roster_by_contest ON user_contest_roster (contest_id, user_id);
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
-LOAD CLASSES procs.jar;
+LOAD CLASSES fantasysports-procs.jar;
 
 -- Define procedures
-CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS procedures.SelectAllScoresInPartition;
-CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS procedures.SelectContestScoresInPartition;
-CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS procedures.UpsertUserScores;
+CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS fantasysports.SelectAllScoresInPartition;
+CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS fantasysports.SelectContestScoresInPartition;
+CREATE PROCEDURE PARTITION ON TABLE fantasy_user COLUMN user_id FROM CLASS fantasysports.UpsertUserScores;
 

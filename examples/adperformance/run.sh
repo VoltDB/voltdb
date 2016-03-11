@@ -58,7 +58,7 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+    if [ ! -e adperformance-procs.jar ] || [ ! -e adperformance-client.jar ]; then
         jars;
     fi
 }

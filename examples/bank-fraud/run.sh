@@ -1,119 +1,87 @@
 #!/usr/bin/env bash
 
-# VoltDB variables
-APPNAME="bank_offers"
-HOST=localhost
-DEPLOYMENT=deployment.xml
+# leader host for startup purposes only
+# (once running, all nodes are the same -- no leaders)
+STARTUPLEADERHOST="localhost"
+# list of cluster nodes separated by commas in host:[port] format
+SERVERS="localhost"
 
 # WEB SERVER variables
 WEB_PORT=8081
 
-# CLIENT variables
-SERVERS=localhost
-
-# This script assumes voltdb/bin is in your path
-VOLTDB_HOME=$(dirname $(dirname "$(which voltdb)"))
-
-LICENSE="$VOLTDB_HOME/voltdb/license.xml"
-
-# Get the PID from PIDFILE if we don't have one yet.
-if [[ -z "${PID}" && -e web/http.pid ]]; then
-  PID=$(cat web/http.pid);
+# find voltdb binaries
+if [ -e ../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+elif [ -n "$(which voltdb 2> /dev/null)" ]; then
+    # assume we're using voltdb from the path
+    VOLTDB_BIN=$(dirname "$(which voltdb)")
+else
+    echo "Unable to find VoltDB installation."
+    echo "Please add VoltDB's bin directory to your path."
+    exit -1
 fi
 
-# remove non-source files
+# call script to set up paths, including
+# java classpaths and binary paths
+source $VOLTDB_BIN/voltenv
+
+# remove everything from "clean" as well as the jarfiles
 function clean() {
-    rm -rf voltdbroot statement-plans log catalog-report.html
-    rm -f web/http.log web/http.pid
-    rm -rf db/obj db/$APPNAME.jar db/nohup.log
-    rm -rf client/obj client/log
+    rm -rf voltdbroot log procedures/bankfraud/*.class client/bankfraud/*.class
 }
 
-function start_web() {
-    if [[ -z "${PID}" ]]; then
-        cd web
-        nohup python -m SimpleHTTPServer $WEB_PORT > http.log 2>&1 &
-        echo $! > http.pid
-        cd ..
-        echo "started http server"
-    else
-        echo "http server is already running (PID: ${PID})"
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    clean
+    rm -rf bankfraud-procs.jar bankfraud-client.jar
+}
+
+function webserver() {
+    cd web; python -m SimpleHTTPServer $WEB_PORT
+}
+
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    # compile java source
+    javac -classpath $APPCLASSPATH procedures/bankfraud/*.java
+    javac -classpath $CLIENTCLASSPATH client/bankfraud/*.java
+    # build procedure and client jars
+    jar cf bankfraud-procs.jar -C procedures bankfraud
+    jar cf bankfraud-client.jar -C client bankfraud
+    # remove compiled .class files
+    rm -rf procedures/bankfraud/*.class client/bankfraud/*.class
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e bankfraud-procs.jar ] || [ ! -e bankfraud-client.jar ]; then
+        jars;
     fi
-}
-function stop_web() {
-  if [[ -z "${PID}" ]]; then
-    echo "http server is not running (missing PID)."
-  else
-      kill ${PID}
-      rm web/http.pid
-      echo "stopped http server (PID: ${PID})."
-  fi
-}
-
-# compile any java stored procedures
-function compile_procedures() {
-    mkdir -p db/obj
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    SRC=`find db/src -name "*.java"`
-    if [ ! -z "$SRC" ]; then
-	javac -classpath $CLASSPATH -d db/obj $SRC
-        # stop if compilation fails
-        if [ $? != 0 ]; then exit; fi
-    fi
-}
-
-# build an application catalog
-function catalog() {
-    compile_procedures
-    voltdb compile --classpath db/obj -o db/$APPNAME.jar db/ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
 }
 
 # run the voltdb server locally
 function server() {
-    catalog
-    nohup_server
-    echo "------------------------------------"
-    echo "|  Ctrl-C to stop tailing the log  |"
-    echo "------------------------------------"
-    tail -f db/nohup.log
+    voltdb create -H $STARTUPLEADERHOST
 }
 
-function nohup_server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f "db/$APPNAME.jar" ]; then catalog; fi
-    # run the server
-    nohup voltdb create -d db/$DEPLOYMENT -l $LICENSE -H $HOST db/$APPNAME.jar > db/nohup.log 2>&1 &
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
+    echo "----Loading rules----"
+    csvloader --servers $SERVERS --separator \| --file data/rules.csv --reportdir log rules
 }
 
-function cluster_server() {
-    export DEPLOYMENT=deployment-cluster.xml
-    server
-}
-
-# update catalog on a running database
-function update() {
-    catalog
-    voltadmin update $APPNAME.jar deployment.xml
+# run this target to see what command line options the client offers
+function client-help() {
+    jars-ifneeded
+    java -classpath bankfraud-client.jar:$CLIENTCLASSPATH bankfraud.FraudBenchmark --help
 }
 
 function client() {
-    compile_client
-
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    CLASSPATH="$CLASSPATH:`ls -1 $VOLTDB_HOME/lib/commons-cli-*.jar`"
-
-    cd client
-
-    mkdir -p log
-    echo "----Loading rules----"
-    csvloader --servers $SERVERS --separator \| --file data/rules.csv --reportdir log rules
-
-    
-    echo "running sync benchmark test..."
-    java -classpath obj:$CLASSPATH -Dlog4j.configuration=file://$VOLTDB_HOME/voltdb/log4j.xml \
-         client.FraudBenchmark \
+    jars-ifneeded
+    java -classpath bankfraud-client.jar:$APPCLASSPATH bankfraud.FraudBenchmark \
          --displayinterval=5 \
          --warmup=3 \
          --duration=600 \
@@ -121,51 +89,17 @@ function client() {
          --autotune=true \
          --latencytarget=5 \
          --custcount=100000
-
-    cd ..
-}
-
-function compile_client() {
-    CLASSPATH=`ls -1 $VOLTDB_HOME/voltdb/voltdb-*.jar`
-    CLASSPATH="$CLASSPATH:`ls -1 $VOLTDB_HOME/lib/commons-cli-*.jar`"
-
-    pushd client
-    # compile client
-    mkdir -p obj
-    SRC=`find src -name "*.java"`
-    javac -Xlint:unchecked -classpath $CLASSPATH -d obj $SRC
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-    popd
-}
-
-# compile the catalog and client code
-function compile() {
-    compile_procedures
-    compile_client
-}
-
-function demo() {
-    export DEPLOYMENT=deployment-demo.xml
-    nohup_server
-    echo "starting client..."
-    sleep 10
-    client
-}
-
-
-function stop() {
-    # stop web server if running
-    stop_web
-    # stop voltdb if running
-    voltadmin shutdown -H $SERVERS
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|compile|catalog|start_web|stop_web|server|cluster_server|client}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
 }
 
-# Run the target passed as the first arg on the command line
+# Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+if [ $# -eq 0 ]; then server; exit; fi
+for arg in "$@"
+do
+    echo "${0}: Performing $arg..."
+    $arg
+done

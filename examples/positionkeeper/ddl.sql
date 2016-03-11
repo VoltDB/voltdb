@@ -2,7 +2,7 @@
 -- CREATE TABLE example_of_types (
 --   id              INTEGER NOT NULL, -- java int, 4-byte signed integer, -2,147,483,647 to 2,147,483,647
 --   name            VARCHAR(40),      -- java String
---   data            VARBINARY(256),   -- java byte array 
+--   data            VARBINARY(256),   -- java byte array
 --   status          TINYINT,          -- java byte, 1-byte signed integer, -127 to 127
 --   type            SMALLINT,         -- java short, 2-byte signed integer, -32,767 to 32,767
 --   pan             BIGINT,           -- java long, 8-byte signed integer, -9,223,372,036,854,775,807 to 9,223,372,036,854,775,807
@@ -14,11 +14,11 @@
 -- PARTITION TABLE example_of_types ON COLUMN id;
 -- CREATE INDEX pan_example ON example_of_types (pan);
 --
--- CREATE VIEW view_example AS 
+-- CREATE VIEW view_example AS
 --  SELECT type, COUNT(*) AS records, SUM(balance)
 --  FROM example_of_types
 --  GROUP BY type;
--- 
+--
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
 -- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
@@ -91,17 +91,20 @@ PARTITION TABLE prc ON COLUMN prc_sec;
 
 -------------- STORED PROCEDURES ------------------------
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES positionkeeper-procs.jar;
+
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
 -- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
 
-CREATE PROCEDURE FROM CLASS procedures.OrderInsert;
+CREATE PROCEDURE FROM CLASS positionkeeper.OrderInsert;
 PARTITION PROCEDURE OrderInsert ON TABLE ord COLUMN ord_sec PARAMETER 2;
 
-CREATE PROCEDURE FROM CLASS procedures.TradeInsert;
+CREATE PROCEDURE FROM CLASS positionkeeper.TradeInsert;
 PARTITION PROCEDURE TradeInsert ON TABLE trd COLUMN trd_sec PARAMETER 2;
 
-CREATE PROCEDURE FROM CLASS procedures.PriceInsert;
+CREATE PROCEDURE FROM CLASS positionkeeper.PriceInsert;
 PARTITION PROCEDURE PriceInsert ON TABLE prc COLUMN prc_sec PARAMETER 1;
 
 CREATE PROCEDURE get_all_pos_for_sec AS

@@ -1,100 +1,61 @@
 #!/usr/bin/env bash
 
-#set -o nounset #exit if an unset variable is used
-set -o errexit #exit on any single command fail
+# leader host for startup purposes only
+# (once running, all nodes are the same -- no leaders)
+STARTUPLEADERHOST="localhost"
+# list of cluster nodes separated by commas in host:[port] format
+SERVERS="localhost"
 
-# find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb 2> /dev/null)" ]; then
+# find voltdb binaries
+if [ -e ../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+elif [ -n "$(which voltdb 2> /dev/null)" ]; then
+    # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
-    echo "The VoltDB scripts are not in your PATH."
-    echo "For ease of use, add the VoltDB bin directory: "
-    echo
-    echo $VOLTDB_BIN
-    echo
-    echo "to your PATH."
-    echo
-fi
-# move voltdb commands into path for this script
-PATH=$VOLTDB_BIN:$PATH
-
-# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
-if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
-    VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
-else
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib"
-    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
+    echo "Unable to find VoltDB installation."
+    echo "Please add VoltDB's bin directory to your path."
+    exit -1
 fi
 
-APPCLASSPATH=$CLASSPATH:$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
-} 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=uniquedevices-client.jar:$CLASSPATH:$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-} 2> /dev/null | paste -sd ':' - )
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
+# call script to set up paths, including
+# java classpaths and binary paths
+source $VOLTDB_BIN/voltenv
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot log \
-        hyperloglogsrc/uniquedevices/org/voltdb/hll/*.class \
-        procedures/uniquedevices/*.class \
-        client/uniquedevices/*.class
+    rm -rf voltdbroot log procedures/positionkeeper/*.class client/positionkeeper/*.class
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
     clean
-    rm -rf uniquedevices-procs.jar uniquedevices-client.jar
+    rm -rf positionkeeper-procs.jar positionkeeper-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac \
-        hyperloglogsrc/org/voltdb/hll/HyperLogLog.java \
-        hyperloglogsrc/org/voltdb/hll/MurmurHash.java \
-        hyperloglogsrc/org/voltdb/hll/RegisterSet.java
-    javac -classpath hyperloglogsrc:$APPCLASSPATH \
-        procedures/uniquedevices/*.java
-    javac -classpath hyperloglogsrc:$CLIENTCLASSPATH \
-        client/uniquedevices/*.java
+    javac -classpath $APPCLASSPATH procedures/positionkeeper/*.java
+    javac -classpath $CLIENTCLASSPATH client/positionkeeper/*.java
     # build procedure and client jars
-    jar cf uniquedevices-procs.jar -C procedures uniquedevices
-    jar uf uniquedevices-procs.jar -C hyperloglogsrc org
-    jar cf uniquedevices-client.jar -C client uniquedevices
-    jar uf uniquedevices-client.jar -C hyperloglogsrc org
+    jar cf positionkeeper-procs.jar -C procedures positionkeeper
+    jar cf positionkeeper-client.jar -C client positionkeeper
     # remove compiled .class files
-    rm -rf \
-        procedures/uniquedevices/*.class \
-        hyperloglogsrc/org/org/voltdb/hll/*.class \
-        client/uniquedevices/*.class
+    rm -rf procedures/positionkeeper/*.class client/positionkeeper/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e uniquedevices-procs.jar ] || [ ! -e uniquedevices-client.jar ]; then
+    if [ ! -e positionkeeper-procs.jar ] || [ ! -e positionkeeper-client.jar ]; then
         jars;
     fi
 }
 
 # run the voltdb server locally
 function server() {
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment.xml -l $LICENSE -H $HOST
+    voltdb create -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures
@@ -103,69 +64,36 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-# wait for backgrounded server to start up
-function wait_for_startup() {
-    until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
-    do
-        sleep 2
-        echo " ... Waiting for VoltDB to start"
-        if [[ $SECONDS -gt 60 ]]
-        then
-            echo "Exiting.  VoltDB did not startup within 60 seconds" 1>&2; exit 1;
-        fi
-    done
-}
-
-# startup server in background and load schema
-function background_server_andload() {
-    # run the server in the background
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
-    wait_for_startup
-    init
-}
-
-# run the client that drives the example
-function client() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        uniquedevices.UniqueDevicesClient \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --appcount=100
-}
-
-# Asynchronous benchmark sample
-# Use this target for argument help
+# run this target to see what command line options the client offers
 function client-help() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH uniquedevices.UniqueDevicesClient --help
+    java -classpath positionkeeper-client.jar:$CLIENTCLASSPATH positionkeeper.positionkeeperApp --help
 }
 
-# The following two demo functions are used by the Docker package. Don't remove.
-# compile the jars for procs and client code
-function demo-compile() {
-    jars
-}
-
-function demo() {
-    echo "starting server in background..."
-    background_server_andload
-    echo "starting client..."
-    client
-
-    echo
-    echo When you are done with the demo database, \
-        remember to use \"voltadmin shutdown\" to stop \
-        the server process.
+# run the client that drives the example with some editable options
+function client() {
+    jars-ifneeded
+    java -classpath positionkeeper-client.jar:$CLIENTCLASSPATH positionkeeper.PositionsBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=60 \
+        --servers=$SERVERS \
+        --ratelimit=30000 \
+        --autotune=true \
+        --latencytarget=2 \
+        --traders=2000 \
+        --secpercnt=5
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|server|init|demo|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
 }
 
-# Run the target passed as the first arg on the command line
+# Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+if [ $# -eq 0 ]; then server; exit; fi
+for arg in "$@"
+do
+    echo "${0}: Performing $arg..."
+    $arg
+done
