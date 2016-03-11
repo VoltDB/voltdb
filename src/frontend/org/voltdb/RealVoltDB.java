@@ -132,6 +132,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
+import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -350,6 +351,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseInformation;
     }
 
+    private String managedPathEmptyCheck(String voltDbRoot, String path) {
+        VoltFile managedPath;
+        if (new File(path).isAbsolute())
+            managedPath = new VoltFile(path);
+        else
+            managedPath = new VoltFile(voltDbRoot, path);
+        if (managedPath.exists() && managedPath.list().length > 0)
+            return managedPath.getAbsolutePath();
+        return null;
+    }
+
+    private void managedPathsEmptyCheck() {
+        PathsType paths = m_catalogContext.getDeployment().getPaths();
+        String voltDbRoot = paths.getVoltdbroot().getPath();
+        List<String> nonEmptyPaths = new ArrayList<String>();
+        String path;
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
+            nonEmptyPaths.add(path);
+        if (!nonEmptyPaths.isEmpty()) {
+            StringBuilder crashMessage =
+                    new StringBuilder("Files from a previous database session exist in the managed directories:");
+            for (String nonEmptyPath : nonEmptyPaths)
+                crashMessage.append("\n  - " + nonEmptyPath);
+            crashMessage.append("\nUse the recover command to restore the previous database or use create --new" +
+                " to start a new database session overwriting existing files.");
+            VoltDB.crashLocalVoltDB(crashMessage.toString());
+        }
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -478,7 +516,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             validateStartAction();
 
             Map<Integer, String> hostGroups = null;
+
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
+            if (!config.m_newVoltdb && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
+                managedPathsEmptyCheck();
+
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }

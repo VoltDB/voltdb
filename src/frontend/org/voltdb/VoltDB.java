@@ -231,6 +231,9 @@ public class VoltDB {
         /** Force catalog upgrade even if version matches. */
         public static boolean m_forceCatalogUpgrade = false;
 
+        /** Allow starting voltdb with non-empty managed directories. */
+        public boolean m_newVoltdb = false;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -479,6 +482,8 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
+                else if (arg.equalsIgnoreCase("new"))
+                    m_newVoltdb = true;
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
