@@ -157,6 +157,9 @@ SELECT
 FROM event_data
 GROUP BY advertiser_id, TRUNCATE(MINUTE,utc_time);
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES adperformance-procs.jar;
+
 CREATE PROCEDURE advertiser_minutely_clicks AS
 SELECT utc_min, clicks, conversions
 FROM advertiser_rates_minutely
@@ -168,9 +171,9 @@ ORDER BY utc_min DESC OFFSET 1 LIMIT 30;
 -- FROM event_data
 -- GROUP BY advertiser_id, campaign_id, creative_id, TRUNCATE(MINUTE,utc_time);
 
-CREATE PROCEDURE FROM CLASS procedures.InitializeCreatives;
+CREATE PROCEDURE FROM CLASS adperformance.InitializeCreatives;
 
-CREATE PROCEDURE FROM CLASS procedures.TrackEvent;
+CREATE PROCEDURE FROM CLASS adperformance.TrackEvent;
 PARTITION PROCEDURE TrackEvent ON TABLE event_data COLUMN creative_id PARAMETER 3;
 
 -- CREATE PROCEDURE ad_campaign_minutely_rates AS
