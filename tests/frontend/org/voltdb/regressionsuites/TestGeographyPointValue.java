@@ -352,11 +352,11 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         verifyStmtFails(client,
                 "select pk, pt + pt from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data type in combination");
 
         verifyStmtFails(client,
                 "select pk, pt + 1 from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data type in combination");
     }
 
     public void testPointNotNull() throws Exception {
