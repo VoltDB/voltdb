@@ -1522,31 +1522,6 @@ class ServerAPI(MethodView):
         result = validate_server_ports(database_id)
         if result is not None:
             return result
-        # arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
-        #
-        # specified_port_values = [{
-        #     "http-listener": get_port(request.json.get('http-listener', "")),
-        #     "admin-listener": get_port(request.json.get('admin-listener', "")),
-        #     "replication-listener": get_port(request.json.get('replication-listener', "")),
-        #     "client-listener": get_port(request.json.get('client-listener', "")),
-        #     "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-        #     "internal-listener": get_port(request.json.get('internal-listener', ""))
-        # }];
-        #
-        # for option in arr:
-        #     value = specified_port_values[0][option]
-        #     for port_values in specified_port_values[0].keys():
-        #         if option != port_values:
-        #             if value != None:
-        #                 if specified_port_values[0][port_values] == value:
-        #                     return jsonify(success=False, errors="Duplicate port")
-        # database_servers = get_servers_from_database_id(database_id)
-        # for servers in database_servers:
-        #     if servers['hostname'] == request.json['hostname']:
-        #         for option in arr:
-        #             result = check_port_valid(option, servers)
-        #             if result is not None:
-        #                 return result
 
         if not Global.SERVERS:
             server_id = 1
