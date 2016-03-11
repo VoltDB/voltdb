@@ -534,6 +534,33 @@ def check_port_valid(port_option, servers):
         return jsonify(success=False, errors="Duplicate %s for same hostname" %port_option)
 
 
+def validate_server_ports(database_id):
+    arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+
+    specified_port_values = [{
+        "http-listener": get_port(request.json.get('http-listener', "")),
+        "admin-listener": get_port(request.json.get('admin-listener', "")),
+        "replication-listener": get_port(request.json.get('replication-listener', "")),
+        "client-listener": get_port(request.json.get('client-listener', "")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
+        "internal-listener": get_port(request.json.get('internal-listener', ""))
+    }];
+
+    for option in arr:
+        value = specified_port_values[0][option]
+        for port_values in specified_port_values[0].keys():
+            if option != port_values:
+                if value is not None:
+                    if specified_port_values[0][port_values] == value:
+                        return jsonify(success=False, errors="Duplicate port")
+    database_servers = get_servers_from_database_id(database_id)
+    for servers in database_servers:
+        if servers['hostname'] == request.json['hostname']:
+            for option in arr:
+                result = check_port_valid(option, servers)
+                if result is not None:
+                    return result
+
 
 def get_configuration():
     deployment_json = {
@@ -1399,6 +1426,19 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 
+def get_servers_from_database_id(database_id):
+    servers = []
+    database = [database for database in Global.DATABASES if database['id'] == database_id]
+    if len(database) == 0:
+        return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+    else:
+        members = database[0]['members']
+
+    for servers_id in members:
+        server = [server for server in Global.SERVERS if server['id'] == servers_id]
+        servers.append(server[0])
+    return servers
+
 class DictClass(dict):
     pass
 
@@ -1479,31 +1519,34 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
-
-        specified_port_values = [{
-            "http-listener": get_port(request.json.get('http-listener', "")),
-            "admin-listener": get_port(request.json.get('admin-listener', "")),
-            "replication-listener": get_port(request.json.get('replication-listener', "")),
-            "client-listener": get_port(request.json.get('client-listener', "")),
-            "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-            "internal-listener": get_port(request.json.get('internal-listener', ""))
-        }];
-
-        for option in arr:
-            value = specified_port_values[0][option]
-            for port_values in specified_port_values[0].keys():
-                if option != port_values:
-                    if value != None:
-                        if specified_port_values[0][port_values] == value:
-                            return jsonify(success=False, errors="Duplicate port")
-
-        for servers in Global.SERVERS:
-            if servers['hostname'] == request.json['hostname']:
-                for option in arr:
-                    result = check_port_valid(option, servers)
-                    if result is not None:
-                        return result
+        result = validate_server_ports(database_id)
+        if result is not None:
+            return result
+        # arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+        #
+        # specified_port_values = [{
+        #     "http-listener": get_port(request.json.get('http-listener', "")),
+        #     "admin-listener": get_port(request.json.get('admin-listener', "")),
+        #     "replication-listener": get_port(request.json.get('replication-listener', "")),
+        #     "client-listener": get_port(request.json.get('client-listener', "")),
+        #     "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
+        #     "internal-listener": get_port(request.json.get('internal-listener', ""))
+        # }];
+        #
+        # for option in arr:
+        #     value = specified_port_values[0][option]
+        #     for port_values in specified_port_values[0].keys():
+        #         if option != port_values:
+        #             if value != None:
+        #                 if specified_port_values[0][port_values] == value:
+        #                     return jsonify(success=False, errors="Duplicate port")
+        # database_servers = get_servers_from_database_id(database_id)
+        # for servers in database_servers:
+        #     if servers['hostname'] == request.json['hostname']:
+        #         for option in arr:
+        #             result = check_port_valid(option, servers)
+        #             if result is not None:
+        #                 return result
 
         if not Global.SERVERS:
             server_id = 1
@@ -1595,6 +1638,10 @@ class ServerAPI(MethodView):
             current_server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(current_server) == 0:
                 abort(404)
+
+            result = validate_server_ports(database_id)
+            if result is not None:
+                return result
 
             current_server[0]['name'] = \
                 request.json.get('name', current_server[0]['name'])

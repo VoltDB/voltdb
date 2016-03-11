@@ -162,7 +162,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': 'test4567',
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '88888'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -184,7 +184,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': 'test4567',
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'internal-interface': '127.0.0.12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -193,6 +193,265 @@ class CreateServer(Server):
         else:
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['errors'][0], 'Invalid IP address.')
+
+    def test_validate_duplicate_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': __host_or_ip__,
+                'name': 'test12345', 'admin-listener': '88', 'client-listener': '88'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+    def test_validate_duplicate_http_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345', 'http-listener': '8080'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate http-listener for same hostname')
+
+    def test_validate_duplicate_admin_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345', 'admin-listener': '21211', 'http-listener': '34'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate admin-listener for same hostname')
+
+    def test_validate_duplicate_internal_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '3021'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate internal-listener for same hostname')
+
+    def test_validate_duplicate_zookeeper_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
+                'zookeeper-listener': '7181', 'replication-listener': '567'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate zookeeper-listener for same hostname')
+
+    def test_validate_duplicate_client_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
+                'zookeeper-listener': '71', 'replication-listener': '55', 'client-listener': '21212'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate client-listener for same hostname')
+
+    def test_validate_duplicate_replication_port(self):
+        """
+        Validate duplicate the port
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': 'test12345'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate port')
+
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': "test123",
+                'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
+                'zookeeper-listener': '71', 'replication-listener': '5555'}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['errors'], 'Duplicate replication-listener for same hostname')
 
 
 class UpdateServer(Server):
