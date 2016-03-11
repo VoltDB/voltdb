@@ -1001,27 +1001,42 @@ public class TestVoltTable extends TestCase {
 
         // add a row of actual data.  Hard-code the timestamp so that we can compare deterministically
         table.addRow(123, 12345, 1234567, 12345678901L, 1.234567, "aabbcc",
-                new byte[] { 10, 26, 10 },
-                new TimestampType(99), new BigDecimal(
-                        "123.45"));
-        String formatted_string = table.toFormattedString();
+                     new byte[] { 10, 26, 10 },
+                     new TimestampType(99),
+                     new BigDecimal("123.45"));
+        String formattedOutput = table.toFormattedString();
 
-        String expected =
+        String expectedOutput =
 "tinyint  smallint  integer  bigint       float     string  varbinary  timestamp                   decimal          \n" +
 "-------- --------- -------- ------------ --------- ------- ---------- --------------------------- -----------------\n" +
 "    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
 "    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
 "     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
 
-        if (!formatted_string.equals(expected))
+        if (!formattedOutput.equals(expectedOutput))
         {
             System.out.println("Received formatted output:");
-            System.out.println(formatted_string);
+            System.out.println(formattedOutput);
             System.out.println("Expected output:");
-            System.out.println(expected);
+            System.out.println(expectedOutput);
         }
-        assertTrue(formatted_string.equals(expected));
+        assertTrue(formattedOutput.equals(expectedOutput));
 
+        // fetch formatted output without column names
+        formattedOutput = table.toFormattedString(false);
+        expectedOutput =
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
+
+        if (!formattedOutput.equals(expectedOutput))
+        {
+            System.out.println("Received formatted output:");
+            System.out.println(formattedOutput);
+            System.out.println("Expected output:");
+            System.out.println(expectedOutput);
+        }
+        assertTrue(formattedOutput.equals(expectedOutput));
 
         table = new VoltTable(new ColumnInfo("bigint",          VoltType.BIGINT),
                               new ColumnInfo("geography",       VoltType.GEOGRAPHY),
@@ -1037,35 +1052,34 @@ public class TestVoltTable extends TestCase {
                                                   " 1.1  9.9))"),
                      new GeographyPointValue(-179.0, -89.9),
                      new TimestampType(-1));
-        formatted_string = table.toFormattedString();
-        expected =
+        formattedOutput = table.toFormattedString();
+        expectedOutput =
 "bigint     geography                                                    geography_point       timestamp                  \n" +
 "---------- ------------------------------------------------------------ --------------------- ---------------------------\n" +
 "      NULL NULL                                                         NULL                  NULL                       \n" +
 "      NULL NULL                                                         NULL                  NULL                       \n" +
 " 123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))  POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n";
 
-        if (!formatted_string.equals(expected))
+        if (!formattedOutput.equals(expectedOutput))
         {
-            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
-            System.out.println(formatted_string);
-            System.out.println("Expected output: (length: " + expected.length() + ")");
-            System.out.println(expected);
+            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
+            System.out.println(formattedOutput);
+            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
+            System.out.println(expectedOutput);
         }
-        assertTrue(formatted_string.equals(expected));
-
+        assertTrue(formattedOutput.equals(expectedOutput));
 
         // row with a polygon that max's output column width for geopgraphy column
         table.addRow(1234567890,
-                    new GeographyValue("POLYGON (( 179.1  89.9, " +
+                     new GeographyValue("POLYGON (( 179.1  89.9, " +
                                                  "-179.1  89.9, " +
                                                  "-179.1 -89.9, " +
                                                  " 179.1 -89.9, " +
                                                  " 179.1  89.9))"),
-                    new GeographyPointValue(-179.0, -89.9),
-                    new TimestampType(0));
-        formatted_string = table.toFormattedString();
-        expected =
+                     new GeographyPointValue(-179.0, -89.9),
+                     new TimestampType(0));
+        formattedOutput = table.toFormattedString();
+        expectedOutput =
 "bigint      geography                                                                   geography_point       timestamp                  \n" +
 "----------- --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
 "       NULL NULL                                                                        NULL                  NULL                       \n" +
@@ -1073,15 +1087,14 @@ public class TestVoltTable extends TestCase {
 "  123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
 " 1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n";
 
-        if (!formatted_string.equals(expected))
+        if (!formattedOutput.equals(expectedOutput))
         {
-            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
-            System.out.println(formatted_string);
-            System.out.println("Expected output: (length: " + expected.length() + ")");
-            System.out.println(expected);
+            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
+            System.out.println(formattedOutput);
+            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
+            System.out.println(expectedOutput);
         }
-        assertTrue(formatted_string.equals(expected));
-
+        assertTrue(formattedOutput.equals(expectedOutput));
 
         // row with a polygon that goes beyond max aligned display limit for polygon. This will result in
         // other columns following to appear further away from their original column
@@ -1095,8 +1108,8 @@ public class TestVoltTable extends TestCase {
                                              " 179.12  89.9))"),
                 new GeographyPointValue(0, 0),
                 new TimestampType(99));
-        formatted_string = table.toFormattedString();
-        expected =
+        formattedOutput = table.toFormattedString();
+        expectedOutput =
 "bigint       geography                                                                   geography_point       timestamp                  \n" +
 "------------ --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
 "        NULL NULL                                                                        NULL                  NULL                       \n" +
@@ -1105,15 +1118,32 @@ public class TestVoltTable extends TestCase {
 "  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
 " 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
 
-        if (!formatted_string.equals(expected))
+        if (!formattedOutput.equals(expectedOutput))
         {
-            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
-            System.out.println(formatted_string);
-            System.out.println("Expected output: (length: " + expected.length() + ")");
-            System.out.println(expected);
+            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
+            System.out.println(formattedOutput);
+            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
+            System.out.println(expectedOutput);
         }
-        assertTrue(formatted_string.equals(expected));
+        assertTrue(formattedOutput.equals(expectedOutput));
 
+        // test the final one without column names
+        formattedOutput = table.toFormattedString(false);
+        expectedOutput =
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"   123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
+"  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
+" 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
+
+        if (!formattedOutput.equals(expectedOutput))
+        {
+            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
+            System.out.println(formattedOutput);
+            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
+            System.out.println(expectedOutput);
+        }
+        assertTrue(formattedOutput.equals(expectedOutput));
     }
 
     @SuppressWarnings("deprecation")
