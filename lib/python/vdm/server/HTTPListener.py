@@ -514,7 +514,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(Global.PATH, 'voltdeploy.xml')
+        path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
@@ -1383,11 +1383,11 @@ class Global:
     DATABASES = []
     DEPLOYMENT = []
     DEPLOYMENT_USERS = []
-    PATH = ''
-    VOLT_ROOT_PATH = ''
+    CONFIG_PATH = ''
+    DATA_PATH = ''
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
-    VOLT_DATA_PATH = ''
+    VOLT_SERVER_PATH = ''
 
 
 class ServerAPI(MethodView):
@@ -2339,8 +2339,8 @@ def main(runner, amodule, config_dir, data_dir, server):
     depjson = os.path.join(path, "deployment.json")
     json_data = open(depjson).read()
     deployment = json.loads(json_data)
-    Global.PATH = config_dir
-    Global.VOLT_ROOT_PATH = data_dir
+    Global.CONFIG_PATH = config_dir
+    Global.DATA_PATH = data_dir
     global __IP__
     global __PORT__
 
@@ -2448,7 +2448,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
 
-    log_file = os.path.join(Global.VOLT_ROOT_PATH, 'voltdeploy.log')
+    log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
         open(log_file, 'w').close()
     handler = RotatingFileHandler(log_file)
@@ -2457,6 +2457,5 @@ def main(runner, amodule, config_dir, data_dir, server):
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.NOTSET)
     log.addHandler(handler)
-
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)

@@ -76,7 +76,7 @@ def check_snapshot_folder(database_id):
             voltdb_root = deployment[0]['paths']['voltdbroot']['path']
             snapshot = deployment[0]['paths']['snapshots']['path']
 
-            outfilename = os.path.join(HTTPListener.Global.VOLT_DATA_PATH, str(voltdb_root), str(snapshot))
+            outfilename = os.path.join(HTTPListener.Global.VOLT_SERVER_PATH, str(voltdb_root), str(snapshot))
             if os.path.isdir(outfilename):
                 freshStart = False
             else:
@@ -256,7 +256,7 @@ class VoltDatabase:
         """
         deploymentcontents = DeploymentConfig.DeploymentConfiguration.get_database_deployment(self.database_id)
         primary = self.get_first_hostname()
-        filename = os.path.realpath(os.path.join(HTTPListener.Global.PATH, 'deployment.xml'))
+        filename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH, 'deployment.xml'))
         deploymentfile = open(filename, 'w')
         deploymentfile.write(deploymentcontents)
         deploymentfile.close()
@@ -268,12 +268,12 @@ class VoltDatabase:
         self.build_network_options(server[0], voltdb_cmd)
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
-        outfilename = os.path.realpath(os.path.join(HTTPListener.Global.PATH,
-                ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER)))
+        outfilename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH,
+                                                    ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER)))
 
-        path = self.get_volt_deploy_root_folder(server, sid)
-        HTTPListener.Global.VOLT_DATA_PATH = path
-        voltserver = self.run_voltserver_process(voltdb_cmd, outfilename, path)
+        server_data_path = self.get_volt_server_data_folder(sid)
+        HTTPListener.Global.VOLT_SERVER_PATH = server_data_path
+        voltserver = self.run_voltserver_process(voltdb_cmd, outfilename, server_data_path)
     
         initialized = False
         rfile = open(outfilename, 'r')
@@ -292,39 +292,15 @@ class VoltDatabase:
         else:
             return 1
 
-    def get_volt_deploy_root_folder(self, server, sid):
-        path = ''
-        is_folder_exist = False
-        folder_name = ''
-        root = HTTPListener.Global.VOLT_ROOT_PATH
-        for item in os.listdir(root):
-            if os.path.isdir(os.path.join(root, item)):
-                item_array = item.split('_')
-                item_id = item_array[len(item_array)-1]
-                if str(item_id) == str(sid):
-                    is_folder_exist = True
-                    folder_name = item
-
-        database = [database for database in HTTPListener.Global.DATABASES if database['id'] == self.database_id]
-        new_folder_name = database[0]['name'] + '_' + server[0]['hostname'] + '_' + str(server[0]['id'])
-        if is_folder_exist:
-            self.rename_folder_name(root, folder_name, new_folder_name)
-            path = os.path.join(root, new_folder_name)
-        else:
-            path = os.path.join(root, new_folder_name)
-            if not os.path.isdir(str(path)):
-                try:
-                    os.makedirs(path)
-                except Exception, err:
-                    print('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
-        return path
-
-    def rename_folder_name(self, root, folder_name, new_folder_name):
-        if new_folder_name != folder_name:
-            oldwd = os.getcwd()
-            os.chdir(root)
-            os.rename(folder_name, new_folder_name)
-            os.chdir(oldwd)
+    def get_volt_server_data_folder(self, sid):
+        folder_name = 'server' + '_' + str(sid)
+        folder_path = os.path.join(HTTPListener.Global.DATA_PATH, folder_name)
+        if not os.path.isdir(str(folder_path)):
+            try:
+                os.makedirs(folder_path)
+            except Exception, err:
+                print('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
+        return folder_path
 
     # Build network options for command line.
     def build_network_options(self, sconfig, voltdb_cmd):
@@ -346,7 +322,7 @@ class VoltDatabase:
             voltdb_cmd.append(cli_switch)
             voltdb_cmd.append(opt_val)
 
-    def run_voltserver_process(self, voltdb_cmd, outfilename, outfolder):
+    def run_voltserver_process(self, voltdb_cmd, outfilename, server_data_folder):
         """
         Utility method to start voltdb process given the cmd details
         and output file for console output
@@ -355,7 +331,7 @@ class VoltDatabase:
     
         # Start server in a separate process
         oldwd = os.getcwd()
-        os.chdir(outfolder)
+        os.chdir(server_data_folder)
         try:
             my_env = os.environ.copy()
             my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
@@ -496,8 +472,8 @@ class VoltDatabase:
         # This needs to look at authentication and port information.
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
-        outfilename = os.path.join(HTTPListener.Global.PATH,
-                ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
+        outfilename = os.path.join(HTTPListener.Global.CONFIG_PATH,
+                                   ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
         return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename, server[0])
 
     def kill_database(self, database_id):

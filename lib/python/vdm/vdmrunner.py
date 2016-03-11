@@ -107,26 +107,26 @@ os.chdir(os.path.normpath(app_root))
 
 if path is None:
     home = expanduser("~")
-    path = os.path.join(home, '.voltdb')
+    config_path = os.path.join(home, '.voltdb')
     data_path = os.path.join(org_wd, 'voltdeployroot')
 else:
+    config_path = os.path.join(path, '.voltdb')
     data_path = os.path.join(path, 'voltdeployroot')
-    path = os.path.join(path, '.voltdb')
 
-if os.path.isdir(str(path)) and os.path.isdir(str(data_path)):
-    if os.access(str(path), os.W_OK) and os.access(str(path), os.W_OK):
-        HTTPListener.main(runner, HTTPListener, path, data_path, server)
+if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
+    if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
+        HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
     else:
         sys.stderr.write('Error: There is no permission to create file in this folder. '
-                         'Unable to start VDM.')
+                         'Unable to start voltdeploy.')
         sys.exit(1)
 else:
     try:
-        if not os.path.isdir(str(path)):
-            os.makedirs(path)
+        if not os.path.isdir(str(config_path)):
+            os.makedirs(config_path)
         if not os.path.isdir(str(data_path)):
             os.makedirs(data_path)
-        HTTPListener.main(runner, HTTPListener, path, data_path, server)
+        HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
     except Exception, err:
         sys.stderr.write('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
         sys.exit(1)
