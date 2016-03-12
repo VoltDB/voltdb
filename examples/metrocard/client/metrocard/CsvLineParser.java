@@ -23,7 +23,8 @@
 
 package metrocard;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 /** Parse comma-separated values (CSV), a common Windows file format.
  * Sample input: "LU",86.25,"11/4/1998","2:19PM",+4.0625
@@ -69,7 +70,7 @@ public class CsvLineParser {
      * @return java.util.Iterator containing each field
      * from the original as a String, in order.
      */
-    public Iterator parse(String line) {
+    public Iterator<String> parse(String line) {
         StringBuffer field = new StringBuffer();
         list.clear();           // discard previous, if any
         int p = 0;
