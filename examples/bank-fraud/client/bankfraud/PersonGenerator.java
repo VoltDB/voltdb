@@ -34,10 +34,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
-
-
 public class PersonGenerator {
-
 
     public class Person {
         String firstname;
@@ -47,7 +44,6 @@ public class PersonGenerator {
         String phonenumber;
         Date dob;
     }
-
 
     private static Random rand = new Random();
     private String[] firstnames;
