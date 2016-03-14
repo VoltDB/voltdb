@@ -228,7 +228,6 @@ public class TestDRConsumerDrIdTracker {
         assertTrue(tracker.getDrIdRanges().equals(expectedMap));
     }
 
-
     @Test
     public void testAppendNeighborTracker() throws Exception {
         RangeSet<Long> expectedMap = TreeRangeSet.create();
