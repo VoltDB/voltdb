@@ -440,6 +440,288 @@ class ClusterSettingsTest extends TestBase {
         println()
     }
 
+    def verifyDuplicateNameAndPortNotCreated() {
+        int count
+        when: 'Create database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                println("The index of database " + indexOfNewDatabase)
+                break
+            } catch(Exception e) {
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+            }
+        }
+        then: 'Choose new database'
+        println("The index of database " + indexOfNewDatabase)
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Set the id for new server'
+        String serverId = getCssPathOfServer(1)
+        then: 'Click Add Server button to open popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                page.btnAddServerOption.click()
+                page.buttonAddServer.click()
+                waitFor { page.popupAddServer.isDisplayed() }
+                println("Add Server popup found")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find Add Server popup - Retrying")
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find Add Server button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide values for new server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_server") }
+                waitFor { popupAddServerHostNameField.value("new_host") }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to the text fields - Retrying")
+            }
+        }
+        count = 0
+        and: 'Click Ok to save the Server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                waitFor { !popupAddServerButtonOk.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to Close Popup - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { !popupAddServerButtonOk.isDisplayed() }
+                } catch(geb.waiting.WaitTimeoutException f) {
+                    println("Popup Closed")
+                    break
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: 'Check if the server is created or not'
+        try {
+            waitFor { $(serverId).text() == "new_server" }
+            println($(serverId).text() + " get Id of server")
+            println("The new server was created")
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Test Fail: The new server was not created")
+            assert false
+        }
+
+        when: 'Click Add Server button to open popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                page.btnAddServerOption.click()
+                page.buttonAddServer.click()
+                waitFor { page.popupAddServer.isDisplayed() }
+                println("Add Server popup found")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find Add Server popup - Retrying")
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find Add Server button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: 'Provide values for new server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_server") }
+                waitFor { popupAddServerHostNameField.value("new_host") }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to the text fields - Retrying")
+            }
+        }
+
+        when: 'Click Ok to save the Server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                waitFor { !popupAddServerButtonOk.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Unable to Close Popup - Retrying")
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { !popupAddServerButtonOk.isDisplayed() }
+                } catch (geb.waiting.WaitTimeoutException f) {
+                    println("Popup Closed")
+                    break
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then:
+        try {
+            waitFor { page.errorClientPort.text().equals("Default port already exists") }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+            println("Test Fail: The Error Message is not displayed")
+            assert false
+        }
+    }
+
+    def verifyDuplicateNameButDifferentPortCreated() {
+        int count
+        when: 'Create database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                println("The index of database " + indexOfNewDatabase)
+                break
+            } catch(Exception e) {
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+            }
+        }
+        then: 'Choose new database'
+        println("The index of database " + indexOfNewDatabase)
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Set the id for new server'
+        String serverId = getCssPathOfServer(1)
+        String serverIdNext = getCssPathOfServer(2)
+        then: 'Click Add Server button to open popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                page.btnAddServerOption.click()
+                page.buttonAddServer.click()
+                waitFor { page.popupAddServer.isDisplayed() }
+                println("Add Server popup found")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find Add Server popup - Retrying")
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find Add Server button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide values for new server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_server") }
+                waitFor { popupAddServerHostNameField.value("new_host") }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to the text fields - Retrying")
+            }
+        }
+        count = 0
+        and: 'Click Ok to save the Server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                waitFor { !popupAddServerButtonOk.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to Close Popup - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { !popupAddServerButtonOk.isDisplayed() }
+                } catch(geb.waiting.WaitTimeoutException f) {
+                    println("Popup Closed")
+                    break
+                }
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: 'Check if the server is created or not'
+        try {
+            waitFor { $(serverId).text() == "new_server" }
+            println($(serverId).text() + " get Id of server")
+            println("The new server was created")
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Test Fail: The new server was not created")
+            assert false
+        }
+
+        when: 'Click Add Server button to open popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                page.btnAddServerOption.click()
+                page.buttonAddServer.click()
+                waitFor { page.popupAddServer.isDisplayed() }
+                println("Add Server popup found")
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to find Add Server popup - Retrying")
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+                println("Unable to find Add Server button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'Click on the Details'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                page.popupAddServerDetails.click()
+                waitFor { popupAddServerClientListenerField.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to open Details")
+            }
+        }
+
+        then: 'Provide values for new server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { popupAddServerNameField.value("new_server") }
+                waitFor { popupAddServerHostNameField.value("new_host") }
+
+                waitFor { popupAddServerClientListenerField.value("12") }
+                waitFor { popupAddServerAdminListenerField.value("13") }
+                waitFor { popupAddServerHttpListenerField.value("14") }
+                waitFor { popupAddServerInternalListenerField.value("15") }
+                waitFor { popupAddServerZookeeperListenerField.value("16") }
+                waitFor { popupAddServerReplicationListenerField.value("17") }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Unable to provide value to the text fields - Retrying")
+            }
+        }
+
+        when: 'Click Ok to save the Server'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                popupAddServerButtonOk.click()
+                waitFor { !popupAddServerButtonOk.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Unable to Close Popup - Retrying")
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                try {
+                    waitFor { !popupAddServerButtonOk.isDisplayed() }
+                } catch (geb.waiting.WaitTimeoutException f) {
+                    println("Popup Closed")
+                    break
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then:
+        println()
+        report "hello"
+        try {
+            waitFor { $(serverIdNext).text() == "new_server" }
+            println($(serverIdNext).text() + " get Id of server")
+            println("The new server with duplicate name was created")
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Test Fail: The new server was not created")
+            assert false
+        }
+    }
+
     def cleanup() {
         to ClusterSettingsPage
 
