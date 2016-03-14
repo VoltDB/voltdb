@@ -57,7 +57,6 @@ from flask_logging import Filter
 
 filter_log = Filter('/api/1.0/', 'GET')
 
-
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
 
@@ -507,7 +506,7 @@ def get_port(ip_with_port):
             return arr[1]
 
 
-def check_port_valid(port_option, servers):
+def check_port_valid(port_option, server):
     if port_option == "http-listener":
         default_port = "8080"
     if port_option == "admin-listener":
@@ -521,9 +520,9 @@ def check_port_valid(port_option, servers):
     if port_option == "internal-listener":
         default_port = "3021"
 
-    server_port = get_port(servers[port_option])
+    server_port = get_port(server[port_option])
     if server_port is None or server_port == "":
-            server_port = default_port
+        server_port = default_port
 
     if port_option not in request.json:
         port = default_port
@@ -531,33 +530,34 @@ def check_port_valid(port_option, servers):
         port = get_port(request.json[port_option])
 
     if port == server_port:
-        return jsonify(success=False, errors="Duplicate %s for same hostname" %port_option)
+        return jsonify(success=False,
+                       errors="Port %s for the same host is already used by server %s for %s" % \
+                              (port, server['hostname'], port_option))
 
 
 def validate_server_ports(database_id):
-    arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+    arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
+           "client-listener"]
 
-    specified_port_values = [{
+    specified_port_values = {
         "http-listener": get_port(request.json.get('http-listener', "")),
         "admin-listener": get_port(request.json.get('admin-listener', "")),
         "replication-listener": get_port(request.json.get('replication-listener', "")),
         "client-listener": get_port(request.json.get('client-listener', "")),
         "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
         "internal-listener": get_port(request.json.get('internal-listener', ""))
-    }];
+    }
 
     for option in arr:
-        value = specified_port_values[0][option]
-        for port_values in specified_port_values[0].keys():
-            if option != port_values:
-                if value is not None:
-                    if specified_port_values[0][port_values] == value:
-                        return jsonify(success=False, errors="Duplicate port")
+        value = specified_port_values[option]
+        for port_key in specified_port_values.keys():
+            if option != port_key and value is not None and specified_port_values[port_key] == value:
+                return jsonify(success=False, errors="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    for servers in database_servers:
-        if servers['hostname'] == request.json['hostname']:
+    for server in database_servers:
+        if server['hostname'] == request.json['hostname']:
             for option in arr:
-                result = check_port_valid(option, servers)
+                result = check_port_valid(option, server)
                 if result is not None:
                     return result
 
@@ -651,7 +651,7 @@ def make_configuration_file():
 def sync_configuration():
     headers = {'content-type': 'application/json'}
     url = 'http://%s:%u/api/1.0/voltdeploy/configuration/' % \
-          (__IP__,__PORT__)
+          (__IP__, __PORT__)
     response = requests.post(url, headers=headers)
     return response
 
@@ -858,7 +858,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                             new_deployment[field]['resourcemonitor'] = {}
                             if 'memorylimit' in deployment[field]['resourcemonitor']:
                                 new_deployment[field]['resourcemonitor']['memorylimit'] = \
-                                deployment[field]['resourcemonitor']['memorylimit']
+                                    deployment[field]['resourcemonitor']['memorylimit']
 
                             if 'disklimit' in deployment[field]['resourcemonitor'] and 'feature' in \
                                     deployment[field]['resourcemonitor']['disklimit']:
@@ -1026,7 +1026,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['resourcemonitor'] = {}
                         if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
                             new_deployment[field]['resourcemonitor']['memorylimit'] = \
-                            deployment_xml[field]['resourcemonitor']['memorylimit']
+                                deployment_xml[field]['resourcemonitor']['memorylimit']
 
                         if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in \
                                 deployment_xml[field]['resourcemonitor']['disklimit']:
@@ -1084,9 +1084,11 @@ def get_deployment_for_upload(deployment_xml, is_list):
             try:
                 if deployment_xml[field] is not None:
                     if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
+                                                                            'list')
                     else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
+                                                                            'dict')
                 else:
                     new_deployment[field] = deployment_xml[field]
             except Exception, exp:
@@ -1095,9 +1097,11 @@ def get_deployment_for_upload(deployment_xml, is_list):
             try:
                 if deployment_xml[field] is not None:
                     if type(deployment_xml[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
+                                                                            'list')
                     else:
-                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'],
+                                                                            'dict')
                 else:
                     new_deployment[field] = deployment_xml[field]
             except Exception, exp:
@@ -1126,7 +1130,8 @@ def get_deployment_for_upload(deployment_xml, is_list):
                 new_deployment[field]['synchronous'] = parse_bool_string(deployment_xml[field]['synchronous'])
                 new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
                 new_deployment[field]['frequency'] = {}
-                new_deployment[field]['frequency']['transactions'] = int(deployment_xml[field]['frequency']['transactions'])
+                new_deployment[field]['frequency']['transactions'] = int(
+                    deployment_xml[field]['frequency']['transactions'])
                 new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
             except Exception, err:
                 return {'error': 'Commandlog: ' + str(err)}
@@ -1142,7 +1147,8 @@ def get_deployment_for_upload(deployment_xml, is_list):
                 new_deployment[field]['port'] = int(deployment_xml[field]['port'])
                 new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                 new_deployment[field]['jsonapi'] = {}
-                new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment_xml[field]['jsonapi']['enabled'])
+                new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(
+                    deployment_xml[field]['jsonapi']['enabled'])
             except Exception, err:
                 return {'error': 'HTTPD: ' + str(err)}
         elif field == 'partition-detection':
@@ -1183,20 +1189,26 @@ def get_deployment_for_upload(deployment_xml, is_list):
                 new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
 
                 if 'resourcemonitor' not in deployment_xml[field] or deployment_xml[field]['resourcemonitor'] is None:
-                    if 'resourcemonitor'  in deployment_xml[field]:
+                    if 'resourcemonitor' in deployment_xml[field]:
                         new_deployment[field]['resourcemonitor'] = None
                 else:
                     new_deployment[field]['resourcemonitor'] = {}
                     if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
-                        new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
+                        new_deployment[field]['resourcemonitor']['memorylimit'] = \
+                        deployment_xml[field]['resourcemonitor']['memorylimit']
 
-                    if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in deployment_xml[field]['resourcemonitor']['disklimit']:
+                    if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in \
+                            deployment_xml[field]['resourcemonitor']['disklimit']:
                         if type(deployment_xml[field]['resourcemonitor']['disklimit']['feature']) is list:
                             new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
+                            new_deployment[field]['resourcemonitor']['disklimit'][
+                                'feature'] = get_deployment_properties(
+                                deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
                         else:
                             new_deployment[field]['resourcemonitor']['disklimit'] = {}
-                            new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
+                            new_deployment[field]['resourcemonitor']['disklimit'][
+                                'feature'] = get_deployment_properties(
+                                deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
             except Exception, err:
                 return {'error': 'SystemSettings: ' + str(err)}
         elif field == 'dr':
@@ -1207,9 +1219,11 @@ def get_deployment_for_upload(deployment_xml, is_list):
                     new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
                     if 'port' in deployment_xml[field]:
                         new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                    if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']:
+                    if 'connection' in deployment_xml[field] and deployment_xml[field][
+                        'connection'] is not None and 'source' in deployment_xml[field]['connection']:
                         new_deployment[field]['connection'] = {}
-                        new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
+                        new_deployment[field]['connection']['source'] = str(
+                            deployment_xml[field]['connection']['source'])
 
             except Exception, err:
                 return {'error': 'DR: ' + str(err)}
@@ -1385,7 +1399,7 @@ def check_size_value(value, key):
             int_value = int(str_value)
             if int_value < 0 or int_value > 100:
                 return jsonify({'error': key + ' percent value must be between 0 and 100.'})
-            return jsonify({'status':'success'})
+            return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
@@ -1393,7 +1407,7 @@ def check_size_value(value, key):
             int_value = int(value)
             if int_value < 0 or int_value > 2147483647:
                 return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
-            return jsonify({'status':'success'})
+            return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
 
@@ -1417,9 +1431,9 @@ def is_pro_version(deployment):
         is_pro = utility.is_pro_version(file_path)
         if is_pro:
             if 'commandlog' in deployment and 'enabled' in deployment['commandlog'] and not \
-            deployment['commandlog']['enabled']:
+                    deployment['commandlog']['enabled']:
                 deployment['commandlog']['enabled'] = True
-    ###############################################
+                ###############################################
 
 
 def allowed_file(filename):
@@ -1430,7 +1444,7 @@ def get_servers_from_database_id(database_id):
     servers = []
     database = [database for database in Global.DATABASES if database['id'] == database_id]
     if len(database) == 0:
-        return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
     else:
         members = database[0]['members']
 
@@ -1438,6 +1452,7 @@ def get_servers_from_database_id(database_id):
         server = [server for server in Global.SERVERS if server['id'] == servers_id]
         servers.append(server[0])
     return servers
+
 
 class DictClass(dict):
     pass
@@ -1469,7 +1484,7 @@ class ServerAPI(MethodView):
     """Class to handle requests related to server"""
 
     @staticmethod
-    def get(database_id, server_id = None):
+    def get(database_id, server_id=None):
         """
         Get the members of the database with specified database_id.
         Args:
@@ -1481,21 +1496,22 @@ class ServerAPI(MethodView):
             servers = []
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
-                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+                return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database[0]['members']
 
             for servers_id in members:
                 server = [server for server in Global.SERVERS if server['id'] == servers_id]
                 if not server:
-                    return make_response(jsonify( { 'statusstring': 'Server details not found for id: %u' % server_id } ), 404)
+                    return make_response(jsonify({'statusstring': 'Server details not found for id: %u' % server_id}),
+                                         404)
                 servers.append(server[0])
 
             return jsonify({'members': servers})
         else:
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
-                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+                return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database[0]['members']
             if server_id in members:
@@ -1504,7 +1520,8 @@ class ServerAPI(MethodView):
                     abort(404)
                 return jsonify({'server': make_public_server(server[0])})
             else:
-                return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
+                return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+                server_id, database_id)})
 
     @staticmethod
     def post(database_id):
@@ -1571,14 +1588,16 @@ class ServerAPI(MethodView):
         """
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database[0]['members']
         if server_id in members:
             # delete a single server
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(server) == 0:
-                return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
+                return make_response(
+                    jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}),
+                    404)
             # remove the server from given database member list
             current_database = [database for database in Global.DATABASES if database['id'] == database_id]
             current_database[0]['members'].remove(server_id)
@@ -1588,7 +1607,8 @@ class ServerAPI(MethodView):
             write_configuration_file()
             return jsonify({'result': True})
         else:
-            return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
+            return make_response(
+                jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}), 404)
 
     @staticmethod
     def put(database_id, server_id):
@@ -1603,7 +1623,7 @@ class ServerAPI(MethodView):
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database[0]['members']
         if server_id in members:
@@ -1650,7 +1670,8 @@ class ServerAPI(MethodView):
             write_configuration_file()
             return jsonify({'server': current_server[0], 'status': 1})
         else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+            server_id, database_id)})
 
 
 class DatabaseAPI(MethodView):
@@ -2128,7 +2149,7 @@ class RecoverServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid,True)
+            return server.check_and_start_local_server(sid, True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -2269,7 +2290,7 @@ class DatabaseDeploymentAPI(MethodView):
                         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
                             frequency_unit = ['h', 'm', 's']
                             frequency = str(req.json['snapshot']['frequency'])
-                            last_char =  frequency[len(frequency)-1]
+                            last_char = frequency[len(frequency) - 1]
                             if last_char not in frequency_unit:
                                 return jsonify({'error': 'Snapshot: Invalid frequency value.'})
                             frequency = frequency[:-1]
@@ -2329,7 +2350,7 @@ class StatusDatabaseAPI(MethodView):
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
             if len(database[0]['members']) == 0:
-                return jsonify({'status':'errorNoMembers'})
+                return jsonify({'status': 'errorNoMembers'})
             for server_id in database[0]['members']:
                 server = [server for server in Global.SERVERS if server['id'] == server_id]
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
@@ -2355,7 +2376,7 @@ class StatusDatabaseAPI(MethodView):
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-            return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
+            return jsonify({'status': status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -2369,7 +2390,7 @@ class StatusDatabaseServerAPI(MethodView):
         else:
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(database[0]['members']) == 0:
-                return jsonify({'error':'errorNoMembers'})
+                return jsonify({'error': 'errorNoMembers'})
             if not server:
                 return make_response(jsonify({'error': 'Not found'}), 404)
             elif server_id not in database[0]['members']:
@@ -2464,7 +2485,6 @@ def main(runner, amodule, config_dir, server):
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
 
-
     START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
     RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
     STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
@@ -2534,10 +2554,9 @@ def main(runner, amodule, config_dir, server):
         open('voltdeploy.log', 'w').close()
     handler = RotatingFileHandler('voltdeploy.log')
     handler.setFormatter(logging.Formatter(
-         "%(asctime)s|%(levelname)s|%(message)s"))
+        "%(asctime)s|%(levelname)s|%(message)s"))
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.NOTSET)
     log.addHandler(handler)
-
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)
