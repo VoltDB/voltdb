@@ -39,6 +39,13 @@ public class DRConsumerDrIdTracker {
         m_lastMpUniqueId = mpUniqueId;
     }
 
+    public DRConsumerDrIdTracker(DRConsumerDrIdTracker other) {
+        m_map = new TreeMap<>(other.m_map);
+        m_lastAckedDrId = other.m_lastAckedDrId;
+        m_lastSpUniqueId = other.m_lastSpUniqueId;
+        m_lastMpUniqueId = other.m_lastMpUniqueId;
+    }
+
     public DRConsumerDrIdTracker(ByteBuffer buff) {
         m_lastAckedDrId = buff.getLong();
         m_lastSpUniqueId = buff.getLong();
