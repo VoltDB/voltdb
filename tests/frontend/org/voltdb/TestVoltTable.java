@@ -971,6 +971,17 @@ public class TestVoltTable extends TestCase {
         assertEquals(rowcounter, content.length);
     }
 
+    private void assertExpectedOutput(String expected, String actual) {
+        if (!actual.equals(expected))
+        {
+            System.out.println("Received formatted output:");
+            System.out.println(actual);
+            System.out.println("Expected output:");
+            System.out.println(expected);
+        }
+        assertEquals(expected, actual);
+    }
+
     public void testFormattedString() throws JSONException, IOException {
         // Set the default timezone since we're using a timestamp type.  Eliminate test flakeyness.
         VoltDB.setDefaultTimezone();
@@ -1005,7 +1016,6 @@ public class TestVoltTable extends TestCase {
                      new TimestampType(99),
                      new BigDecimal("123.45"));
         String formattedOutput = table.toFormattedString();
-
         String expectedOutput =
 "tinyint  smallint  integer  bigint       float     string  varbinary  timestamp                   decimal          \n" +
 "-------- --------- -------- ------------ --------- ------- ---------- --------------------------- -----------------\n" +
@@ -1013,14 +1023,7 @@ public class TestVoltTable extends TestCase {
 "    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
 "     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output:");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output:");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
 
         // fetch formatted output without column names
         formattedOutput = table.toFormattedString(false);
@@ -1029,14 +1032,7 @@ public class TestVoltTable extends TestCase {
 "    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
 "     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output:");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output:");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
 
         table = new VoltTable(new ColumnInfo("bigint",          VoltType.BIGINT),
                               new ColumnInfo("geography",       VoltType.GEOGRAPHY),
@@ -1060,14 +1056,7 @@ public class TestVoltTable extends TestCase {
 "      NULL NULL                                                         NULL                  NULL                       \n" +
 " 123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))  POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
 
         // row with a polygon that max's output column width for geopgraphy column
         table.addRow(1234567890,
@@ -1087,14 +1076,7 @@ public class TestVoltTable extends TestCase {
 "  123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
 " 1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
 
         // row with a polygon that goes beyond max aligned display limit for polygon. This will result in
         // other columns following to appear further away from their original column
@@ -1118,14 +1100,7 @@ public class TestVoltTable extends TestCase {
 "  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
 " 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
 
         // test the final one without column names
         formattedOutput = table.toFormattedString(false);
@@ -1136,14 +1111,7 @@ public class TestVoltTable extends TestCase {
 "  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
 " 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
 
-        if (!formattedOutput.equals(expectedOutput))
-        {
-            System.out.println("Received formatted output: (length: " + formattedOutput.length() +")");
-            System.out.println(formattedOutput);
-            System.out.println("Expected output: (length: " + expectedOutput.length() + ")");
-            System.out.println(expectedOutput);
-        }
-        assertTrue(formattedOutput.equals(expectedOutput));
+        assertExpectedOutput(expectedOutput, formattedOutput);
     }
 
     @SuppressWarnings("deprecation")
