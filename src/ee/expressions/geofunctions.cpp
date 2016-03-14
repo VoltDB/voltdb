@@ -365,7 +365,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     return polygonFromText(wkt, false);
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMVALIDTEXT>() const
+template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
 {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
