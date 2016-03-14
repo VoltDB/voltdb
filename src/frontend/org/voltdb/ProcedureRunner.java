@@ -147,6 +147,9 @@ public class ProcedureRunner {
     /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
     private long m_spBigBatchBeginToken;
 
+    protected ByteBuffer m_udpatableScratchPad = null;
+    protected ByteBuffer m_savedScratchPad = null;
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -421,6 +424,10 @@ public class ProcedureRunner {
 
             int hash = (int) m_inputCRC.getValue();
             if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
+                if (m_savedScratchPad != null) {
+                    m_inputCRC.update(m_savedScratchPad.array());
+                    hash = (int) m_inputCRC.getValue();
+                }
                 retval.setHash(hash);
             }
             if ((m_txnState != null) && // may be null for tests
@@ -577,6 +584,47 @@ public class ProcedureRunner {
      */
     public int getClusterId() {
         return m_site.getCorrespondingClusterId();
+    }
+
+    public ByteBuffer viewScratchPad()
+    {
+        if (m_savedScratchPad == null) {
+            return m_site.getCorrespondingScratchPad().asReadOnlyBuffer();
+        }
+        else {
+            return m_savedScratchPad.asReadOnlyBuffer();
+        }
+    }
+
+    public ByteBuffer loadScratchPad()
+    {
+        ByteBuffer siteBuffer;
+        if (m_savedScratchPad == null) {
+            siteBuffer = m_site.getCorrespondingScratchPad();
+        }
+        else {
+            siteBuffer = m_savedScratchPad;
+        }
+        ByteBuffer m_udpatableScratchPad = ByteBuffer.allocate(siteBuffer.capacity());
+        assert(siteBuffer.position() == 0);
+        m_udpatableScratchPad.put(siteBuffer);
+        siteBuffer.rewind();
+        m_udpatableScratchPad.flip();
+        return m_udpatableScratchPad;
+    }
+
+    public void saveScratchPad()
+    {
+        if (m_isReadOnly) {
+            throw new VoltAbortException("Attempted to save scratchpad from a read only procedure");
+        }
+        if (m_udpatableScratchPad == null) {
+            throw new VoltAbortException("Attempted to save scratchpad that was never loaded");
+        }
+        if (m_udpatableScratchPad != null) {
+            m_savedScratchPad = m_udpatableScratchPad;
+            m_savedScratchPad.rewind();
+        }
     }
 
     private void updateCRC(QueuedSQL queuedSQL) {

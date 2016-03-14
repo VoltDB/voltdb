@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Random;
 
@@ -295,5 +296,20 @@ public abstract class VoltProcedure {
      */
     public void setAppStatusString(String statusString) {
         m_runner.setAppStatusString(statusString);
+    }
+
+    public ByteBuffer viewScratchPad()
+    {
+        return m_runner.viewScratchPad();
+    }
+
+    public ByteBuffer loadScratchPad()
+    {
+        return m_runner.loadScratchPad();
+    }
+
+    public void saveScratchPad()
+    {
+        m_runner.saveScratchPad();
     }
 }
