@@ -554,12 +554,12 @@ def validate_server_ports(database_id):
             if option != port_key and value is not None and specified_port_values[port_key] == value:
                 return jsonify(success=False, errors="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    for server in database_servers:
-        if server['hostname'] == request.json['hostname']:
-            for option in arr:
-                result = check_port_valid(option, server)
-                if result is not None:
-                    return result
+    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    for server in servers:
+        for option in arr:
+            result = check_port_valid(option, server)
+            if result is not None:
+                return result
 
 
 def get_configuration():
