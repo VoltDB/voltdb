@@ -814,7 +814,7 @@ public class TestDDLCompiler extends TestCase {
 
         String schema[] = {
                 "CREATE INDEX POLY ON GEO ( POLYGONFROMTEXT( REGION ) );",
-                "CREATE INDEX POLY ON GEO ( POLYGONFROMVALIDTEXT( REGION ) );",
+                "CREATE INDEX POLY ON GEO ( VALIDPOLYGONFROMTEXT( REGION ) );",
         };
 
         VoltCompiler compiler = new VoltCompiler();

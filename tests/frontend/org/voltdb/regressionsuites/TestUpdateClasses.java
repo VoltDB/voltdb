@@ -248,7 +248,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             }
             catch (ProcCallException pce) {
-                assertTrue(pce.getMessage().contains("does not have sysproc permission"));
+                assertTrue(pce.getMessage().contains("does not have admin permission"));
                 threw = true;
             }
             assertTrue(threw);
