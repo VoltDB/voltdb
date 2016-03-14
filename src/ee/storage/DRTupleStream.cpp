@@ -556,7 +556,7 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
         }
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
 
         if (flag == TXN_PAR_HASH_REPLICATED || flag == TXN_PAR_HASH_SPECIAL) {
@@ -567,7 +567,7 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
         if (flag != TXN_PAR_HASH_SINGLE) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + 1));
             for (int zz = 0; zz < 5; zz++) {
-                stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
             }
             tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
         }

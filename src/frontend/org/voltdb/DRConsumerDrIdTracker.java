@@ -145,6 +145,20 @@ public class DRConsumerDrIdTracker {
     }
 
     /**
+     * Add a range to the tracker.
+     * @param startDrId
+     * @param endDrId
+     * @param spUniqueId
+     * @param mpUniqueId
+     */
+    public void addRange(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
+        // Note that any given range or tracker could have either sp or mp sentinel values
+        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, spUniqueId);
+        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, mpUniqueId);
+        m_map.add(range(startDrId, endDrId));
+    }
+
+    /**
      * Appends a range to the tracker. The range has to be after the last DrId
      * of the tracker.
      * @param startDrId
@@ -155,10 +169,7 @@ public class DRConsumerDrIdTracker {
     public void append(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
         assert(startDrId <= endDrId && startDrId > end(m_map.span()));
 
-        // Note that any given range or tracker could have either sp or mp sentinel values
-        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, spUniqueId);
-        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, mpUniqueId);
-        m_map.add(range(startDrId, endDrId));
+        addRange(startDrId, endDrId, spUniqueId, mpUniqueId);
     }
 
     /**
