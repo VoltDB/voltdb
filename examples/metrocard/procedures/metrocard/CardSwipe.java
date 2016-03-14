@@ -23,8 +23,6 @@
 
 package metrocard;
 
-import java.util.Random;
-
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -48,22 +46,20 @@ public class CardSwipe extends VoltProcedure {
     public final SQLStmt exportActivity = new SQLStmt(
             "INSERT INTO card_alert_export (card_id, export_time, station_name, name, phone, email, notify, alert_message) VALUES (?,?,?,?,?,?,?,?);");
 
-    private Random rand = new Random();
-
     // for returning results as a VoltTable
-        final VoltTable resultTemplate = new VoltTable(
-                new VoltTable.ColumnInfo("card_accepted",VoltType.TINYINT),
-                new VoltTable.ColumnInfo("message",VoltType.STRING));
+    final VoltTable resultTemplate = new VoltTable(
+            new VoltTable.ColumnInfo("card_accepted",VoltType.TINYINT),
+            new VoltTable.ColumnInfo("message",VoltType.STRING));
 
-        public VoltTable buildResult(int accepted, String msg) {
-                VoltTable r = resultTemplate.clone(64);
-                r.addRow(accepted, msg);
-                return r;
-        }
+    public VoltTable buildResult(int accepted, String msg) {
+        VoltTable r = resultTemplate.clone(64);
+        r.addRow(accepted, msg);
+        return r;
+    }
 
-        public static String intToCurrency(int i) {
-                return String.format("%d.%02d", i/100, i%100);
-        }
+    public static String intToCurrency(int i) {
+        return String.format("%d.%02d", i/100, i%100);
+    }
 
     public VoltTable run( int cardId,
                           int stationId
@@ -98,10 +94,6 @@ public class CardSwipe extends VoltProcedure {
         int fare = (int)stationInfo.getLong(0);
         String stationName = stationInfo.getString(1);
 
-        int cardAccepted = 0;
-        String message;
-        int fareCharged = 0;
-
         // if card is disabled
         if (enabled == 0) {
                 return buildResult(0,"Card Disabled");
@@ -124,7 +116,8 @@ public class CardSwipe extends VoltProcedure {
                         voltExecuteSQL(true);
                         return buildResult(0,"Card has insufficient balance: "+intToCurrency(balance));
                 }
-        } else { // unlimited card (e.g. monthly or weekly pass)
+        }
+        else { // unlimited card (e.g. monthly or weekly pass)
                 if (expires.compareTo(new TimestampType(getTransactionTime())) > 0) {
                         voltQueueSQL(insertActivity, cardId, getTransactionTime(), stationId, 1, 0);
                         voltExecuteSQL(true);

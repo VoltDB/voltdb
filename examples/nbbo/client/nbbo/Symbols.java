@@ -68,8 +68,6 @@ public class Symbols {
 
     public void loadFile(String filename) {
         try {
-
-
             FileReader fileReader = new FileReader(filename);
             BufferedReader bufferedReader = new BufferedReader(fileReader);
             CsvLineParser parser = new CsvLineParser();
@@ -79,15 +77,15 @@ public class Symbols {
 
             // read remaining lines
             int i=0;
-            Iterator it;
+            Iterator<String> it;
             BigDecimal bd10000 = new BigDecimal(10000);
             while ((line = bufferedReader.readLine()) != null) {
                 i++;
                 it = parser.parse(line);
                 Symbol s = new Symbol();
-                s.symbol = (String)it.next();
+                s.symbol = it.next();
                 it.next(); // skip name
-                String price = (String)it.next();
+                String price = it.next();
                 if (price.equals("n/a")) {
                     price = "20";
                 }
@@ -95,8 +93,6 @@ public class Symbols {
                 s.price = priceBD.multiply(bd10000).intValue();
 
                 symbols.add(s);
-
-                //System.out.println(s.symbol + "   " + price + "   " + s.price);
             }
             bufferedReader.close();
             System.out.println("read " + i + " lines");
