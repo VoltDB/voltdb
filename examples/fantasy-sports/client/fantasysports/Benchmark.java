@@ -23,12 +23,14 @@
 
 package fantasysports;
 
-import java.util.Random;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.voltdb.*;
-import org.voltdb.client.*;
+
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 
 public class Benchmark {
 
@@ -36,7 +38,7 @@ public class Benchmark {
     private int nflPlayers = 300;
     private int userCount = 1000000;
     private int largeContests = 1;
-    private int smallContests = 0;
+    //private int smallContests = 0;
     private int threads = 1;
 
 

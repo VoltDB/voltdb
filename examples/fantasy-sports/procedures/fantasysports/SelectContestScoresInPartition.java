@@ -23,13 +23,9 @@
 
 package fantasysports;
 
-//import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-
-import org.voltdb.*;
-import org.voltdb.types.TimestampType;
-import org.voltdb.client.ClientResponse;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 public class SelectContestScoresInPartition extends VoltProcedure {
 
@@ -45,12 +41,9 @@ public class SelectContestScoresInPartition extends VoltProcedure {
         "ORDER BY score DESC"+
         ";");
 
-
-
     public VoltTable[] run(int partitionVal, int contest) throws VoltAbortException {
 
     voltQueueSQL(selectScores, contest);
         return voltExecuteSQL(true);
-
     }
 }

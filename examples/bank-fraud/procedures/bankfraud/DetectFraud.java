@@ -155,7 +155,6 @@ public class DetectFraud extends VoltProcedure {
 
             // evaluate each rule, stop if a rule results in Denied
             VoltTable rules = results1[4];
-            Object result = null;
             while (rules.advanceRow() && !txnStatus.equals("Denied")) {
                 String cond = rules.getString(1);
                 ruleId = rules.getLong(0);
