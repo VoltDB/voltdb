@@ -1158,7 +1158,7 @@ public final class InvocationDispatcher {
                     else if (result instanceof CatalogChangeResult) {
                         final CatalogChangeResult changeResult = (CatalogChangeResult) result;
 
-                        if (changeResult.diffCommandsLength == 0) {
+                        if (changeResult.encodedDiffCommands.trim().length() == 0) {
                             ClientResponseImpl shortcutResponse =
                                     new ClientResponseImpl(
                                             ClientResponseImpl.SUCCESS,
