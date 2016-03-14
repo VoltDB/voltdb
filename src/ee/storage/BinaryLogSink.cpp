@@ -481,14 +481,16 @@ int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
     uniqueId = taskInfo->readLong();
     sequenceNumber = taskInfo->readLong();
 
-    isMultiHash = (static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte()) == TXN_PAR_HASH_MULTI);
+    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
+    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI);
     taskInfo->readInt();  // txnLength
     partitionHash = taskInfo->readInt();
     if (isMultiHash) {
         skipWrongHashRows = !engine->isLocalSite(partitionHash);
     }
     else {
-        assert(engine->isLocalSite(partitionHash));
+        // check if the sp txn is for local site.
+        assert(hashFlag != TXN_PAR_HASH_SINGLE || engine->isLocalSite(partitionHash));
         skipWrongHashRows = false;
     }
     // Read the whole txn since there is only one version number at the beginning

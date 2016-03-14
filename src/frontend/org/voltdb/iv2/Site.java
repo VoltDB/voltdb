@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -97,13 +98,14 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger drLog = new VoltLogger("DRAGENT");
 
     private static final double m_taskLogReplayRatio =
             Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
@@ -405,6 +407,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
         }
+
+        /**
+         * Check to see if binary log is expected (start DR id adjacent to last received DR id)
+         *
+         * @return 0 expected, -1 duplicated binary log, 1 future binary log
+         */
         @Override
         public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                              long lastReceivedDRId)
@@ -494,6 +502,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
+            if (drLog.isTraceEnabled()) {
+                for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : m_maxSeenDrLogsBySrcPartition.entrySet()) {
+                    for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
+                        drLog.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
+                                " contains " + e2.getValue().toShortString());
+                    }
+                }
+            }
             return m_maxSeenDrLogsBySrcPartition;
         }
 

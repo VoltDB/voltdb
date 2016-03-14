@@ -48,6 +48,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         SPECIAL
     }
 
+    public enum DRTestBufferFlag {
+        REPLICATED,
+        SINGLE,
+        MULTI,
+        MIXED,
+        SPECIAL
+    }
+
     public static enum DRRowType {
         EXISTING_ROW,
         EXPECTED_ROW,

@@ -37,8 +37,6 @@ public interface ConsumerDRGateway extends Promotable {
 
     public void restart() throws InterruptedException;
 
-    public abstract void beginPromotePartition(int partitionId, boolean fromUAC);
-
     public abstract void completePromotePartition(int partitionId);
 
     public static class DummyConsumerDRGateway implements ConsumerDRGateway {
@@ -60,9 +58,6 @@ public interface ConsumerDRGateway extends Promotable {
 
         @Override
         public void restart() throws InterruptedException {}
-
-        @Override
-        public void beginPromotePartition(int partitionId, boolean fromUAC) {}
 
         @Override
         public void completePromotePartition(int partitionId) {}
