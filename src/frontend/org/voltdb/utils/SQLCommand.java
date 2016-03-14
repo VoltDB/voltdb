@@ -874,6 +874,7 @@ public class SQLCommand
                 rowCount = t.getRowCount();
                 // Run it through the output formatter.
                 m_outputFormatter.printTable(System.out, t, m_outputShowMetadata);
+                //System.out.println("printable");
             }
             else {
                 rowCount = t.fetchRow(0).getLong(0);
@@ -1109,7 +1110,8 @@ public class SQLCommand
             Integer curr_val = proc_param_counts.get(this_proc);
             if (curr_val == null) {
                 curr_val = 1;
-            } else {
+            }
+            else {
                 ++curr_val;
             }
             proc_param_counts.put(this_proc, curr_val);
@@ -1219,17 +1221,23 @@ public class SQLCommand
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
                 serverList = extractArgInput(arg);
-            } else if (arg.startsWith("--port=")) {
+            }
+            else if (arg.startsWith("--port=")) {
                 port = Integer.valueOf(extractArgInput(arg));
-            } else if (arg.startsWith("--user=")) {
+            }
+            else if (arg.startsWith("--user=")) {
                 user = extractArgInput(arg);
-            } else if (arg.startsWith("--password=")) {
+            }
+            else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
-            } else if (arg.startsWith("--kerberos=")) {
+            }
+            else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
-            } else if (arg.startsWith("--kerberos")) {
+            }
+            else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
-            } else if (arg.startsWith("--query=")) {
+            }
+            else if (arg.startsWith("--query=")) {
                 List<String> argQueries = SQLParser.parseQuery(arg.substring(8));
                 if (!argQueries.isEmpty()) {
                     if (queries == null) {
