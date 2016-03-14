@@ -828,7 +828,7 @@ class ServerAPI(MethodView):
             response = requests.get(url)
 
             if response.json()['status'] == "running":
-                return make_response(jsonify({'error': 'Cannot delete a running server'}), 404)
+                return make_response(jsonify({'statusstring': 'Cannot delete a running server'}), 403)
             else:
                 # remove the server from given database member list
                 current_database = [database for database in Global.DATABASES if database['id'] == database_id]
