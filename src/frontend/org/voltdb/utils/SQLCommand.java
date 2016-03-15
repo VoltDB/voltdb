@@ -735,7 +735,7 @@ public class SQLCommand
             m_testFrontEndResult += statement + ";\n";
             return;
         }
-        if ( ! m_interactive ) {
+        if ( !m_interactive && m_outputShowMetadata) {
             System.out.println();
             System.out.println(statement + ";");
         }
