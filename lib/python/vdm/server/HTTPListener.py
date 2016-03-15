@@ -709,15 +709,16 @@ def allowed_file(filename):
 
 def get_servers_from_database_id(database_id):
     servers = []
-    database = [database for database in Global.DATABASES if database['id'] == database_id]
+    database = Global.Dict_DATABASES.get(str(database_id))
     if len(database) == 0:
         return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
     else:
-        members = database[0]['members']
+        members = database['members']
 
-    for servers_id in members:
-        server = [server for server in Global.SERVERS if server['id'] == servers_id]
-        servers.append(server[0])
+    for server_id in members:
+        # server = [server for server in Global.SERVERS if server['id'] == servers_id]
+        server = Global.Dict_SERVERS.get(str(server_id))
+        servers.append(server)
     return servers
 
 
@@ -745,6 +746,8 @@ class Global:
     PATH = ''
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
+    Dict_DATABASES = {}
+    Dict_SERVERS = {}
 
 
 class ServerAPI(MethodView):
@@ -759,33 +762,34 @@ class ServerAPI(MethodView):
         Returns:
             List of member ids related to specified database.
         """
+
         if server_id is None:
             servers = []
-            database = [database for database in Global.DATABASES if database['id'] == database_id]
+            database = Global.Dict_DATABASES.get(str(database_id))
             if len(database) == 0:
                 return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
-                members = database[0]['members']
+                members = database['members']
 
-            for servers_id in members:
-                server = [server for server in Global.SERVERS if server['id'] == servers_id]
+            for server_id in members:
+                server = Global.Dict_SERVERS.get(str(server_id))
                 if not server:
                     return make_response(jsonify({'statusstring': 'Server details not found for id: %u' % server_id}),
                                          404)
-                servers.append(server[0])
+                servers.append(server)
 
             return jsonify({'members': servers})
         else:
-            database = [database for database in Global.DATABASES if database['id'] == database_id]
+            database = Global.Dict_DATABASES.get(str(database_id))
             if len(database) == 0:
                 return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
-                members = database[0]['members']
+                members = database['members']
             if server_id in members:
-                server = [server for server in Global.SERVERS if server['id'] == server_id]
+                server = Global.Dict_SERVERS.get(str(server_id))
                 if not server:
                     abort(404)
-                return jsonify({'server': make_public_server(server[0])})
+                return jsonify({'server': make_public_server(server)})
             else:
                 return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
                 server_id, database_id)})
@@ -807,11 +811,12 @@ class ServerAPI(MethodView):
         if result is not None:
             return result
 
-        if not Global.SERVERS:
+        if not Global.Dict_SERVERS:
             server_id = 1
         else:
-            server_id = Global.SERVERS[-1]['id'] + 1
-        server = {
+            server_id = len(Global.Dict_SERVERS) + 1
+
+        Global.Dict_SERVERS[str(server_id)] = {
             'id': server_id,
             'name': request.json.get('name', "").strip(),
             'description': request.json.get('description', "").strip(),
@@ -826,23 +831,21 @@ class ServerAPI(MethodView):
             'public-interface': request.json.get('public-interface', "").strip(),
             'internal-listener': request.json.get('internal-listener', "").strip(),
             'http-listener': request.json.get('http-listener', "").strip(),
-            'placement-group': request.json.get('placement-group', "").strip(),
-
+            'placement-group': request.json.get('placement-group', "").strip()
         }
-        Global.SERVERS.append(server)
 
         # Add server to the current database
-        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+        current_database = Global.Dict_DATABASES.get(str(database_id))
         if len(current_database) == 0:
             abort(404)
         if not request.json:
             abort(400)
-        current_database[0]['members'].append(server_id)
+        current_database['members'].append(server_id)
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'server': server, 'status': 1,
-                        'members': current_database[0]['members']}), 201
+        return jsonify({'server': Global.Dict_SERVERS[str(server_id)], 'status': 1,
+                        'members': current_database['members']}), 201
 
     @staticmethod
     def delete(database_id, server_id):
@@ -853,31 +856,31 @@ class ServerAPI(MethodView):
         Returns:
             True if the server is deleted otherwise the error message.
         """
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        database = Global.Dict_DATABASES.get(str(database_id))
         if len(database) == 0:
             return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
-            members = database[0]['members']
+            members = database['members']
         if server_id in members:
             # delete a single server
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
+            server = Global.Dict_SERVERS.get(str(server_id))
             if len(server) == 0:
                 return make_response(
                     jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}),
                     404)
             # remove the server from given database member list
             url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/status' % \
-                  (server[0]['hostname'], __PORT__, database_id, server_id)
+                  (server['hostname'], __PORT__, database_id, server_id)
             response = requests.get(url)
 
             if response.json()['status'] == "running":
                 return make_response(jsonify({'statusstring': 'Cannot delete a running server'}), 403)
             else:
                 # remove the server from given database member list
-                current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-                current_database[0]['members'].remove(server_id)
-                Global.DELETED_HOSTNAME = server[0]['hostname']
-                Global.SERVERS.remove(server[0])
+                current_database = Global.Dict_DATABASES.get(str(database_id))
+                current_database['members'].remove(server_id)
+                Global.DELETED_HOSTNAME = server['hostname']
+                del Global.Dict_SERVERS[str(server_id)]
                 sync_configuration()
                 write_configuration_file()
                 return jsonify({'result': True})
@@ -895,17 +898,18 @@ class ServerAPI(MethodView):
             Information of server with specified server_id after being updated
             otherwise the error message.
         """
-
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        database = Global.Dict_DATABASES.get(str(database_id))
+        # database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
             return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
-            members = database[0]['members']
+            members = database['members']
         if server_id in members:
             inputs = ServerInputs(request)
             if not inputs.validate():
                 return jsonify(success=False, errors=inputs.errors)
-            current_server = [server for server in Global.SERVERS if server['id'] == server_id]
+            # current_server = [server for server in Global.SERVERS if server['id'] == server_id]
+            current_server = Global.Dict_SERVERS.get(str(server_id))
             if len(current_server) == 0:
                 abort(404)
 
@@ -913,37 +917,37 @@ class ServerAPI(MethodView):
             if result is not None:
                 return result
 
-            current_server[0]['name'] = \
-                request.json.get('name', current_server[0]['name'])
-            current_server[0]['hostname'] = \
-                request.json.get('hostname', current_server[0]['hostname'])
-            current_server[0]['description'] = \
-                request.json.get('description', current_server[0]['description'])
-            current_server[0]['enabled'] = \
-                request.json.get('enabled', current_server[0]['enabled'])
-            current_server[0]['admin-listener'] = \
-                request.json.get('admin-listener', current_server[0]['admin-listener'])
-            current_server[0]['internal-listener'] = \
-                request.json.get('internal-listener', current_server[0]['internal-listener'])
-            current_server[0]['http-listener'] = \
-                request.json.get('http-listener', current_server[0]['http-listener'])
-            current_server[0]['zookeeper-listener'] = \
-                request.json.get('zookeeper-listener', current_server[0]['zookeeper-listener'])
-            current_server[0]['replication-listener'] = \
-                request.json.get('replication-listener', current_server[0]['replication-listener'])
-            current_server[0]['client-listener'] = \
-                request.json.get('client-listener', current_server[0]['client-listener'])
-            current_server[0]['internal-interface'] = \
-                request.json.get('internal-interface', current_server[0]['internal-interface'])
-            current_server[0]['external-interface'] = \
-                request.json.get('external-interface', current_server[0]['external-interface'])
-            current_server[0]['public-interface'] = \
-                request.json.get('public-interface', current_server[0]['public-interface'])
-            current_server[0]['placement-group'] = \
-                request.json.get('placement-group', current_server[0]['placement-group'])
+            current_server['name'] = \
+                request.json.get('name', current_server['name'])
+            current_server['hostname'] = \
+                request.json.get('hostname', current_server['hostname'])
+            current_server['description'] = \
+                request.json.get('description', current_server['description'])
+            current_server['enabled'] = \
+                request.json.get('enabled', current_server['enabled'])
+            current_server['admin-listener'] = \
+                request.json.get('admin-listener', current_server['admin-listener'])
+            current_server['internal-listener'] = \
+                request.json.get('internal-listener', current_server['internal-listener'])
+            current_server['http-listener'] = \
+                request.json.get('http-listener', current_server['http-listener'])
+            current_server['zookeeper-listener'] = \
+                request.json.get('zookeeper-listener', current_server['zookeeper-listener'])
+            current_server['replication-listener'] = \
+                request.json.get('replication-listener', current_server['replication-listener'])
+            current_server['client-listener'] = \
+                request.json.get('client-listener', current_server['client-listener'])
+            current_server['internal-interface'] = \
+                request.json.get('internal-interface', current_server['internal-interface'])
+            current_server['external-interface'] = \
+                request.json.get('external-interface', current_server['external-interface'])
+            current_server['public-interface'] = \
+                request.json.get('public-interface', current_server['public-interface'])
+            current_server['placement-group'] = \
+                request.json.get('placement-group', current_server['placement-group'])
             sync_configuration()
             Configuration.write_configuration_file()
-            return jsonify({'server': current_server[0], 'status': 1})
+            return jsonify({'server': current_server, 'status': 1})
         else:
             return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
             server_id, database_id)})
@@ -964,15 +968,17 @@ class DatabaseAPI(MethodView):
         Returns:
             database or list of databases.
         """
+
         if database_id is None:
             # return a list of users
-            return jsonify({'databases': [make_public_database(x) for x in Global.DATABASES]})
+            return jsonify({'databases': Global.Dict_DATABASES.values()})
         else:
             # expose a single user
-            database = [database for database in Global.DATABASES if database['id'] == database_id]
+            database = Global.Dict_DATABASES.get(str(database_id))
             if len(database) == 0:
                 abort(404)
-            return jsonify({'database': make_public_database(database[0])})
+
+            return jsonify({'database': Global.Dict_DATABASES.get(str(database_id))})
 
     @staticmethod
     def post():
@@ -988,20 +994,16 @@ class DatabaseAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        database = [database for database in Global.DATABASES if database['name'] == request.json['name']]
-        if len(database) != 0:
+        databases = [v if type(v) is list else [v] for v in Global.Dict_DATABASES.values()]
+        if request.json['name'] in [(d["name"]) for item in databases for d in item]:
             return make_response(jsonify({'error': 'database name already exists'}), 404)
 
-        if not Global.DATABASES:
+        if not Global.Dict_DATABASES:
             database_id = 1
         else:
-            database_id = Global.DATABASES[-1]['id'] + 1
-        database = {
-            'id': database_id,
-            'name': request.json['name'],
-            'members': []
-        }
-        Global.DATABASES.append(database)
+            database_id = len(Global.Dict_DATABASES) + 1
+
+        Global.Dict_DATABASES[str(database_id)] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
@@ -1015,7 +1017,7 @@ class DatabaseAPI(MethodView):
         sync_configuration()
 
         Configuration.write_configuration_file()
-        return jsonify({'database': database, 'status': 1}), 201
+        return jsonify({'database': Global.Dict_DATABASES.get(str(database_id)), 'status': 1}), 201
 
     @staticmethod
     def put(database_id):
@@ -1030,14 +1032,15 @@ class DatabaseAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-        if len(current_database) == 0:
+        database = Global.Dict_DATABASES.get(str(database_id))
+        if len(database) == 0:
             abort(404)
 
-        current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
+        Global.Dict_DATABASES[str(database_id)] = {'id': database_id, 'name': request.json['name'], 'members': database['members']}
+
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'database': current_database[0], 'status': 1})
+        return jsonify({'database': database, 'status': 1})
 
     @staticmethod
     def delete(database_id):
@@ -1049,28 +1052,16 @@ class DatabaseAPI(MethodView):
         True if the server is deleted otherwise the error message.
         """
         members = []
-        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+        current_database = Global.Dict_DATABASES.get(str(database_id))
         if len(current_database) == 0:
             abort(404)
         else:
-            members = current_database[0]['members']
+            members = current_database['members']
 
         for server_id in members:
-            is_server_associated = False
-            # Check if server is referenced by database
-            for database in Global.DATABASES:
-                if database["id"] == database_id:
-                    continue
-                if server_id in database["members"]:
-                    is_server_associated = True
-            # if server is not referenced by other database then delete it
-            if not is_server_associated:
-                server = [server for server in Global.SERVERS if server['id'] == server_id]
-                if len(server) == 0:
-                    continue
-                Global.SERVERS.remove(server[0])
+            del Global.Dict_SERVERS[str(server_id)]
 
-        Global.DATABASES.remove(current_database[0])
+        del Global.Dict_DATABASES[str(database_id)]
 
         deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
 
@@ -1618,29 +1609,31 @@ class StatusDatabaseAPI(MethodView):
         serverDetails = []
         status = []
 
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        # database = [database for database in Global.DATABASES if database['id'] == database_id]
+        database = Global.Dict_DATABASES.get(str(database_id))
         has_stalled = False
         has_run = False
         if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
-            if len(database[0]['members']) == 0:
+            if len(database['members']) == 0:
                 return jsonify({'status': 'errorNoMembers'})
-            for server_id in database[0]['members']:
-                server = [server for server in Global.SERVERS if server['id'] == server_id]
+            for server_id in database['members']:
+                # server = [server for server in Global.SERVERS if server['id'] == server_id]
+                server = Global.Dict_SERVERS.get(str(server_id))
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
-                      (server[0]['hostname'], __PORT__, database_id, server[0]['id'])
+                      (server['hostname'], __PORT__, database_id, server['id'])
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({'status': 'error', 'hostname': server[0]['hostname']})
+                    return jsonify({'status': 'error', 'hostname': server['hostname']})
 
                 if response.json()['status'] == "stalled":
                     has_stalled = True
                 elif response.json()['status'] == "running":
                     has_run = True
 
-                serverDetails.append({server[0]['hostname']: response.json()})
+                serverDetails.append({server['hostname']: response.json()})
 
             if has_run == True:
                 status.append({'status': 'running'})
@@ -1659,32 +1652,34 @@ class StatusDatabaseServerAPI(MethodView):
 
     @staticmethod
     def get(database_id, server_id):
-        database = [database for database in Global.DATABASES if database['id'] == database_id]
+        # database = [database for database in Global.DATABASES if database['id'] == database_id]
+        database = Global.Dict_DATABASES.get(str(database_id))
         if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
-            server = [server for server in Global.SERVERS if server['id'] == server_id]
-            if len(database[0]['members']) == 0:
+            # server = [server for server in Global.SERVERS if server['id'] == server_id]
+            server = Global.Dict_SERVERS.get(str(server_id))
+            if len(database['members']) == 0:
                 return jsonify({'error': 'errorNoMembers'})
             if not server:
                 return make_response(jsonify({'error': 'Not found'}), 404)
-            elif server_id not in database[0]['members']:
+            elif server_id not in database['members']:
                 return make_response(jsonify({'error': 'Not found'}), 404)
             else:
 
                 try:
-                    if not server[0]['client-listener']:
+                    if not server['client-listener']:
                         client_port = 21212
-                        client_host = str(server[0]['hostname'])
+                        client_host = str(server['hostname'])
                     else:
-                        client_listener = server[0]['client-listener']
+                        client_listener = server['client-listener']
                         if ":" in client_listener:
                             arr_client = client_listener.split(':', 2)
                             client_port = int(arr_client[1])
                             client_host = str(arr_client[0])
                         else:
                             client_port = int(client_listener)
-                            client_host = str(server[0]['hostname'])
+                            client_host = str(server['hostname'])
 
                     client = voltdbclient.FastSerializer(client_host, client_port)
                     proc = voltdbclient.VoltProcedure(client, "@Ping")
@@ -1748,12 +1743,13 @@ def main(runner, amodule, config_dir, server):
 
         Global.DEPLOYMENT.append(deployment)
 
-        Global.SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
+        Global.Dict_SERVERS["1"] = {'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
                                'enabled': True, 'external-interface': "", 'internal-interface': "",
                                'public-interface': "", 'client-listener': "", 'internal-listener': "",
                                'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                               'zookeeper-listener': "", 'placement-group': ""})
-        Global.DATABASES.append({'id': 1, 'name': "Database", "members": [1]})
+                               'zookeeper-listener': "", 'placement-group': ""}
+
+        Global.Dict_DATABASES["1"] = {'id': 1, 'name': "Database", "members": [1]}
 
     Configuration.write_configuration_file()
 
