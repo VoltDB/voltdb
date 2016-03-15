@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -51,8 +50,6 @@ import org.voltdb.utils.CatalogUtil;
 public class DefaultProcedureManager {
 
     Map<String, Procedure> m_defaultProcMap = new HashMap<>();
-
-    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     final Database m_db;
     // fake db makes it easy to create procedures that aren't
