@@ -132,6 +132,7 @@ public class CatalogContext {
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
         m_memoizedDeployment = null;
 
+        //hostLog.warn("test");
         m_defaultProcs = new DefaultProcedureManager(database);
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);

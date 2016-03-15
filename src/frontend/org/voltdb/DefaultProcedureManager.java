@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -51,6 +52,8 @@ public class DefaultProcedureManager {
 
     Map<String, Procedure> m_defaultProcMap = new HashMap<>();
 
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
     final Database m_db;
     // fake db makes it easy to create procedures that aren't
     // part of the main catalog
@@ -70,8 +73,14 @@ public class DefaultProcedureManager {
         for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
-            // skip export tables XXX why no insert?
             if (CatalogUtil.isTableExportOnly(m_db, table)) {
+                Column partitioncolumn = table.getPartitioncolumn();
+                if (partitioncolumn != null) {
+                    int partitionIndex = partitioncolumn.getIndex();
+                    addShimProcedure(prefix + "insert", table, null, true, partitionIndex, partitioncolumn, false);
+                } else {
+                    addShimProcedure(prefix + "insert", table, null, true, -1, null, false);
+                }
                 continue;
             }
 
