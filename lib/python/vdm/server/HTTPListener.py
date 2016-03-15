@@ -499,6 +499,127 @@ def get_volt_jar_dir():
     return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
 
 
+def get_port(ip_with_port):
+    if ip_with_port != "":
+        if ":" not in ip_with_port:
+            return ip_with_port
+        else:
+            arr = ip_with_port.split(":")
+            return arr[1]
+
+
+def check_port_valid(port_option, servers):
+    if port_option == "http-listener":
+        default_port = "8080"
+    if port_option == "admin-listener":
+        default_port = "21211"
+    if port_option == "zookeeper-listener":
+        default_port = "7181"
+    if port_option == "replication-listener":
+        default_port = "5555"
+    if port_option == "client-listener":
+        default_port = "21212"
+    if port_option == "internal-listener":
+        default_port = "3021"
+    if port_option not in request.json:
+        port = default_port
+        server_port = get_port(servers[port_option])
+        if server_port is None:
+            server_port = default_port
+    else:
+        port = get_port(request.json[port_option])
+        server_port = get_port(servers[port_option])
+    if port == server_port:
+        return jsonify(success=False, errors="Duplicate %s for same hostname" %port_option)
+
+
+
+def get_configuration():
+    deployment_json = {
+        'voltdeploy': {
+            'databases': Global.DATABASES,
+            'members': Global.SERVERS,
+            'deployments': Global.DEPLOYMENT,
+            'deployment_users': Global.DEPLOYMENT_USERS
+        }
+    }
+    return deployment_json
+
+
+def write_configuration_file():
+    main_header = make_configuration_file()
+
+    try:
+        path = os.path.join(Global.PATH, 'voltdeploy.xml')
+        f = open(path, 'w')
+        f.write(main_header)
+        f.close()
+
+    except Exception, err:
+        print str(err)
+
+
+def make_configuration_file():
+    main_header = Element('voltdeploy')
+    db_top = SubElement(main_header, 'databases')
+    server_top = SubElement(main_header, 'members')
+    deployment_top = SubElement(main_header, 'deployments')
+    i = 0
+    while i < len(Global.DATABASES):
+        db_elem = SubElement(db_top, 'database')
+        for key, value in Global.DATABASES[i].iteritems():
+            if isinstance(value, bool):
+                if value == False:
+                    db_elem.attrib[key] = "false"
+                else:
+                    db_elem.attrib[key] = "true"
+            else:
+                db_elem.attrib[key] = str(value)
+        i += 1
+
+    i = 0
+    while i < len(Global.SERVERS):
+        server_elem = SubElement(server_top, 'member')
+        for key, value in Global.SERVERS[i].iteritems():
+            if isinstance(value, bool):
+                if value == False:
+                    server_elem.attrib[key] = "false"
+                else:
+                    server_elem.attrib[key] = "true"
+            else:
+                server_elem.attrib[key] = str(value)
+        i += 1
+
+    i = 0
+    while i < len(Global.DEPLOYMENT):
+        Global.DEPLOYMENT[i]['users'] = {}
+        Global.DEPLOYMENT[i]['users']['user'] = []
+        deployment_user = filter(lambda t: t['databaseid'] == Global.DEPLOYMENT[i]['databaseid'],
+                                 Global.DEPLOYMENT_USERS)
+        if len(deployment_user) == 0:
+            Global.DEPLOYMENT[i]['users'] = None
+        for user in deployment_user:
+            Global.DEPLOYMENT[i]['users']['user'].append({
+                'name': user['name'],
+                'roles': user['roles'],
+                'plaintext': user['plaintext'],
+                'password': user['password'],
+                'databaseid': user['databaseid']
+            })
+
+        deployment_elem = SubElement(deployment_top, 'deployment')
+        for key, value in Global.DEPLOYMENT[i].iteritems():
+            if type(value) is dict:
+                DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
+            elif type(value) is list:
+                DeploymentConfig.handle_deployment_list(deployment_elem, key, value)
+            else:
+                if value is not None:
+                    deployment_elem.attrib[key] = str(value)
+        i += 1
+    return tostring(main_header, encoding='UTF-8')
+
+
 def sync_configuration():
     headers = {'content-type': 'application/json'}
     url = 'http://%s:%u/api/1.0/voltdeploy/configuration/' % \
@@ -637,13 +758,21 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener", "client-listener"]
+        for servers in Global.SERVERS:
+            if servers['hostname'] == request.json['hostname']:
+                for option in arr:
+                    result = check_port_valid(option, servers)
+                    if result != None:
+                        return result
+
         if not Global.SERVERS:
             server_id = 1
         else:
             server_id = Global.SERVERS[-1]['id'] + 1
         server = {
             'id': server_id,
-            'name': request.json['name'].strip(),
+            'name': request.json.get('name', "").strip(),
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
@@ -694,13 +823,21 @@ class ServerAPI(MethodView):
             if len(server) == 0:
                 return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
             # remove the server from given database member list
-            current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-            current_database[0]['members'].remove(server_id)
-            Global.DELETED_HOSTNAME = server[0]['hostname']
-            Global.SERVERS.remove(server[0])
-            sync_configuration()
-            Configuration.write_configuration_file()
-            return jsonify({'result': True})
+            url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/status' % \
+                  (server[0]['hostname'], __PORT__, database_id, server_id)
+            response = requests.get(url)
+
+            if response.json()['status'] == "running":
+                return make_response(jsonify({'statusstring': 'Cannot delete a running server'}), 403)
+            else:
+                # remove the server from given database member list
+                current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+                current_database[0]['members'].remove(server_id)
+                Global.DELETED_HOSTNAME = server[0]['hostname']
+                Global.SERVERS.remove(server[0])
+                sync_configuration()
+                write_configuration_file()
+                return jsonify({'result': True})
         else:
             return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
 

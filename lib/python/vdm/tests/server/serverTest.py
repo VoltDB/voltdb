@@ -32,6 +32,7 @@ import requests
 import xmlrunner
 import socket
 
+
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
@@ -256,28 +257,6 @@ class DeleteServer(unittest.TestCase):
         """
         server delete test
         """
-        # Create a db
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {'name': 'testDB'}
-        response = requests.post(__db_url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-        # Create a server
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
-            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code == 201:
-                self.assertEqual(response.status_code, 201)
-            else:
-                self.assertEqual(response.status_code, 404)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -296,13 +275,43 @@ class DeleteServer(unittest.TestCase):
                 (__host_or_ip__,last_db_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                value = response.json()
+                if response.status_code == 403:
+                    print value['statusstring']
+                    self.assertEqual(value['statusstring'], 'Cannot delete a running server')
+                else:
+                    self.assertEqual(response.status_code, 200)
 
-                db_url = __db_url__ + str(last_db_id)
-                response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                    db_url = __db_url__ + str(last_db_id)
+                    response = requests.delete(db_url)
+                    self.assertEqual(response.status_code, 200)
             else:
                 print "The Server list is empty"
+
+        # # Create a db
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        db_data = {'name': 'Database'}
+        response = requests.post(__db_url__, json=db_data, headers=headers)
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 404)
+        # Create a server
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            data = {'hostname': __host_or_ip__, 'name':__host_name__}
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 201:
+                self.assertEqual(response.status_code, 201)
+            else:
+                self.assertEqual(response.status_code, 404)
+
+
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
