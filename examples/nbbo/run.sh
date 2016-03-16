@@ -83,10 +83,8 @@ function client() {
     java -classpath nbbo-client.jar:$CLIENTCLASSPATH nbbo.NbboBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=1800 \
+        --duration=120 \
         --ratelimit=20000 \
-        --autotune=true \
-        --latencytarget=3 \
         --servers=$SERVERS
 }
 

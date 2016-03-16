@@ -86,8 +86,6 @@ function client() {
          --warmup=3 \
          --duration=600 \
          --servers=$SERVERS \
-         --autotune=true \
-         --latencytarget=5 \
          --custcount=100000
 }
 

@@ -26,7 +26,7 @@
 
 ----- REPLICATED TABLES -----------------
 
-CREATE TABLE customer(
+CREATE TABLE customer (
   cust_id BIGINT NOT NULL,
   cust_first_name VARCHAR(50) NOT NULL,
   cust_last_name VARCHAR(50) NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE customer(
   PRIMARY KEY (cust_id)
 );
 
-CREATE TABLE rules(
+CREATE TABLE rules (
   rule_id INTEGER NOT NULL,
   rule_desc VARCHAR(200) NOT NULL,
   PRIMARY KEY (rule_id)
@@ -47,7 +47,7 @@ CREATE TABLE rules(
 ----- PARTITIONED TABLES -----------------
 
 
-CREATE TABLE account(
+CREATE TABLE account (
   acc_no BIGINT NOT NULL,
   cust_id BIGINT NOT NULL,
   acc_balance FLOAT NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE account(
 );
 PARTITION TABLE account ON COLUMN acc_no;
 
-CREATE TABLE transaction(
+CREATE TABLE transaction (
   txn_id BIGINT NOT NULL,
   acc_no BIGINT  NOT NULL,
   txn_amt FLOAT NOT NULL,
@@ -73,7 +73,7 @@ PARTITION TABLE transaction ON COLUMN acc_no;
 
 --CREATE INDEX idx_transaction ON transaction (acc_no, txn_dt);
 
-CREATE TABLE account_fraud(
+CREATE TABLE account_fraud (
   acc_no BIGINT NOT NULL,
   rule_id INTEGER NOT NULL,
   fraud_status_online VARCHAR(1) DEFAULT 'N',

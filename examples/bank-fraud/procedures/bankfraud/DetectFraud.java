@@ -27,7 +27,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-//import procedures.PerformanceTimer;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -35,9 +34,6 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 public class DetectFraud extends VoltProcedure {
-
-    // performance timing
-    //public final SQLStmt insertTiming = new SQLStmt("INSERT INTO procedure_timings VALUES (?,?,?,?);");
 
     //SQL to check if account exists
     public final SQLStmt CheckAcctExists = new SQLStmt(
@@ -69,34 +65,16 @@ public class DetectFraud extends VoltProcedure {
 
     public final SQLStmt getTransactions = new SQLStmt("SELECT * FROM transaction WHERE acc_no = ? and TRUNCATE(DAY,txn_ts) = TRUNCATE(DAY,?) ORDER BY txn_ts;");
 
-    public ScriptEngineManager manager = new ScriptEngineManager();
-    public ScriptEngine engine = manager.getEngineByName("js");
-
-
-    // public static boolean evalBoolExpression(String expr) {
-    //     ScriptEngineManager manager = new ScriptEngineManager();
-    //     ScriptEngine engine = manager.getEngineByName("js");
-    //     Object result = null;
-    //     try {
-    //         result = engine.eval(expr);
-    //         //System.out.println(result);
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //     }
-    //     return ((Boolean)result).booleanValue();
-    // }
+    public final ScriptEngineManager manager = new ScriptEngineManager();
+    public final ScriptEngine engine = manager.getEngineByName("js");
 
     public VoltTable[] run( long txnId,
                             long acctNo,
                             double txnAmt,
                             String txnState,
                             String txnCity,
-                            TimestampType txnTimestamp)
-        throws VoltAbortException {
-
-        //PerformanceTimer pt = new PerformanceTimer();
-        //pt.start("validate inputs");
-
+                            TimestampType txnTimestamp) throws VoltAbortException
+    {
         String txnStatus = "Approved";
         long threshold = 1;
         double totalAmt = txnAmt;
@@ -106,27 +84,23 @@ public class DetectFraud extends VoltProcedure {
         // run all the information-gathering queries up front
         // if no fraud, will need to run them all anyway, and better to do it in one batch (one voltExecuteSQL() call)
 
-        //pt.start("run queries");
-
         // Check if account exists
-        voltQueueSQL(CheckAcctExists,EXPECT_ONE_ROW,acctNo);
+        voltQueueSQL(CheckAcctExists, EXPECT_ONE_ROW, acctNo);
         // Check if account is already in the fraud table
-        voltQueueSQL(CheckAlreadyFraud,EXPECT_ZERO_OR_ONE_ROW,acctNo);
+        voltQueueSQL(CheckAlreadyFraud, EXPECT_ZERO_OR_ONE_ROW, acctNo);
         // Check customer state for the account
-        voltQueueSQL(checkCustState,EXPECT_ONE_ROW,acctNo);
+        voltQueueSQL(checkCustState, EXPECT_ONE_ROW, acctNo);
         // get count and sum of transactions so far
-        voltQueueSQL(TxnAlreadyStatus,EXPECT_ZERO_OR_ONE_ROW,acctNo,txnTimestamp);
+        voltQueueSQL(TxnAlreadyStatus, EXPECT_ZERO_OR_ONE_ROW, acctNo, txnTimestamp);
         // get the rules
         voltQueueSQL(GetRule,EXPECT_NON_EMPTY);
         VoltTable[] results1 = voltExecuteSQL();
 
-        //pt.start("check if already fraud");
         // if account was found in fraud table, status is denied
         if (results1[1].getRowCount() == 1 ) {
-            txnStatus="Denied";
+            txnStatus = "Denied";
         }
 
-        //pt.start("check for card chameleon");
         // check for card chameleon
         if (!txnStatus.equals("Denied")) {
             //Cust_State=getCustomerState(acctNo);
@@ -139,8 +113,6 @@ public class DetectFraud extends VoltProcedure {
                 voltQueueSQL(AcctFraudInsert,acctNo,ruleId,"Y","N",getTransactionTime());
             }
         }
-
-        //pt.stop();
 
         // evaluate other rules
         if (!txnStatus.equals("Denied")) {
@@ -177,18 +149,10 @@ public class DetectFraud extends VoltProcedure {
             }
         }
 
-        //pt.start("get details");
         // (optionally get details, insert fraud record) and insert Transaction record
         voltQueueSQL(TxnInsert,txnId,acctNo,txnAmt,txnState,txnCity,txnTimestamp,txnStatus);
         VoltTable[] results2 = voltExecuteSQL();
         VoltTable detail = results2[0];
-        //pt.stop();
-
-        // insert timing results
-        // for (Map.Entry<String, Long> entry : pt.getResults().entrySet()) {
-        //     voltQueueSQL(insertTiming,acctNo,"DetectFraud",entry.getKey(),entry.getValue());
-        //     voltExecuteSQL();
-        // }
 
         // status results
         VoltTable t = new VoltTable(
@@ -197,10 +161,11 @@ public class DetectFraud extends VoltProcedure {
                 new VoltTable.ColumnInfo("threshold",VoltType.BIGINT),
                 new VoltTable.ColumnInfo("total_amt",VoltType.BIGINT));
         t.addRow(new Object[] {
-                txnStatus,
-                ruleId,
-                threshold,
-                totalAmt});
+                    txnStatus,
+                    ruleId,
+                    threshold,
+                    totalAmt
+                });
 
         // array of final results
         if (includeDetail) {

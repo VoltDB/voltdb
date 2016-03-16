@@ -117,22 +117,6 @@ public class NbboBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        // CUSTOM OPTIONS
-        @Option(desc = "Number of Sites")
-        int sites = 1000;
-
-        @Option(desc = "Pages per Site")
-        int pagespersite = 10;
-
-        @Option(desc = "Number of Advertisers")
-        int advertisers = 1000;
-
-        @Option(desc = "Campaigns per Site")
-        int campaignsperadvertiser = 10;
-
-        @Option(desc = "Creatives per Campaign")
-        int creativespercampaign = 10;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
