@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.io.Console;
+import java.io.IOException;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -81,25 +83,25 @@ public abstract class CLIConfig {
         field.setAccessible(true);
         Class<?> cls = field.getType();
 
-        if ((cls == boolean.class) || (cls == Boolean.class))
+        if ((cls == boolean.class) || (cls == Boolean.class)) {
             field.set(this, Boolean.parseBoolean(value));
-        else if ((cls == byte.class) || (cls == Byte.class))
+        } else if ((cls == byte.class) || (cls == Byte.class)) {
             field.set(this, Byte.parseByte(value));
-        else if ((cls == short.class) || (cls == Short.class))
+        } else if ((cls == short.class) || (cls == Short.class)) {
             field.set(this, Short.parseShort(value));
-        else if ((cls == int.class) || (cls == Integer.class))
+        } else if ((cls == int.class) || (cls == Integer.class)) {
             field.set(this, Integer.parseInt(value));
-        else if ((cls == long.class) || (cls == Long.class))
+        } else if ((cls == long.class) || (cls == Long.class)) {
             field.set(this, Long.parseLong(value));
-        else if ((cls == float.class) || (cls == Float.class))
+        } else if ((cls == float.class) || (cls == Float.class)) {
             field.set(this, Float.parseFloat(value));
-        else if ((cls == double.class) || (cls == Double.class))
+        } else if ((cls == double.class) || (cls == Double.class)) {
             field.set(this, Double.parseDouble(value));
-        else if ((cls == String.class))
-                field.set(this, value);
-        else if (value.length() == 1 && ((cls == char.class) || (cls == Character.class)))
-                field.set(this, value.charAt(0));
-        else {
+        } else if ((cls == String.class)) {
+            field.set(this, value);
+        } else if (value.length() == 1 && ((cls == char.class) || (cls == Character.class))) {
+            field.set(this, value.charAt(0));
+        } else {
                 System.err.println("Parsing failed. Reason: can not assign " + value + " to "
                                 + cls.toString() + " class");
                 printUsage();
@@ -196,8 +198,9 @@ public abstract class CLIConfig {
                         Field[] fields = getClass().getDeclaredFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
                         for (;j < fields.length; j++) {
-                                if (fields[j].isAnnotationPresent(AdditionalArgs.class))
-                                        break;
+                                if (fields[j].isAnnotationPresent(AdditionalArgs.class)) {
+                                    break;
+                                }
                         }
                         fields[j].setAccessible(true);
                         fields[j].set(this, leftargs[i]);
@@ -226,6 +229,24 @@ public abstract class CLIConfig {
             printUsage();
             System.exit(-1);
         }
+    }
+
+    public static String readPasswordIfNeeded(String user, String pwd, String prompt) throws IOException
+    {
+        // If a username was specified, and no password was specified,
+        // then read password from the console
+        if ((null!=user) && (user.trim().length()>0))
+        {
+            if ((pwd==null) || (pwd.trim().length() == 0))
+            {
+                Console console = System.console();
+                if (console == null) {
+                    throw new IOException("Unable to read password from console.");
+                }
+                return new String(console.readPassword(prompt));
+            }
+        }
+        return pwd;
     }
 
     public void validate() {}
