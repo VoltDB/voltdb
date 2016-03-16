@@ -125,6 +125,7 @@ java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
 java_opts.append('-XX:+CMSClassUnloadingEnabled')
+java_opts.append('-XX:+PerfDisableSharedMem')
 
 # skip PermSize in Java 8
 if "1.8" not in java_version:
