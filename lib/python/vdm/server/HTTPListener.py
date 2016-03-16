@@ -1265,7 +1265,7 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        if 'application/xml, text/xml' in request.headers['Accept']:
+        if 'text/xml' in request.headers['Accept']:
             deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
             return Response(deployment_content, mimetype='text/xml')
         else:
