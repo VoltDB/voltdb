@@ -177,7 +177,7 @@ public class DRConsumerDrIdTracker {
             } else if (next.contains(newTruncationPoint)) {
                 iter.remove();
                 m_map.add(range(newTruncationPoint, end(next)));
-                break;
+                return;
             } else {
                 break;
             }
