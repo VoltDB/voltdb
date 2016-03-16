@@ -125,7 +125,7 @@ public class PersonGenerator {
     }
 
     public Date randomDOB() {
-        long someTime = startDate + (long)(Math.random() * diff);
+        long someTime = startDate + (long) (Math.random() * diff);
         cal.setTimeInMillis(someTime);
         cal.set(Calendar.HOUR_OF_DAY,0);
         cal.set(Calendar.MINUTE,0);

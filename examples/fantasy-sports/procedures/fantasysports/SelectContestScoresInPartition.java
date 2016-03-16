@@ -30,20 +30,17 @@ import org.voltdb.VoltTable;
 public class SelectContestScoresInPartition extends VoltProcedure {
 
     public final SQLStmt selectScores = new SQLStmt(
-        "SELECT r.user_id, SUM(p.score) AS score "+
-        "FROM "+
-        "  user_contest_roster r "+
-        "INNER JOIN nfl_contest_large c ON r.contest_id = c.contest_id "+
-        "INNER JOIN nfl_player_game_score p ON r.player_id = p.player_id AND c.game_id = p.game_id "+
-        "WHERE "+
-        " r.contest_id = ? "+
-        "GROUP BY r.user_id "+
-        "ORDER BY score DESC"+
+        "SELECT r.user_id, SUM(p.score) AS score " +
+        "FROM user_contest_roster r " +
+        "INNER JOIN contest_large c ON r.contest_id = c.contest_id " +
+        "INNER JOIN player_game_score p ON r.player_id = p.player_id AND c.game_id = p.game_id " +
+        "WHERE r.contest_id = ? " +
+        "GROUP BY r.user_id " +
+        "ORDER BY score DESC" +
         ";");
 
     public VoltTable[] run(int partitionVal, int contest) throws VoltAbortException {
-
-    voltQueueSQL(selectScores, contest);
+        voltQueueSQL(selectScores, contest);
         return voltExecuteSQL(true);
     }
 }

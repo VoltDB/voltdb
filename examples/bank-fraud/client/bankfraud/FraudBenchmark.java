@@ -68,7 +68,7 @@ public class FraudBenchmark {
     private long txnId = 0;
     private Long[] accounts;
     private String[] acct_states;
-    private int[] amounts = {25,50,75,100,150,200,250,300};
+    private int[] amounts = { 25, 50, 75, 100, 150, 200, 250, 300 };
     private PersonGenerator gen = new PersonGenerator();
 
     /**

@@ -23,16 +23,23 @@
 
 package nbbo;
 
-import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
+
+import org.supercsv.cellprocessor.Optional;
+import org.supercsv.cellprocessor.constraint.NotNull;
+import org.supercsv.cellprocessor.constraint.UniqueHashCode;
+import org.supercsv.cellprocessor.ift.CellProcessor;
+import org.supercsv.io.CsvMapReader;
+import org.supercsv.io.ICsvMapReader;
+import org.supercsv.prefs.CsvPreference;
 
 public class Symbols {
 
+    static final BigDecimal BD10000 = new BigDecimal(10000);
 
     private Random rand = new Random();
 
@@ -67,48 +74,55 @@ public class Symbols {
     }
 
     public void loadFile(String filename) {
+
+        // Schema for CSV file
+        final CellProcessor[] processors = new CellProcessor[] {
+                new UniqueHashCode(), // Symbol
+                new NotNull(), // Name
+                new NotNull(), // LastSale
+                new NotNull(), // MarketCap
+                new NotNull(), // ADR TSO
+                new NotNull(), // IPOyear
+                new NotNull(), // Sector
+                new NotNull(), // Industry
+                new NotNull(), // Summary Quote
+                new Optional() // blank column
+        };
+
+        ICsvMapReader mapReader = null;
         try {
-            FileReader fileReader = new FileReader(filename);
-            BufferedReader bufferedReader = new BufferedReader(fileReader);
-            CsvLineParser parser = new CsvLineParser();
+            mapReader = new CsvMapReader(new FileReader(filename), CsvPreference.STANDARD_PREFERENCE);
 
-            // skip first line (headers)
-            String line = bufferedReader.readLine();
+            // the header columns are used as the keys to the Map
+            final String[] header = mapReader.getHeader(true);
 
-            // read remaining lines
-            int i=0;
-            Iterator<String> it;
-            BigDecimal bd10000 = new BigDecimal(10000);
-            while ((line = bufferedReader.readLine()) != null) {
-                i++;
-                it = parser.parse(line);
+            Map<String, Object> tuple;
+            int rowsRead = 0;
+            while( (tuple = mapReader.read(header, processors)) != null ) {
+
                 Symbol s = new Symbol();
-                s.symbol = it.next();
-                it.next(); // skip name
-                String price = it.next();
+                s.symbol = (String) tuple.get("Symbol");
+                String price = (String) tuple.get("LastSale");
                 if (price.equals("n/a")) {
                     price = "20";
                 }
                 BigDecimal priceBD = new BigDecimal(price);
-                s.price = priceBD.multiply(bd10000).intValue();
+                s.price = priceBD.multiply(BD10000).intValue();
 
                 symbols.add(s);
+                rowsRead++;
             }
-            bufferedReader.close();
-            System.out.println("read " + i + " lines");
-        } catch (IOException e) {
-            e.printStackTrace();
+
+            System.out.printf("Read %d rows from CSV file at: %s\n", rowsRead, filename);
         }
-
-    }
-
-    public static void main(String[] args) throws Exception {
-        Symbols s = new Symbols();
-        s.loadFile("data/NYSE.csv");
-
-        for (int i=0; i<20; i++) {
-            Symbol sym = s.incrementAndGet(100);
-            System.out.println(sym);
+        catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        finally {
+            if( mapReader != null ) {
+                try { mapReader.close(); } catch (Exception e) {}
+            }
         }
     }
 }
