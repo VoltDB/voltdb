@@ -425,8 +425,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                 }
                 else {
-                    Map.Entry<Long, Long> lastTrackerEntry = targetTracker.getDrIdRanges().lastEntry();
-                    if (lastTrackerEntry == null) {
+                    if (targetTracker.size() == 0) {
                         if (lastReceivedDRId == -1L) {
                             return (byte)0;
                         }
@@ -436,11 +435,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         }
                     }
 
-                    if (lastTrackerEntry.getValue() == lastReceivedDRId) {
+                    final long lastDrId = targetTracker.getLastDrId();
+                    if (lastDrId == lastReceivedDRId) {
                         // This is what we expected
                         return (byte)0;
                     }
-                    if (lastTrackerEntry.getValue() > lastReceivedDRId) {
+                    if (lastDrId > lastReceivedDRId) {
                         // This is a duplicate
                         return (byte)-1;
                     }
@@ -453,7 +453,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                              long localUniqueId, DRConsumerDrIdTracker tracker)
         {
-            assert(tracker.getDrIdRanges().size() > 0);
+            assert(tracker.size() > 0);
             if (UniqueIdGenerator.getPartitionIdFromUniqueId(localUniqueId) == MpInitiator.MP_INIT_PID) {
                 m_lastLocalMpUniqueId = localUniqueId;
             }
@@ -472,7 +472,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     clusterSources.put(producerPartitionId, tracker);
                 }
                 else {
-                    targetTracker.appendTracker(tracker);
+                    targetTracker.mergeTracker(tracker);
                 }
             }
         }
