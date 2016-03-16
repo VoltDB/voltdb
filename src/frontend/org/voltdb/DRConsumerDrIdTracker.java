@@ -18,41 +18,98 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.TreeMap;
+import java.util.Iterator;
 
+import com.google_voltpatches.common.collect.BoundType;
+import com.google_voltpatches.common.collect.DiscreteDomain;
+import com.google_voltpatches.common.collect.Range;
+import com.google_voltpatches.common.collect.RangeSet;
+import com.google_voltpatches.common.collect.TreeRangeSet;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.iv2.UniqueIdGenerator;
-
-import com.google_voltpatches.common.collect.Maps;
 
 public class DRConsumerDrIdTracker {
 
-    private TreeMap<Long, Long> m_map = new TreeMap<Long, Long>();
-    private long m_lastAckedDrId;
+    private final RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
 
+    /**
+     * Returns a canonical range that can be added to the internal range
+     * set. Only ranges returned by this method can be added to the range set,
+     * otherwise range operations like contains may yield unexpected
+     * results. Consult the Guava doc on Range for details.
+     *
+     * @param start    Start of the range
+     * @param end      End of the range
+     * @return Canonical range
+     */
+    static Range<Long> range(long start, long end) {
+        return Range.closed(start, end).canonical(DiscreteDomain.longs());
+    }
+
+    /**
+     * Get the start of the range. Always use this method to get the start of a
+     * range because it respects the bound type.
+     * @param range
+     * @return Start of the range
+     */
+    private static long start(Range<Long> range) {
+        if (range.lowerBoundType() == BoundType.OPEN) {
+            return DiscreteDomain.longs().next(range.lowerEndpoint());
+        } else {
+            return range.lowerEndpoint();
+        }
+    }
+
+    /**
+     * Get the end of the range. Always use this method to get the end of a
+     * range because it respects the bound type.
+     * @param range
+     * @return End of the range
+     */
+    private static long end(Range<Long> range) {
+        if (range.upperBoundType() == BoundType.OPEN) {
+            return DiscreteDomain.longs().previous(range.upperEndpoint());
+        } else {
+            return range.upperEndpoint();
+        }
+    }
+
     public DRConsumerDrIdTracker(long initialAckPoint, long spUniqueId, long mpUniqueId) {
-        m_lastAckedDrId = initialAckPoint;
+        m_map = TreeRangeSet.create();
+        m_map.add(range(initialAckPoint, initialAckPoint));
         m_lastSpUniqueId = spUniqueId;
         m_lastMpUniqueId = mpUniqueId;
     }
 
     public DRConsumerDrIdTracker(DRConsumerDrIdTracker other) {
-        m_map = new TreeMap<>(other.m_map);
-        m_lastAckedDrId = other.m_lastAckedDrId;
+        m_map = TreeRangeSet.create(other.m_map);
         m_lastSpUniqueId = other.m_lastSpUniqueId;
         m_lastMpUniqueId = other.m_lastMpUniqueId;
     }
 
+    public DRConsumerDrIdTracker(JSONObject jsObj) throws JSONException {
+        m_map = TreeRangeSet.create();
+        m_lastSpUniqueId = jsObj.getLong("spUniqueId");
+        m_lastMpUniqueId = jsObj.getLong("mpUniqueId");
+        final JSONArray drIdRanges = jsObj.getJSONArray("drIdRanges");
+        for (int ii = 0; ii < drIdRanges.length(); ii++) {
+            JSONObject obj = drIdRanges.getJSONObject(ii);
+            String startDrIdStr = obj.keys().next();
+            m_map.add(range(Long.valueOf(startDrIdStr), obj.getLong(startDrIdStr)));
+        }
+    }
+
     public DRConsumerDrIdTracker(ByteBuffer buff) {
-        m_lastAckedDrId = buff.getLong();
+        m_map = TreeRangeSet.create();
         m_lastSpUniqueId = buff.getLong();
         m_lastMpUniqueId = buff.getLong();
         int mapSize = buff.getInt();
         for (int ii=0; ii<mapSize; ii++) {
-            m_map.put(buff.getLong(), buff.getLong());
+            m_map.add(range(buff.getLong(), buff.getLong()));
         }
     }
 
@@ -61,22 +118,20 @@ public class DRConsumerDrIdTracker {
     }
 
     public int getSerializedSize() {
-        return 8        // m_lastAckedDrId
-             + 8        // m_lastSpUniqueId
+        return 8        // m_lastSpUniqueId
              + 8        // m_lastMpUniqueId
              + 4        // map size
-             + (m_map.size() * 16);
+             + (m_map.asRanges().size() * 16);
     }
 
     public void serialize(ByteBuffer buff) {
         assert(buff.remaining() >= getSerializedSize());
-        buff.putLong(m_lastAckedDrId);
         buff.putLong(m_lastSpUniqueId);
         buff.putLong(m_lastMpUniqueId);
-        buff.putInt(m_map.size());
-        for(Map.Entry<Long, Long> entry : m_map.entrySet()) {
-            buff.putLong(entry.getKey());
-            buff.putLong(entry.getValue());
+        buff.putInt(m_map.asRanges().size());
+        for(Range<Long> entry : m_map.asRanges()) {
+            buff.putLong(start(entry));
+            buff.putLong(end(entry));
         }
     }
 
@@ -86,150 +141,82 @@ public class DRConsumerDrIdTracker {
     }
 
     public int size() {
-        return m_map.size();
+        return m_map.asRanges().size();
     }
 
+    /**
+     * Appends a range to the tracker. The range has to be after the last DrId
+     * of the tracker.
+     * @param startDrId
+     * @param endDrId
+     * @param spUniqueId
+     * @param mpUniqueId
+     */
     public void append(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
-        // There should never be keys past the append point
-        assert(startDrId <= endDrId && startDrId > m_lastAckedDrId);
-        assert(m_map.size() == 0 || m_map.lastEntry().getValue() < startDrId);
+        assert(startDrId <= endDrId && startDrId > end(m_map.span()));
 
         // Note that any given range or tracker could have either sp or mp sentinel values
         m_lastSpUniqueId = Math.max(m_lastSpUniqueId, spUniqueId);
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, mpUniqueId);
-        Map.Entry<Long, Long> prevEntry = m_map.lowerEntry(startDrId);
-        if (prevEntry != null && prevEntry.getValue()+1 == startDrId) {
-            // This entry can be merged with the previous one
-            m_map.put(prevEntry.getKey(), endDrId);
-        }
-        else {
-            m_map.put(startDrId, endDrId);
-        }
-    }
-
-    public void appendTracker(DRConsumerDrIdTracker tracker) {
-        assert(m_lastAckedDrId <= tracker.m_lastAckedDrId);
-
-        // Note that any given range or tracker could have either sp or mp sentinel values
-        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
-        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
-
-        assert (tracker.size() > 0);
-        if (m_map.isEmpty()) {
-            m_map = new TreeMap<>(tracker.m_map);
-        }
-        else {
-            Map.Entry<Long, Long> lastEntry = m_map.lastEntry();
-            for (Entry<Long, Long> newEntry : tracker.m_map.entrySet()) {
-                // There should never be keys past the append point
-                assert(lastEntry.getValue() < newEntry.getKey());
-                if (lastEntry.getValue()+1 == newEntry.getKey()) {
-                    // consolidate the two ranges
-                    m_map.put(lastEntry.getKey(), newEntry.getValue());
-                    lastEntry = Maps.immutableEntry(lastEntry.getKey(), newEntry.getValue());
-                } else {
-                    m_map.put(newEntry.getKey(), newEntry.getValue());
-                    lastEntry = newEntry;
-                }
-            }
-        }
-        truncate(tracker.m_lastAckedDrId);
-    }
-
-    private void put(long startDrId, long endDrId) {
-        Map.Entry<Long, Long> nextEntry = m_map.higherEntry(endDrId);
-        Map.Entry<Long, Long> prevEntry = m_map.lowerEntry(startDrId);
-        assert(!m_map.containsKey(startDrId) && !m_map.containsKey(endDrId));
-        if (prevEntry != null && prevEntry.getValue()+1 == startDrId) {
-            // This entry can be merged with the previous one
-            if (nextEntry!= null && endDrId+1 == nextEntry.getKey()) {
-                // The entry fills a hole between two
-                m_map.remove(nextEntry.getKey());
-                m_map.put(prevEntry.getKey(), nextEntry.getValue());
-            }
-            else {
-                assert(nextEntry == null || endDrId < nextEntry.getKey());
-                m_map.put(prevEntry.getKey(), endDrId);
-            }
-        }
-        else {
-            assert(prevEntry == null || prevEntry.getValue() < startDrId);
-            if (nextEntry != null && endDrId+1 == nextEntry.getKey()) {
-                // This value should replace one ahead of this one
-                m_map.remove(nextEntry.getKey());
-                m_map.put(startDrId, nextEntry.getValue());
-            }
-            else {
-                assert(nextEntry == null || endDrId < nextEntry.getKey());
-                m_map.put(startDrId, endDrId);
-            }
-        }
-    }
-
-    public void truncate(long newTruncationPoint) {
-        assert(newTruncationPoint >= m_lastAckedDrId);
-        Map.Entry<Long, Long> firstEntry = m_map.firstEntry();
-        while (firstEntry != null && firstEntry.getKey() <= newTruncationPoint) {
-            m_map.remove(firstEntry.getKey());
-            if (firstEntry.getValue() > newTruncationPoint) {
-                m_map.put(newTruncationPoint+1, firstEntry.getValue());
-                break;
-            }
-            firstEntry = m_map.firstEntry();
-        }
-        m_lastAckedDrId = newTruncationPoint;
-    }
-
-    private void doMerge(DRConsumerDrIdTracker tracker) {
-        for(Map.Entry<Long, Long> entry : tracker.m_map.entrySet()) {
-            if (entry.getValue() <= m_lastAckedDrId) {
-                // skip entries before the truncation (ack) point
-                continue;
-            }
-            else if (entry.getKey() <= m_lastAckedDrId) {
-                // entries that cross the truncation (ack) point need to be adjusted up
-                put(m_lastAckedDrId+1, entry.getValue());
-            }
-            else {
-                put(entry.getKey(), entry.getValue());
-            }
-        }
-    }
-
-    public void mergeTracker(DRConsumerDrIdTracker tracker) {
-        if (tracker.m_lastAckedDrId > m_lastAckedDrId) {
-            truncate(tracker.m_lastAckedDrId);
-        }
-        doMerge(tracker);
-        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
-        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
-    }
-
-    public long advancedAckPoint() {
-        Entry<Long, Long> firstEntry = m_map.firstEntry();
-        if (firstEntry != null && m_lastAckedDrId+1 == firstEntry.getKey()) {
-            // Advance the ackpoint
-            m_lastAckedDrId = firstEntry.getValue();
-            m_map.remove(firstEntry.getKey());
-        }
-        return m_lastAckedDrId;
+        m_map.add(range(startDrId, endDrId));
     }
 
     /**
-     * Check if this tracker contains a given DR id
-     * @param startDrId
-     * @return the entry if this tracker has an entry contains the given DR id, otherwise returns null
+     * Truncate the tracker to the given safe point. After truncation, the new
+     * safe point will be the first DrId of the tracker. If the new safe point
+     * is before the first DrId of the tracker, it's a no-op.
+     * @param newTruncationPoint    New safe point
      */
-    public Map.Entry<Long, Long> contains(Long startDrId) {
-        Map.Entry<Long, Long> prevEntry = m_map.floorEntry(startDrId);
-        if (prevEntry != null && startDrId >= prevEntry.getKey() && startDrId <= prevEntry.getValue()) {
-            return prevEntry;
+    public void truncate(long newTruncationPoint) {
+        if (newTruncationPoint < getFirstDrId()) return;
+        final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
+        while (iter.hasNext()) {
+            final Range<Long> next = iter.next();
+            if (end(next) < newTruncationPoint) {
+                iter.remove();
+            } else if (next.contains(newTruncationPoint)) {
+                iter.remove();
+                m_map.add(range(newTruncationPoint, end(next)));
+                break;
+            } else {
+                break;
+            }
         }
-        return null;
+        m_map.add(range(newTruncationPoint, newTruncationPoint));
     }
 
-    public long getLastAckedDrId() {
-        return m_lastAckedDrId;
+    /**
+     * Merge the given tracker with the current tracker. Ranges can
+     * overlap. After the merge, the current tracker will be truncated to the
+     * larger safe point.
+     * @param tracker
+     */
+    public void mergeTracker(DRConsumerDrIdTracker tracker) {
+        final long newSafePoint = Math.max(tracker.getSafePointDrId(), getSafePointDrId());
+        m_map.addAll(tracker.m_map);
+        truncate(newSafePoint);
+        m_lastSpUniqueId = Math.max(m_lastSpUniqueId, tracker.m_lastSpUniqueId);
+        m_lastMpUniqueId = Math.max(m_lastMpUniqueId, tracker.m_lastMpUniqueId);
+    }
+
+    /**
+     * Check if this tracker contains the given range. If the given range is
+     * before the safe point, it always returns true.
+     * @return true if the given range can be covered by the tracker.
+     */
+    public boolean contains(long startDrId, long endDrId) {
+        assert startDrId <= endDrId;
+        return endDrId <= getSafePointDrId() || m_map.encloses(range(startDrId, endDrId));
+    }
+
+    /**
+     * Get the current safe point for acking. There is no gap before this point
+     * in this tracker.
+     * @return The current safe-to-ack DrId
+     */
+    public long getSafePointDrId() {
+        assert (!m_map.isEmpty());
+        return end(m_map.asRanges().iterator().next());
     }
 
     public long getLastSpUniqueId() {
@@ -240,22 +227,52 @@ public class DRConsumerDrIdTracker {
         return m_lastMpUniqueId;
     }
 
-    public TreeMap<Long, Long> getDrIdRanges() {
+    RangeSet<Long> getDrIdRanges() {
         return m_map;
     }
 
-    public String debugInfo() {
+    /**
+     * Get the first DrId of the tracker. It will always be smaller than or
+     * equal to the current safe point.
+     */
+    public long getFirstDrId() {
+        return start(m_map.span());
+    }
+
+    /**
+     * Get the last DrId of the tracker. It will always be greater than or equal
+     * to the current safe point.
+     */
+    public long getLastDrId() {
+        return end(m_map.span());
+    }
+
+    public JSONObject toJSON() throws JSONException
+    {
+        JSONObject obj = new JSONObject();
+        obj.put("spUniqueId", m_lastSpUniqueId);
+        obj.put("mpUniqueId", m_lastMpUniqueId);
+        JSONArray drIdRanges = new JSONArray();
+        for (Range<Long> sequenceRange : m_map.asRanges()) {
+            JSONObject range = new JSONObject();
+            range.put(Long.toString(start(sequenceRange)), end(sequenceRange));
+            drIdRanges.put(range);
+        }
+        obj.put("drIdRanges", drIdRanges);
+        return obj;
+    }
+
+    @Override
+    public String toString() {
         if (m_map.isEmpty()) {
             return "Empty Map";
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("lastAckPoint ").append(DRLogSegmentId.getClusterIdFromDRId(m_lastAckedDrId)).append(":")
-          .append(DRLogSegmentId.getSentinelOrSeqNumFromDRId(m_lastAckedDrId)).append(" ");
         sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
-        for (Map.Entry<Long, Long> entry : m_map.entrySet()) {
-            sb.append("[").append(DRLogSegmentId.getSequenceNumberFromDRId(entry.getKey())).append(", ")
-              .append(DRLogSegmentId.getSequenceNumberFromDRId(entry.getValue())).append("] ");
+        for (Range<Long> entry : m_map.asRanges()) {
+            sb.append("[").append(DRLogSegmentId.getSequenceNumberFromDRId(start(entry))).append(", ")
+              .append(DRLogSegmentId.getSequenceNumberFromDRId(end(entry))).append("] ");
         }
         return sb.toString();
     }
