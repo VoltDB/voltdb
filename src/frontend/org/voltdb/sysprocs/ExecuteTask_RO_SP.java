@@ -88,7 +88,7 @@ public class ExecuteTask_RO_SP extends VoltSystemProcedure {
                 stringer.key(Integer.toString(clusterTrackers.getKey())).object();
                 for (Map.Entry<Integer, DRConsumerDrIdTracker> e : clusterTrackers.getValue().entrySet()) {
                     stringer.key(e.getKey().toString());
-                    stringer.value(ExtensibleSnapshotDigestData.serializeConsumerDrIdTrackerToJSON(e.getValue()));
+                    stringer.value(e.getValue().toJSON());
                 }
                 stringer.endObject();
             }
