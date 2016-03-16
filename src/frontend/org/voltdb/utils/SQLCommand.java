@@ -45,6 +45,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -385,8 +386,9 @@ public class SQLCommand
 
     private static void execListConfigurations() throws Exception {
         VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
-        if (configData.getRowCount() != 0)
+        if (configData.getRowCount() != 0) {
             printConfig(configData);
+        }
     }
 
     private static void execListClasses() {
@@ -1305,6 +1307,16 @@ public class SQLCommand
 
         // Phone home to see if there is a newer version of VoltDB
         openURLAsync();
+
+        try
+        {
+            // If we need to prompt the user for a password, do so.
+            password = CLIConfig.readPasswordIfNeeded(user, password, "Enter password: ");
+        }
+        catch (IOException ex)
+        {
+            printUsage("Unable to read password: " + ex);
+        }
 
         // Create connection
         ClientConfig config = new ClientConfig(user, password);

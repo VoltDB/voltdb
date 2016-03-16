@@ -36,6 +36,7 @@ from verbs import *
 from voltcli import cli
 from voltcli import environment
 from voltcli import utility
+from getpass import getpass
 
 #===============================================================================
 # Global data
@@ -476,6 +477,11 @@ class VerbRunner(object):
                 kwargs['username'] = username
                 if password:
                     kwargs['password'] = password
+                else:
+                    """
+                    If a username was specified and a password was not, prompt the user for the pwd.
+                    """
+                    kwargs['password'] = getpass('Enter your password: ')
             self.client = FastSerializer(host, port, **kwargs)
         except Exception, e:
             utility.abort(e)
