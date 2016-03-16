@@ -22,6 +22,7 @@ formatted. The allowable options are:
     --output-format={fixed|csv|tab}
     --output-skip-metadata
     --query={query}
+    --query-timeout=time-limit
     --stop-on-error={true|false}
 
 In addition to SQL statements, sqlcmd lets you enter directives that provide
