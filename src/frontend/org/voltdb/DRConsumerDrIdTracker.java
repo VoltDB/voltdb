@@ -17,22 +17,28 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.voltdb.iv2.UniqueIdGenerator;
 
 import com.google_voltpatches.common.collect.BoundType;
 import com.google_voltpatches.common.collect.DiscreteDomain;
 import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.voltdb.iv2.UniqueIdGenerator;
 
-public class DRConsumerDrIdTracker {
+public class DRConsumerDrIdTracker implements Serializable {
+    private static final long serialVersionUID = -4057397384030151271L;
 
-    private final RangeSet<Long> m_map;
+    private transient RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
 
@@ -138,6 +144,33 @@ public class DRConsumerDrIdTracker {
     public void serialize(byte[] flattened) {
         ByteBuffer buff = ByteBuffer.wrap(flattened);
         serialize(buff);
+    }
+
+    /**
+    * Serialize this {@code DRConsumerDrIdTracker} instance.
+    *
+    * @serialData The last spUnique id and mpUniqueId is emitted ({@code long}), followed by size of
+    * the range set ({@code int}) (number of ranges) , followed by each individual range that includes
+    * start ({@code long}) and end ({@code long})
+    */
+    private void writeObject(ObjectOutputStream out) throws IOException {
+        out.writeLong(m_lastSpUniqueId);
+        out.writeLong(m_lastMpUniqueId);
+        out.writeInt(m_map.asRanges().size());
+        for(Range<Long> entry : m_map.asRanges()) {
+            out.writeLong(start(entry));
+            out.writeLong(end(entry));
+        }
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException {
+        m_map = TreeRangeSet.create();
+        m_lastSpUniqueId = in.readLong();
+        m_lastMpUniqueId = in.readLong();
+        int mapSize = in.readInt();
+        for (int ii = 0; ii < mapSize; ii++) {
+            m_map.add(range(in.readLong(), in.readLong()));
+        }
     }
 
     public int size() {
