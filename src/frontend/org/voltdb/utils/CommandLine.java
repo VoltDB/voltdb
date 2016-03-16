@@ -90,6 +90,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
+        cl.m_newVoltdb = m_newVoltdb;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -389,6 +390,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine newVoltdb(boolean newVoltdb)
+    {
+        m_newVoltdb = newVoltdb;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -563,7 +570,9 @@ public class CommandLine extends VoltDB.Configuration
         if (jarFileName() != null) {
             cmdline.add("catalog"); cmdline.add(jarFileName());
         }
-        cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        if (pathToDeployment() != null) {
+            cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        }
 
         // rejoin has no replication role
         if (!m_startAction.doesRejoin()) {
@@ -604,6 +613,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_internalInterface != null && (m_externalInterface != null && !m_externalInterface.isEmpty()))
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
+        }
+
+        if (m_newVoltdb)
+        {
+            cmdline.add("new");
         }
 
         if (m_isEnterprise) {

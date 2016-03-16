@@ -164,6 +164,8 @@ public abstract class CatalogUtil {
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
+    private static boolean m_exportEnabled = false;
+
     private static JAXBContext m_jc;
     private static Schema m_schema;
     static {
@@ -470,6 +472,10 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    public static boolean isExportEnabled() {
+        return m_exportEnabled;
     }
 
     public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
@@ -1032,15 +1038,6 @@ public abstract class CatalogUtil {
             catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
-            catDeploy.setExport(false);
-
-            ExportType export = deployment.getExport();
-            if (export != null) {
-                for (ExportConfigurationType exportConfig : export.getConfiguration()) {
-                    if (exportConfig.isEnabled())
-                        catDeploy.setExport(true);
-                }
-            }
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection().isEnabled()) {
@@ -1388,6 +1385,7 @@ public abstract class CatalogUtil {
             }
 
             if (connectorEnabled) {
+                m_exportEnabled = true;
                 if (streamList.contains(targetName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
                             targetName + ".");

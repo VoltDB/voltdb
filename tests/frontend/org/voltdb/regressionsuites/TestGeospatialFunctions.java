@@ -743,20 +743,20 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    public void testPolygonFromValidText() throws Exception {
+    public void testValidPolygonFromText() throws Exception {
         Client client = getClient();
         populateBorders(client, invalidBorders);
         // These should all fail.
         for (Border b : invalidBorders) {
             String expectedPattern = b.getMessage();
-            String sql = String.format("select polygonfromvalidtext('%s') from borders where pk = 100",
+            String sql = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
                                        b.getRegion().toWKT());
             verifyStmtFails(client, sql, expectedPattern);
         }
         // These should all succeed.
         for (Border b : borders) {
             if (b.getRegion() != null) {
-                String stmt = String.format("select polygonfromvalidtext('%s') from borders where pk = 100",
+                String stmt = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
                                             b.getRegion().toWKT());
                 ClientResponse cr = client.callProcedure("@AdHoc", stmt);
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
