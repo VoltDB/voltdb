@@ -125,13 +125,11 @@ class UploadConfiguration(Database):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-
             res = requests.put(__db_url__ + str(last_db_id) + '/deployment/', files={'file': open('test-files/deployment.xml', 'rb')})
             assert res.status_code == 200
             result = json.loads(res.content)
             self.assertEqual(result['status'],'success')
-
-            response = requests.get(__deployment_url__ + str(last_db_id))
+            response = requests.get(__db_url__ + str(last_db_id) + '/deployment/')
             value = response.json()
 
             if value:
