@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -199,35 +198,6 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    static public JSONObject serializeConsumerDrIdTrackerToJSON(
-            DRConsumerDrIdTracker tracker)  throws JSONException {
-        JSONObject obj = new JSONObject();
-        obj.put("lastAckedDrId", tracker.getLastAckedDrId());
-        obj.put("spUniqueId", tracker.getLastSpUniqueId());
-        obj.put("mpUniqueId", tracker.getLastMpUniqueId());
-        JSONArray drIdRanges = new JSONArray();
-        for (Map.Entry<Long, Long> sequenceRange : tracker.getDrIdRanges().entrySet()) {
-            JSONObject range = new JSONObject();
-            range.put(sequenceRange.getKey().toString(), sequenceRange.getValue());
-            drIdRanges.put(range);
-        }
-        obj.put("drIdRanges", drIdRanges);
-        return obj;
-    }
-
-
-    static public DRConsumerDrIdTracker JSON_ToConsumerDrIdTracker(JSONObject consumerPID) throws JSONException {
-        final DRConsumerDrIdTracker tracker = new DRConsumerDrIdTracker(consumerPID.getLong("lastAckedDrId"),
-                consumerPID.getLong("spUniqueId"), consumerPID.getLong("mpUniqueId"));
-        final JSONArray drIdRanges = consumerPID.getJSONArray("drIdRanges");
-        for (int ii = 0; ii < drIdRanges.length(); ii++) {
-            JSONObject obj = drIdRanges.getJSONObject(ii);
-            String startDrIdStr = obj.keys().next();
-            tracker.append(Long.valueOf(startDrIdStr), obj.getLong(startDrIdStr), 0L, 0L);
-        }
-        return tracker;
-    }
-
     static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> remoteDCLastIds)
             throws JSONException {
         JSONObject clusters = new JSONObject();
@@ -236,7 +206,7 @@ public class ExtensibleSnapshotDigestData {
             // from the local cluster's partition count (which is not tracked here)
             JSONObject partitions = new JSONObject();
             for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
-                partitions.put(e2.getKey().toString(),serializeConsumerDrIdTrackerToJSON(e2.getValue()));
+                partitions.put(e2.getKey().toString(), e2.getValue().toJSON());
             }
             clusters.put(e.getKey().toString(), partitions);
         }
@@ -255,7 +225,7 @@ public class ExtensibleSnapshotDigestData {
             while (producerPartitionKeys.hasNext()) {
                 String producerPartitionIdStr = producerPartitionKeys.next();
                 int producerPartitionId = Integer.valueOf(producerPartitionIdStr);
-                DRConsumerDrIdTracker producerPartitionTracker = JSON_ToConsumerDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
+                DRConsumerDrIdTracker producerPartitionTracker = new DRConsumerDrIdTracker(producerPartitionInfo.getJSONObject(producerPartitionIdStr));
                 perProducerPartitionTrackers.put(producerPartitionId, producerPartitionTracker);
             }
             perSiteTrackers.put(clusterId, perProducerPartitionTrackers);
