@@ -45,39 +45,50 @@ def convert_xml_to_json(config_path):
     with open(config_path) as config_file:
         xml = config_file.read()
     config_content = XML(xml)
-    xml_final = json.loads(json.dumps(etree_to_dict(config_content)))
-    if type(xml_final['voltdeploy']['members']['member']) is dict:
-        member_json = get_field_from_xml(xml_final['voltdeploy']['members']['member'], 'dict')
-    else:
-        member_json = get_field_from_xml(xml_final['voltdeploy']['members']['member'], 'list')
+    xml_final = etree_to_dict(config_content)
 
-    if type(xml_final['voltdeploy']['databases']['database']) is dict:
-        db_json = get_field_from_xml(xml_final['voltdeploy']['databases']['database'],
+    D2 = {}
+    for (k,v) in zip(xml_final.keys(), xml_final.values()):
+        D2[k] = v
+
+    if type(D2[k]['members']['member']) is dict:
+        member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
+        HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+    else:
+        member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
+        for member in member_json:
+            HTTPListener.Global.SERVERS[member['id']] = member
+
+    if type(D2[k]['databases']['database']) is dict:
+        db_json = get_field_from_xml(D2[k]['databases']['database'],
                                      'dict', 'database')
+        HTTPListener.Global.DATABASES[db_json[0]['id']] = db_json[0]
     else:
-        db_json = get_field_from_xml(xml_final['voltdeploy']['databases']['database'],
+        db_json = get_field_from_xml(D2[k]['databases']['database'],
                                      'list', 'database')
+        for database in db_json:
+            HTTPListener.Global.DATABASES[database['id']] = database
 
-    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
-        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']
+    if type(D2[k]['deployments']['deployment']) is dict:
+        deployment_json = get_deployment_from_xml(D2[k]['deployments']
                                                   ['deployment'], 'dict')
+        HTTPListener.Global.DEPLOYMENT[deployment_json[0]['databaseid']] = deployment_json[0]
     else:
-        deployment_json = get_deployment_from_xml(xml_final['voltdeploy']['deployments']
+        deployment_json = get_deployment_from_xml(D2[k]['deployments']
                                                   ['deployment'], 'list')
-    if type(xml_final['voltdeploy']['deployments']['deployment']) is dict:
-        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'],
-                                       'dict')
-    else:
-        user_json = get_users_from_xml(xml_final['voltdeploy']['deployments']['deployment'],
-                                       'list')
+        for deployment in deployment_json:
+            HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
 
-    HTTPListener.Global.DATABASES = db_json
-
-    HTTPListener.Global.SERVERS = member_json
-
-    HTTPListener.Global.DEPLOYMENT = deployment_json
-
-    HTTPListener.Global.DEPLOYMENT_USERS = user_json
+    if 'users' in D2[k]:
+        if type(D2[k]['users']['user']) is dict:
+            user_json = get_users_from_xml(D2[k]['users']['user'],
+                                           'dict')
+            HTTPListener.Global.DEPLOYMENT_USERS[user_json[0]['name']] = user_json[0]
+        else:
+            user_json = get_users_from_xml(D2[k]['users']['user'],
+                                           'list')
+            for deployment_user in user_json:
+                    HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['name'])] = deployment_user
 
 
 def get_deployment_from_xml(deployment_xml, is_list):
@@ -161,7 +172,7 @@ def get_deployment(deployment, is_upload=False):
 def set_export_import_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] is not None:
+        if deployment[field] != 'None':
             new_deployment[field] = {}
             new_deployment[field]['configuration'] = {}
             if type(deployment[field]['configuration']) is list:
@@ -360,7 +371,7 @@ def set_system_setting_field(deployment, field, new_deployment):
 def set_dr_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] is not None:
+        if deployment[field] != 'None':
             new_deployment[field] = {}
             new_deployment[field]['id'] = int(deployment[field]['id'])
             new_deployment[field]['listen'] = parse_bool_string(deployment[field]
@@ -383,7 +394,7 @@ def set_dr_field(deployment, field, new_deployment):
 def set_users_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] is not None:
+        if deployment[field] != 'None':
             new_deployment[field] = {}
             if type(deployment[field]['user']) is list:
                 new_deployment[field]['user'] = []
@@ -596,59 +607,41 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    i = 0
-    while i < len(HTTPListener.Global.DATABASES):
+
+    for key, value in HTTPListener.Global.DATABASES.items():
         db_elem = SubElement(db_top, 'database')
-        for key, value in HTTPListener.Global.DATABASES[i].iteritems():
-            if isinstance(value, bool):
-                if value == False:
-                    db_elem.attrib[key] = "false"
+        for k, val in value.items():
+            if isinstance(val, bool):
+                if not value:
+                    db_elem.attrib[k] = "false"
                 else:
-                    db_elem.attrib[key] = "true"
+                    db_elem.attrib[k] = "true"
             else:
-                db_elem.attrib[key] = str(value)
-        i += 1
+                db_elem.attrib[k] = str(val)
 
-    i = 0
-    while i < len(HTTPListener.Global.SERVERS):
+    # servers = [v if type(v) is list else [v] for v in HTTPListener.Global.SERVERS.values()]
+
+    for key, value in HTTPListener.Global.SERVERS.items():
         server_elem = SubElement(server_top, 'member')
-        for key, value in HTTPListener.Global.SERVERS[i].iteritems():
-            if isinstance(value, bool):
-                if value == False:
-                    server_elem.attrib[key] = "false"
+        for k, v in value.items():
+            if isinstance(v, bool):
+                if not value:
+                    server_elem.attrib[k] = "false"
                 else:
-                    server_elem.attrib[key] = "true"
+                    server_elem.attrib[k] = "true"
             else:
-                server_elem.attrib[key] = str(value)
-        i += 1
+                server_elem.attrib[k] = str(v)
 
-    i = 0
-    while i < len(HTTPListener.Global.DEPLOYMENT):
-        HTTPListener.Global.DEPLOYMENT[i]['users'] = {}
-        HTTPListener.Global.DEPLOYMENT[i]['users']['user'] = []
-        deployment_user = filter(lambda t: t['databaseid'] == HTTPListener.Global.DEPLOYMENT[i]['databaseid']
-                                 , HTTPListener.Global.DEPLOYMENT_USERS)
-        if len(deployment_user) == 0:
-            HTTPListener.Global.DEPLOYMENT[i]['users'] = None
-        for user in deployment_user:
-            HTTPListener.Global.DEPLOYMENT[i]['users']['user'].append({
-                'name': user['name'],
-                'roles': user['roles'],
-                'plaintext': user['plaintext'],
-                'password': user['password'],
-                'databaseid': user['databaseid']
-            })
-
+    for key, value in HTTPListener.Global.DEPLOYMENT.items():
         deployment_elem = SubElement(deployment_top, 'deployment')
-        for key, value in HTTPListener.Global.DEPLOYMENT[i].iteritems():
-            if type(value) is dict:
-                DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
-            elif type(value) is list:
-                DeploymentConfig.handle_deployment_list(deployment_elem, key, value)
+        for k, val in value.items():
+            if type(val) is dict:
+                DeploymentConfig.handle_deployment_dict(deployment_elem, k, val, False)
+            elif type(val) is list:
+                DeploymentConfig.handle_deployment_list(deployment_elem, k, val)
             else:
                 if value is not None:
-                    deployment_elem.attrib[key] = str(value)
-        i += 1
+                    deployment_elem.attrib[k] = str(val)
     return tostring(main_header, encoding='UTF-8')
 
 

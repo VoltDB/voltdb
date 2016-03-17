@@ -70,11 +70,12 @@ def get_voltdb_dir():
 
 
 def check_snapshot_folder(database_id):
-    deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+    # deployment = [deployment for deployment in HTTPListener.Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+    deployment = HTTPListener.Global.DEPLOYMENT.get(database_id)
     if len(deployment) > 0:
-        if 'paths' in deployment[0] and 'voltdbroot' in deployment[0]['paths'] and 'snapshots' in deployment[0]['paths']:
-            voltdb_root = deployment[0]['paths']['voltdbroot']['path']
-            snapshot = deployment[0]['paths']['snapshots']['path']
+        if 'paths' in deployment and 'voltdbroot' in deployment['paths'] and 'snapshots' in deployment['paths']:
+            voltdb_root = deployment['paths']['voltdbroot']['path']
+            snapshot = deployment['paths']['snapshots']['path']
 
             outfilename = os.path.join(HTTPListener.Global.PATH, str(voltdb_root), str(snapshot))
             if os.path.isdir(outfilename):
