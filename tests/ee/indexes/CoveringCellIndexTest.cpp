@@ -564,10 +564,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
     ASSERT_FALSE(foundTuple.isNullTuple());
 
     tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((10 10, 11 10, 10 11, 10 10))"));
-    bool success = table->updateTupleWithSpecificIndexes(foundTuple,
-                                                         tempTuple,
-                                                         {ccIndex});
-    ASSERT_TRUE(success);
+    table->updateTupleWithSpecificIndexes(foundTuple, tempTuple, {ccIndex});
 
     // Now tuple 0 should not contain this point.
     searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));

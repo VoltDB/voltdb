@@ -136,27 +136,54 @@ public class TestSqlUpsertSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc", String.format(
                     "Upsert into %s (id, dept) values (%d, %d)", tb, 2, 1)).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}});
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2,1,1}});
 
             // test UPSERT with column name in random order
             vt = client.callProcedure("@AdHoc", String.format(
                     "Upsert into %s (dept, wage, id) values(%d, %d, %d)", tb, 1, 2, 2)).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2,2,1}});
 
             // test UPSERT with default value
             vt = client.callProcedure("@AdHoc", String.format(
-                    "Upsert into %s (dept, id) values(%d, %d)", tb, 1, 1)).getResults()[0];
+                                                              "Upsert into %s (dept, id) values(%d, %d)", tb, 3, 1)).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+            validateTableOfLongs(vt, new long[][] {{1,1,3}, {2,2,1}});
+            // Try that again but with a new row.
+            vt = client.callProcedure("@AdHoc", String.format(
+                                                              "Upsert into %s (dept, id) values(%d, %d)", tb, 3, 4)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,3}, {2,2,1}, {4,1,3}});
+            // test UPSERT with existing row with non-defaultable value
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s (wage, id) values(%d, %d)", tb, 5, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+                                 validateTableOfLongs(vt, new long[][] {{1,5,3}, {2,2,1}, {4,1,3}});
         }
 
-        // Test AdHoc UPSER with SELECT
+        // negative test UPSERT with non-existing row and not providing a non-defaultable value
+        try {
+            vt = client.callProcedure("@AdHoc", "Upsert into R2 (wage, id) values(6, 7)").getResults()[0];
+            fail("Should have thrown a sql exception on upsert of a new row " +
+                 "without a required non-nullable column value.\n" +
+                 "Instead, the upsert return value was:\n" +
+                 vt.toString() +
+                 " and the check query now returns:\n" +
+                 client.callProcedure("@AdHoc",
+                         "select ID, wage, dept from R1 order by ID, dept").getResults()[0].toString());
+        }
+        catch (ProcCallException pce) {
+            String msg = pce.toString();
+            System.out.println("DEBUG: OK got PCE:" + msg);
+            assertTrue(msg.contains("DEPT"));
+        }
+
+        // Test AdHoc UPSERT with SELECT
         vt = client.callProcedure("@AdHoc", String.format(
-                "Upsert into R1 (dept, id) SELECT dept, id+1 FROM R2 order by 1, 2")).getResults()[0];
+                "Upsert into R1 (dept, id) SELECT dept+10, id+1 FROM R2 order by 1, 2")).getResults()[0];
         vt = client.callProcedure("@AdHoc",
-                "select ID, wage, dept from R1 order by ID, dept").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}, {3, 1, 1}});
+                                  "select ID, wage, dept from R1 order by ID, dept").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1,4,3}, {2,2,13}, {3,1,11}});
 
         // Without the order by in the SELECT clause, the result is content non-deterministic.
         // This is different with INSERT INTO SELECT.
@@ -164,7 +191,7 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 1, 2 ")).getResults()[0];
         vt = client.callProcedure("@AdHoc",
                 "select ID, wage, dept from P1 order by ID, dept").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 1, 2}, {2, 2, 1}});
+        validateTableOfLongs(vt, new long[][] {{1,1,2}, {2,2,1}, {3,1,1}});
 
     }
 
