@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -117,6 +117,9 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     TableTuple tuple = m_templateTuple.tuple();
 
     std::set<int> fieldsExplicitlySet(m_node->getFieldMap().begin(), m_node->getFieldMap().end());
+    // These default values are used for an INSERT including the INSERT sub-case of an UPSERT.
+    // The defaults are purposely ignored in favor of existing column values
+    // for the UPDATE subcase of an UPSERT.
     m_node->initTupleWithDefaultValues(m_engine,
                                        &m_memoryPool,
                                        fieldsExplicitlySet,
@@ -127,7 +130,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
+void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
     PersistentTable* table = *ptrToTable;
     int tupleLimit = table->tupleLimit();
     int numTuples = table->visibleTupleCount();
@@ -149,8 +152,6 @@ bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
         // the correct instance of PersistentTable.
         *ptrToTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     }
-
-    return true;
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -177,6 +178,24 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
+    TableTuple& count_tuple = outputTable->tempTuple();
+
+    // For export tables with no partition column,
+    // if the data is from a replicated source,
+    // only insert into one partition (the one for hash(0)).
+    // Other partitions can just return a 0 modified tuple count.
+    // OTOH, if the data is coming from a (sub)query with
+    // partitioned tables, perform the insert on every partition.
+    if (m_partitionColumn == -1 &&
+            m_isStreamed &&
+            m_multiPartition &&
+            !m_sourceIsPartitioned &&
+            !m_engine->isLocalSite(ValueFactory::getBigIntValue(0L))) {
+        count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
+        // put the tuple into the output table
+        outputTable->insertTuple(count_tuple);
+        return true;
+    }
 
     TableTuple templateTuple = m_templateTuple.tuple();
 
@@ -197,127 +216,113 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     TableTuple inputTuple(m_inputTable->schema());
     assert (inputTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
+    Pool* tempPool = ExecutorContext::getTempStringPool();
+    const std::vector<int>& fieldMap = m_node->getFieldMap();
+    std::size_t mapSize = fieldMap.size();
     while (iterator.next(inputTuple)) {
 
-        for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
+        for (int i = 0; i < mapSize; ++i) {
             // Most executors will just call setNValue instead of
             // setNValueAllocateForObjectCopies.
             //
             // However, We need to call
-            // setNValueAlocateForObjectCopies here.  Sometimes the
+            // setNValueAllocateForObjectCopies here.  Sometimes the
             // input table's schema has an inlined string field, and
             // it's being assigned to the target table's outlined
             // string field.  In this case we need to tell the NValue
             // where to allocate the string data.
-            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
+            // For an "upsert", this templateTuple setup has two effects --
+            // It sets the primary key column(s) and it sets the
+            // updated columns to their new values.
+            // If the primary key value (combination) is new, the
+            // templateTuple is the exact combination of new values
+            // and default values required by the insert.
+            // If the primary key value (combination) already exists,
+            // only the NEW values stored on the templateTuple get updated
+            // in the existing tuple and its other columns keep their existing
+            // values -- the DEFAULT values that are stored in templateTuple
+            // DO NOT get copied to an existing tuple.
+            templateTuple.setNValueAllocateForObjectCopies(fieldMap[i],
                                                            inputTuple.getNValue(i),
-                                                           ExecutorContext::getTempStringPool());
+                                                           tempPool);
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    templateTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                    targetTable->schema()->debug().c_str());
 
-        // if there is a partition column for the target table
+        // If there is a partition column for the target table
         if (m_partitionColumn != -1) {
-
             // get the value for the partition column
             NValue value = templateTuple.getNValue(m_partitionColumn);
             bool isLocal = m_engine->isLocalSite(value);
 
-            // if it doesn't map to this site
+            // if it doesn't map to this partiton
             if (!isLocal) {
-                if (!m_multiPartition) {
-                    throw ConstraintFailureException(
-                            dynamic_cast<PersistentTable*>(targetTable),
-                            templateTuple,
-                            "Mispartitioned tuple in single-partition insert statement.");
+                if (m_multiPartition) {
+                    // The same row is presumed to also be generated
+                    // on some other partition, where the partition key
+                    // belongs.
+                    continue;
                 }
 
-                // don't insert
-                continue;
+                // When there are views, be strict and throw mispartitioned
+                // tuples to force partitioned data to be generated only
+                // where partitoned view rows are maintained.
+                if (!m_isStreamed) {
+                    throw ConstraintFailureException(
+                        static_cast<PersistentTable*>(targetTable), templateTuple,
+                        "Mispartitioned tuple in single-partition insert statement.");
+                }
             }
         }
 
-        // for multi partition export tables, only insert into one
-        // place (the partition with hash(0)), if the data is from a
-        // replicated source.  If the data is coming from a subquery
-        // with partitioned tables, we need to perform the insert on
-        // every partition.
-        if (m_isStreamed && m_multiPartition && !m_sourceIsPartitioned) {
-            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
-            if (!isLocal) continue;
-        }
-
-
-        if (! m_isUpsert) {
-            // try to put the tuple into the target table
-
-            if (m_hasPurgeFragment) {
-                if (!executePurgeFragmentIfNeeded(&persistentTable))
-                    return false;
-                // purge fragment might have truncated the table, and
-                // refreshed the persistent table pointer.  Make sure to
-                // use it when doing the insert below.
-                targetTable = persistentTable;
-            }
-
-            if (!targetTable->insertTuple(templateTuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " target table '%s'",
-                           m_inputTable->name().c_str(),
-                           targetTable->name().c_str());
-                return false;
-            }
-
-        } else {
+        if (m_isUpsert) {
             // upsert execution logic
             assert(persistentTable->primaryKeyIndex() != NULL);
             TableTuple existsTuple = persistentTable->lookupTupleByValues(templateTuple);
 
-            if (existsTuple.isNullTuple()) {
-                // try to put the tuple into the target table
-
-                if (m_hasPurgeFragment) {
-                    if (!executePurgeFragmentIfNeeded(&persistentTable))
-                        return false;
-                }
-
-                if (!persistentTable->insertTuple(templateTuple)) {
-                    VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                               " target table '%s'",
-                               m_inputTable->name().c_str(),
-                               persistentTable->name().c_str());
-                    return false;
-                }
-            } else {
-                // tuple exists already, try to update the tuple instead
+            if (!existsTuple.isNullTuple()) {
+                // The tuple exists already, update (only) the templateTuple columns
+                // that were initialized from the input tuple via the field map.
+                // Technically, this includes setting primary key values,
+                // but they are getting set to equivalent values, so that's OK.
+                // A simple setNValue works here because any required object
+                // allocations were handled when copying the input values into
+                // the templateTuple.
                 upsertTuple.move(templateTuple.address());
-                TableTuple &tempTuple = persistentTable->getTempTupleInlined(upsertTuple);
-
-                if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                        persistentTable->allIndexes())) {
-                    VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            persistentTable->name().c_str());
-                    return false;
+                TableTuple &tempTuple = persistentTable->copyIntoTempTuple(existsTuple);
+                for (int i = 0; i < mapSize; ++i) {
+                    tempTuple.setNValue(fieldMap[i],
+                                        templateTuple.getNValue(fieldMap[i]));
                 }
+
+                persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
+                                                                persistentTable->allIndexes());
+                // successfully updated
+                ++modifiedTuples;
+                continue;
             }
+            // else, the primary key did not match,
+            // so fall through to the "insert" logic
         }
 
-        // successfully inserted or updated
-        modifiedTuples++;
+        // try to put the tuple into the target table
+        if (m_hasPurgeFragment) {
+            executePurgeFragmentIfNeeded(&persistentTable);
+            // purge fragment might have truncated the table, and
+            // refreshed the persistent table pointer.  Make sure to
+            // use it when doing the insert below.
+            targetTable = persistentTable;
+        }
+        targetTable->insertTuple(templateTuple);
+        // successfully inserted
+        ++modifiedTuples;
     }
 
-    TableTuple& count_tuple = outputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
-    // try to put the tuple into the output table
-    if (!outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%d) into"
-                   " output table '%s'",
-                   modifiedTuples,
-                   outputTable->name().c_str());
-        return false;
-    }
+    // put the tuple into the output table
+    outputTable->insertTuple(count_tuple);
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(modifiedTuples);
