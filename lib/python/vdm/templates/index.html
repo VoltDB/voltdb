@@ -6,11 +6,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Voltdb Deployment Manager</title>
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/jquery-ui.css') }}">
 <link rel="shortcut icon" href="{{ url_for('static',filename='images/favicon.ico') }}" type="image/x-icon" />
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/aero.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/multi-select.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap-tokenfield.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/tokenfield-typeahead.css') }}">
+
 </head>
 <body>
 <div id="wrap">
@@ -559,6 +563,7 @@
   <p>Copyright © 2015 VoltDB. All rights reserved. </p>
 </div>
 <script src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.cookie.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.validate.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.multi-select.js') }}"></script>
@@ -569,6 +574,7 @@
 <script src="{{ url_for('static', filename='js/vdm.serversetting.ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vdm.service.js') }}"></script>
 <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap-tokenfield.js') }}"></script>
 <script src="{{ url_for('static', filename='js/icheck.js') }}"></script>
 
 <script>

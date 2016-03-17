@@ -1211,6 +1211,8 @@ input.drop-down-input{width:125px !important;}
 .col-xs-4{padding-left:0 !important;}
 
 .connSource { }
+.tokenNote { font-size:11px; text-decoration:underline; position:relative; top:7px;}
+
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1524,5 +1526,7 @@ ul.drList {
 }
 }
 
+/*jquery UI override*/
+.ui-menu { z-index:9999; width:213px!important;}
 
 
