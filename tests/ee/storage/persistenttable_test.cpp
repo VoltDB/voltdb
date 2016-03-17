@@ -238,13 +238,12 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     iterator = table->iteratorDeletingAsWeGo();
     ASSERT_TRUE(iterator.next(tuple));
     ASSERT_TRUE(iterator.next(tuple));
-    srcTuple = table->getTempTupleInlined(tuple);
-    srcTuple.setNValue(1, newStringData);
+    TableTuple& tempTuple = table->copyIntoTempTuple(tuple);
+    tempTuple.setNValue(1, newStringData);
 
     table->updateTupleWithSpecificIndexes(tuple,
-                                          srcTuple,
-                                          table->allIndexes(),
-                                          true);
+                                          tempTuple,
+                                          table->allIndexes());
 
     // verify the updated tuple has the new timestamp.
     int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
