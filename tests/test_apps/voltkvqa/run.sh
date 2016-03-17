@@ -51,10 +51,15 @@ function clean() {
     rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
 }
 
+# migration away from catalog
+function jars() {
+    ant -f build.xml all
+}
+
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/voltkvqa/*.java \
         src/voltkvqa/procedures/*.java \
         src/voltkvqa/procedures_withexport/*.java
@@ -97,14 +102,13 @@ function async-benchmark-help() {
     java -classpath obj:$CLASSPATH:obj voltkvqa.AsyncBenchmark --help
 }
 
-#        --servers=volt3d,volt3e,volt3f \
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=60 \
-        --servers=volt3e,volt3g,volt3f \
+        --servers=localhost \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.9 \
@@ -150,7 +154,7 @@ function http-benchmark() {
         voltkvqa.HTTPBenchmark \
         --displayinterval=5 \
         --duration=300 \
-        --servers=volt3e,volt3g,volt3f \
+        --servers=localhost \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \

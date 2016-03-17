@@ -252,46 +252,9 @@ public class HTTPBenchmark {
         connections.await();
     }
 
-    /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
-    public void schedulePeriodicStats() {
-        timer = new Timer();
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() { printStatistics(); }
-        };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
-    }
 
     /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
-     */
-    public synchronized void printStatistics() {
-        ClientStatsContext statscontext = periodicStatsContext.fetchAndResetBaseline();
-        ClientAffinityStats affinityStats = statscontext.getAggregateAffinityStats();
-        ClientStats stats = statscontext.getStats();
-        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
-
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%.2fms, ", stats.getAverageLatency(),
-                stats.kPercentileLatencyAsDouble(0.95));
-        System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n",
-                affinityStats.getAffinityWrites(),
-                affinityStats.getAffinityReads(),
-                affinityStats.getRrWrites(),
-                affinityStats.getRrReads());
-    }
-
-    /**
-     * Prints the results of the voting simulation and statistics
+     * Prints the results of the test and statistics
      * about performance.
      *
      * @throws Exception if anything unexpected happens.
@@ -338,44 +301,6 @@ public class HTTPBenchmark {
                 getThroughput + putThroughput,
                 (successfulGets.get()+successfulPuts.get())/(double)config.duration);
 
-        // 2. Performance statistics
-//      System.out.print(HORIZONTAL_RULE);
-//      System.out.println(" Client Workload Statistics");
-//      System.out.println(HORIZONTAL_RULE);
-
-//      System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-//      System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-//      System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
-//      System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
-//      System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
-//      System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
-//      System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
-//      System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
-//      System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
-//      System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
-//      System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
-
-//      System.out.print("\n" + HORIZONTAL_RULE);
-//      System.out.println(" System Server Statistics");
-//      System.out.println(HORIZONTAL_RULE);
-
-//      System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
-
-//      System.out.print("\n" + HORIZONTAL_RULE);
-//      System.out.println(" Latency Histogram");
-//      System.out.println(HORIZONTAL_RULE);
-//      System.out.println(stats.latencyHistoReport());
-
-//      // 3. Affinity stats
-//      System.out.print("\n" + HORIZONTAL_RULE);
-//      System.out.println(" Client Affinity Statistics");
-//      System.out.print(HORIZONTAL_RULE + "\n");
-//      Map<Integer, ClientAffinityStats> affinityStats = fullStatsContext.fetch().getAffinityStats();
-//      for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
-//          System.out.println(e.getValue());
-//      }
-
-        // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
@@ -417,45 +342,45 @@ public class HTTPBenchmark {
 
             while (benchmarkComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
-                if (rand.nextDouble() < config.getputratio) {
-                    // Get a key/value pair, synchronously
-                    try {
-                        HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
-                                processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+            	if (rand.nextDouble() < config.getputratio) {
+            		// Get a key/value pair, synchronously
+            		try {
+            			HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
+            					processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
 
-                        if (response.results[0].advanceRow()) {
+            			if (response.results[0].advanceRow()) {
 
-                        final VoltTable pairData = response.results[0];
-                        // Cache miss (Key does not exist)
-                        if (pairData.getRowCount() == 0)
-                            missedGets.incrementAndGet();
-                        else {
-                            final PayloadProcessor.Pair pair =
-                                    processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                                                                pairData.fetchRow(0).getVarbinary(1));
-                            successfulGets.incrementAndGet();
-                            networkGetData.addAndGet(pair.getStoreValueLength());
-                            rawGetData.addAndGet(pair.getRawValueLength());
-                        }
-                        }
-                    }
-                    catch (Exception e) {
-                         e.printStackTrace(System.out); failedGets.incrementAndGet();
-                    }
-                }
-                else {
-                    // Put a key/value pair, synchronously
-                    final PayloadProcessor.Pair pair = processor.generateForStore();
-                    try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost );
-                        successfulPuts.incrementAndGet();
-                    }
-                    catch (Exception e) {
-                         e.printStackTrace(System.out); failedPuts.incrementAndGet();
-                    }
-                    networkPutData.addAndGet(pair.getStoreValueLength());
-                    rawPutData.addAndGet(pair.getRawValueLength());
-                }
+            				final VoltTable pairData = response.results[0];
+            				// Cache miss (Key does not exist)
+            				if (pairData.getRowCount() == 0)
+            					missedGets.incrementAndGet();
+            				else {
+            					final PayloadProcessor.Pair pair =
+            							processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+            									pairData.fetchRow(0).getVarbinary(1));
+            					successfulGets.incrementAndGet();
+            					networkGetData.addAndGet(pair.getStoreValueLength());
+            					rawGetData.addAndGet(pair.getRawValueLength());
+            				}
+            			}
+            		}
+            		catch (Exception e) {
+            			e.printStackTrace(System.out); failedGets.incrementAndGet();
+            		}
+            	}
+            	else {
+            		// Put a key/value pair, synchronously
+            		final PayloadProcessor.Pair pair = processor.generateForStore();
+            		try {
+            			HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost );
+            			successfulPuts.incrementAndGet();
+            		}
+            		catch (Exception e) {
+            			e.printStackTrace(System.out); failedPuts.incrementAndGet();
+            		}
+            		networkPutData.addAndGet(pair.getStoreValueLength());
+            		rawPutData.addAndGet(pair.getRawValueLength());
+            	}
             }
         }
     }
@@ -513,14 +438,6 @@ public class HTTPBenchmark {
 
         // signal to threads to end the warmup phase
         warmupComplete.set(true);
-
-//        // reset the stats after warmup
-//        fullStatsContext.fetchAndResetBaseline();
-//        periodicStatsContext.fetchAndResetBaseline();
-//
-//        // print periodic statistics to the console
-//        benchmarkStartTS = System.currentTimeMillis();
-//        schedulePeriodicStats();
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");

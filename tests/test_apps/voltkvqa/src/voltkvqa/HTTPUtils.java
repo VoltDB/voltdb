@@ -136,7 +136,6 @@ public class HTTPUtils {
         // Call insert
         String paramsInJSON = pset.toJSONString();
 
-        // System.out.println(paramsInJSON);
         List<NameValuePair> params = new ArrayList<NameValuePair>();
         params.add(new BasicNameValuePair("Procedure", procName));
         params.add(new BasicNameValuePair("Parameters", paramsInJSON));
