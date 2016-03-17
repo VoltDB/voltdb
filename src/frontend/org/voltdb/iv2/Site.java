@@ -107,7 +107,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
 
     private static final int m_scratchPadSize =
-            Integer.getInteger("SITE_SCRACTHPAD_SIZE", 0);
+            Integer.getInteger("SITE_SCRACTHPAD_SIZE", 2048);
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;

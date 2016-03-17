@@ -23,6 +23,8 @@ import java.util.Random;
 
 import org.voltdb.Expectation.Type;
 
+import com.google_voltpatches.common.base.Supplier;
+
 /**
  * Wraps the stored procedure object created by the user
  * with metadata available at runtime. This is used to call
@@ -311,5 +313,13 @@ public abstract class VoltProcedure {
     public void saveScratchPad()
     {
         m_runner.saveScratchPad();
+    }
+
+    public <T> Supplier<T> initialScratchPadValue() {
+        return new Supplier<T>() {
+            public T get() {
+                return null;
+            }
+        };
     }
 }

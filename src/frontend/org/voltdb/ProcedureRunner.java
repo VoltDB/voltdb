@@ -147,7 +147,7 @@ public class ProcedureRunner {
     /** boolean flag to mark whether the previous batch execution has EE exception or not.*/
     private long m_spBigBatchBeginToken;
 
-    protected ByteBuffer m_udpatableScratchPad = null;
+    protected ByteBuffer m_updatableScratchPad = null;
     protected ByteBuffer m_savedScratchPad = null;
 
     // Used to get around the "abstract" for StmtProcedures.
@@ -427,6 +427,7 @@ public class ProcedureRunner {
                 if (m_savedScratchPad != null) {
                     m_inputCRC.update(m_savedScratchPad.array());
                     hash = (int) m_inputCRC.getValue();
+                    m_site.setCorrespondingScratchPad(m_savedScratchPad);
                 }
                 retval.setHash(hash);
             }
@@ -453,6 +454,8 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
+            m_updatableScratchPad = null;
+            m_savedScratchPad = null;
 
             m_site.setProcedureName(null);
         }
@@ -605,12 +608,12 @@ public class ProcedureRunner {
         else {
             siteBuffer = m_savedScratchPad;
         }
-        ByteBuffer m_udpatableScratchPad = ByteBuffer.allocate(siteBuffer.capacity());
+        m_updatableScratchPad = ByteBuffer.allocate(siteBuffer.capacity());
         assert(siteBuffer.position() == 0);
-        m_udpatableScratchPad.put(siteBuffer);
+        m_updatableScratchPad.put(siteBuffer);
         siteBuffer.rewind();
-        m_udpatableScratchPad.flip();
-        return m_udpatableScratchPad;
+        m_updatableScratchPad.flip();
+        return m_updatableScratchPad;
     }
 
     public void saveScratchPad()
@@ -618,11 +621,11 @@ public class ProcedureRunner {
         if (m_isReadOnly) {
             throw new VoltAbortException("Attempted to save scratchpad from a read only procedure");
         }
-        if (m_udpatableScratchPad == null) {
+        if (m_updatableScratchPad == null) {
             throw new VoltAbortException("Attempted to save scratchpad that was never loaded");
         }
-        if (m_udpatableScratchPad != null) {
-            m_savedScratchPad = m_udpatableScratchPad;
+        if (m_updatableScratchPad != null) {
+            m_savedScratchPad = m_updatableScratchPad;
             m_savedScratchPad.rewind();
         }
     }
