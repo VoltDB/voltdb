@@ -48,10 +48,8 @@ public class OrderInsert extends VoltProcedure {
                      int     ord_cnt,
                      int     ord_sec,
                      int     ord_qty,
-                     double  ord_prc
-             ) throws VoltAbortException {
-
-
+                     double  ord_prc) throws VoltAbortException
+   {
         voltQueueSQL(insertOrder,
                      codord,
                      ord_cnt,
@@ -81,7 +79,6 @@ public class OrderInsert extends VoltProcedure {
             voltExecuteSQL();
         }
 
-    return ClientResponse.SUCCESS;
-
+        return ClientResponse.SUCCESS;
     }
 }

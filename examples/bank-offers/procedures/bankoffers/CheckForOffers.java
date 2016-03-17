@@ -23,16 +23,13 @@
 
 package bankoffers;
 
-//import procedures.PerformanceTimer;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
 
-
 public class CheckForOffers extends VoltProcedure {
-
 
     public final SQLStmt insertActivity = new SQLStmt(
         "INSERT INTO activity VALUES ( ?,?,?,?,?,?,?);");
@@ -42,7 +39,6 @@ public class CheckForOffers extends VoltProcedure {
         "FROM account a "+
         "INNER JOIN customer c ON a.cust_id = c.cust_id "+
         "WHERE a.acc_no = ?;");
-
 
     // check for vendor offers
     public final SQLStmt getVendorOffers = new SQLStmt(
@@ -63,30 +59,27 @@ public class CheckForOffers extends VoltProcedure {
         "INSERT INTO offers_given_exp VALUES (?,?,NOW,?);");
 
 
-
-    public long run( long txnId,
-                     long acctNo,
-                     double txnAmt,
-                     String txnState,
-                     String txnCity,
-                     TimestampType txnTimestamp,
-                     int vendorId)
-        throws VoltAbortException {
-
-
+    public long run(long txnId,
+                    long acctNo,
+                    double txnAmt,
+                    String txnState,
+                    String txnCity,
+                    TimestampType txnTimestamp,
+                    int vendorId) throws VoltAbortException
+    {
         // insert activity
-        voltQueueSQL(insertActivity,txnId,acctNo,txnAmt,txnState,txnCity,txnTimestamp,vendorId);
+        voltQueueSQL(insertActivity, txnId, acctNo, txnAmt, txnState, txnCity, txnTimestamp, vendorId);
 
         // get vendor offers
-        voltQueueSQL(getVendorOffers,acctNo,vendorId);
+        voltQueueSQL(getVendorOffers, acctNo, vendorId);
 
         VoltTable[] results0 = voltExecuteSQL();
 
-        if (results0[1].getRowCount() > 0) { // offers found
-            results0[1].advanceRow();
-            String offerText = results0[1].getString(0);
-            voltQueueSQL(insertOffer,acctNo,vendorId,offerText);
-            voltQueueSQL(insertOfferExport,acctNo,vendorId,offerText);
+        // if offers found
+        if (results0[1].getRowCount() > 0) {
+            String offerText = results0[1].fetchRow(0).getString(0);
+            voltQueueSQL(insertOffer, acctNo, vendorId, offerText);
+            voltQueueSQL(insertOfferExport, acctNo, vendorId, offerText);
             voltExecuteSQL();
         }
 

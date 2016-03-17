@@ -25,7 +25,6 @@ package positionkeeper;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 
 public class TradeInsert extends VoltProcedure {
@@ -49,9 +48,8 @@ public class TradeInsert extends VoltProcedure {
                      int     trd_sec,
                      int     trd_qty,
                      double  trd_prc
-             ) throws VoltAbortException {
-
-
+             ) throws VoltAbortException
+    {
         voltQueueSQL(insertTrade,
                      codtrd,
                      trd_cnt,
@@ -64,9 +62,7 @@ public class TradeInsert extends VoltProcedure {
                      trd_sec,
                      trd_cnt);
 
-        VoltTable results1[] = voltExecuteSQL();
-
-        long rowsAffected = results1[1].asScalarLong();
+        long rowsAffected = voltExecuteSQL()[1].asScalarLong();
 
         if (rowsAffected == 0) {
             // then insert
@@ -79,10 +75,9 @@ public class TradeInsert extends VoltProcedure {
                          0,
                          trd_qty * trd_prc
                          );
-            voltExecuteSQL();
+            voltExecuteSQL(true);
         }
 
-    return ClientResponse.SUCCESS;
-
+        return ClientResponse.SUCCESS;
     }
 }
