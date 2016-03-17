@@ -69,7 +69,7 @@ function server() {
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
-    echo "----Loading rules----"
+    echo "----Loading Rules----"
     csvloader --servers $SERVERS --separator \| --file data/rules.csv --reportdir log rules
 }
 

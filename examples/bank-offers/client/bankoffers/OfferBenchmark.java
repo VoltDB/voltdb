@@ -112,12 +112,6 @@ public class OfferBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = 100000;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = true;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 6;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -134,7 +128,6 @@ public class OfferBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
 
@@ -143,13 +136,7 @@ public class OfferBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
@@ -281,9 +268,6 @@ public class OfferBenchmark {
 
         printHeading("System Server Statistics");
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested
@@ -395,18 +379,18 @@ public class OfferBenchmark {
 
         // generate vendor offers
         System.out.println("generating " + config.vendorcount + " vendors...");
-        for (int v=0; v<config.vendorcount; v++) {
+        for (int v = 0; v < config.vendorcount; v++) {
             if (v % 10000 == 0) {
-                System.out.println("  "+v);
+                System.out.println("  " + v);
             }
 
             client.callProcedure(new BenchmarkCallback("VENDOR_OFFERS.insert"),
                                  "VENDOR_OFFERS.insert",
                                  v,
-                                 rand.nextInt(5)+1,
+                                 rand.nextInt(5) + 1,
                                  0,
-                                 rand.nextInt(5)+1,
-                                 (double)rand.nextInt(100),
+                                 rand.nextInt(5) + 1,
+                                 (double) rand.nextInt(100),
                                  0,
                                  offers[rand.nextInt(offers.length)]
                                  );

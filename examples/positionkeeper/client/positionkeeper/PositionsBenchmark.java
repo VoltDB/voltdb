@@ -103,12 +103,6 @@ public class PositionsBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = 100000;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = true;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 6;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -124,7 +118,6 @@ public class PositionsBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
 
@@ -271,9 +264,6 @@ public class PositionsBenchmark {
 
         printHeading("System Server Statistics");
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         // cast stats.getAverageInternalLatency from long to double
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
         //System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
@@ -285,26 +275,26 @@ public class PositionsBenchmark {
     public void initialize() throws Exception {
 
         // EXC
-        for (int e=0; e<5; e++) {
-            client.callProcedure(new BenchmarkCallback("EXC.insert"),"EXC.insert",e);
+        for (int e = 0; e < 5; e++) {
+            client.callProcedure(new BenchmarkCallback("EXC.insert"), "EXC.insert", e);
         }
         System.out.println("  loaded 5 records into EXC");
 
         // SEC
-        for (int s=0; s<numSecs; s++) {
-            client.callProcedure(new BenchmarkCallback("SEC.insert"),"SEC.insert",s,rand.nextInt(5));
+        for (int s = 0; s < numSecs; s++) {
+            client.callProcedure(new BenchmarkCallback("SEC.insert"), "SEC.insert", s, rand.nextInt(5));
             prices[s] = rand.nextInt(100);
         }
         System.out.println("  loaded "+numSecs+" records into SEC");
 
         // CNT
-        for (int t=0; t<config.traders; t++) {
-            client.callProcedure(new BenchmarkCallback("CNT.insert"),"CNT.insert",t);
+        for (int t = 0; t < config.traders; t++) {
+            client.callProcedure(new BenchmarkCallback("CNT.insert"), "CNT.insert", t);
         }
         System.out.println("  loaded "+config.traders+" records into CNT");
 
         // positions (client side only)
-        for (int t=0; t<config.traders; t++) {
+        for (int t = 0; t < config.traders; t++) {
 
             // make a list of random securities with no duplicates
             List<Integer> secs = new ArrayList<Integer>();
@@ -315,7 +305,7 @@ public class PositionsBenchmark {
             }
 
             // put securities into an two-dimension array: positions[trader][index] = sec_id
-            for (int i=0; i<config.secpercnt; i++) {
+            for (int i = 0; i < config.secpercnt; i++) {
                 positions[t][i] = secs.get(i);
             }
         }
@@ -382,13 +372,14 @@ public class PositionsBenchmark {
         newPrice();
 
         // 1/10th of the time
-        if (rand.nextInt(10) == 0)
+        if (rand.nextInt(10) == 0) {
             newOrder();
+        }
 
         // 1/50th of the time
-        if (rand.nextInt(50) == 0)
+        if (rand.nextInt(50) == 0) {
             newTrade();
-
+        }
     }
 
 

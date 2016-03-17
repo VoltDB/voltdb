@@ -76,11 +76,9 @@ function client() {
     java -classpath positionkeeper-client.jar:$CLIENTCLASSPATH positionkeeper.PositionsBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=60 \
+        --duration=120 \
         --servers=$SERVERS \
         --ratelimit=30000 \
-        --autotune=true \
-        --latencytarget=2 \
         --traders=2000 \
         --secpercnt=5
 }

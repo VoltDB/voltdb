@@ -44,7 +44,7 @@ public class CardSwipe extends VoltProcedure {
         "INSERT INTO activity (card_id, date_time, station_id, activity_code, amount) VALUES (?,?,?,?,?);");
 
     public final SQLStmt exportActivity = new SQLStmt(
-            "INSERT INTO card_alert_export (card_id, export_time, station_name, name, phone, email, notify, alert_message) VALUES (?,?,?,?,?,?,?,?);");
+        "INSERT INTO card_alert_export (card_id, export_time, station_name, name, phone, email, notify, alert_message) VALUES (?,?,?,?,?,?,?,?);");
 
     // for returning results as a VoltTable
     final VoltTable resultTemplate = new VoltTable(
@@ -61,21 +61,18 @@ public class CardSwipe extends VoltProcedure {
         return String.format("%d.%02d", i/100, i%100);
     }
 
-    public VoltTable run( int cardId,
-                          int stationId
-                          ) throws VoltAbortException {
-
+    public VoltTable run(int cardId, int stationId) throws VoltAbortException {
 
         // check station fare, card status, get card owner's particulars
         voltQueueSQL(checkCard, EXPECT_ZERO_OR_ONE_ROW, cardId);
-        voltQueueSQL(checkStationFare, EXPECT_ZERO_OR_ONE_ROW, stationId);
+        voltQueueSQL(checkStationFare, EXPECT_ONE_ROW, stationId);
         VoltTable[] checks = voltExecuteSQL();
         VoltTable cardInfo = checks[0];
         VoltTable stationInfo = checks[1];
 
         // check that card exists
         if (cardInfo.getRowCount() == 0) {
-                return buildResult(0,"Card Invalid");
+            return buildResult(0,"Card Invalid");
         }
 
         // card exists, so advanceRow to read the record

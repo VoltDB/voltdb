@@ -73,6 +73,8 @@ function server() {
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
+    echo "----Loading Stations----"
+    csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
 }
 
 # run this target to see what command line options the client offers
@@ -86,14 +88,11 @@ function client() {
     jars-ifneeded
     java -classpath metrocard-client.jar:$CLIENTCLASSPATH metrocard.MetroBenchmark \
         --displayinterval=5 \
-        --warmup=0 \
+        --warmup=5 \
         --duration=300 \
         --servers=$SERVERS \
         --ratelimit=250000 \
-        --autotune=false \
-        --latencytarget=1 \
-        --cardcount=50000 \
-        --stationfilename=data/station_weights.csv
+        --cardcount=50000
 }
 
 function help() {

@@ -23,20 +23,20 @@
 
 package metrocard;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -122,15 +122,37 @@ public class MetroBenchmark {
         @Option(desc = "Number of Cards")
         int cardcount = 500000;
 
-        @Option(desc = "Filename containing stations and weights.")
-        String stationfilename = "client/data/station_weights.csv";
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+        }
+    }
+
+    public static class RandomCollection<E> {
+        private final NavigableMap<Double, E> map = new TreeMap<Double, E>();
+        private final Random random;
+        private double total = 0;
+
+        public RandomCollection() {
+            this(new Random());
+        }
+
+        public RandomCollection(Random random) {
+            this.random = random;
+        }
+
+        public void add(double weight, E result) {
+            if (weight <= 0) return;
+            total += weight;
+            map.put(total, result);
+        }
+
+        public E next() {
+            double value = random.nextDouble() * total;
+            return map.ceilingEntry(value).getValue();
         }
     }
 
@@ -344,29 +366,21 @@ public class MetroBenchmark {
 
     public void initialize() throws Exception {
 
-        // load stations
-        FileReader fileReader = new FileReader(config.stationfilename);
-        BufferedReader bufferedReader = new BufferedReader(fileReader);
-        CsvLineParser parser = new CsvLineParser();
-        Iterator<String> it;
-        int station_id = 0;
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-            it = parser.parse(line);
+        VoltTable stationTable = client.callProcedure("@AdHoc","SELECT * FROM stations ORDER BY station_id DESC;").getResults()[0];
 
-            String name = it.next();
-            int weight = Integer.parseInt(it.next());
-            int fare = 250;
-
-            stations.add(weight,station_id);
-            client.callProcedure(new BenchmarkCallback("STATIONS.upsert"),
-                                 "STATIONS.upsert",
-                                 station_id++,
-                                 name,
-                                 fare);
+        if (stationTable.getRowCount() == 0) {
+            System.err.println("Station data not loaded. Please load station data before using this example.");
+            System.exit(-1);
         }
-        bufferedReader.close();
-        max_station_id = station_id;
+
+        while (stationTable.advanceRow()) {
+            double weight = stationTable.getLong("weight");
+            int id = (int) stationTable.getLong("station_id");
+            stations.add(weight, id);
+        }
+
+        // assume sorted
+        max_station_id = (int) stationTable.fetchRow(0).getLong("station_id");
 
         // generate cards
         System.out.println("Generating " + config.cardcount + " cards...");

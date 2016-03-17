@@ -44,10 +44,8 @@ public class PriceInsert extends VoltProcedure {
     public VoltTable[] run( int     codprc,
                             int     prc_sec,
                             double  prc_price,
-                            Date    prc_ts
-                            ) throws VoltAbortException {
-
-
+                            Date    prc_ts) throws VoltAbortException
+    {
         voltQueueSQL(insertPrice,
                      codprc,
                      prc_sec,
@@ -60,7 +58,6 @@ public class PriceInsert extends VoltProcedure {
                      prc_price,
                      prc_sec);
 
-        return voltExecuteSQL();
-
+        return voltExecuteSQL(true);
     }
 }
