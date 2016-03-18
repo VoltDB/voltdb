@@ -1,4 +1,4 @@
-Voter application
+Voter Application
 ===========================
 
 This example application simulates a phone based election process. Voters (based on phone numbers generated randomly by the client application) are allowed a limited number of votes.
@@ -53,7 +53,7 @@ VoltDB Examples come with a run.sh script that sets up some environment and save
 
 Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-Other run.sh actions
+Other run.sh Actions
 -----------
 - *run.sh* : start the server
 - *run.sh server* : start the server
@@ -64,6 +64,4 @@ Other run.sh actions
 - *run.sh jdbc-benchmark* : start the JDBC client, more than 1 client is permitted
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
-
-
 

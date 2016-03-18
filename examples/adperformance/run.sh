@@ -79,12 +79,10 @@ function client() {
     java -classpath adperformance-client.jar:$CLIENTCLASSPATH \
          adperformance.AdTrackingBenchmark \
          --displayinterval=5 \
-         --warmup=0 \
+         --warmup=5 \
          --duration=1800 \
          --servers=$SERVERS \
          --ratelimit=20000 \
-         --autotune=true \
-         --latencytarget=1 \
          --sites=100 \
          --pagespersite=10 \
          --advertisers=20 \
