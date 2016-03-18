@@ -106,6 +106,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private static final double m_taskLogReplayRatio =
             Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
 
+    private static final int m_scratchPadSize =
+            Integer.getInteger("SITE_SCRACTHPAD_SIZE", 2048);
+
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
 
@@ -190,6 +193,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public final static long kInvalidUndoToken = -1L;
     private long m_latestUndoToken = 0L;
     private long m_latestUndoTxnId = Long.MIN_VALUE;
+
+    private ByteBuffer m_scratchPad = ByteBuffer.allocate(m_scratchPadSize);
 
     private long getNextUndoToken(long txnId)
     {
@@ -825,6 +830,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public ByteBuffer getCorrespondingScratchPad()
+    {
+        return m_scratchPad;
+    }
+
+    @Override
+    public void setCorrespondingScratchPad(ByteBuffer newScratchPad)
+    {
+        m_scratchPad = newScratchPad;
     }
 
     @Override

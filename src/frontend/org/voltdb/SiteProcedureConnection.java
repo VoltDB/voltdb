@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -62,6 +63,16 @@ public interface SiteProcedureConnection {
      * Get the catalog cluster id for the corresponding SiteProcedureConnection
      */
     public int getCorrespondingClusterId();
+
+    /**
+     * Load a copy of the scratchpad that can be saved transactionally
+     */
+    public ByteBuffer getCorrespondingScratchPad();
+
+    /**
+     * Transactionally save the loaded scratchpad
+     */
+    public void setCorrespondingScratchPad(ByteBuffer newScratchPad);
 
     /**
      * Log settings changed. Signal EE to update log level.

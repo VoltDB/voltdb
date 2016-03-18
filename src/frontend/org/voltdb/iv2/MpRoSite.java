@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -361,6 +362,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public ByteBuffer getCorrespondingScratchPad()
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setCorrespondingScratchPad(ByteBuffer newScratchPad)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override

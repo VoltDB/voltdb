@@ -17,10 +17,13 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.Random;
 
 import org.voltdb.Expectation.Type;
+
+import com.google_voltpatches.common.base.Supplier;
 
 /**
  * Wraps the stored procedure object created by the user
@@ -295,5 +298,28 @@ public abstract class VoltProcedure {
      */
     public void setAppStatusString(String statusString) {
         m_runner.setAppStatusString(statusString);
+    }
+
+    public ByteBuffer viewScratchPad()
+    {
+        return m_runner.viewScratchPad();
+    }
+
+    public ByteBuffer loadScratchPad()
+    {
+        return m_runner.loadScratchPad();
+    }
+
+    public void saveScratchPad()
+    {
+        m_runner.saveScratchPad();
+    }
+
+    public <T> Supplier<T> initialScratchPadValue() {
+        return new Supplier<T>() {
+            public T get() {
+                return null;
+            }
+        };
     }
 }
