@@ -1,4 +1,4 @@
-# VoltDB Bank Fraud Example App
+# VoltDB Bank Fraud Application
 
 Use Case
 --------
@@ -6,64 +6,66 @@ Ingest generated consumer purchase transaction data and use summary data from ma
 
 The web dashboard shows recent alerts and their related transactions.
 
+Quickstart
+---------------------------
+VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
-Code organization
------------------
-The code is divided into projects:
+1. Make sure "bin" inside the VoltDB kit is in your path.
+2. Type "voltdb create --new" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+4. Type "./run.sh client" to run the client code.
+5. Open up the index.html the "web" directory to view the status dashboard.
 
-- "db": the database project, which contains the schema, stored procedures and other configurations that are compiled into a catalog and run in a VoltDB database.  
-- "client": a java client that generates tick events and records performance metrics.
-- "web": a simple web server that provides the demo dashboard.
+If you're running the example on a different machine than your web browser is running on, you can run `./run.sh webserver` in a new shell and then connect to your dashboard from a browser at [http://servername:8081](http://servername:8081).
 
-See below for instructions on running these applications.  For any questions, 
-please contact fieldengineering@voltdb.com.
+You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
 
-Pre-requisites
---------------
+Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-Before running these scripts you need to have VoltDB 4.0 or later installed.  If you choose the .tar.gz file distribution, simply untar it to a directory such as your $HOME directory, then add the bin subdirectory to your PATH environment variable.  For example:
+Other run.sh Actions
+---------------------------
+- *run.sh* : start the server
+- *run.sh server* : start the server
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
+- *run.sh client* : start the client, more than 1 client is permitted
+- *run.sh clean* : remove compilation and runtime artifacts
+- *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
+- *run.sh webserver* : serve the web directory over http on port 8081
 
-    export PATH="$PATH:$HOME/voltdb-ent-4.7/bin"
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-You may choose to add this to your .bashrc file.
+Client Behavior Options
+---------------------------
+You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
 
-If you installed the .deb or .rpm distribution, the binaries should already be in your PATH.  To verify this, the following command should return a version number:
+**Speed & Duration:**
 
-    voltdb --version
-
-Single Server Instructions
------------------
-
-1. Start the web server
-
-    ./run.sh start_web
-   
-2. Start the database server
-
-    ./run.sh server
-
-Optionally type Ctrl-C to close the tailing of the server log before proceeding, or open a new terminal in the same directory.
-
-3. Start the client
-
-    ./run.sh client
-
-4. Open a web browser to http://hostname:8081
-
-5. To stop the demo:
-
-Stop the client (if it hasn't already completed)
-
-    Ctrl-C
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring 
+                                   benchmark performance.)
+    --duration=120                (benchmark duration in seconds)
+    --ratelimit=20000             (run up to this rate of requests/second)
     
-Stop the database
+**Cluster Info:**
 
-    voltadmin shutdown
-   
-Stop the web server
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
 
-    ./run.sh stop_web
+**Parameters Affecting Simulation:**
 
+    --sites=100                   (number of web sites where ad events may occur)
+    --pagespersite=10             (number of pages per web site)
+    --advertisers=100             (number of advertisers)
+    --campaignsperadvertiser=10   (number of campaigns per advertiser)
+    --creativespercampaign=5      (number of creatives or banners per campaign)
+
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
 
 Options
 -------
@@ -79,71 +81,5 @@ Speed & Duration:
     --vendorcount=5000            (number of vendors to pre-populate)
 
 
-Instructions for running on a cluster
--------------------------------------
 
-Before running this demo on a cluster, make the following changes:
-
-1. On each server, edit the run.sh file to set the HOST variable to the name of a selected server in the cluster:
-    
-    HOST=voltserver01
-    
-2. On each server, edit db/deployment-cluster.xml to change hostcount to the actual number of servers (it is defaulted to 3):
-
-    <cluster hostcount="3" sitesperhost="8" kfactor="1" />
-
-4. On each server, start the database. Start with the same server as "$HOST" that you set above, e.g. voltserver01
-
-	./run.sh cluster_server
-
-On each of the servers you should see the following output:
-
-    Host id of this node is: 0
-    
-When all servers have joined the cluster and it becomes available you will see:
-
-    Server completed initialization.
-    
-5. To run the client, edit the run.sh script on the server where you intend to run the client to set the SERVERS variable to a comma-separated list of the servers in the cluster (note: this could be a separate server or one of the servers in the cluster).
-
-    SERVERS=voltserver01,voltserver02,voltserver03
-    
-6. Run the client script:
-
-	./run.sh client
-
-
-
-Instructions for exporting to CSV
----------------------------------
-1. Edit the deployment.xml file to add the following.  For an example, see the provided deployment-export-csv.xml file.
-
-```xml
-<export enabled="true" target="file">  
- <configuration>  
-  <property name="type">csv</property>  
-  <property name="nonce">MyExport</property>  
- </configuration>
-</export>
-```
-
-2. Then follow the instructions for running on a single server or cluster.
-
-
-Instructions for exporting to Hadoop
-------------------------------------
-1. Edit the deployment.xml file to add the following.  For an example, see the provided deployment-export-hadoop.xml file.
-
-```xml
-<export enabled="true" target="http">
- <configuration>
-  <property name="endpoint">http://myhadoopsvr/webhdfs/v1.0/%t/data%p.%t.csv</property>
-  <property name="batch.mode">true</property>
-  <property name="period">120</property>
- </configuration>
-</export>
-```
-
-
-2. Then follow the instructions for running on a single server or cluster.
 
