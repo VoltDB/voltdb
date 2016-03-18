@@ -79,13 +79,13 @@ def convert_xml_to_json(config_path):
         for deployment in deployment_json:
             HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
 
-    if 'users' in D2[k]:
-        if type(D2[k]['users']['user']) is dict:
-            user_json = get_users_from_xml(D2[k]['users']['user'],
+    if 'users' in D2[k]['deployments']['deployment']:
+        if type(D2[k]['deployments']['deployment']['users']['user']) is dict:
+            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'dict')
             HTTPListener.Global.DEPLOYMENT_USERS[user_json[0]['name']] = user_json[0]
         else:
-            user_json = get_users_from_xml(D2[k]['users']['user'],
+            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'list')
             for deployment_user in user_json:
                     HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['name'])] = deployment_user
@@ -394,7 +394,7 @@ def set_dr_field(deployment, field, new_deployment):
 def set_users_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] != 'None':
+        if deployment[field] != 'None' or deployment[field] is not None or deployment[field] != "":
             new_deployment[field] = {}
             if type(deployment[field]['user']) is list:
                 new_deployment[field]['user'] = []
@@ -633,6 +633,23 @@ def make_configuration_file():
                 server_elem.attrib[k] = str(v)
 
     for key, value in HTTPListener.Global.DEPLOYMENT.items():
+
+        HTTPListener.Global.DEPLOYMENT[key]['users'] = {}
+        HTTPListener.Global.DEPLOYMENT[key]['users']['user'] = []
+
+        d = HTTPListener.Global.DEPLOYMENT_USERS
+        for key, value1 in d.iteritems():
+            # for k, v in value.items():
+                #if k == "databaseid" and v == key:
+                HTTPListener.Global.DEPLOYMENT[value1['databaseid']]['users']['user'].append({
+                'name': d[key]['name'],
+                'roles': d[key]['roles'],
+                'plaintext': d[key]['plaintext'],
+                'password': d[key]['password'],
+                'databaseid': d[key]['databaseid'],
+                'sdfsdfs': 'sdfsdf'
+                })
+
         deployment_elem = SubElement(deployment_top, 'deployment')
         for k, val in value.items():
             if type(val) is dict:

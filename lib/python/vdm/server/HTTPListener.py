@@ -371,7 +371,7 @@ def map_deployment(request, database_id):
             deployment['systemsettings']['resourcemonitor'] = {}
 
     if 'import' in request.json:
-        if 'import' not in deployment or deployment['import'] is None:
+        if 'import' not in deployment or deployment['import'] is None or deployment['import'] == "None":
             deployment['import'] = {}
 
     if 'import' in request.json and 'configuration' in request.json['import']:
@@ -398,11 +398,14 @@ def map_deployment(request, database_id):
                     )
                 i += 1
     if 'export' in request.json:
-        if 'export' not in deployment or deployment['export'] is None:
+        if 'export' not in deployment or deployment['export'] is None or deployment['import'] == "None":
             deployment['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
-        deployment['export']['configuration'] = []
+        try:
+            deployment['export']['configuration'] = []
+        except Exception, err:
+            print err
         i = 0
         for configuration in request.json['export']['configuration']:
             deployment['export']['configuration'].append(
@@ -900,9 +903,8 @@ class DatabaseAPI(MethodView):
         Returns:
             Information and the status of database if it is saved otherwise the error message.
         """
-        sync_configuration()
 
-        Configuration.write_configuration_file()
+        # Configuration.write_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -925,7 +927,7 @@ class DatabaseAPI(MethodView):
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
             is_pro_version(deployment)
-        Global.DEPLOYMENT.append(deployment)
+        Global.DEPLOYMENT[database_id] = deployment
 
         sync_configuration()
 
@@ -1001,8 +1003,39 @@ class DeploymentAPI(MethodView):
             # return a list of users
             return jsonify({'deployment': Global.DEPLOYMENT.values()})
         else:
+
+            Global.DEPLOYMENT[database_id]['users'] = {}
+            Global.DEPLOYMENT[database_id]['users']['user'] = []
+
+            d = Global.DEPLOYMENT_USERS
+            for key, value in d.iteritems():
+                for k, v in value.items():
+                    if k == "databaseid" and v == database_id:
+                        Global.DEPLOYMENT[database_id]['users']['user'].append({
+                        'name': d[key]['name'],
+                        'roles': d[key]['roles'],
+                        'plaintext': d[key]['plaintext'],
+                        'databaseid': d[key]['databaseid'],
+                        'password':  d[key]['password']
+
+                        })
+
+            # if deployment_users is not None:
+            #     for user in deployment_users:
+            #         Global.DEPLOYMENT[database_id]['users']['user'].append({
+            #             'name': user['name'],
+            #             'roles': user['roles'],
+            #             'plaintext': user['plaintext']
+            #
+            #         })
+
             deployment = Global.DEPLOYMENT.get(database_id)
-            return jsonify({'deployment': deployment})
+
+            dep = deployment.copy()
+            del dep['databaseid']
+
+            return jsonify({'deployment': dep})
+
 
     @staticmethod
     def put(database_id):
@@ -1097,12 +1130,10 @@ class DeploymentUserAPI(MethodView):
         except Exception, err:
             print err
 
-
-
         sync_configuration()
         Configuration.write_configuration_file()
 
-        return jsonify({"user": deployment_user, 'status': 1})
+        return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
 
 
     @staticmethod
@@ -1360,18 +1391,25 @@ class SyncVdmConfiguration(MethodView):
             result = request.json
 
             databases = result['voltdeploy']['databases']
+            databases = {int(k):v for k,v in databases.items()}
             servers = result['voltdeploy']['members']
+            servers = {int(k):v for k,v in servers.items()}
             deployments = result['voltdeploy']['deployments']
+            deployments = {int(k):v for k,v in deployments.items()}
             deployment_users = result['voltdeploy']['deployment_users']
 
         except Exception, errs:
             print traceback.format_exc()
             return jsonify({'status': 'success', 'error': str(errs)})
 
-        Global.DATABASES = databases
-        Global.SERVERS = servers
-        Global.DEPLOYMENT = deployments
-        Global.DEPLOYMENT_USERS = deployment_users
+        try:
+            Global.DATABASES = databases
+            Global.SERVERS = servers
+            Global.DEPLOYMENT = deployments
+            Global.DEPLOYMENT_USERS = deployment_users
+        except Exception, errs:
+            print traceback.format_exc()
+            return jsonify({'status': 'success', 'error': str(errs)})
 
         return jsonify({'status': 'success'})
 
@@ -1389,16 +1427,26 @@ class VdmConfiguration(MethodView):
     def post():
 
         result = Configuration.get_configuration()
+        d = result['voltdeploy']['members']
+        for key, value in d.iteritems():
+                try:
+                    headers = {'content-type': 'application/json'}
+                    url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (d[key]['hostname'], __PORT__)
+                    data = result
+                    response = requests.post(url, data=json.dumps(data), headers=headers)
+                except Exception, errs:
+                    print traceback.format_exc()
+                    print str(errs)
 
-        for member in result['voltdeploy']['members']:
-            try:
-                headers = {'content-type': 'application/json'}
-                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
-                data = result
-                response = requests.post(url, data=json.dumps(data), headers=headers)
-            except Exception, errs:
-                print traceback.format_exc()
-                print str(errs)
+        # for member in result['voltdeploy']['members']:
+        #     try:
+        #         headers = {'content-type': 'application/json'}
+        #         url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
+        #         data = result
+        #         response = requests.post(url, data=json.dumps(data), headers=headers)
+        #     except Exception, errs:
+        #         print traceback.format_exc()
+        #         print str(errs)
 
         if Global.DELETED_HOSTNAME != '':
 
@@ -1665,7 +1713,7 @@ def main(runner, amodule, config_dir, server):
 
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
 
-    Configuration.write_configuration_file()
+    #Configuration.write_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
