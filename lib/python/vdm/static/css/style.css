@@ -481,6 +481,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 
 .createDB {float:left; margin-top:7px; cursor:pointer;}
 .errorWrapper{max-height:375px; overflow-y:auto;}
+table td.tdROle label.error{height:20px;}
 
 
 /******************************new added Ends***************/
