@@ -78,7 +78,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -88,7 +87,6 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.MiscUtils;
 
@@ -987,6 +985,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    CatalogContext getCatalogContext() {
+        return m_catalogContext.get();
+    }
+
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public boolean createTransaction(
             final long connectionId,
@@ -1347,29 +1349,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return InvocationDispatcher.getProcedureFromName(procName, catalogContext);
     }
 
-
-    public StoredProcedureInvocation getUpdateCatalogExecutionTask(CatalogChangeResult changeResult) {
-     // create the execution site task
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        task.procName = "@UpdateApplicationCatalog";
-        task.setParams(changeResult.encodedDiffCommands,
-                       changeResult.catalogHash,
-                       changeResult.catalogBytes,
-                       changeResult.expectedCatalogVersion,
-                       changeResult.deploymentString,
-                       changeResult.tablesThatMustBeEmpty,
-                       changeResult.reasonsForEmptyTables,
-                       changeResult.requiresSnapshotIsolation ? 1 : 0,
-                       changeResult.worksWithElastic ? 1 : 0,
-                       changeResult.deploymentHash);
-        task.clientHandle = changeResult.clientHandle;
-        // DR stuff
-        task.type = changeResult.invocationType;
-        task.originalTxnId = changeResult.originalTxnId;
-        task.originalUniqueId = changeResult.originalUniqueId;
-        return task;
+    public void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin) {
+        m_dispatcher.dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, isAdmin);
     }
-
 
     private ScheduledFuture<?> m_deadConnectionFuture;
     private ScheduledFuture<?> m_topologyCheckFuture;
@@ -1805,23 +1788,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param partitionId
      */
     public void sendSentinel(long uniqueId, int partitionId) {
-        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitionId);
-        sendSentinel(uniqueId, initiatorHSId, -1, -1, true);
-    }
-
-    private void sendSentinel(long uniqueId, long initiatorHSId, long ciHandle,
-                              long connectionId, boolean forReplay) {
-        //The only field that is relevant is txnid, and forReplay.
-        MultiPartitionParticipantMessage mppm =
-                new MultiPartitionParticipantMessage(
-                        m_siteId,
-                        initiatorHSId,
-                        uniqueId,
-                        ciHandle,
-                        connectionId,
-                        false,  // isReadOnly
-                        forReplay);  // isForReplay
-        m_mailbox.send(initiatorHSId, mppm);
+        m_dispatcher.sendSentinel(uniqueId, partitionId);
     }
 
     /**

@@ -93,6 +93,9 @@ public final class InvocationDispatcher {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    /**
+     * This reference is shared with the one in {@link ClientInterface}
+     */
     private final AtomicReference<CatalogContext> m_catalogContext;
     private final long m_plannerSiteId;
     private final long m_siteId;
@@ -873,9 +876,8 @@ public final class InvocationDispatcher {
         return pCol.getType();
     }
 
-    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
-            boolean useDdlSchema)
+    final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
     {
         ParameterSet params = task.getParams();
         final Object [] paramArray = params.toArray();
@@ -902,14 +904,23 @@ public final class InvocationDispatcher {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                    handler.isAdmin(), ccxn, catalogBytes, deploymentString,
+                    task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
+                    isAdmin, ccxn, catalogBytes, deploymentString,
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     useDdlSchema,
-                    m_adhocCompletionHandler, user));
+                    m_adhocCompletionHandler, user,
+                    null, -1L, -1L
+                    ));
 
         m_mailbox.send(m_plannerSiteId, work);
+    }
+
+    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
+            boolean useDdlSchema)
+    {
+        dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, handler.isAdmin());
         return null;
     }
 
@@ -1044,6 +1055,7 @@ public final class InvocationDispatcher {
                         log.error("Received error response for updating catalog " + r.getStatusString());
                         return;
                     }
+                    m_catalogContext.set(VoltDB.instance().getCatalogContext());
                     dispatch(task, alternateHandler, alternateAdapter, user);
                 }
             },
@@ -1138,21 +1150,14 @@ public final class InvocationDispatcher {
                                 createAdHocTransaction(plannedStmtBatch, c);
                             }
                             catch (VoltTypeException vte) {
-                                String msg = "Unable to execute adhoc sql statement(s): " +
-                                        vte.getMessage();
-                                ClientResponseImpl errorResponse =
-                                        new ClientResponseImpl(
-                                                ClientResponseImpl.GRACEFUL_FAILURE,
-                                                new VoltTable[0], msg,
-                                                result.clientHandle);
-                                writeResponseToConnection(errorResponse);
+                                String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
+                                writeResponseToConnection(gracefulFailureResponse(msg, result.clientHandle));
                             }
                         }
                     }
                     else if (result instanceof CatalogChangeResult) {
                         final CatalogChangeResult changeResult = (CatalogChangeResult) result;
 
-                        // if the catalog change is a null change
                         if (changeResult.encodedDiffCommands.trim().length() == 0) {
                             ClientResponseImpl shortcutResponse =
                                     new ClientResponseImpl(
@@ -1180,7 +1185,6 @@ public final class InvocationDispatcher {
                                     hostLog.fatal(e);
                                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                                 }
-
                                 // initiate the transaction. These hard-coded values from catalog
                                 // procedure are horrible, horrible, horrible.
                                 createTransaction(changeResult.connectionId,
@@ -1482,6 +1486,7 @@ public final class InvocationDispatcher {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
+    @SuppressWarnings("unused")
     public  boolean createTransaction(
             final long connectionId,
             final long txnId,

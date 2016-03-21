@@ -481,6 +481,7 @@ public class TestClientInterface {
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
+        catalogResult.diffCommandsLength = 10;
         catalogResult.user = new AuthSystem.AuthDisabledUser();
         m_ci.getDispatcher().processFinishedCompilerWork(catalogResult).run();
 
