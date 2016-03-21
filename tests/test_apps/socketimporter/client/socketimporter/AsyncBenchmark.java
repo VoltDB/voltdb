@@ -300,59 +300,59 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark(HostAndPort hap) throws Exception {
-    	System.out.print(HORIZONTAL_RULE);
-    	log.info(" Setup & Initialization");
-    	log.info(HORIZONTAL_RULE);
+        System.out.print(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
-    	System.out.print(HORIZONTAL_RULE);
-    	log.info(" Starting Benchmark");
-    	log.info(HORIZONTAL_RULE);
+        System.out.print(HORIZONTAL_RULE);
+        log.info(" Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
-    	SecureRandom rnd = new SecureRandom();
-    	rnd.setSeed(Thread.currentThread().getId());
-    	log.info("Warming up...");
-    	final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-    	while (warmupEndTime > System.currentTimeMillis()) {
-    		String key = Long.toString(rnd.nextLong());
-    		String s;
-    		if (config.perftest) {
-    			String valString = RandomStringUtils.randomAlphanumeric(1024);
-    			s = key + "," + valString + "\n";
-    		} else {
-    			String t = Long.toString(System.currentTimeMillis());
-    			Pair<String,String> p = new Pair<String,String>(key, t);
-    			queue.offer(p);
-    			s = key + "," + t + "\n";
-    		}
-    		writeFully(s, hap, warmupEndTime);
-    		warmupCount.getAndIncrement();
-    	}
+        SecureRandom rnd = new SecureRandom();
+        rnd.setSeed(Thread.currentThread().getId());
+        log.info("Warming up...");
+        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+        while (warmupEndTime > System.currentTimeMillis()) {
+            String key = Long.toString(rnd.nextLong());
+            String s;
+            if (config.perftest) {
+                String valString = RandomStringUtils.randomAlphanumeric(1024);
+                s = key + "," + valString + "\n";
+            } else {
+                String t = Long.toString(System.currentTimeMillis());
+                Pair<String,String> p = new Pair<String,String>(key, t);
+                queue.offer(p);
+                s = key + "," + t + "\n";
+            }
+            writeFully(s, hap, warmupEndTime);
+            warmupCount.getAndIncrement();
+        }
 
-    	benchmarkStartTS = System.currentTimeMillis();
+        benchmarkStartTS = System.currentTimeMillis();
 
-    	// Run the benchmark loop for the requested duration
-    	// The throughput may be throttled depending on client configuration
-    	// Save the key/value pairs so they can be verified through the database
-    	log.info("\nRunning benchmark...");
-    	final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-    	while (benchmarkEndTime > System.currentTimeMillis()) {
-    		String key = Long.toString(rnd.nextLong());
-    		String s;
-    		if (config.perftest) {
-    			String valString = RandomStringUtils.randomAlphanumeric(16);
-    			s = key + "," + valString + "\n";
-    		} else {
-    			String t = Long.toString(System.currentTimeMillis());
-    			Pair<String,String> p = new Pair<String,String>(key, t);
-    			queue.offer(p);
-    			s = key + "," + t + "\n";
-    		}
-    		writeFully(s, hap, benchmarkEndTime);
-    		runCount.getAndIncrement();
-    	}
-    	haplist.get(hap).flush();
-    	log.info("Benchmark loop complete for this thread.");
-    	if (timer != null) timer.cancel();
+        // Run the benchmark loop for the requested duration
+        // The throughput may be throttled depending on client configuration
+        // Save the key/value pairs so they can be verified through the database
+        log.info("\nRunning benchmark...");
+        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        while (benchmarkEndTime > System.currentTimeMillis()) {
+            String key = Long.toString(rnd.nextLong());
+            String s;
+            if (config.perftest) {
+                String valString = RandomStringUtils.randomAlphanumeric(16);
+                s = key + "," + valString + "\n";
+            } else {
+                String t = Long.toString(System.currentTimeMillis());
+                Pair<String,String> p = new Pair<String,String>(key, t);
+                queue.offer(p);
+                s = key + "," + t + "\n";
+            }
+            writeFully(s, hap, benchmarkEndTime);
+            runCount.getAndIncrement();
+        }
+        haplist.get(hap).flush();
+        log.info("Benchmark loop complete for this thread.");
+        if (timer != null) timer.cancel();
     }
 
     private void writeFully(String data, HostAndPort hap, long endTime) {
@@ -473,14 +473,14 @@ public class AsyncBenchmark {
         long prev_outstandingRequests = outstandingRequests;
         int waitloops = 10; // kinda arbitrary but if outstanding requests is not changing for this interval...
         while (outstandingRequests != 0 && waitloops > 0) {
-        	log.info("Importer outstanding requests is " + outstandingRequests + ". Waiting for zero.");
-        	outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
-        	if (prev_outstandingRequests == outstandingRequests) {
-        		log.info("Outstanding requests unchanged since last interval.");
-        		waitloops--;
-        	}
-        	prev_outstandingRequests = outstandingRequests;
-        	Thread.sleep(config.displayinterval*1000);
+            log.info("Importer outstanding requests is " + outstandingRequests + ". Waiting for zero.");
+            outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
+            if (prev_outstandingRequests == outstandingRequests) {
+                log.info("Outstanding requests unchanged since last interval.");
+                waitloops--;
+            }
+            prev_outstandingRequests = outstandingRequests;
+            Thread.sleep(config.displayinterval*1000);
         }
 
         client.drain();

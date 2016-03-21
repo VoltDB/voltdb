@@ -31,7 +31,7 @@
 
     <target name="client-compile">
         <mkdir dir="${clientclasses.dir}"/>
-        <javac debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
+        <javac srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
             <classpath refid="build-classpath"/>
         </javac>
     </target>
