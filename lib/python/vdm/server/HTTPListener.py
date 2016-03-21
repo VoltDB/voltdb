@@ -58,7 +58,6 @@ import Configuration
 
 filter_log = Filter('/api/1.0/', 'GET')
 
-
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
 
@@ -499,10 +498,161 @@ def get_volt_jar_dir():
     return os.path.realpath(os.path.join(Global.MODULE_PATH, '../../../..', 'voltdb'))
 
 
+def get_port(ip_with_port):
+    if ip_with_port != "":
+        if ":" not in ip_with_port:
+            return ip_with_port
+        else:
+            arr = ip_with_port.split(":")
+            return arr[1]
+
+
+def check_port_valid(port_option, server):
+    if port_option == "http-listener":
+        default_port = "8080"
+    if port_option == "admin-listener":
+        default_port = "21211"
+    if port_option == "zookeeper-listener":
+        default_port = "7181"
+    if port_option == "replication-listener":
+        default_port = "5555"
+    if port_option == "client-listener":
+        default_port = "21212"
+    if port_option == "internal-listener":
+        default_port = "3021"
+
+    server_port = get_port(server[port_option])
+    if server_port is None or server_port == "":
+        server_port = default_port
+
+    if port_option not in request.json:
+        port = default_port
+    else:
+        port = get_port(request.json[port_option])
+
+    if port == server_port:
+        return jsonify(success=False,
+                       errors="Port %s for the same host is already used by server %s for %s" % \
+                              (port, server['hostname'], port_option))
+
+
+def validate_server_ports(database_id):
+    arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
+           "client-listener"]
+
+    specified_port_values = {
+        "http-listener": get_port(request.json.get('http-listener', "")),
+        "admin-listener": get_port(request.json.get('admin-listener', "")),
+        "replication-listener": get_port(request.json.get('replication-listener', "")),
+        "client-listener": get_port(request.json.get('client-listener', "")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
+        "internal-listener": get_port(request.json.get('internal-listener', ""))
+    }
+
+    for option in arr:
+        value = specified_port_values[option]
+        for port_key in specified_port_values.keys():
+            if option != port_key and value is not None and specified_port_values[port_key] == value:
+                return jsonify(success=False, errors="Duplicate port")
+    database_servers = get_servers_from_database_id(database_id)
+    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    for server in servers:
+        for option in arr:
+            result = check_port_valid(option, server)
+            if result is not None:
+                return result
+
+
+def get_configuration():
+    deployment_json = {
+        'voltdeploy': {
+            'databases': Global.DATABASES,
+            'members': Global.SERVERS,
+            'deployments': Global.DEPLOYMENT,
+            'deployment_users': Global.DEPLOYMENT_USERS
+        }
+    }
+    return deployment_json
+
+
+def write_configuration_file():
+    main_header = make_configuration_file()
+
+    try:
+        path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
+        f = open(path, 'w')
+        f.write(main_header)
+        f.close()
+
+    except Exception, err:
+        print str(err)
+
+
+def make_configuration_file():
+    main_header = Element('voltdeploy')
+    db_top = SubElement(main_header, 'databases')
+    server_top = SubElement(main_header, 'members')
+    deployment_top = SubElement(main_header, 'deployments')
+    i = 0
+    while i < len(Global.DATABASES):
+        db_elem = SubElement(db_top, 'database')
+        for key, value in Global.DATABASES[i].iteritems():
+            if isinstance(value, bool):
+                if value == False:
+                    db_elem.attrib[key] = "false"
+                else:
+                    db_elem.attrib[key] = "true"
+            else:
+                db_elem.attrib[key] = str(value)
+        i += 1
+
+    i = 0
+    while i < len(Global.SERVERS):
+        server_elem = SubElement(server_top, 'member')
+        for key, value in Global.SERVERS[i].iteritems():
+            if isinstance(value, bool):
+                if value == False:
+                    server_elem.attrib[key] = "false"
+                else:
+                    server_elem.attrib[key] = "true"
+            else:
+                server_elem.attrib[key] = str(value)
+        i += 1
+
+    i = 0
+    while i < len(Global.DEPLOYMENT):
+        Global.DEPLOYMENT[i]['users'] = {}
+        Global.DEPLOYMENT[i]['users']['user'] = []
+        deployment_user = filter(lambda t: t['databaseid'] == Global.DEPLOYMENT[i]['databaseid'],
+                                 Global.DEPLOYMENT_USERS)
+        if len(deployment_user) == 0:
+            Global.DEPLOYMENT[i]['users'] = None
+        for user in deployment_user:
+            Global.DEPLOYMENT[i]['users']['user'].append({
+                'name': user['name'],
+                'roles': user['roles'],
+                'plaintext': user['plaintext'],
+                'password': user['password'],
+                'databaseid': user['databaseid']
+            })
+
+        deployment_elem = SubElement(deployment_top, 'deployment')
+        for key, value in Global.DEPLOYMENT[i].iteritems():
+            if type(value) is dict:
+                DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
+            elif type(value) is list:
+                DeploymentConfig.handle_deployment_list(deployment_elem, key, value)
+            else:
+                if value is not None:
+                    deployment_elem.attrib[key] = str(value)
+        i += 1
+    return tostring(main_header, encoding='UTF-8')
+
+
 def sync_configuration():
     headers = {'content-type': 'application/json'}
     url = 'http://%s:%u/api/1.0/voltdeploy/configuration/' % \
-          (__IP__,__PORT__)
+          (__IP__, __PORT__)
     response = requests.post(url, headers=headers)
     return response
 
@@ -520,7 +670,7 @@ def check_size_value(value, key):
             int_value = int(str_value)
             if int_value < 0 or int_value > 100:
                 return jsonify({'error': key + ' percent value must be between 0 and 100.'})
-            return jsonify({'status':'success'})
+            return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
@@ -528,7 +678,7 @@ def check_size_value(value, key):
             int_value = int(value)
             if int_value < 0 or int_value > 2147483647:
                 return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
-            return jsonify({'status':'success'})
+            return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
 
@@ -548,13 +698,27 @@ def is_pro_version(deployment):
         is_pro = utility.is_pro_version(file_path)
         if is_pro:
             if 'commandlog' in deployment and 'enabled' in deployment['commandlog'] and not \
-            deployment['commandlog']['enabled']:
+                    deployment['commandlog']['enabled']:
                 deployment['commandlog']['enabled'] = True
-    ###############################################
+                ###############################################
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+
+def get_servers_from_database_id(database_id):
+    servers = []
+    database = [database for database in Global.DATABASES if database['id'] == database_id]
+    if len(database) == 0:
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+    else:
+        members = database[0]['members']
+
+    for servers_id in members:
+        server = [server for server in Global.SERVERS if server['id'] == servers_id]
+        servers.append(server[0])
+    return servers
 
 
 class DictClass(dict):
@@ -578,16 +742,18 @@ class Global:
     DATABASES = []
     DEPLOYMENT = []
     DEPLOYMENT_USERS = []
-    PATH = ''
+    CONFIG_PATH = ''
+    DATA_PATH = ''
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
+    VOLT_SERVER_PATH = ''
 
 
 class ServerAPI(MethodView):
     """Class to handle requests related to server"""
 
     @staticmethod
-    def get(database_id, server_id = None):
+    def get(database_id, server_id=None):
         """
         Get the members of the database with specified database_id.
         Args:
@@ -599,21 +765,22 @@ class ServerAPI(MethodView):
             servers = []
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
-                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+                return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database[0]['members']
 
             for servers_id in members:
                 server = [server for server in Global.SERVERS if server['id'] == servers_id]
                 if not server:
-                    return make_response(jsonify( { 'statusstring': 'Server details not found for id: %u' % server_id } ), 404)
+                    return make_response(jsonify({'statusstring': 'Server details not found for id: %u' % server_id}),
+                                         404)
                 servers.append(server[0])
 
             return jsonify({'members': servers})
         else:
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
-                return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+                return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database[0]['members']
             if server_id in members:
@@ -622,7 +789,8 @@ class ServerAPI(MethodView):
                     abort(404)
                 return jsonify({'server': make_public_server(server[0])})
             else:
-                return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id)})
+                return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+                server_id, database_id)})
 
     @staticmethod
     def post(database_id):
@@ -637,13 +805,17 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        result = validate_server_ports(database_id)
+        if result is not None:
+            return result
+
         if not Global.SERVERS:
             server_id = 1
         else:
             server_id = Global.SERVERS[-1]['id'] + 1
         server = {
             'id': server_id,
-            'name': request.json['name'].strip(),
+            'name': request.json.get('name', "").strip(),
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
@@ -685,24 +857,35 @@ class ServerAPI(MethodView):
         """
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database[0]['members']
         if server_id in members:
             # delete a single server
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(server) == 0:
-                return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
+                return make_response(
+                    jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}),
+                    404)
             # remove the server from given database member list
-            current_database = [database for database in Global.DATABASES if database['id'] == database_id]
-            current_database[0]['members'].remove(server_id)
-            Global.DELETED_HOSTNAME = server[0]['hostname']
-            Global.SERVERS.remove(server[0])
-            sync_configuration()
-            Configuration.write_configuration_file()
-            return jsonify({'result': True})
+            url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/status' % \
+                  (server[0]['hostname'], __PORT__, database_id, server_id)
+            response = requests.get(url)
+
+            if response.json()['status'] == "running":
+                return make_response(jsonify({'statusstring': 'Cannot delete a running server'}), 403)
+            else:
+                # remove the server from given database member list
+                current_database = [database for database in Global.DATABASES if database['id'] == database_id]
+                current_database[0]['members'].remove(server_id)
+                Global.DELETED_HOSTNAME = server[0]['hostname']
+                Global.SERVERS.remove(server[0])
+                sync_configuration()
+                write_configuration_file()
+                return jsonify({'result': True})
         else:
-            return make_response(jsonify( { 'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id) } ), 404)
+            return make_response(
+                jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}), 404)
 
     @staticmethod
     def put(database_id, server_id):
@@ -717,7 +900,7 @@ class ServerAPI(MethodView):
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            return make_response(jsonify( { 'statusstring': 'No database found for id: %u' % database_id } ), 404)
+            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database[0]['members']
         if server_id in members:
@@ -727,6 +910,10 @@ class ServerAPI(MethodView):
             current_server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(current_server) == 0:
                 abort(404)
+
+            result = validate_server_ports(database_id)
+            if result is not None:
+                return result
 
             current_server[0]['name'] = \
                 request.json.get('name', current_server[0]['name'])
@@ -760,7 +947,8 @@ class ServerAPI(MethodView):
             Configuration.write_configuration_file()
             return jsonify({'server': current_server[0], 'status': 1})
         else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' %(server_id,database_id) })
+            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+            server_id, database_id)})
 
 
 class DatabaseAPI(MethodView):
@@ -1238,7 +1426,7 @@ class RecoverServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid,True)
+            return server.check_and_start_local_server(sid, True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1379,7 +1567,7 @@ class DatabaseDeploymentAPI(MethodView):
                         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
                             frequency_unit = ['h', 'm', 's']
                             frequency = str(req.json['snapshot']['frequency'])
-                            last_char =  frequency[len(frequency)-1]
+                            last_char = frequency[len(frequency) - 1]
                             if last_char not in frequency_unit:
                                 return jsonify({'error': 'Snapshot: Invalid frequency value.'})
                             frequency = frequency[:-1]
@@ -1439,7 +1627,7 @@ class StatusDatabaseAPI(MethodView):
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
             if len(database[0]['members']) == 0:
-                return jsonify({'status':'errorNoMembers'})
+                return jsonify({'status': 'errorNoMembers'})
             for server_id in database[0]['members']:
                 server = [server for server in Global.SERVERS if server['id'] == server_id]
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
@@ -1465,7 +1653,7 @@ class StatusDatabaseAPI(MethodView):
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-            return jsonify({'status':status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
+            return jsonify({'status': status, 'serverDetails': serverDetails, 'isFreshStart': isFreshStart})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -1479,7 +1667,7 @@ class StatusDatabaseServerAPI(MethodView):
         else:
             server = [server for server in Global.SERVERS if server['id'] == server_id]
             if len(database[0]['members']) == 0:
-                return jsonify({'error':'errorNoMembers'})
+                return jsonify({'error': 'errorNoMembers'})
             if not server:
                 return make_response(jsonify({'error': 'Not found'}), 404)
             elif server_id not in database[0]['members']:
@@ -1518,7 +1706,7 @@ class StatusDatabaseServerAPI(MethodView):
                         return jsonify({'status': "stopped", "details": error})
 
 
-def main(runner, amodule, config_dir, server):
+def main(runner, amodule, config_dir, data_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
     except KeyError:
@@ -1532,7 +1720,8 @@ def main(runner, amodule, config_dir, server):
     depjson = os.path.join(path, "deployment.json")
     json_data = open(depjson).read()
     deployment = json.loads(json_data)
-    Global.PATH = config_dir
+    Global.CONFIG_PATH = config_dir
+    Global.DATA_PATH = data_dir
     global __IP__
     global __PORT__
 
@@ -1573,7 +1762,6 @@ def main(runner, amodule, config_dir, server):
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
-
 
     START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
     RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
@@ -1640,14 +1828,14 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
                      methods=['GET'])
 
-    if os.path.exists('voltdeploy.log'):
-        open('voltdeploy.log', 'w').close()
-    handler = RotatingFileHandler('voltdeploy.log')
+    log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
+    if os.path.exists(log_file):
+        open(log_file, 'w').close()
+    handler = RotatingFileHandler(log_file)
     handler.setFormatter(logging.Formatter(
-         "%(asctime)s|%(levelname)s|%(message)s"))
+        "%(asctime)s|%(levelname)s|%(message)s"))
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.NOTSET)
     log.addHandler(handler)
-
 
     APP.run(threaded=True, host=bindIp, port=__PORT__)
