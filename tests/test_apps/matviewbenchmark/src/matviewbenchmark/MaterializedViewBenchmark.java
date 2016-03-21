@@ -93,6 +93,9 @@ public class MaterializedViewBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Run stream view version of the benchmark (true|false).")
+        Boolean streamview = false;
+
         @Override
         public void validate() {
             if (displayinterval <= 0)
@@ -429,102 +432,106 @@ public class MaterializedViewBenchmark {
         if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
             printResults(procStr + "_insert");
         } else {
-            printResults(procStr + "_insert", fw, "Insert " + csvStr + " MV");
+        	String suffix = config.streamview ? " SV" : " MV";
+            printResults(procStr + "_insert", fw, "Insert " + csvStr + suffix);
         }
         System.out.print(HORIZONTAL_RULE);
 
-        if ( ! isMinMatViewCase(matView) ) {
-            // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
-            grp = 2;
+        // Exclude updates and deletes on underlying tables, not possible for stream views
+        if (!config.streamview) {
+        	if ( ! isMinMatViewCase(matView) ) {
+        		// grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
+        		grp = 2;
 
-            fullStatsContext.fetchAndResetBaseline();
-            periodicStatsContext.fetchAndResetBaseline();
+        		fullStatsContext.fetchAndResetBaseline();
+        		periodicStatsContext.fetchAndResetBaseline();
 
-            benchmarkStartTS = System.currentTimeMillis();
-            schedulePeriodicStats();
+        		benchmarkStartTS = System.currentTimeMillis();
+        		schedulePeriodicStats();
 
-            System.out.println("\n\nUpdating grouping column in table " + systemStr + " materialized view...\n");
+        		System.out.println("\n\nUpdating grouping column in table " + systemStr + " materialized view...\n");
 
-            if (config.group > 0) {
-                for (int i=0; i<config.txn; i++){
-                    client.callProcedure(new NullCallback(),
-                                         procStr + "_group_id_update",
-                                         grp,
-                                         i);
-                    if (grp == (config.group + 1)) {
-                        grp = 2;
-                    } else {
-                        grp++;
-                    }
-                }
-            } else {
-                for (int i=0; i<config.txn; i++){
-                    client.callProcedure(new NullCallback(),
-                                         procStr + "_group_id_update",
-                                         (i + 1),
-                                         i);
-                }
-            }
-            timer.cancel();
-            client.drain();
+        		if (config.group > 0) {
+        			for (int i=0; i<config.txn; i++){
+        				client.callProcedure(new NullCallback(),
+        						procStr + "_group_id_update",
+        						grp,
+        						i);
+        				if (grp == (config.group + 1)) {
+        					grp = 2;
+        				} else {
+        					grp++;
+        				}
+        			}
+        		} else {
+        			for (int i=0; i<config.txn; i++){
+        				client.callProcedure(new NullCallback(),
+        						procStr + "_group_id_update",
+        						(i + 1),
+        						i);
+        			}
+        		}
+        		timer.cancel();
+        		client.drain();
 
-            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-                printResults(procStr + "_group_id_update");
-            } else {
-                printResults(procStr + "_group_id_update", fw, "Update Grp " + csvStr + " MV");
-            }
-            System.out.print(HORIZONTAL_RULE);
+        		if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+        			printResults(procStr + "_group_id_update");
+        		} else {
+        			printResults(procStr + "_group_id_update", fw, "Update Grp " + csvStr + " MV");
+        		}
+        		System.out.print(HORIZONTAL_RULE);
 
-            fullStatsContext.fetchAndResetBaseline();
-            periodicStatsContext.fetchAndResetBaseline();
+        		fullStatsContext.fetchAndResetBaseline();
+        		periodicStatsContext.fetchAndResetBaseline();
 
-            benchmarkStartTS = System.currentTimeMillis();
-            schedulePeriodicStats();
+        		benchmarkStartTS = System.currentTimeMillis();
+        		schedulePeriodicStats();
 
-            System.out.println("\n\nUpdating aggregated column in table " + systemStr + " materialized view...\n");
+        		System.out.println("\n\nUpdating aggregated column in table " + systemStr + " materialized view...\n");
 
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     procStr + "_value_update",
-                                     (i + 1),
-                                     i);
-            }
-            timer.cancel();
-            client.drain();
+        		for (int i=0; i<config.txn; i++){
+        			client.callProcedure(new NullCallback(),
+        					procStr + "_value_update",
+        					(i + 1),
+        					i);
+        		}
+        		timer.cancel();
+        		client.drain();
 
-            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-                printResults(procStr + "_value_update");
-            } else {
-                printResults(procStr + "_value_update", fw, "Update Sum " + csvStr + " MV");
-            }
-            System.out.print(HORIZONTAL_RULE);
-        }
+        		if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+        			printResults(procStr + "_value_update");
+        		} else {
+        			printResults(procStr + "_value_update", fw, "Update Sum " + csvStr + " MV");
+        		}
+        		System.out.print(HORIZONTAL_RULE);
+        	}
 
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
+        	fullStatsContext.fetchAndResetBaseline();
+        	periodicStatsContext.fetchAndResetBaseline();
 
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
+        	benchmarkStartTS = System.currentTimeMillis();
+        	schedulePeriodicStats();
 
-        int numDeletes = config.txn;
-        if (systemStr.startsWith("multi")) {
-            // when the deletion with multi groups benchmarks are running fast, we can get rid of this limit
-            numDeletes = 10000;
-        }
-        System.out.println("\n\nDeleting " + numDeletes + " rows from table " + systemStr + " materialized view...\n");
+        	int numDeletes = config.txn;
+        	if (systemStr.startsWith("multi")) {
+        		// when the deletion with multi groups benchmarks are running fast, we can get rid of this limit
+        		numDeletes = 10000;
+        	}
+        	System.out.println("\n\nDeleting " + numDeletes + " rows from table " + systemStr + " materialized view...\n");
 
-        for (int i=0; i<numDeletes; i++){
-            client.callProcedure(new NullCallback(),
-                                 procStr + "_delete",
-                                 i);
-        }
-        timer.cancel();
-        client.drain();
+        	for (int i=0; i<numDeletes; i++){
+        		client.callProcedure(new NullCallback(),
+        				procStr + "_delete",
+        				i);
+        	}
+        	timer.cancel();
+        	client.drain();
 
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults(procStr + "_delete");
-        } else {
-            printResults(procStr + "_delete", fw, "Delete " + csvStr + " MV");
+        	if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+        		printResults(procStr + "_delete");
+        	} else {
+        		printResults(procStr + "_delete", fw, "Delete " + csvStr + " MV");
+        	}
         }
     }
 
@@ -604,36 +611,38 @@ public class MaterializedViewBenchmark {
                                     i);
             }
             client.drain();
-            for (int i=0; i<config.warmup; i++){
-                client.callProcedure(new NullCallback(),
-                                     "ids_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMinMatViewOpt_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith4MinMatView_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                     "idsWith4MinMatViewOpt_delete",
-                                     i);
-                client.callProcedure(new NullCallback(),
-                                    "idsWithMultiGroupsMinMatView_delete",
-                                    i);
-                client.callProcedure(new NullCallback(),
-                                    "idsWithMultiGroupsMinMatViewOpt_delete",
-                                    i);
-                client.callProcedure(new NullCallback(),
-                                    "idsWithMultiGroupsMinMatViewBestOpt_delete",
-                                    i);
+            if (!config.streamview) {
+            	for (int i=0; i<config.warmup; i++){
+            		client.callProcedure(new NullCallback(),
+            				"ids_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMatView_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMinMatView_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMinMatViewOpt_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWith4MinMatView_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWith4MinMatViewOpt_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMultiGroupsMinMatView_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMultiGroupsMinMatViewOpt_delete",
+            				i);
+            		client.callProcedure(new NullCallback(),
+            				"idsWithMultiGroupsMinMatViewBestOpt_delete",
+            				i);
+            	}
+            	client.drain();
             }
-            client.drain();
         }
 
         FileWriter fw = null;
