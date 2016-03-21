@@ -175,8 +175,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
             new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
-    private long m_lastLocalSpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
-    private long m_lastLocalMpUniqueId;   // Only populated by the Site for ApplyBinaryLog Txns
+    private long m_lastLocalSpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
+    private long m_lastLocalMpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
 
     // Current topology
     int m_partitionId;
@@ -487,6 +487,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void resetDrAppliedTracker() {
             m_maxSeenDrLogsBySrcPartition.clear();
+            m_lastLocalSpUniqueId = -1L;
+            m_lastLocalMpUniqueId = -1L;
         }
 
         @Override
