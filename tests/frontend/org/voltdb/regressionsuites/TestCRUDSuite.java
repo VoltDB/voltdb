@@ -208,6 +208,20 @@ public class TestCRUDSuite extends RegressionSuite {
         }
         VoltTable[] results = client.callProcedure("@AdHoc", "SELECT * FROM EV1").getResults();
         assertEquals(10, results[0].getRowCount());
+
+        try {
+            client.callProcedure("E1.delete", 0);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("was not found"));
+        }
+
+        try {
+            client.callProcedure("E1.update", 1, 11);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("was not found"));
+        }
     }
 
 
