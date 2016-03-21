@@ -979,9 +979,10 @@ class DatabaseAPI(MethodView):
 
         del Global.DATABASES[database_id]
 
-        deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
-
-        Global.DEPLOYMENT.remove(deployment[0])
+        # deployment = Global.DEPLOYMENT.get(database_id)
+        #
+        # Global.DEPLOYMENT.remove(deployment)
+        del Global.DEPLOYMENT[database_id]
         sync_configuration()
         Configuration.write_configuration_file()
         return jsonify({'result': True})
