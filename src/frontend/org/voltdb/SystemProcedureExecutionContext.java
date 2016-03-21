@@ -92,6 +92,8 @@ public interface SystemProcedureExecutionContext {
 
     public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
 
+    public void resetDrAppliedTracker();
+
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 
     public Pair<Long, Long> getDrLastAppliedUniqueIds();

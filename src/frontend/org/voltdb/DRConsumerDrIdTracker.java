@@ -105,12 +105,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         for (int ii = 0; ii < drIdRanges.length(); ii++) {
             JSONObject obj = drIdRanges.getJSONObject(ii);
             String startDrIdStr = obj.keys().next();
-            long start = Long.valueOf(startDrIdStr);
-            long end = obj.getLong(startDrIdStr);
-            if (start > end) {
-                throw new IllegalArgumentException(start + " after " + end);
-            }
-            m_map.add(range(start, end));
+            m_map.add(range(Long.valueOf(startDrIdStr), obj.getLong(startDrIdStr)));
         }
     }
 
@@ -120,12 +115,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_lastMpUniqueId = buff.getLong();
         int mapSize = buff.getInt();
         for (int ii=0; ii<mapSize; ii++) {
-            long start = buff.getLong();
-            long end = buff.getLong();
-            if (start > end) {
-                throw new IllegalArgumentException(start + " after " + end);
-            }
-            m_map.add(range(start, end));
+            m_map.add(range(buff.getLong(), buff.getLong()));
         }
     }
 
@@ -179,12 +169,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_lastMpUniqueId = in.readLong();
         int mapSize = in.readInt();
         for (int ii = 0; ii < mapSize; ii++) {
-            long start = in.readLong();
-            long end = in.readLong();
-            if (start > end) {
-                throw new IllegalArgumentException(start + " after " + end);
-            }
-            m_map.add(range(start, end));
+            m_map.add(range(in.readLong(), in.readLong()));
         }
     }
 
