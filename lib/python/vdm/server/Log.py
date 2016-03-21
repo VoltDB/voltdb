@@ -3,7 +3,7 @@ import os
 
 
 def get_most_recent_log():
-    logdir = HTTPListener.Global.PATH
+    logdir = HTTPListener.Global.CONFIG_PATH
 
     logfiles = sorted([ f for f in os.listdir(logdir) if f.startswith('voltserver.output')])
 
@@ -11,7 +11,7 @@ def get_most_recent_log():
 
 
 def get_error_log_details():
-    outfilename = os.path.join(HTTPListener.Global.PATH, get_most_recent_log())
+    outfilename = os.path.join(HTTPListener.Global.CONFIG_PATH, get_most_recent_log())
     try:
         rfile = open(outfilename, 'r')
         error = rfile.read()

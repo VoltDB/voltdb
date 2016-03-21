@@ -844,7 +844,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
         <p>Do you want to delete this server?</p>
       </div>
       <div class="modal-footer">
-        <button id="deleteServerOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button id="deleteServerOk" type="button" class="btn"  data-target="#errorDialog">Ok</button>
         <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
       </div>
     </div>
@@ -915,7 +915,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
             <p id="errorMsg"></p>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn" data-dismiss="modal">Ok</button>
+            <button type="button" id="btnErrorDialog" class="btn" data-dismiss="modal">Ok</button>
         </div>
     </div>
   </div>

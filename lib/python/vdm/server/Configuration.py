@@ -579,7 +579,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(HTTPListener.Global.PATH, 'voltdeploy.xml')
+        path = os.path.join(HTTPListener.Global.CONFIG_PATH, 'voltdeploy.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
