@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.ExecutorService;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -36,7 +35,6 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
@@ -70,7 +68,6 @@ public class HTTPClientInterface {
     final String m_servicePrincipal;
 
     final String m_timeoutResponse;
-    private final ExecutorService m_closeAllExecutor;
 
     private final Supplier<InternalConnectionHandler> m_invocationHandler =
             Suppliers.memoize(new Supplier<InternalConnectionHandler>() {
@@ -132,15 +129,11 @@ public class HTTPClientInterface {
         final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
                 new VoltTable[0], "Request Timeout");
         m_timeoutResponse = r.toJSONString();
-        m_closeAllExecutor = CoreUtils.getSingleThreadExecutor("HttpClientInterface-closeAll"); // STEBUG remove
         m_servicePrincipal = getAuthSystem().getServicePrincipal();
         m_spnegoEnabled = m_servicePrincipal != null && !m_servicePrincipal.isEmpty();
     }
 
     public void stop() {
-        // This is called on server shutdown.
-        // So, it is OK if we interrupt threads trying to close client connections.
-        m_closeAllExecutor.shutdownNow();
     }
 
     public final static String asJsonp(String jsonp, String msg) {
@@ -487,5 +480,9 @@ public class HTTPClientInterface {
             m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
         }
         return authResult;
+    }
+
+    public void notifyOfCatalogUpdate() {
+        // NOOP
     }
 }

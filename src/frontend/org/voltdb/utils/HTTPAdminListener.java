@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -871,9 +872,12 @@ public class HTTPAdminListener {
         /*
          * Don't force us to look at a huge pile of threads
          */
-        final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
-        qtp.setIdleTimeout(timeout * 1000);
-        qtp.setMinThreads(1);
+        final QueuedThreadPool qtp = new QueuedThreadPool(
+                poolsize,
+                1, // minimum threads
+                timeout * 1000,
+                new LinkedBlockingQueue<>(poolsize + 16)
+                );
 
         m_server = new Server(qtp);
         m_server.setAttribute(
@@ -983,5 +987,9 @@ public class HTTPAdminListener {
         catch (Exception e) {}
         try { m_server.destroy(); } catch (Exception e2) {}
         m_server = null;
+    }
+
+    public void notifyOfCatalogUpdate() {
+        httpClientInterface.notifyOfCatalogUpdate();
     }
 }
