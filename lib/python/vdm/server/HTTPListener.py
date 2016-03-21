@@ -1014,20 +1014,8 @@ class DeploymentAPI(MethodView):
                         Global.DEPLOYMENT[database_id]['users']['user'].append({
                         'name': d[key]['name'],
                         'roles': d[key]['roles'],
-                        'plaintext': d[key]['plaintext'],
-                        'databaseid': d[key]['databaseid'],
-                        'password':  d[key]['password']
-
+                        'plaintext': d[key]['plaintext']
                         })
-
-            # if deployment_users is not None:
-            #     for user in deployment_users:
-            #         Global.DEPLOYMENT[database_id]['users']['user'].append({
-            #             'name': user['name'],
-            #             'roles': user['roles'],
-            #             'plaintext': user['plaintext']
-            #
-            #         })
 
             deployment = Global.DEPLOYMENT.get(database_id)
 
@@ -1713,7 +1701,7 @@ def main(runner, amodule, config_dir, server):
 
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
 
-    #Configuration.write_configuration_file()
+    Configuration.write_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')

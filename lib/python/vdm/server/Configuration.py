@@ -79,7 +79,8 @@ def convert_xml_to_json(config_path):
         for deployment in deployment_json:
             HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
 
-    if 'users' in D2[k]['deployments']['deployment']:
+    if 'users' in D2[k]['deployments']['deployment'] and D2[k]['deployments']['deployment']['users'] is not None\
+            and 'user' in D2[k]['deployments']['deployment']['users']:
         if type(D2[k]['deployments']['deployment']['users']['user']) is dict:
             user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'dict')
@@ -182,7 +183,7 @@ def set_export_import_field(deployment, field, new_deployment):
                 new_deployment[field]['configuration'] = get_field_from_xml(
                     deployment[field]['configuration'], 'dict', 'export')
         else:
-            new_deployment[field] = deployment[field]
+            new_deployment[field] = None
     except Exception, err:
         result = str(err)
         print_errors(field, result)
@@ -619,8 +620,6 @@ def make_configuration_file():
             else:
                 db_elem.attrib[k] = str(val)
 
-    # servers = [v if type(v) is list else [v] for v in HTTPListener.Global.SERVERS.values()]
-
     for key, value in HTTPListener.Global.SERVERS.items():
         server_elem = SubElement(server_top, 'member')
         for k, v in value.items():
@@ -646,18 +645,19 @@ def make_configuration_file():
                 'roles': d[key]['roles'],
                 'plaintext': d[key]['plaintext'],
                 'password': d[key]['password'],
-                'databaseid': d[key]['databaseid'],
-                'sdfsdfs': 'sdfsdf'
+                'databaseid': d[key]['databaseid']
                 })
 
         deployment_elem = SubElement(deployment_top, 'deployment')
         for k, val in value.items():
-            if type(val) is dict:
+            if k == 'users' and not val['user']:
+                pass
+            elif type(val) is dict:
                 DeploymentConfig.handle_deployment_dict(deployment_elem, k, val, False)
             elif type(val) is list:
                 DeploymentConfig.handle_deployment_list(deployment_elem, k, val)
             else:
-                if value is not None:
+                if val is not None:
                     deployment_elem.attrib[k] = str(val)
     return tostring(main_header, encoding='UTF-8')
 
