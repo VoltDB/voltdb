@@ -42,7 +42,6 @@ __host_or_ip__ = socket.gethostbyname(__host_name__)
 
 __url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/servers/'
 __db_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
-__deployment_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/'
 
 
 class Database(unittest.TestCase):
