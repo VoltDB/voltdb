@@ -154,7 +154,7 @@ public class AsyncCompilerAgentHelper
             }
             newCatalogBytes = loadResults.getFirst().getFullJarBytes();
             retval.catalogBytes = newCatalogBytes;
-            retval.isForReplay = work.replayHashOverride != null;
+            retval.isForReplay = work.isForReplay();
             if (!retval.isForReplay) {
                 retval.catalogHash = loadResults.getFirst().getSha1Hash();
             } else {
