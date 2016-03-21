@@ -75,6 +75,10 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
         {
             m_responseFuture.set(response);
         }
+
+        public ListenableFuture<ClientResponse> getResponseFuture() {
+            return m_responseFuture;
+        }
     }
 
     private final long m_connectionId;

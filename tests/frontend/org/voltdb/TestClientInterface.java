@@ -29,6 +29,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
@@ -54,6 +55,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -71,6 +73,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ClientInputHandler;
@@ -116,6 +119,8 @@ public class TestClientInterface {
     private Cartographer m_cartographer;
     private SimpleClientResponseAdapter m_cxn;
     private ZooKeeper m_zk;
+    private ScheduledThreadPoolExecutor m_periodicWorkThread;
+
 
     // real context
     private static CatalogContext m_context = null;
@@ -139,12 +144,14 @@ public class TestClientInterface {
 
     @Before
     public void setUp() throws Exception {
+        m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
         // Set up CI with the mock objects.
         m_volt = mock(VoltDBInterface.class);
         m_sysinfoAgent = mock(SystemInformationAgent.class);
         m_messenger = mock(HostMessenger.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
+
         m_zk = mock(ZooKeeper.class);
         responses = new LinkedTransferQueue<ByteBuffer>();
         responsesDS = new LinkedTransferQueue<DeferredSerialization>();
@@ -167,7 +174,11 @@ public class TestClientInterface {
          * construction
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
-        doReturn(m_cxn.connectionId()).when(m_handler).connectionId();
+
+        when(m_handler.connectionId()).thenReturn(0L);
+        when(m_handler.isAdmin()).thenReturn(false);
+        when(m_volt.getSES(anyBoolean())).thenReturn(m_periodicWorkThread);
+
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
         doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
@@ -227,9 +238,12 @@ public class TestClientInterface {
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws Exception {
         reset(m_messenger);
         reset(m_handler);
+        m_periodicWorkThread.shutdown();
+        m_periodicWorkThread.awaitTermination(356, TimeUnit.DAYS);
+
     }
 
     private static ByteBuffer createMsg(String name, final Object...params) throws IOException {
@@ -354,7 +368,7 @@ public class TestClientInterface {
                 AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes,
                                                          new Object[]{3}, partitionParamIndex,
                                                          m_context.getCatalogHash());
-        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
+        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
                 ArgumentCaptor.forClass(Long.class);
@@ -397,7 +411,7 @@ public class TestClientInterface {
         AdHocPlannedStmtBatch plannedStmtBatch =
             AdHocPlannedStmtBatch.mockStatementBatch(3, query, extractedValues, paramTypes, null, -1,
                     m_context.getCatalogHash());
-        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
+        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Long> destinationCaptor =
                 ArgumentCaptor.forClass(Long.class);
@@ -467,8 +481,9 @@ public class TestClientInterface {
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
+        catalogResult.diffCommandsLength = 10;
         catalogResult.user = new AuthSystem.AuthDisabledUser();
-        m_ci.processFinishedCompilerWork(catalogResult).run();
+        m_ci.getDispatcher().processFinishedCompilerWork(catalogResult).run();
 
         ArgumentCaptor<Long> destinationCaptor =
                 ArgumentCaptor.forClass(Long.class);
@@ -620,7 +635,7 @@ public class TestClientInterface {
         AdHocPlannedStmtBatch plannedStmt =
                 AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash());
         plannedStmt.clientData = m_cxn;
-        m_ci.processFinishedCompilerWork(plannedStmt).run();
+        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
         assertEquals(0, responses.size());
 
         query = "insert into A values (10)";
@@ -630,7 +645,7 @@ public class TestClientInterface {
         plannedStmt =
                 AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash(), false, isAdmin);
         plannedStmt.clientData = m_cxn;
-        m_ci.processFinishedCompilerWork(plannedStmt).run();
+        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
         if (isAdmin) {
             assertEquals(0, responses.size());
         } else {
