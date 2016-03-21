@@ -41,6 +41,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -1116,7 +1117,7 @@ public class SQLCommand
             proc_param_counts.put(this_proc, curr_val);
         }
         params.resetRowPosition();
-        List<String> userProcs = new ArrayList<String>();
+        Set<String> userProcs = new HashSet<String>();
         while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
             userProcs.add(proc_name);
