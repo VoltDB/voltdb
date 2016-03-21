@@ -29,6 +29,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import geb.Page
 import geb.Module
+import org.openqa.selenium.Keys
 
 class OverviewModule extends Module {
     static content = {
@@ -53,6 +54,24 @@ class OverviewModule extends Module {
         usernameTitleText               { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.child-row-6.subLabelRow.thead.secTbl1 > td.configLabel") }
         roleTitleText                   { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.child-row-6.subLabelRow.thead.secTbl1 > td:nth-child(2)") }
         addUserButton                   { $("#btnAddSecurity > span") }
+
+        addSecurityButton               { $("#btnAddSecurity") }
+        userField                       { $("#txtUser") }
+        passwordField                   { $("#txtPassword") }
+        roleField                       { $("#txtUserRole-tokenfield") }
+        selectAdminRole                 { $("#selectRole > option:nth-child(1)") }
+        saveUserOkButton                { $("#btnSaveUserOk") }
+        securityLabel                   { $("tr.securityList").find("td.configLabel") }
+        updateSecurityButton            { $("a.btnUpdateSecurity") }
+        deleteUserButton                { $("#deleteUser") }
+        errorUser                       { $("#errorUser") }
+        errorPassword                   { $("#errorPassword") }
+        cancelUserButton                { $("#btnCancelUser") }
+        noSecurityAvailable             { $("#trSecurity > td.configLabel") }
+
+        editSecurityOne (required: false)   { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td:nth-child(4) > a") }
+        usernameOne (required: false)       { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td.configLabel") }
+        roleOne (required: false)           { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td:nth-child(2)") }
 
         // HTTP Access
         httpAccessText                  { $("#row-1 > td.configLabel > a > span") }
@@ -182,34 +201,11 @@ class OverviewModule extends Module {
         memoryLimitField                { $("#txtMemoryLimit") }
         memoryLimitType                 { $(id:"selMemoryLimitUnit") }
         memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }
-
-        // security
-        securityText               { $("#row-6 > td.configLabel") }
-
-        addSecurityButton              {$("#btnAddSecurity")}
-
-        userField                     {$("#txtUser")}
-
-        passwordField                 {$("#txtPassword")}
-
-        selectAdminRole             { $("#selectRole > option:nth-child(1)") }
-
-        SaveUserOkButton               {$("#btnSaveUserOk")}
-
-        securityLabel               {$("tr.securityList").find("td.configLabel")}
-
-
-        updateSecurityButton           {$("a.btnUpdateSecurity")}
-
-        deleteUserButton               {$("#deleteUser")}
-
-        errorUser                   {$("#errorUser")}
-
-        errorPassword               {$("#errorPassword")}
-
-        cancelUserButton               {$("#btnCancelUser")}
-
     }
+
+    int count
+    static int numberOfTrials = 10
+    
     def String getIdOfExportText(int index) {
         return ("exportList_" + String.valueOf(index))
     }
@@ -228,6 +224,78 @@ class OverviewModule extends Module {
             println("Checkbox is not displayed")
         }
         return result;
+    }
+
+    // Edit for VDM-37 starts from here
+
+    def void expandSecurity() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                securityText.click()
+                waitFor { addSecurityButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { addSecurityButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
+            }
+        }
+    }
+
+    def addUser() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                addSecurityButton.click()
+                waitFor { saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+    }
+
+    def provideValueForUser(String username, String password, String role) {
+        userField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        userField.value(username)
+
+        passwordField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        passwordField.value(password)
+
+        roleField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        roleField.value(role + ",")
+    }
+
+    def saveUser() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                saveUserOkButton.click()
+                waitFor { !saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
     }
 
 }
