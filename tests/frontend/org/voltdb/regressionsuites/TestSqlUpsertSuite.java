@@ -120,78 +120,159 @@ public class TestSqlUpsertSuite extends RegressionSuite {
     {
         Client client = getClient();
         VoltTable vt = null;
-
+        final long modifiedOneTuple = 1;
         // Test AdHoc UPSERT with default value and random column order values
         String[] tables = {"R1", "P1", "R2", "P2"};
         for (String tb : tables) {
             String query = "select ID, wage, dept from " + tb + " order by ID, dept";
 
             // Insert here is on purpose for testing the cached AdHoc feature
-            vt = client.callProcedure("@AdHoc", String.format(
-                    "Insert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}});
+            validateDMLTupleCount(client,
+                    String.format("Insert into %s values(%d, %d, %d)", tb, 1, 1, 1),
+                    modifiedOneTuple);
+            validateTableOfLongs(client, query, new long[][] {{1,1,1}});
 
             // test UPSERT with default value
-            vt = client.callProcedure("@AdHoc", String.format(
-                    "Upsert into %s (id, dept) values (%d, %d)", tb, 2, 1)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2,1,1}});
+            validateDMLTupleCount(client,
+                    String.format("Upsert into %s (id, dept) values (%d, %d)", tb, 2, 1),
+                    modifiedOneTuple);
+            validateTableOfLongs(client, query, new long[][] {{1,1,1}, {2,1,1}});
 
             // test UPSERT with column name in random order
-            vt = client.callProcedure("@AdHoc", String.format(
-                    "Upsert into %s (dept, wage, id) values(%d, %d, %d)", tb, 1, 2, 2)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2,2,1}});
+            validateDMLTupleCount(client,
+                    String.format("Upsert into %s (dept, wage, id) values(%d, %d, %d)", tb, 1, 2, 2),
+                    modifiedOneTuple);
+            validateTableOfLongs(client, query, new long[][] {{1,1,1}, {2,2,1}});
 
             // test UPSERT with default value
-            vt = client.callProcedure("@AdHoc", String.format(
-                                                              "Upsert into %s (dept, id) values(%d, %d)", tb, 3, 1)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,3}, {2,2,1}});
+
+            // trivial no-op case.
+            validateDMLTupleCount(client,
+                    String.format("Upsert into %s (dept, id) values(%d, %d)", tb, 1, 1),
+                    modifiedOneTuple);
+            validateTableOfLongs(client, query, new long[][] {{1,1,1}, {2,2,1}});
+
+            // case that goes differently for single or compound primary keys
+            validateDMLTupleCount(client,
+                    String.format("Upsert into %s (dept, id) values(%d, %d)", tb, 3, 1),
+                    modifiedOneTuple);
+            if (tb.contains("2")) {
+                validateTableOfLongs(client, query, new long[][] {{1,1,1}, {1,1,3}, {2,2,1}});
+                // Delete the original row to compensate for single/compound key differences.
+                // Assuming that we continue to use deterministic querying to work around
+                // differences in the stored tuple order and partition response order,
+                // this restores a consistent baseline for follow-on test cases.
+                validateDMLTupleCount(client,
+                    String.format("Delete from %s where id = %s and dept = %s", tb, 1, 1),
+                    modifiedOneTuple);
+            }
+            validateTableOfLongs(client, query, new long[][] {{1,1,3}, {2,2,1}});
+
             // Try that again but with a new row.
-            vt = client.callProcedure("@AdHoc", String.format(
-                                                              "Upsert into %s (dept, id) values(%d, %d)", tb, 3, 4)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{1,1,3}, {2,2,1}, {4,1,3}});
-            // test UPSERT with existing row with non-defaultable value
-            vt = client.callProcedure("@AdHoc", String.format(
-                    "Upsert into %s (wage, id) values(%d, %d)", tb, 5, 1)).getResults()[0];
-            vt = client.callProcedure("@AdHoc", query).getResults()[0];
-                                 validateTableOfLongs(vt, new long[][] {{1,5,3}, {2,2,1}, {4,1,3}});
+            validateDMLTupleCount(client,
+                    String.format("Upsert into %s (dept, id) values(%d, %d)", tb, 3, 4),
+                    modifiedOneTuple);
+            validateTableOfLongs(client, query, new long[][] {{1,1,3}, {2,2,1}, {4,1,3}});
+            // negative test UPSERT neglecting to specify a value for a primary key (component)
+            try {
+                vt = client.callProcedure("@AdHoc",
+                        String.format("Upsert into %s (wage) values(%d)", tb, 5)
+                        ).getResults()[0];
+                fail("Should have thrown a planner exception on upsert with missing primary key.\n" +
+                        "Instead, the upsert return value was:\n" +
+                        vt.toString() +
+                        " and the check query now returns:\n" +
+                        client.callProcedure("@AdHoc", query).getResults()[0].toString());
+            }
+            catch (ProcCallException pce) {
+                String msg = pce.toString();
+                //* enable to debug */ System.out.println("DEBUG: OK got PCE:" + msg);
+                assertTrue(msg.contains("\" must specify a value for primary key \""));
+            }
+            // test UPSERT with an existing row safely having a required non-defaulted value.
+            // The unsafe new row variant of this test is run below specifically on table R2
+            // outside this table loop because it's a pain to get all of the positive and
+            // negative cases and their side effects right for all the different table schema.
+            // Most of them degenerate into uninteresting minor variants of existing positive
+            // and negative test cases already covered in this suite.
+            // Various modes of failure here were one symptom of ENG-10072.
+            // Expect a failure here on tables where DEPT is a required primary key component.
+            if (tb.contains("1")) {
+                validateDMLTupleCount(client,
+                        String.format("Upsert into %s (wage, id) values(%d, %d)", tb, 6, 2),
+                        modifiedOneTuple);
+            }
+            else {
+                try {
+                    vt = client.callProcedure("@AdHoc",
+                            String.format("Upsert into %s (wage, id) values(%d, %d)", tb, 6, 2)
+                            ).getResults()[0];
+                    fail("Should have thrown a planner exception on upsert with missing primary key.\n" +
+                            "Instead, the upsert return value was:\n" +
+                            vt.toString() +
+                            " and the check query now returns:\n" +
+                            client.callProcedure("@AdHoc", query).getResults()[0].toString());
+                }
+                catch (ProcCallException pce) {
+                    String msg = pce.toString();
+                    //* enable to debug */ System.out.println("DEBUG: OK got PCE:" + msg);
+                    assertTrue(msg.contains("\" must specify a value for primary key \""));
+                }
+                // Compensate for failure in compound key schemas by providing compund key.
+                // Providing the required DEPT id does not exercise the interesting code path.
+                // For that, there would need to be another variant of the schema with a
+                // non-nullable non-defaulted value OUTSIDE the compound primary key, but that's
+                // not a very interesting variant of the single primary key cases in the
+                // existing list of test tables.
+                // This statement is just to re-establish a consistent baseline data set
+                // for later test queries.
+                validateDMLTupleCount(client,
+                        String.format("Upsert into %s (wage, id, dept) values(%d, %d, %d)", tb, 6, 2, 1),
+                        modifiedOneTuple);
+            }
+            validateTableOfLongs(client, query, new long[][] {{1,1,3}, {2,6,1}, {4,1,3}});
         }
 
         // negative test UPSERT with non-existing row and not providing a non-defaultable value
         try {
-            vt = client.callProcedure("@AdHoc", "Upsert into R2 (wage, id) values(6, 7)").getResults()[0];
+            vt = client.callProcedure("@AdHoc", "Upsert into P1 (wage, id) values(8, 9)").getResults()[0];
             fail("Should have thrown a sql exception on upsert of a new row " +
                  "without a required non-nullable column value.\n" +
                  "Instead, the upsert return value was:\n" +
                  vt.toString() +
                  " and the check query now returns:\n" +
                  client.callProcedure("@AdHoc",
-                         "select ID, wage, dept from R1 order by ID, dept").getResults()[0].toString());
+                         "select ID, wage, dept from P1 order by ID, dept").getResults()[0].toString());
         }
         catch (ProcCallException pce) {
             String msg = pce.toString();
-            System.out.println("DEBUG: OK got PCE:" + msg);
-            assertTrue(msg.contains("DEPT"));
+            //* enable to debug */ System.out.println("DEBUG: OK got PCE:" + msg);
+            assertTrue(msg.contains("CONSTRAINT VIOLATION"));
         }
 
         // Test AdHoc UPSERT with SELECT
-        vt = client.callProcedure("@AdHoc", String.format(
-                "Upsert into R1 (dept, id) SELECT dept+10, id+1 FROM R2 order by 1, 2")).getResults()[0];
-        vt = client.callProcedure("@AdHoc",
-                                  "select ID, wage, dept from R1 order by ID, dept").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1,4,3}, {2,2,13}, {3,1,11}});
+        validateDMLTupleCount(client,
+                "Upsert into R1 (dept, id) SELECT dept+10, id+1 FROM R2 order by 1, 2",
+                3); // expect 1 update + 2 inserts
+        validateTableOfLongs(client, "select ID, wage, dept from R1 order by ID, dept",
+                //            original merged    new       original new
+                new long[][] {{1,1,3}, {2,6,13}, {3,1,11}, {4,1,3}, {5,1,13}});
 
-        // Without the order by in the SELECT clause, the result is content non-deterministic.
-        // This is different with INSERT INTO SELECT.
-        vt = client.callProcedure("@AdHoc", String.format(
-                "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 1, 2 ")).getResults()[0];
-        vt = client.callProcedure("@AdHoc",
-                "select ID, wage, dept from P1 order by ID, dept").getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1,1,2}, {2,2,1}, {3,1,1}});
+        // Note: Without the order by in the SELECT clause, the result is content non-deterministic.
+        // This is different from INSERT INTO SELECT.
+        // Also: the last two rows from the select have the same ID value,
+        // {1,X,2}, {3,X,1}, {3,X,4}
+        // so they operate on the same tuple -- inserting and then updating it.
+        // BOTH operations get included in the so-called modified tuple count.
+        // This is a LITTLE surprising, but it's arguably consistent with
+        // counting 1 modified tuple in the case where an UPDATE statement
+        // sets columns to their existing values with no detectable effect.
+        validateDMLTupleCount(client,
+                "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 1, 2 ",
+                3); // expect 2 updates + 1 insert
+        validateTableOfLongs(client, "select ID, wage, dept from P1 order by ID, dept",
+                //            merged   original new      original
+                new long[][] {{1,1,2}, {2,6,1}, {3,1,4}, {4,1,3}});
 
     }
 
