@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
+ /*
  * This samples uses multiple threads to post synchronous requests to the
  * VoltDB server, simulating multiple client application posting
  * synchronous requests to the database, using the native VoltDB client
@@ -31,7 +31,6 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
-
 package kvbench;
 
 import java.io.BufferedReader;
@@ -58,6 +57,7 @@ import org.voltdb.utils.Encoder;
 public class HTTPUtils {
 
     static class Response {
+
         public byte status = 0;
         public String statusString = null;
         public byte appStatus = Byte.MIN_VALUE;
@@ -70,19 +70,15 @@ public class HTTPUtils {
     static boolean prehash = true;
 
     static void dumpResponse(Response resp) {
-    	System.out.println("resp.toString(): " + resp.toString());
-    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
-//    	System.out.println("status: " + resp.status);
+        System.out.println("resp.toString(): " + resp.toString());
+        System.out.println("status: " + resp.status);
     }
 
-    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
+    static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
         for (Entry<String, String> e : params.entrySet()) {
             String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
-            s += "&"+ e.getKey() + "=" + encodedValue;
+            s += "&" + e.getKey() + "=" + encodedValue;
         }
         s = s.substring(1);
         return s;
@@ -105,19 +101,19 @@ public class HTTPUtils {
 
         BufferedReader in = null;
         try {
-            if(conn.getInputStream()!=null){
+            if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getInputStream(), "UTF-8"));
+                                conn.getInputStream(), "UTF-8"));
             }
-        } catch(IOException e){
-            if(conn.getErrorStream()!=null){
+        } catch (IOException e) {
+            if (conn.getErrorStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getErrorStream(), "UTF-8"));
+                                conn.getErrorStream(), "UTF-8"));
             }
         }
-        if(in==null) {
+        if (in == null) {
             throw new Exception("Unable to read response from server");
         }
 
@@ -136,18 +132,17 @@ public class HTTPUtils {
         try {
             conn.getInputStream().close();
             conn.disconnect();
+        } // ignore closing problems here
+        catch (Exception e) {
         }
-        // ignore closing problems here
-        catch (Exception e) {}
         conn = null;
 
         //System.err.println(response);
-
         return response;
     }
 
     public static String getHashedPasswordForHTTPVar(String password) {
-        assert(password != null);
+        assert (password != null);
 
         MessageDigest md = null;
         try {
@@ -178,7 +173,7 @@ public class HTTPUtils {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String,String> params = new HashMap<String,String>();
+        HashMap<String, String> params = new HashMap<String, String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (username != null) {
@@ -209,7 +204,7 @@ public class HTTPUtils {
         response.results = new VoltTable[resultsJson.length()];
         for (int i = 0; i < response.results.length; i++) {
             JSONObject tableJson = resultsJson.getJSONObject(i);
-            response.results[i] =  VoltTable.fromJSONObject(tableJson);
+            response.results[i] = VoltTable.fromJSONObject(tableJson);
             System.out.println(response.results[i].toString());
         }
         if (jsonObj.isNull("status") == false) {
@@ -231,29 +226,24 @@ public class HTTPUtils {
         return response;
     }
 
-//	public static void callProcedure(String string, String key, byte[] storeValue) {
-//		ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-//		String resp = callProcOverJSON(string, pset, username, password, prehash);
-//	}
+    public static Response callProcedure(String string, String key, byte[] storeValue) throws JSONException, IOException, Exception {
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
+        System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
+        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        System.out.println("Response KV resp: " + resp.toString());
+        Response response = responseFromJSON(resp);
+        System.out.println("Response KV: " + response.toString());
+        return response;
+    }
 
-	public static Response callProcedure(String string, String key, byte[] storeValue) throws JSONException, IOException, Exception {
-		ParameterSet pset = ParameterSet.fromArrayNoCopy(key, storeValue);
-		System.out.println("Call proc: " + string + ". key: " + key + ". len(storeValue): " + storeValue.length);
-		String resp = callProcOverJSON(string, pset, username, password, prehash);
-		System.out.println("Response KV resp: " + resp.toString());
-		Response response = responseFromJSON(resp);
-		System.out.println("Response KV: " + response.toString());
-		return response;
-	}
-
-	public static Response  callProcedure(String string, String generateRandomKeyForRetrieval) throws JSONException, IOException, Exception {
-		ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
-		System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
-		String resp = callProcOverJSON(string, pset, username, password, prehash);
-		System.out.println("Response K resp: " + resp.toString());
-		Response response = responseFromJSON(resp);
-		System.out.println("Response K: " + response.toString());
-		return response;
-	}
+    public static Response callProcedure(String string, String generateRandomKeyForRetrieval) throws JSONException, IOException, Exception {
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(generateRandomKeyForRetrieval);
+        System.out.println("Call proc: " + string + ". key: " + generateRandomKeyForRetrieval);
+        String resp = callProcOverJSON(string, pset, username, password, prehash);
+        System.out.println("Response K resp: " + resp.toString());
+        Response response = responseFromJSON(resp);
+        System.out.println("Response K: " + response.toString());
+        return response;
+    }
 
 }

@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
+ /*
  * This samples uses multiple threads to post synchronous requests to the
  * VoltDB server, simulating multiple client application posting
  * synchronous requests to the database, using the native VoltDB client
@@ -31,7 +31,6 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
-
 package kvbench;
 
 import java.io.File;
@@ -64,9 +63,9 @@ import com.google_voltpatches.common.base.Throwables;
 public class HTTPBenchmark {
 
     // handy, rather than typing this out several times
-    static final String HORIZONTAL_RULE =
-            "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+    static final String HORIZONTAL_RULE
+            = "----------" + "----------" + "----------" + "----------"
+            + "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
     final KVConfig config;
@@ -107,11 +106,10 @@ public class HTTPBenchmark {
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
     /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
+     * Uses included {@link CLIConfig} class to declaratively state command line options with defaults and validation.
      */
     static class KVConfig extends CLIConfig {
+
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
@@ -146,7 +144,7 @@ public class HTTPBenchmark {
         int entropy = 127;
 
         @Option(desc = "Compress values on the client side.")
-        boolean usecompression= false;
+        boolean usecompression = false;
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
@@ -162,25 +160,52 @@ public class HTTPBenchmark {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
-            if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
-            if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
+            if (duration <= 0) {
+                exitWithMessageAndUsage("duration must be > 0");
+            }
+            if (warmup < 0) {
+                exitWithMessageAndUsage("warmup must be >= 0");
+            }
+            if (displayinterval <= 0) {
+                exitWithMessageAndUsage("displayinterval must be > 0");
+            }
+            if (poolsize <= 0) {
+                exitWithMessageAndUsage("poolsize must be > 0");
+            }
+            if (getputratio < 0) {
+                exitWithMessageAndUsage("getputratio must be >= 0");
+            }
+            if (getputratio > 1) {
+                exitWithMessageAndUsage("getputratio must be <= 1");
+            }
 
-            if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
-            if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
-            if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
-            if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
-            if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
-            if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+            if (keysize <= 0) {
+                exitWithMessageAndUsage("keysize must be > 0");
+            }
+            if (keysize > 250) {
+                exitWithMessageAndUsage("keysize must be <= 250");
+            }
+            if (minvaluesize <= 0) {
+                exitWithMessageAndUsage("minvaluesize must be > 0");
+            }
+            if (maxvaluesize <= 0) {
+                exitWithMessageAndUsage("maxvaluesize must be > 0");
+            }
+            if (entropy <= 0) {
+                exitWithMessageAndUsage("entropy must be > 0");
+            }
+            if (entropy > 127) {
+                exitWithMessageAndUsage("entropy must be <= 127");
+            }
 
-            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
+            if (threads <= 0) {
+                exitWithMessageAndUsage("threads must be > 0");
+            }
         }
     }
 
     static class GraphiteLogger implements AutoCloseable {
+
         final static String METRIC_PREFIX = "volt.kv.";
         final Socket m_socket;
         final PrintWriter m_writer;
@@ -193,8 +218,8 @@ public class HTTPBenchmark {
 
             PrintWriter pw = null;
             try {
-                m_socket.connect(addr,2000);
-                pw = new PrintWriter(m_socket.getOutputStream(),true);
+                m_socket.connect(addr, 2000);
+                pw = new PrintWriter(m_socket.getOutputStream(), true);
             } catch (IOException ioex) {
                 Throwables.propagate(ioex);
             }
@@ -208,7 +233,9 @@ public class HTTPBenchmark {
         }
 
         public void log(final ClientStats stats) {
-            if (stats == null) return;
+            if (stats == null) {
+                return;
+            }
 
             double now = stats.getEndTimestamp() / 1000.0;
 
@@ -222,11 +249,12 @@ public class HTTPBenchmark {
     }
 
     static class CsvLogger implements AutoCloseable {
+
         final PrintWriter m_writer;
         final SimpleDateFormat m_df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
 
         public CsvLogger(String csvFN) {
-            Preconditions.checkArgument(csvFN != null && !csvFN.trim().isEmpty(),"file name is null or empty");
+            Preconditions.checkArgument(csvFN != null && !csvFN.trim().isEmpty(), "file name is null or empty");
             File fh = new File(csvFN);
             PrintWriter pw = null;
             try {
@@ -247,19 +275,19 @@ public class HTTPBenchmark {
         public void log(final ClientStats stats) {
             String ts = m_df.format(new Date(stats.getEndTimestamp()));
             m_writer.printf("%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f\n",
-                    ts,                                        // col 00 string timestamp
-                    stats.getEndTimestamp(),                   // col 01 long   timestamp millis
-                    stats.getInvocationsCompleted(),           // col 02 long   invocations completed
-                    stats.getInvocationAborts(),               // col 03 long   invocation aborts
-                    stats.getInvocationErrors(),               // col 04 long   invocation errors
-                    stats.getInvocationTimeouts(),             // col 05 long   invocation timeouts
-                    stats.getTxnThroughput(),                  // col 06 long   transaction throughput
-                    stats.getAverageLatency(),                 // col 07 double average latency
-                    stats.kPercentileLatencyAsDouble(0.99),    // col 08 double two nines latency
-                    stats.kPercentileLatencyAsDouble(0.999),   // col 09 double three nines latency
-                    stats.kPercentileLatencyAsDouble(0.9999),  // col 10 double four nines latency
-                    stats.kPercentileLatencyAsDouble(0.99999)  // col 11 double five nines latency
-                    );
+                    ts, // col 00 string timestamp
+                    stats.getEndTimestamp(), // col 01 long   timestamp millis
+                    stats.getInvocationsCompleted(), // col 02 long   invocations completed
+                    stats.getInvocationAborts(), // col 03 long   invocation aborts
+                    stats.getInvocationErrors(), // col 04 long   invocation errors
+                    stats.getInvocationTimeouts(), // col 05 long   invocation timeouts
+                    stats.getTxnThroughput(), // col 06 long   transaction throughput
+                    stats.getAverageLatency(), // col 07 double average latency
+                    stats.kPercentileLatencyAsDouble(0.99), // col 08 double two nines latency
+                    stats.kPercentileLatencyAsDouble(0.999), // col 09 double three nines latency
+                    stats.kPercentileLatencyAsDouble(0.9999), // col 10 double four nines latency
+                    stats.kPercentileLatencyAsDouble(0.99999) // col 11 double five nines latency
+            );
         }
     }
 
@@ -273,8 +301,7 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Constructor for benchmark instance.
-     * Configures VoltDB client and prints configuration.
+     * Constructor for benchmark instance. Configures VoltDB client and prints configuration.
      *
      * @param config Parsed & validated CLI options.
      */
@@ -307,9 +334,8 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * Connect to a single server with retry. Limited exponential backoff. No timeout. This will run until the process
+     * is killed if it's not able to connect.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
@@ -319,22 +345,25 @@ public class HTTPBenchmark {
             try {
                 client.createConnection(server);
                 break;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                try {
+                    Thread.sleep(sleep);
+                } catch (Exception interruted) {
+                }
+                if (sleep < 8000) {
+                    sleep += sleep;
+                }
             }
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
+     * Connect to a set of servers in parallel. Each will retry until connection. This call will block until all have
+     * connected.
      *
-     * @param servers A comma separated list of servers using the hostname:port
-     * syntax (where :port is optional).
+     * @param servers A comma separated list of servers using the hostname:port syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
@@ -358,23 +387,24 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
+     * Create a Timer task to display performance data on the Vote procedure It calls printStatistics() every
+     * displayInterval seconds
      */
     public void schedulePeriodicStats() {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
-            public void run() { printStatistics(); }
+            public void run() {
+                printStatistics();
+            }
         };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+                config.displayinterval * 1000,
+                config.displayinterval * 1000);
     }
 
     /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
+     * Prints a one line update on performance that can be printed periodically during a benchmark.
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
@@ -392,8 +422,7 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
+     * Prints the results of the voting simulation and statistics about performance.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -401,29 +430,29 @@ public class HTTPBenchmark {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Get/Put performance results
-        String display = "\n" +
-                         HORIZONTAL_RULE +
-                         " KV Store Results\n" +
-                         HORIZONTAL_RULE +
-                         "\nA total of %,d operations were posted...\n" +
-                         " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n" +
-                         "         %,9d MB in compressed store data\n" +
-                         "         %,9d MB in uncompressed application data\n" +
-                         "         Network Throughput: %6.3f Gbps*\n" +
-                         " - PUTs: %,9d Operations (%,d Failures)\n" +
-                         "         %,9d MB in compressed store data\n" +
-                         "         %,9d MB in uncompressed application data\n" +
-                         "         Network Throughput: %6.3f Gbps*\n" +
-                         " - Total Network Throughput: %6.3f Gbps*\n\n" +
-                         "* Figure includes key & value traffic but not database protocol overhead.\n\n";
+        String display = "\n"
+                + HORIZONTAL_RULE
+                + " KV Store Results\n"
+                + HORIZONTAL_RULE
+                + "\nA total of %,d operations were posted...\n"
+                + " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n"
+                + "         %,9d MB in compressed store data\n"
+                + "         %,9d MB in uncompressed application data\n"
+                + "         Network Throughput: %6.3f Gbps*\n"
+                + " - PUTs: %,9d Operations (%,d Failures)\n"
+                + "         %,9d MB in compressed store data\n"
+                + "         %,9d MB in uncompressed application data\n"
+                + "         Network Throughput: %6.3f Gbps*\n"
+                + " - Total Network Throughput: %6.3f Gbps*\n\n"
+                + "* Figure includes key & value traffic but not database protocol overhead.\n\n";
 
         double oneGigabit = (1024 * 1024 * 1024) / 8;
         long oneMB = (1024 * 1024);
         double getThroughput = networkGetData.get() + (successfulGets.get() * config.keysize);
-               getThroughput /= (oneGigabit * config.duration);
+        getThroughput /= (oneGigabit * config.duration);
         long totalPuts = successfulPuts.get() + failedPuts.get();
         double putThroughput = networkGetData.get() + (totalPuts * config.keysize);
-               putThroughput /= (oneGigabit * config.duration);
+        putThroughput /= (oneGigabit * config.duration);
 
         System.out.printf(display,
                 stats.getInvocationsCompleted(),
@@ -471,8 +500,8 @@ public class HTTPBenchmark {
     }
 
     /**
-     * While <code>benchmarkComplete</code> is set to false, run as many
-     * synchronous procedure calls as possible and record the results.
+     * While <code>benchmarkComplete</code> is set to false, run as many synchronous procedure calls as possible and
+     * record the results.
      *
      */
     class KVThread implements Runnable {
@@ -485,16 +514,15 @@ public class HTTPBenchmark {
                     // Get a key/value pair, synchronously
                     try {
                         HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval());
+                    } catch (Exception e) {
                     }
-                    catch (Exception e) {}
-                }
-                else {
+                } else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                    	HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
+                    } catch (Exception e) {
                     }
-                    catch (Exception e) {}
                 }
             }
 
@@ -507,32 +535,29 @@ public class HTTPBenchmark {
                                 processor.generateRandomKeyForRetrieval());
 
                         if (response.results[0].advanceRow()) {
-                        	final VoltTable pairData = response.results[0];
-                        	// Cache miss (Key does not exist)
-                        	if (pairData.getRowCount() == 0)
-                        		missedGets.incrementAndGet();
-                        	else {
-                        		final PayloadProcessor.Pair pair =
-                        				processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                        						pairData.fetchRow(0).getVarbinary(1));
-                        		successfulGets.incrementAndGet();
-                        		networkGetData.addAndGet(pair.getStoreValueLength());
-                        		rawGetData.addAndGet(pair.getRawValueLength());
-                        	}
+                            final VoltTable pairData = response.results[0];
+                            // Cache miss (Key does not exist)
+                            if (pairData.getRowCount() == 0) {
+                                missedGets.incrementAndGet();
+                            } else {
+                                final PayloadProcessor.Pair pair
+                                        = processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                                pairData.fetchRow(0).getVarbinary(1));
+                                successfulGets.incrementAndGet();
+                                networkGetData.addAndGet(pair.getStoreValueLength());
+                                rawGetData.addAndGet(pair.getRawValueLength());
+                            }
                         }
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         failedGets.incrementAndGet();
                     }
-                }
-                else {
+                } else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                    	HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue());
                         successfulPuts.incrementAndGet();
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                         failedPuts.incrementAndGet();
                     }
                     networkPutData.addAndGet(pair.getStoreValueLength());
@@ -543,8 +568,7 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Core benchmark code.
-     * Connect. Initialize. Run the loop. Cleanup. Print Results.
+     * Core benchmark code. Connect. Initialize. Run the loop. Cleanup. Print Results.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -560,11 +584,11 @@ public class HTTPBenchmark {
         System.out.println();
         if (config.preload) {
             System.out.println("Preloading data store...");
-            for(int i=0; i < config.poolsize; i++) {
+            for (int i = 0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
-                                     "Put",
-                                     String.format(processor.KeyFormat, i),
-                                     processor.generateForStore().getStoreValue());
+                        "Put",
+                        String.format(processor.KeyFormat, i),
+                        processor.generateForStore().getStoreValue());
             }
             client.drain();
             System.out.println("Preloading complete.\n");

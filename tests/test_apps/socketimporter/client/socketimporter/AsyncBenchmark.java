@@ -47,8 +47,6 @@ package socketimporter.client.socketimporter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.util.HashMap;
@@ -465,8 +463,8 @@ public class AsyncBenchmark {
             while (queueEndTime > System.currentTimeMillis()) {
                 checkDB.processQueue();
             }
-        } 
-        
+        }
+
         // final exit criteria -- queue of outstanding importer requests goes to zero
         // but with checking for no-progress so we don't get stuck forever.
         long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);

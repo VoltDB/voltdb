@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
+ /*
  * This samples uses multiple threads to post synchronous requests to the
  * VoltDB server, simulating multiple client application posting
  * synchronous requests to the database, using the native VoltDB client
@@ -31,14 +31,10 @@
  * transaction), the VoltDB cluster at large is still able to perform at
  * blazing speeds when many clients are connected to it.
  */
-
 package voltkvqa;
 
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -47,12 +43,9 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
@@ -62,9 +55,9 @@ import org.voltdb.client.NullCallback;
 public class HTTPBenchmark {
 
     // handy, rather than typing this out several times
-    static final String HORIZONTAL_RULE =
-            "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
+    static final String HORIZONTAL_RULE
+            = "----------" + "----------" + "----------" + "----------"
+            + "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
     final KVConfig config;
@@ -99,11 +92,10 @@ public class HTTPBenchmark {
     final AtomicLong networkPutData = new AtomicLong(0);
 
     /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
+     * Uses included {@link CLIConfig} class to declaratively state command line options with defaults and validation.
      */
     static class KVConfig extends CLIConfig {
+
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
@@ -138,7 +130,7 @@ public class HTTPBenchmark {
         int entropy = 127;
 
         @Option(desc = "Compress values on the client side.")
-        boolean usecompression= false;
+        boolean usecompression = false;
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
@@ -157,27 +149,52 @@ public class HTTPBenchmark {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
-            if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
-            if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
+            if (duration <= 0) {
+                exitWithMessageAndUsage("duration must be > 0");
+            }
+            if (warmup < 0) {
+                exitWithMessageAndUsage("warmup must be >= 0");
+            }
+            if (displayinterval <= 0) {
+                exitWithMessageAndUsage("displayinterval must be > 0");
+            }
+            if (poolsize <= 0) {
+                exitWithMessageAndUsage("poolsize must be > 0");
+            }
+            if (getputratio < 0) {
+                exitWithMessageAndUsage("getputratio must be >= 0");
+            }
+            if (getputratio > 1) {
+                exitWithMessageAndUsage("getputratio must be <= 1");
+            }
 
-            if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
-            if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
-            if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
-            if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
-            if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
-            if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+            if (keysize <= 0) {
+                exitWithMessageAndUsage("keysize must be > 0");
+            }
+            if (keysize > 250) {
+                exitWithMessageAndUsage("keysize must be <= 250");
+            }
+            if (minvaluesize <= 0) {
+                exitWithMessageAndUsage("minvaluesize must be > 0");
+            }
+            if (maxvaluesize <= 0) {
+                exitWithMessageAndUsage("maxvaluesize must be > 0");
+            }
+            if (entropy <= 0) {
+                exitWithMessageAndUsage("entropy must be > 0");
+            }
+            if (entropy > 127) {
+                exitWithMessageAndUsage("entropy must be <= 127");
+            }
 
-            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
+            if (threads <= 0) {
+                exitWithMessageAndUsage("threads must be > 0");
+            }
         }
     }
 
     /**
-     * Constructor for benchmark instance.
-     * Configures VoltDB client and prints configuration.
+     * Constructor for benchmark instance. Configures VoltDB client and prints configuration.
      *
      * @param config Parsed & validated CLI options.
      */
@@ -202,9 +219,8 @@ public class HTTPBenchmark {
     }
 
     /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * Connect to a single server with retry. Limited exponential backoff. No timeout. This will run until the process
+     * is killed if it's not able to connect.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
@@ -214,22 +230,25 @@ public class HTTPBenchmark {
             try {
                 client.createConnection(server);
                 break;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                try {
+                    Thread.sleep(sleep);
+                } catch (Exception interruted) {
+                }
+                if (sleep < 8000) {
+                    sleep += sleep;
+                }
             }
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
     /**
-     * Connect to a set of servers in parallel. Each will retry until
-     * connection. This call will block until all have connected.
+     * Connect to a set of servers in parallel. Each will retry until connection. This call will block until all have
+     * connected.
      *
-     * @param servers A comma separated list of servers using the hostname:port
-     * syntax (where :port is optional).
+     * @param servers A comma separated list of servers using the hostname:port syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
@@ -252,10 +271,8 @@ public class HTTPBenchmark {
         connections.await();
     }
 
-
     /**
-     * Prints the results of the test and statistics
-     * about performance.
+     * Prints the results of the test and statistics about performance.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -263,30 +280,30 @@ public class HTTPBenchmark {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Get/Put performance results
-        String display = "\n" +
-                         HORIZONTAL_RULE +
-                         " KV Store Results\n" +
-                         HORIZONTAL_RULE +
-                         "\nA total of %,d operations were posted...\n" +
-                         " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n" +
-                         "         %,9d MB in compressed store data\n" +
-                         "         %,9d MB in uncompressed application data\n" +
-                         "         Network Throughput: %6.3f Gbps*\n" +
-                         " - PUTs: %,9d Operations (%,d Failures)\n" +
-                         "         %,9d MB in compressed store data\n" +
-                         "         %,9d MB in uncompressed application data\n" +
-                         "         Network Throughput: %6.3f Gbps*\n" +
-                         " - Total Network Throughput: %6.3f Gbps*\n\n" +
-                         " - Transactions/second (GET+PUT): %6.3f TPS*\n\n" +
-                         "* Figure includes key & value traffic but not database protocol overhead.\n\n";
+        String display = "\n"
+                + HORIZONTAL_RULE
+                + " KV Store Results\n"
+                + HORIZONTAL_RULE
+                + "\nA total of %,d operations were posted...\n"
+                + " - GETs: %,9d Operations (%,d Misses and %,d Failures)\n"
+                + "         %,9d MB in compressed store data\n"
+                + "         %,9d MB in uncompressed application data\n"
+                + "         Network Throughput: %6.3f Gbps*\n"
+                + " - PUTs: %,9d Operations (%,d Failures)\n"
+                + "         %,9d MB in compressed store data\n"
+                + "         %,9d MB in uncompressed application data\n"
+                + "         Network Throughput: %6.3f Gbps*\n"
+                + " - Total Network Throughput: %6.3f Gbps*\n\n"
+                + " - Transactions/second (GET+PUT): %6.3f TPS*\n\n"
+                + "* Figure includes key & value traffic but not database protocol overhead.\n\n";
 
         double oneGigabit = (1024 * 1024 * 1024) / 8;
         long oneMB = (1024 * 1024);
         double getThroughput = networkGetData.get() + (successfulGets.get() * config.keysize);
-               getThroughput /= (oneGigabit * config.duration);
+        getThroughput /= (oneGigabit * config.duration);
         long totalPuts = successfulPuts.get() + failedPuts.get();
         double putThroughput = networkGetData.get() + (totalPuts * config.keysize);
-               putThroughput /= (oneGigabit * config.duration);
+        putThroughput /= (oneGigabit * config.duration);
 
         System.out.printf(display,
                 stats.getInvocationsCompleted(),
@@ -299,24 +316,25 @@ public class HTTPBenchmark {
                 rawPutData.get() / oneMB,
                 putThroughput,
                 getThroughput + putThroughput,
-                (successfulGets.get()+successfulPuts.get())/(double)config.duration);
+                (successfulGets.get() + successfulPuts.get()) / (double) config.duration);
 
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
-     * While <code>benchmarkComplete</code> is set to false, run as many
-     * synchronous procedure calls as possible and record the results.
+     * While <code>benchmarkComplete</code> is set to false, run as many synchronous procedure calls as possible and
+     * record the results.
      *
      */
     class KVThread implements Runnable {
+
         private final CloseableHttpClient m_httpClient;
         private final HttpPost m_httpPost;
 
         // constructor  --  each thread gets its http connection
         public KVThread(CloseableHttpClient httpClient, HttpPost httpPost) {
-                m_httpClient = httpClient;
-                m_httpPost = httpPost;
+            m_httpClient = httpClient;
+            m_httpPost = httpPost;
         }
 
         @Override
@@ -327,67 +345,66 @@ public class HTTPBenchmark {
                     // Get a key/value pair, synchronously
                     try {
                         HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+                    } catch (Exception e) {
+                        e.printStackTrace(System.out);
                     }
-                    catch (Exception e) { e.printStackTrace(System.out); }
-                }
-                else {
+                } else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
                         HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                    } catch (Exception e) {
+                        e.printStackTrace(System.out);
                     }
-                    catch (Exception e) { e.printStackTrace(System.out); }
                 }
             }
 
             while (benchmarkComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
-            	if (rand.nextDouble() < config.getputratio) {
-            		// Get a key/value pair, synchronously
-            		try {
-            			HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
-            					processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+                if (rand.nextDouble() < config.getputratio) {
+                    // Get a key/value pair, synchronously
+                    try {
+                        HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
+                                processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
 
-            			if (response.results[0].advanceRow()) {
+                        if (response.results[0].advanceRow()) {
 
-            				final VoltTable pairData = response.results[0];
-            				// Cache miss (Key does not exist)
-            				if (pairData.getRowCount() == 0)
-            					missedGets.incrementAndGet();
-            				else {
-            					final PayloadProcessor.Pair pair =
-            							processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-            									pairData.fetchRow(0).getVarbinary(1));
-            					successfulGets.incrementAndGet();
-            					networkGetData.addAndGet(pair.getStoreValueLength());
-            					rawGetData.addAndGet(pair.getRawValueLength());
-            				}
-            			}
-            		}
-            		catch (Exception e) {
-            			e.printStackTrace(System.out); failedGets.incrementAndGet();
-            		}
-            	}
-            	else {
-            		// Put a key/value pair, synchronously
-            		final PayloadProcessor.Pair pair = processor.generateForStore();
-            		try {
-            			HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost );
-            			successfulPuts.incrementAndGet();
-            		}
-            		catch (Exception e) {
-            			e.printStackTrace(System.out); failedPuts.incrementAndGet();
-            		}
-            		networkPutData.addAndGet(pair.getStoreValueLength());
-            		rawPutData.addAndGet(pair.getRawValueLength());
-            	}
+                            final VoltTable pairData = response.results[0];
+                            // Cache miss (Key does not exist)
+                            if (pairData.getRowCount() == 0) {
+                                missedGets.incrementAndGet();
+                            } else {
+                                final PayloadProcessor.Pair pair
+                                        = processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                                pairData.fetchRow(0).getVarbinary(1));
+                                successfulGets.incrementAndGet();
+                                networkGetData.addAndGet(pair.getStoreValueLength());
+                                rawGetData.addAndGet(pair.getRawValueLength());
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace(System.out);
+                        failedGets.incrementAndGet();
+                    }
+                } else {
+                    // Put a key/value pair, synchronously
+                    final PayloadProcessor.Pair pair = processor.generateForStore();
+                    try {
+                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                        successfulPuts.incrementAndGet();
+                    } catch (Exception e) {
+                        e.printStackTrace(System.out);
+                        failedPuts.incrementAndGet();
+                    }
+                    networkPutData.addAndGet(pair.getStoreValueLength());
+                    rawPutData.addAndGet(pair.getRawValueLength());
+                }
             }
         }
     }
 
     /**
-     * Core benchmark code.
-     * Connect. Initialize. Run the loop. Cleanup. Print Results.
+     * Core benchmark code. Connect. Initialize. Run the loop. Cleanup. Print Results.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -403,11 +420,11 @@ public class HTTPBenchmark {
         System.out.println();
         if (config.preload) {
             System.out.println("Preloading data store...");
-            for(int i=0; i < config.poolsize; i++) {
+            for (int i = 0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
-                                     "Put",
-                                     String.format(processor.KeyFormat, i),
-                                     processor.generateForStore().getStoreValue());
+                        "Put",
+                        String.format(processor.KeyFormat, i),
+                        processor.generateForStore().getStoreValue());
             }
             client.drain();
             System.out.println("Preloading complete.\n");
@@ -419,7 +436,7 @@ public class HTTPBenchmark {
 
         // setup the HTTP connection pool that will be used by the threads
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
-        cm.setMaxTotal(config.threads*2);
+        cm.setMaxTotal(config.threads * 2);
         cm.setDefaultMaxPerRoute(config.threads);
         CloseableHttpClient httpclient = HttpClients.custom().setConnectionManager(cm).build();
         String[] servers = config.servers.split(",");
@@ -427,7 +444,7 @@ public class HTTPBenchmark {
         // create/start the requested number of threads
         Thread[] kvThreads = new Thread[config.threads];
         for (int i = 0; i < config.threads; ++i) {
-            HttpPost httppost = new HttpPost("http://" + servers[i%servers.length] + ":8080/api/1.0/");
+            HttpPost httppost = new HttpPost("http://" + servers[i % servers.length] + ":8080/api/1.0/");
             kvThreads[i] = new Thread(new KVThread(httpclient, httppost));
             kvThreads[i].start();
         }
@@ -448,7 +465,6 @@ public class HTTPBenchmark {
 
         // cancel periodic stats printing
         // timer.cancel();
-
         // block until all outstanding txns return
         client.drain();
 
