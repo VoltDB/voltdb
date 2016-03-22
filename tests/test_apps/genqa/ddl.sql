@@ -46,7 +46,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table
+CREATE STREAM export_partitioned_table EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -74,7 +74,7 @@ CREATE TABLE export_partitioned_table
 );
 PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_mirror_partitioned_table
+CREATE TABLE  export_mirror_partitioned_table 
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -103,7 +103,7 @@ CREATE TABLE export_mirror_partitioned_table
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_done_table
+CREATE STREAM  export_done_table EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -154,7 +154,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE TABLE export_replicated_table
+CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -181,7 +181,7 @@ CREATE TABLE export_replicated_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_skinny_partitioned_table
+CREATE STREAM export_skinny_partitioned_table  EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -202,7 +202,7 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
   ON TABLE export_skinny_partitioned_table COLUMN rowid;
 
-EXPORT TABLE export_skinny_partitioned_table;
-EXPORT TABLE export_partitioned_table;
-EXPORT TABLE export_replicated_table;
-EXPORT TABLE export_done_table;
+-- EXPORT TABLE export_skinny_partitioned_table;
+-- EXPORT TABLE export_partitioned_table;
+-- EXPORT TABLE export_replicated_table;
+-- EXPORT TABLE export_done_table;
