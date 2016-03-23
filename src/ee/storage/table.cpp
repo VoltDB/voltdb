@@ -79,7 +79,6 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
-    m_pkeyIndex(NULL),
     m_refcount(0),
     m_compactionThreshold(95)
 {
@@ -88,12 +87,6 @@ Table::Table(int tableAllocationTargetSize) :
 Table::~Table() {
     // not all tables are reference counted but this should be invariant
     assert(m_refcount == 0);
-
-    // clean up indexes
-    BOOST_FOREACH(TableIndex *index, m_indexes) {
-        delete index;
-    }
-    m_pkeyIndex = NULL;
 
     // clear the schema
     if (m_ownsTupleSchema) {
@@ -427,20 +420,13 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     return true;
 }
 
-bool Table::equals(voltdb::Table *other) {
+bool Table::equals(voltdb::Table *other)
+{
     if (!(columnCount() == other->columnCount())) return false;
-    if (!(indexCount() == other->indexCount())) return false;
     if (!(activeTupleCount() == other->activeTupleCount())) return false;
     if (!(databaseId() == other->databaseId())) return false;
     if (!(name() == other->name())) return false;
     if (!(tableType() == other->tableType())) return false;
-
-    const std::vector<voltdb::TableIndex*>& indexes = allIndexes();
-    const std::vector<voltdb::TableIndex*>& otherIndexes = other->allIndexes();
-    if (!(indexes.size() == indexes.size())) return false;
-    for (std::size_t ii = 0; ii < indexes.size(); ii++) {
-        if (!(indexes[ii]->equals(otherIndexes[ii]))) return false;
-    }
 
     const voltdb::TupleSchema *otherSchema = other->schema();
     if ((!m_schema->equals(otherSchema))) return false;
@@ -561,102 +547,5 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
-
-bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
-    BOOST_FOREACH(TableIndex *i2, indexes) {
-        if (i2 == index) {
-            return true;
-        }
-    }
-    return false;
-}
-
-TableIndex *Table::index(std::string name) {
-    BOOST_FOREACH(TableIndex *index, m_indexes) {
-        if (index->getName().compare(name) == 0) {
-            return index;
-        }
-    }
-    std::stringstream errorString;
-    errorString << "Could not find Index with name " << name << " among {";
-    const char* sep = "";
-    BOOST_FOREACH(TableIndex *index, m_indexes) {
-        errorString << sep << index->getName();
-        sep = ", ";
-    }
-    errorString << "}";
-    throwFatalException("%s", errorString.str().c_str());
-}
-
-void Table::addIndex(TableIndex *index) {
-    // silently ignore indexes if they've gotten this far
-    if (isExport()) {
-        return;
-    }
-
-    assert(!isExistingTableIndex(m_indexes, index));
-
-    // fill the index with tuples... potentially the slow bit
-    TableTuple tuple(m_schema);
-    TableIterator iter = iterator();
-    while (iter.next(tuple)) {
-        index->addEntry(&tuple, NULL);
-    }
-
-    // add the index to the table
-    if (index->isUniqueIndex()) {
-        m_uniqueIndexes.push_back(index);
-    }
-    m_indexes.push_back(index);
-}
-
-void Table::removeIndex(TableIndex *index) {
-    // silently ignore indexes if they've gotten this far
-    if (isExport()) {
-        return;
-    }
-
-    assert(isExistingTableIndex(m_indexes, index));
-
-    std::vector<TableIndex*>::iterator iter;
-    for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
-        if ((*iter) == index) {
-            m_indexes.erase(iter);
-            break;
-        }
-    }
-    for (iter = m_uniqueIndexes.begin(); iter != m_uniqueIndexes.end(); iter++) {
-        if ((*iter) == index) {
-            m_uniqueIndexes.erase(iter);
-            break;
-        }
-    }
-    if (m_pkeyIndex == index) {
-        m_pkeyIndex = NULL;
-    }
-
-    // this should free any memory used by the index
-    delete index;
-}
-
-void Table::setPrimaryKeyIndex(TableIndex *index) {
-    // for now, no calling on non-empty tables
-    assert(activeTupleCount() == 0);
-    assert(isExistingTableIndex(m_indexes, index));
-
-    m_pkeyIndex = index;
-}
-
-void Table::configureIndexStats(CatalogId databaseId)
-{
-    // initialize stats for all the indexes for the table
-    BOOST_FOREACH(TableIndex *index, m_indexes) {
-        index->getIndexStats()->configure(index->getName() + " stats",
-                                          name(),
-                                          databaseId);
-    }
-
-}
-
 
 }
