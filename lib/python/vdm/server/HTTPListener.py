@@ -1081,73 +1081,6 @@ class DatabaseAPI(MethodView):
         Configuration.write_configuration_file()
         return jsonify({'result': True})
 
-
-class deploymentAPI(MethodView):
-    """Class to handle request related to deployment."""
-
-    @staticmethod
-    def get(database_id):
-        """
-        Get the deployment with specified database_id.
-        Args:
-            database_id (int): The first parameter.
-        Returns:
-            List of deployment information with specified database.
-        """
-        if database_id is None:
-            # return a list of users
-            return jsonify({'deployment': [make_public_deployment(x) for x in Global.DEPLOYMENT]})
-        else:
-            deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
-            return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
-
-    @staticmethod
-    def put(database_id):
-        """
-        Add deployment information to specified database_id.
-        Args:
-            database_id (int): The first parameter.
-        Returns:
-            Deployment object of added deployment.
-        """
-        inputs = JsonInputs(request)
-        if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
-
-        if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
-            if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and \
-                            'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
-                size = str(request.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
-                response = json.loads(check_size_value(size, 'memorylimit').data)
-                if 'error' in response:
-                    return jsonify({'error': response['error']})
-            disk_limit_arr = []
-            if 'disklimit' in request.json['systemsettings']['resourcemonitor'] and \
-                            'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
-                for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                    size = feature['size']
-                    if feature['name'] in disk_limit_arr:
-                        return jsonify({'error': 'Duplicate items are not allowed.'})
-                    disk_limit_arr.append(feature['name'])
-                    response = json.loads(check_size_value(size, 'disklimit').data)
-                    if 'error' in response:
-                        return jsonify({'error': response['error']})
-
-        # if 'users' in request.json:
-        #     if 'user' in request.json['users']:
-        #         prev_username = ''
-        #         for user in request.json['users']['user']:
-        #             if user['name'] == prev_username:
-        #                 return make_response(jsonify({'error': 'Duplicate Username'
-        #                                                  , 'success': False}), 404)
-        #             prev_username = user['name']
-
-        deployment = map_deployment(request, database_id)
-        sync_configuration()
-        Configuration.write_configuration_file()
-        return jsonify({'deployment': deployment, 'status': 1})
-
-
 class deploymentUserAPI(MethodView):
     """Class to handle request related to deployment."""
 
@@ -1519,87 +1452,33 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-        return Response(deployment_content, mimetype='text/xml')
+        if 'text/xml' in request.headers['Accept']:
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
+            return Response(deployment_content, mimetype='text/xml')
+        else:
+            deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
+            return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
 
     @staticmethod
     def put(database_id):
-        file = request.files['file']
-        if file and allowed_file(file.filename):
-            try:
-                content = file.read()
-                o = XML(content)
-                xml_final = json.loads(json.dumps(Configuration.etree_to_dict(o)))
-                if 'deployment' not in xml_final:
-                    return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
-                else:
-                    if type(xml_final['deployment']) is dict:
-                        deployment_data = Configuration.get_deployment_for_upload(xml_final['deployment'])
-                        if type(deployment_data) is dict:
-                            if 'error' in deployment_data:
-                                return jsonify({'error': deployment_data['error']})
-                        else:
-                            deployment_json = deployment_data[0]
-                        req = DictClass()
-                        req.json = {}
-                        req.json = deployment_json
-                        inputs = JsonInputs(req)
-                        if not inputs.validate():
-                            return jsonify(success=False, errors=inputs.errors)
-                        if 'systemsettings' in req.json and 'resourcemonitor' in req.json['systemsettings']:
-                            if 'memorylimit' in req.json['systemsettings']['resourcemonitor'] and \
-                                            'size' in req.json['systemsettings']['resourcemonitor']['memorylimit']:
-                                size = str(req.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
-                                response = json.loads(check_size_value(size, 'memorylimit').data)
-                                if 'error' in response:
-                                    return jsonify({'error': response['error']})
-                            disk_limit_arr = []
-                            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
-                                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
-                                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                                    size = feature['size']
-                                    if feature['name'] in disk_limit_arr:
-                                        return jsonify({'error': 'Duplicate items are not allowed.'})
-                                    disk_limit_arr.append(feature['name'])
-                                    response = json.loads(check_size_value(size, 'disklimit').data)
-                                    if 'error' in response:
-                                        return jsonify({'error': response['error']})
-                        if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
-                            frequency_unit = ['h', 'm', 's']
-                            frequency = str(req.json['snapshot']['frequency'])
-                            last_char = frequency[len(frequency) - 1]
-                            if last_char not in frequency_unit:
-                                return jsonify({'error': 'Snapshot: Invalid frequency value.'})
-                            frequency = frequency[:-1]
-                            try:
-                                int_frequency = int(frequency)
-                            except Exception, exp:
-                                return jsonify({'error': 'Snapshot: ' + str(exp)})
+        if 'application/json' in request.headers['Content-Type']:
+            inputs = JsonInputs(request)
+            if not inputs.validate():
+                return jsonify(success=False, errors=inputs.errors)
+            result = Configuration.check_validation_deployment(request)
+            if 'status' in result and result['status'] == 'error':
+                return jsonify(result)
 
-                        map_deployment(req, database_id)
-                        Global.DEPLOYMENT_USERS = []
-                        if 'users' in req.json and 'user' in req.json['users']:
-                            for user in req.json['users']['user']:
-                                Global.DEPLOYMENT_USERS.append(
-                                    {
-                                        'name': user['name'],
-                                        'roles': user['roles'],
-                                        'password': user['password'],
-                                        'plaintext': user['plaintext'],
-                                        'databaseid': database_id
-                                    }
-                                )
-                        sync_configuration()
-                        Configuration.write_configuration_file()
-                        return jsonify({'status': 'success'})
-                    else:
-                        return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
-
-            except Exception as err:
-                return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
+            deployment = map_deployment(request, database_id)
+            sync_configuration()
+            Configuration.write_configuration_file()
+            return jsonify({'deployment': deployment, 'status': 1})
         else:
-            return jsonify({'status': 'failure', 'error': 'Invalid file type.'})
-
+            result = Configuration.set_deployment_for_upload(database_id, request)
+            if 'status' in result and result['status'] == 'failure':
+                return jsonify(result)
+            else:
+                return jsonify({'status': 'success'})
 
 class VdmAPI(MethodView):
     """
@@ -1770,7 +1649,6 @@ def main(runner, amodule, config_dir, data_dir, server):
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
     STOP_DATABASE_VIEW = StopDatabaseAPI.as_view('stop_database_api')
     RECOVER_DATABASE_VIEW = RecoverDatabaseAPI.as_view('recover_database_api')
-    DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
@@ -1805,11 +1683,6 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-
-    APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
-                     view_func=DEPLOYMENT_VIEW, methods=['GET'])
-
-    APP.add_url_rule('/api/1.0/deployment/<int:database_id>', view_func=DEPLOYMENT_VIEW, methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])

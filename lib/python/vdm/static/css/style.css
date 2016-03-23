@@ -481,6 +481,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 
 .createDB {float:left; margin-top:7px; cursor:pointer;}
 .errorWrapper{max-height:375px; overflow-y:auto;}
+table td.tdROle label.error{height:20px;}
 
 
 /******************************new added Ends***************/
@@ -1211,6 +1212,8 @@ input.drop-down-input{width:125px !important;}
 .col-xs-4{padding-left:0 !important;}
 
 .connSource { }
+.tokenNote { font-size:11px; text-decoration:underline; position:relative; top:7px;}
+
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1524,5 +1527,7 @@ ul.drList {
 }
 }
 
+/*jquery UI override*/
+.ui-menu { z-index:9999; width:213px!important;}
 
 
