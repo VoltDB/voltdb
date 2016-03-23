@@ -168,7 +168,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              */
             m_finishedTableScan = true;
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
-            m_iterator.reset(m_backedUpTuples.get()->makeIterator());
+            m_iterator.reset(m_backedUpTuples->makeIterator());
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
@@ -385,7 +385,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
+    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
         count2++;

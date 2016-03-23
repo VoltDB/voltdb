@@ -55,7 +55,6 @@ namespace voltdb {
 class CopyOnWriteContext;
 class CopyOnWriteIterator;
 class AbstractDRTupleStream;
-class MaterializedViewMetadata;
 class PersistentTable;
 class PersistentTableUndoDeleteAction;
 class PersistentTableUndoTruncateTableAction;

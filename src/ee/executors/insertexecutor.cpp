@@ -102,7 +102,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
             VOLT_ERROR("UPSERT is not supported for Stream table %s", targetTable->name().c_str());
         }
         // look up the tuple whether it exists already
-        if (targetTable->primaryKeyIndex() == NULL) {
+        if (persistentTarget->primaryKeyIndex() == NULL) {
             VOLT_ERROR("No primary keys were found in our target table '%s'",
                     targetTable->name().c_str());
         }

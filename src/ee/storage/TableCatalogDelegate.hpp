@@ -64,10 +64,10 @@ class TableCatalogDelegate {
 
     void deleteCommand();
 
-    int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
-    bool evaluateExport(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+    void init(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
+    void evaluateExport(catalog::Database const &catalogDatabase,
+            catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
