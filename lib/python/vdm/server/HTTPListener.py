@@ -477,9 +477,10 @@ def map_deployment(request, database_id):
     return deployment
 
 
-def map_deployment_users(request, user):
+def map_deployment_users(request, user_id):
     if 'name' not in Global.DEPLOYMENT_USERS:
-        Global.DEPLOYMENT_USERS[user] = {
+        Global.DEPLOYMENT_USERS[user_id] = {
+            'userid': user_id,
             'databaseid': request.json['databaseid'],
             'name': request.json['name'],
             'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
@@ -487,10 +488,10 @@ def map_deployment_users(request, user):
             'plaintext': request.json['plaintext']
         }
 
-        deployment_user = Global.DEPLOYMENT_USERS.get(user)
+        deployment_user = Global.DEPLOYMENT_USERS.get(user_id)
 
     else:
-        deployment_user = Global.DEPLOYMENT_USERS.get(user)
+        deployment_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         if len(deployment_user) != 0:
             deployment_user['name'] = request.json['name']
@@ -1068,7 +1069,7 @@ class DeploymentUserAPI(MethodView):
     """Class to handle request related to deployment."""
 
     @staticmethod
-    def get(username):
+    def get(database_id):
         """
         Get the deployment with specified database_id.
         Args:
@@ -1076,86 +1077,102 @@ class DeploymentUserAPI(MethodView):
         Returns:
             List of deployment information with specified database.
         """
-        # deployment_user = [deployment_user for deployment_user in Global.DEPLOYMENT_USERS
-        #                    if deployment_user['name'] == username]
-        deployment_user = Global.DEPLOYMENT_USERS.get(username)
+        # deployment_user = Global.DEPLOYMENT_USERS.get(user_id)
+
+        deployment_user = []
+        for key, value in Global.DEPLOYMENT_USERS.iteritems():
+            if value["databaseid"] == database_id:
+                deployment_user.append(value)
 
         return jsonify({'deployment': deployment_user})
 
     @staticmethod
-    def put(username, database_id):
+    def post(database_id):
         """
-        Add user information with specified username.
-        Args:
-            user (string): The first parameter.
-        Returns:
-            Deployment user object of added deployment user.
-        """
-
+        #     Add user information with specified username.
+        #     Args:
+        #         user (string): The first parameter.
+        #     Returns:
+        #         Deployment user object of added deployment user.
+        #     """
         inputs = UserInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_user = Global.DEPLOYMENT_USERS.get(username)
+        user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
+        if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
+            return make_response(jsonify({'error': 'user name already exists'}), 404)
 
-        if current_user is not None:
-            if len(current_user) != 0:
-                return make_response(jsonify({'error': 'Duplicate Username'
-                                                 , 'success': False}), 404)
-
-        deployment_user = map_deployment_users(request, username)
-
-        if Global.DEPLOYMENT[database_id]['users'] is None:
-            Global.DEPLOYMENT[database_id]['users'] = {}
-            Global.DEPLOYMENT[database_id]['users']['user'] = []
+        if not Global.DEPLOYMENT_USERS:
+            user_id = 1
+        else:
+            user_id = len(Global.DEPLOYMENT_USERS) + 1
 
         try:
 
-            Global.DEPLOYMENT[database_id]['users']['user'].append({
-                'name': deployment_user['name'],
-                'roles': deployment_user['roles'],
-                'plaintext': deployment_user['plaintext']
-            })
+            Global.DEPLOYMENT_USERS[user_id] = {
+                'userid': user_id,
+                'databaseid': database_id,
+                'name': request.json['name'],
+                'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
+                'roles': request.json['roles'],
+                'plaintext': True
+            }
         except Exception, err:
             print err
 
         sync_configuration()
         Configuration.write_configuration_file()
 
-        return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
-
+        return jsonify({'user': Global.DEPLOYMENT_USERS.get(user_id), 'status': 1, 'statusstring': 'User Created'})
 
     @staticmethod
-    def post(username, database_id):
-        """
-        Add user information with specified username.
-        Args:
-            user (string): The first parameter.
-        Returns:
-            Deployment user object of added deployment user.
-        """
+    def put(database_id, user_id):
+        #     """
+        #     Add user information with specified username.
+        #     Args:
+        #         user (string): The first parameter.
+        #     Returns:
+        #         Deployment user object of added deployment user.
+        #     """
 
         inputs = UserInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_user = [user for user in Global.DEPLOYMENT_USERS if
-                        user['name'] == username and user['databaseid'] == database_id]
-        current_user[0]['name'] = request.json.get('name', current_user[0]['name'])
-        current_user[0]['password'] = urllib.unquote(
-            str(request.json.get('password', current_user[0]['password'])).encode('ascii')).decode('utf-8')
-        current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
-        current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
+        user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
+        if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
+            return make_response(jsonify({'error': 'user name already exists'}), 404)
+
+        current_user = Global.DEPLOYMENT_USERS.get(user_id)
+
+        current_user['name'] = request.json.get('name', current_user['name'])
+        current_user['password'] = urllib.unquote(
+            str(request.json.get('password', current_user['password'])).encode('ascii')).decode('utf-8')
+        current_user['roles'] = request.json.get('roles', current_user['roles'])
+        current_user['plaintext'] = request.json.get('plaintext', current_user['plaintext'])
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'user': current_user[0], 'status': 1, 'statusstring': "User Updated"})
+        return jsonify({'user': current_user, 'status': 1, 'statusstring': "User Updated"})
 
     @staticmethod
-    def delete(username, database_id):
-        current_user = [user for user in Global.DEPLOYMENT_USERS if
-                        user['name'] == username and user['databaseid'] == database_id]
+    def delete(database_id, user_id):
+        """
+        Delete the user with specified user_id.
+        Args:
+            user_id (int): The first parameter.
+        Returns:
+            True if the user is deleted otherwise the error message.
+        """
+        current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if len(current_user) == 0:
+            return make_response(jsonify({'statusstring': 'No user found for id: %u' % user_id}), 404)
 
-        Global.DEPLOYMENT_USERS.remove(current_user[0])
+        del Global.DEPLOYMENT_USERS[user_id]
+
+        sync_configuration()
+        Configuration.write_configuration_file()
+
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
 
@@ -1386,6 +1403,7 @@ class SyncVdmConfiguration(MethodView):
             deployments = result['voltdeploy']['deployments']
             deployments = {int(k):v for k,v in deployments.items()}
             deployment_users = result['voltdeploy']['deployment_users']
+            deployment_users = {int(k):v for k,v in deployment_users.items()}
 
         except Exception, errs:
             print traceback.format_exc()
@@ -1426,16 +1444,6 @@ class VdmConfiguration(MethodView):
                 except Exception, errs:
                     print traceback.format_exc()
                     print str(errs)
-
-        # for member in result['voltdeploy']['members']:
-        #     try:
-        #         headers = {'content-type': 'application/json'}
-        #         url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (member['hostname'], __PORT__)
-        #         data = result
-        #         response = requests.post(url, data=json.dumps(data), headers=headers)
-        #     except Exception, errs:
-        #         print traceback.format_exc()
-        #         print str(errs)
 
         if Global.DELETED_HOSTNAME != '':
 
@@ -1517,18 +1525,17 @@ class DatabaseDeploymentAPI(MethodView):
                                 return jsonify({'error': 'Snapshot: ' + str(exp)})
 
                         map_deployment(req, database_id)
-                        Global.DEPLOYMENT_USERS = []
+                        Global.DEPLOYMENT_USERS = {}
                         if 'users' in req.json and 'user' in req.json['users']:
                             for user in req.json['users']['user']:
-                                Global.DEPLOYMENT_USERS.append(
-                                    {
+                                Global.DEPLOYMENT_USERS[user['name']]= {
                                         'name': user['name'],
                                         'roles': user['roles'],
                                         'password': user['password'],
                                         'plaintext': user['plaintext'],
                                         'databaseid': database_id
                                     }
-                                )
+
                         sync_configuration()
                         Configuration.write_configuration_file()
                         return jsonify({'status': 'success'})
@@ -1757,10 +1764,10 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/deployment/users/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['GET', 'PUT', 'POST', 'DELETE'])
-    APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['PUT', 'POST', 'DELETE'])
+    APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
+                     methods=['PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>', view_func=DEPLOYMENT_USER_VIEW,
+                     methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/voltdeploy/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/voltdeploy/configuration/',

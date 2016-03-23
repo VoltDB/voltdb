@@ -81,15 +81,16 @@ def convert_xml_to_json(config_path):
 
     if 'users' in D2[k]['deployments']['deployment'] and D2[k]['deployments']['deployment']['users'] is not None\
             and 'user' in D2[k]['deployments']['deployment']['users']:
-        if type(D2[k]['deployments']['deployment']['users']['user']) is dict:
+        if type(D2[k]['deployments']['deployment']) is dict:
             user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'dict')
-            HTTPListener.Global.DEPLOYMENT_USERS[user_json[0]['name']] = user_json[0]
+            for user in user_json:
+                HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
         else:
             user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'list')
             for deployment_user in user_json:
-                    HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['name'])] = deployment_user
+                    HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
 
 
 def get_deployment_from_xml(deployment_xml, is_list):
@@ -645,7 +646,8 @@ def make_configuration_file():
                 'roles': d[key]['roles'],
                 'plaintext': d[key]['plaintext'],
                 'password': d[key]['password'],
-                'databaseid': d[key]['databaseid']
+                'databaseid': d[key]['databaseid'],
+                'userid': d[key]['userid']
                 })
 
         deployment_elem = SubElement(deployment_top, 'deployment')
