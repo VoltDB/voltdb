@@ -112,13 +112,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endType = m_node->getEndType();
     }
 
-    //
-    // Grab the Index from our inner table
-    // We'll throw an error if the index is missing
-    //
-    Table* targetTable = m_node->getTargetTable();
-    //target table should be persistenttable
-    assert(dynamic_cast<PersistentTable*>(targetTable));
+    // The target table should be a persistent table
+    // Grab the Index from the table. Throw an error if the index is missing.
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(targetTable);
 
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
     assert (tableIndex != NULL);
@@ -143,7 +140,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
     // update local target table with its most recent reference
-    Table* targetTable = m_node->getTargetTable();
+    assert(dynamic_cast<PersistentTable*>(m_node->getTargetTable()));
+    PersistentTable* targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
     IndexCursor indexCursor(tableIndex->getTupleSchema());
 

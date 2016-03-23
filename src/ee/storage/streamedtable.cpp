@@ -15,20 +15,22 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "streamedtable.h"
+
+#include "StreamedTableUndoAction.hpp"
+#include "ExportTupleStream.h"
+#include "tableiterator.h"
+#include "MaterializedViewMetadata.h"
+#include "catalog/materializedviewinfo.h"
+#include "common/executorcontext.hpp"
+
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
 #include <sstream>
 #include <cassert>
 #include <cstdio>
 #include <algorithm>    // std::find
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-
-#include "streamedtable.h"
-#include "persistenttable.h"
-#include "StreamedTableUndoAction.hpp"
-#include "ExportTupleStream.h"
-#include "common/executorcontext.hpp"
-#include "tableiterator.h"
-#include "ExportMaterializedViewMetadata.h"
 
 using namespace voltdb;
 
@@ -69,91 +71,21 @@ bool StreamedTable::enableStream() {
     return false;
 }
 
-void
-StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
-{
-    if (target == NULL) {
-        return;
-    }
-    std::string targetName = target->name();
-
-    // find the materialized view that uses the table or its precursor (by the same name).
-    BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
-        PersistentTable* currTarget = currView->targetTable();
-
-        // found: target is alreafy set
-        if (currTarget == target) {
-            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            return;
-        }
-
-        // found: this is the table to set the
-        std::string currName = currTarget->name();
-        if (currName == targetName) {
-            // A match on name only indicates that the target table has been re-defined since
-            // the view was initialized, so re-initialize the view.
-            currView->setTargetTable(target);
-            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            return;
-        }
-    }
-
-    // The connection needs to be made using a new MaterializedViewMetadata
-    // This is not a leak -- the materialized view is self-installing into srcTable.
-    new ExportMaterializedViewMetadata(this, target, targetMvInfo);
-}
-
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void StreamedTable::addMaterializedView(ExportMaterializedViewMetadata *view)
+void StreamedTable::addMaterializedView(MaterializedViewStreamInsertTrigger* view)
 {
     m_views.push_back(view);
 }
 
-void
-StreamedTable::segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
-                                            std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
-                                            std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
-                                            std::vector<ExportMaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<ExportMaterializedViewMetadata*> &obsoleteViewsOut)
+void StreamedTable::dropMaterializedView(MaterializedViewStreamInsertTrigger* targetView)
 {
-    //////////////////////////////////////////////////////////
-    // find all of the materialized views to remove or keep
-    //////////////////////////////////////////////////////////
-
-    // iterate through all of the existing views
-    BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
-        std::string currentViewId = currView->targetTable()->name();
-
-        // iterate through all of the catalog views, looking for a match.
-        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
-        bool viewfound = false;
-        for (viewIter = start; viewIter != end; ++viewIter) {
-            catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
-            if (currentViewId == catalogViewInfo->name()) {
-                viewfound = true;
-                //TODO: This MIGHT be a good place to identify the need for view re-definition.
-                survivingInfosOut.push_back(catalogViewInfo);
-                survivingViewsOut.push_back(currView);
-                break;
-            }
-        }
-
-
-        // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
-        if (!viewfound) {
-            obsoleteViewsOut.push_back(currView);
-        }
-    }
-}
-
-void StreamedTable::dropMaterializedView(ExportMaterializedViewMetadata *targetView) {
     assert( ! m_views.empty());
-    ExportMaterializedViewMetadata *lastView = m_views.back();
+    MaterializedViewStreamInsertTrigger* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<ExportMaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewStreamInsertTrigger*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
@@ -174,11 +106,6 @@ StreamedTable::~StreamedTable()
 }
 
 TableIterator& StreamedTable::iterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
-}
-
-TableIterator* StreamedTable::makeIterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
@@ -228,33 +155,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
         }
-    }
-    return true;
-}
-
-bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
-{
-    size_t mark = 0;
-    if (m_wrapper) {
-        for (int i = 0; i < m_views.size(); i++) {
-            m_views[i]->processTupleDelete(tuple, fallible);
-        }
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
-                                      m_executorContext->currentSpHandle(),
-                                      m_sequenceNo++,
-                                      m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
-                                      tuple,
-                                      ExportTupleStream::DELETE);
-        m_tupleCount++;
-        // Infallible delete (schema change with tuple migration & views) is not supported for export tables
-        assert(fallible);
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        if (!uq) {
-            // With no active UndoLog, there is no undo support.
-            return true;
-        }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }

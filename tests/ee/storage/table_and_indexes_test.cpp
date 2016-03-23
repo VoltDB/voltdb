@@ -76,8 +76,7 @@ protected:
 
 class MockVoltDBEngine : public VoltDBEngine {
 public:
-    MockVoltDBEngine(bool isActiveActiveEnabled) {
-        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    MockVoltDBEngine() {
         setHashinator(MockHashinator::newInstance());
     }
     bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
@@ -92,12 +91,12 @@ class TableAndIndexTest : public Test {
             : drStream(44, 64*1024),
               drReplicatedStream(16383, 64*1024) {
             NValueArray* noParams = NULL;
-            mockEngine = new MockVoltDBEngine(false);
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            mockEngine = new MockVoltDBEngine();
+            eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
 
-            engine->setupForPlanFragments( NULL, 44, 44, 44, 44);
+            eContext->setupForPlanFragments(NULL, 44, 44, 44, 44);
 
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
@@ -259,10 +258,11 @@ class TableAndIndexTest : public Test {
                 TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
                                                  &limits));
 
-            warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
-                                                                      warehouseTupleSchema, warehouseColumnNames,
-                                                                      signature, false,
-                                                                      0, false, false);
+            warehouseTable = static_cast<PersistentTable*>(TableFactory::getPersistentTable(0, "WAREHOUSE",
+                                                                                            warehouseTupleSchema,
+                                                                                            warehouseColumnNames,
+                                                                                            signature, false,
+                                                                                            0, false, false));
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, warehouseIndexes) {
@@ -302,7 +302,7 @@ class TableAndIndexTest : public Test {
         }
 
         ~TableAndIndexTest() {
-            delete engine;
+            delete eContext;
             delete mockEngine;
             delete districtTable;
             delete districtTableReplica;
@@ -339,8 +339,8 @@ class TableAndIndexTest : public Test {
     protected:
         int mem;
         TempTableLimits limits;
-        ExecutorContext *engine;
-        MockVoltDBEngine *mockEngine;
+        ExecutorContext *eContext;
+        VoltDBEngine *mockEngine;
         DRTupleStream drStream;
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
@@ -360,7 +360,7 @@ class TableAndIndexTest : public Test {
 
         TupleSchema      *warehouseTupleSchema;
         vector<TableIndexScheme> warehouseIndexes;
-        Table            *warehouseTable;
+        PersistentTable  *warehouseTable;
         TempTable        *warehouseTempTable;
         vector<int>       warehouseIndex1ColumnIndices;
         TableIndexScheme  warehouseIndex1Scheme;
@@ -394,7 +394,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     drStream.m_enabled = true;
     districtTable->setDR(true);
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
+    eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
 
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
@@ -447,7 +447,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->setDR(true);
 
     //Should have one row from the insert
-    EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+    EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
     TableIterator iterator = districtTableReplica->iterator();
     ASSERT_TRUE(iterator.hasNext());
@@ -456,7 +456,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
+    eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
 
     /*
      * Test that update propagates
@@ -490,7 +490,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->setDR(true);
 
     //Expect one row with the update
-    EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+    EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
     //Validate the update took place
     TableTuple updated = districtTableReplica->lookupTupleForDR(temp_tuple);
@@ -501,9 +501,9 @@ TEST_F(TableAndIndexTest, DrTest) {
     ASSERT_FALSE(toDelete.isNullTuple());
 
     //Prep another transaction to test propagating a delete
-    engine->setupForPlanFragments( NULL, addPartitionId(102), addPartitionId(102), addPartitionId(101), addPartitionId(89));
+    eContext->setupForPlanFragments( NULL, addPartitionId(102), addPartitionId(102), addPartitionId(101), addPartitionId(89));
 
-    districtTable->deleteTuple( toDelete, true);
+    districtTable->deleteTuple(toDelete, true);
 
     //Flush to generate the buffer
     drStream.endTransaction(addPartitionId(89));
@@ -526,7 +526,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->setDR(true);
 
     //Expect no rows after the delete propagates
-    EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
+    EXPECT_EQ(0, districtTableReplica->activeTupleCount());
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
         (*i).free();
@@ -537,7 +537,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     drStream.m_enabled = true;
     districtTable->setDR(true);
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
+    eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
 
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
@@ -590,7 +590,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->setDR(true);
 
     //Should have one row from the insert
-    EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+    EXPECT_EQ(1, districtTableReplica->activeTupleCount());
 
     TableIterator iterator = districtTableReplica->iterator();
     ASSERT_TRUE(iterator.hasNext());
@@ -599,7 +599,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
+    eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
 
     /*
      * Test that delete propagates
@@ -629,7 +629,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->setDR(true);
 
     //Expect no rows after the delete propagates
-    EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
+    EXPECT_EQ(0, districtTableReplica->activeTupleCount());
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
         (*i).free();
@@ -640,7 +640,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     drStream.m_enabled = true;
     customerTable->setDR(true);
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
+    eContext->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70));
 
     vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = customerTempTable->tempTuple();
@@ -708,7 +708,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->setDR(true);
 
     //Should have one row from the insert
-    EXPECT_EQ( 1, customerTableReplica->activeTupleCount());
+    EXPECT_EQ(1, customerTableReplica->activeTupleCount());
 
     TableIterator iterator = customerTableReplica->iterator();
     ASSERT_TRUE(iterator.hasNext());
@@ -717,7 +717,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     EXPECT_EQ(nextTuple.getNValue(20).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
+    eContext->setupForPlanFragments( NULL, addPartitionId(100), addPartitionId(100), addPartitionId(99), addPartitionId(72));
 
     /*
      * Test that delete propagates
@@ -747,7 +747,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->setDR(true);
 
     //Expect no rows after the delete propagates
-    EXPECT_EQ( 0, customerTableReplica->activeTupleCount());
+    EXPECT_EQ(0, customerTableReplica->activeTupleCount());
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
         (*i).free();

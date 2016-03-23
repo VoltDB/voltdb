@@ -34,7 +34,6 @@
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
-#include "storage/ExportMaterializedViewMetadata.h"
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
@@ -418,28 +417,31 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     catalogTable.tuplelimit(),
                                                     m_compactionThreshold,
                                                     drEnabled);
+    PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(table);
+    if (!persistenttable) {
+        return table;
+    }
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
         TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
         assert(pkeyIndex);
-        table->addIndex(pkeyIndex);
-        table->setPrimaryKeyIndex(pkeyIndex);
+        persistenttable->addIndex(pkeyIndex);
+        persistenttable->setPrimaryKeyIndex(pkeyIndex);
     }
 
     // add other indexes
     BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
         TableIndex *index = TableIndexFactory::getInstance(scheme);
         assert(index);
-        table->addIndex(index);
+        persistenttable->addIndex(index);
     }
 
     return table;
 }
 
-int
-TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
-                           catalog::Table const &catalogTable)
+int TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
+        catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable);
@@ -447,28 +449,27 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
         return false; // mixing ints and booleans here :(
     }
 
-    m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
+    evaluateExport(catalogDatabase, catalogTable);
 
     // configure for stats tables
-    int32_t databaseId = catalogDatabase.relativeIndex();
-    m_table->configureIndexStats(databaseId);
-
+    PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
+    if (persistenttable) {
+        int32_t databaseId = catalogDatabase.relativeIndex();
+        persistenttable->configureIndexStats(databaseId);
+    }
     m_table->incrementRefcount();
     return 0;
 }
 
 //After catalog is updated call this to ensure your export tables are connected correctly.
-bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
+void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
-    return m_exportEnabled;
 }
 
-static void
-migrateChangedTuples(catalog::Table const &catalogTable,
-                     PersistentTable* existingTable,
-                     PersistentTable* newTable)
+static void migrateChangedTuples(catalog::Table const &catalogTable,
+        PersistentTable* existingTable, PersistentTable* newTable)
 {
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
@@ -602,19 +603,19 @@ migrateChangedTuples(catalog::Table const &catalogTable,
     }
 }
 
-static
-void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
-                  PersistentTable *existingTable, PersistentTable *newTable,
-                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
+static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>& views,
+                         PersistentTable* existingTable, PersistentTable* newTable,
+                         std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<MaterializedViewMetadata*> survivingViews;
-    std::vector<MaterializedViewMetadata*> obsoleteViews;
+    std::vector<MaterializedViewWriteTrigger*> survivingViews;
+    std::vector<MaterializedViewWriteTrigger*> obsoleteViews;
 
-    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
-    existingTable->segregateMaterializedViews(views.begin(), views.end(),
-                                              survivingInfos, survivingViews,
-                                              obsoleteViews);
+    // Now, it's safe to transfer the wholesale state of the surviving
+    // dependent materialized views.
+    MaterializedViewInsertTrigger::segregateMaterializedViews(existingTable->views(),
+            views.begin(), views.end(),
+            survivingInfos, survivingViews, obsoleteViews);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
@@ -624,7 +625,7 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
     // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
     // At this point, the materialized view makes a best effort to use the
     // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // "old" version's primary key index, which is used in the MaterializedViewInsertTrigger constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
     // an obsolete target table needs to be brought forward to reference the replacement table.
     // See initMaterializedViews
@@ -633,9 +634,8 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
         catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
         PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate =
-            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                delegatesByName));
+        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldTargetTable->name(),
+                                                               delegatesByName);
         PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
             PersistentTable* newTargetTable =
@@ -644,28 +644,24 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                 targetTable = newTargetTable;
             }
         }
-        // This is not a leak -- the materialized view metadata is self-installing into the new table.
-        // Also, it guards its targetTable from accidental deletion with a refcount bump.
-        new MaterializedViewMetadata(newTable, targetTable, currInfo);
+        // This guards its targetTable from accidental deletion with a refcount bump.
+        MaterializedViewWriteTrigger::build(newTable, targetTable, currInfo);
     }
 }
 
-static
-void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
-                  StreamedTable *existingTable, StreamedTable *newTable,
-                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
+static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>& views,
+                  StreamedTable* existingTable, StreamedTable* newTable,
+                  std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
 {
-//    std::cout << "Migrating export views\n";
-//    std::cout.flush();
-
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<ExportMaterializedViewMetadata*> survivingViews;
-    std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
+    std::vector<MaterializedViewStreamInsertTrigger*> survivingViews;
+    std::vector<MaterializedViewStreamInsertTrigger*> obsoleteViews;
 
-    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
-    existingTable->segregateMaterializedViews(views.begin(), views.end(),
-                                              survivingInfos, survivingViews,
-                                              obsoleteViews);
+    // Now, it's safe to transfer the wholesale state of the surviving
+    // dependent materialized views.
+    MaterializedViewInsertTrigger::segregateMaterializedViews(existingTable->views(),
+            views.begin(), views.end(),
+            survivingInfos, survivingViews, obsoleteViews);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,
@@ -675,18 +671,17 @@ void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>
     // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
     // At this point, the materialized view makes a best effort to use the
     // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // "old" version's primary key index, which is used in the MaterializedViewInsertTrigger constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
-    // an obsolete target table needs to be brought forward to reference the replacement table.
+    // an obsolete target table need to be brought forward to reference the replacement table.
     // See initMaterializedViews
 
     for (int ii = 0; ii < survivingInfos.size(); ++ii) {
         catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
         PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate =
-            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                delegatesByName));
+        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldTargetTable->name(),
+                                                               delegatesByName);
         PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
             PersistentTable* newTargetTable =
@@ -695,9 +690,8 @@ void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>
                 targetTable = newTargetTable;
             }
         }
-        // This is not a leak -- the materialized view metadata is self-installing into the new table.
-        // Also, it guards its targetTable from accidental deletion with a refcount bump.
-        new ExportMaterializedViewMetadata(newTable, targetTable, currInfo);
+        // This guards its targetTable from accidental deletion with a refcount bump.
+        MaterializedViewStreamInsertTrigger::build(newTable, targetTable, currInfo);
     }
 }
 
@@ -709,32 +703,32 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
 
     ///////////////////////////////////////////////
-    // Create a new table so two tables exist
-    ///////////////////////////////////////////////
-
-    PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
-    assert(newTable);
-    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
-
-    ///////////////////////////////////////////////
+    // Create a new table so two tables exist.
     // Make this delegate point to the new table,
     // so we can migrate views below, which may
     // contains plans that reference this table
     ///////////////////////////////////////////////
-    newTable->incrementRefcount();
-    m_table = newTable;
+
+    Table* existingTable = m_table;
+    m_table = constructTableFromCatalog(catalogDatabase, catalogTable);
+    assert(m_table);
+    m_table->incrementRefcount();
+    PersistentTable* newPersistentTable = dynamic_cast<PersistentTable*>(m_table);
+    PersistentTable* existingPersistentTable = dynamic_cast<PersistentTable*>(existingTable);
 
     ///////////////////////////////////////////////
     // Move tuples from one table to the other
     ///////////////////////////////////////////////
-    migrateChangedTuples(catalogTable, existingTable, newTable);
-
-    migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
-    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(existingTable);
-    if (streamedTable) {
-        StreamedTable *newSTable = dynamic_cast<StreamedTable*>(newTable);
-        migrateExportViews(catalogTable.views(), streamedTable, newSTable, delegatesByName);
+    if (existingPersistentTable && newPersistentTable) {
+        migrateChangedTuples(catalogTable, existingPersistentTable, newPersistentTable);
+        migrateViews(catalogTable.views(), existingPersistentTable, newPersistentTable, delegatesByName);
+    }
+    else {
+        StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
+        StreamedTable *existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
+        if (existingStreamedTable && newStreamedTable) {
+            migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
+        }
     }
 
     ///////////////////////////////////////////////
@@ -742,8 +736,15 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
     existingTable->decrementRefcount();
 
-    // configure for stats for the new table
-    newTable->configureIndexStats(catalogDatabase.relativeIndex());
+    ///////////////////////////////////////////////
+    // Patch up the new table as a replacement
+    ///////////////////////////////////////////////
+
+    // configure for stats tables
+    if (newPersistentTable) {
+        int32_t databaseId = catalogDatabase.relativeIndex();
+        newPersistentTable->configureIndexStats(databaseId);
+    }
 }
 
 void TableCatalogDelegate::deleteCommand()

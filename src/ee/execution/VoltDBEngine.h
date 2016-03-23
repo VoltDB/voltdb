@@ -90,6 +90,7 @@ class ExecutorContext;
 class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
+class StreamedTable;
 class Table;
 class TableCatalogDelegate;
 class TempTableLimits;
@@ -133,10 +134,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         TableCatalogDelegate* getTableDelegate(const std::string& name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(const std::string& name) const;
-        virtual bool getIsActiveActiveDREnabled() const;
-        // virtual keyword here is used to override the functions in test case
-        virtual Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
-        virtual Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
+        bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
+        Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
+        Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
+        void enableActiveActiveForTest(Table* partitionedConflictTable,
+                                       Table* replicatedConflictTable)
+        {
+            m_isActiveActiveDREnabled = true;
+            m_drPartitionedConflictExportTable = partitionedConflictTable;
+            m_drReplicatedConflictExportTable = replicatedConflictTable;
+        }
 
         // -------------------------------------------------
         // Execution Functions
@@ -394,6 +401,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        void othermethod1();
+
+        void othermethod2();
+
+        void othermethod3(Table* localTable, TableCatalogDelegate* tcd, int32_t ri);
+
+        void othermethod4(TableCatalogDelegate* tcd, int32_t ri);
+
         int64_t tempTableMemoryLimit() const {
             return m_tempTableMemoryLimit;
         }
@@ -425,7 +440,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
-
+        void resetExportConflictTables();
         /**
          * Call into the topend with information about how executing a plan fragment is going.
          */
@@ -505,7 +520,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Map of table signatures to exporting tables.
          */
-        std::map<std::string, Table*> m_exportingTables;
+        std::map<std::string, StreamedTable*> m_exportingTables;
 
         /*
          * Only includes non-materialized tables
@@ -517,6 +532,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         boost::scoped_ptr<catalog::Catalog> m_catalog;
         catalog::Database *m_database;
+        bool m_isActiveActiveDREnabled;
 
         /** reused parameter container. */
         NValueArray m_staticParams;

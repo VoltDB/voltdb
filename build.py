@@ -335,39 +335,38 @@ CTX.INPUT['indexes'] = """
 """
 
 CTX.INPUT['storage'] = """
+ AbstractDRTupleStream.cpp
+ BinaryLogSink.cpp
+ BinaryLogSinkWrapper.cpp
+ CompatibleBinaryLogSink.cpp
+ CompatibleDRTupleStream.cpp
+ ConstraintFailureException.cpp
  constraintutil.cpp
  CopyOnWriteContext.cpp
- ElasticContext.cpp
  CopyOnWriteIterator.cpp
- ConstraintFailureException.cpp
- TableStreamer.cpp
+ DRTupleStream.cpp
+ ElasticContext.cpp
+ ElasticIndex.cpp
+ ElasticIndexReadContext.cpp
  ElasticScanner.cpp
+ ExportTupleStream.cpp
  MaterializedViewMetadata.cpp
- ExportMaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
- StreamedTableStats.cpp
+ RecoveryContext.cpp
  streamedtable.cpp
+ StreamedTableStats.cpp
  table.cpp
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
+ TableStreamer.cpp
+ TableStreamerContext.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp
- TupleStreamBase.cpp
- ExportTupleStream.cpp
- DRTupleStream.cpp
- BinaryLogSinkWrapper.cpp
- BinaryLogSink.cpp
- CompatibleBinaryLogSink.cpp
- RecoveryContext.cpp
  TupleBlock.cpp
- TableStreamerContext.cpp
- ElasticIndex.cpp
- ElasticIndexReadContext.cpp
- AbstractDRTupleStream.cpp
- CompatibleDRTupleStream.cpp
+ TupleStreamBase.cpp
 """
 
 CTX.INPUT['stats'] = """
