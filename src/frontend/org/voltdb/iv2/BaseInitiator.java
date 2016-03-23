@@ -239,10 +239,6 @@ public abstract class BaseInitiator implements Initiator
     public void setConsumerDRGateway(ConsumerDRGateway gateway) {
         assert m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway;
         m_consumerDRGateway = gateway;
-        if (m_term != null) {
-            // We're the leader, and this consumer gateway is late to the party
-            m_consumerDRGateway.beginPromotePartition(m_partitionId, true);
-        }
     }
 
     abstract protected void acceptPromotion() throws Exception;
