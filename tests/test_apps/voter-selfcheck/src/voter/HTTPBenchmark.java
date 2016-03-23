@@ -59,7 +59,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltTable;
 import org.voltdb.utils.Encoder;
 
-import procedures.Vote;
+import voter.procedures.Vote;
 
 public class HTTPBenchmark {
 
