@@ -177,12 +177,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-
-                    // If we are a DR replica, inform that subsystem of any remote data we've seen
-                    if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.beginPromotePartition(m_partitionId, false);
-                    }
-
                 }
                 else {
                     // The only known reason to fail is a failed replica during

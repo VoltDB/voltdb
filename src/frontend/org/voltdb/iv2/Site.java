@@ -405,6 +405,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
         }
+
+        /**
+         * Check to see if binary log is expected (start DR id adjacent to last received DR id)
+         *
+         * @return 0 expected, -1 duplicated binary log, 1 future binary log
+         */
         @Override
         public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
                                              long lastReceivedDRId)
