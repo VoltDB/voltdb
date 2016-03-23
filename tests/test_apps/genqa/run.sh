@@ -36,7 +36,7 @@ CLASSPATH=$({ \
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
 ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar"
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -69,10 +69,14 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    $VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql
-    $VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql
-    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql
+    cmd="$VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql"
+    echo $cmd; $cmd
+    cmd="$VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql"
+    echo $cmd; $cmd
+    cmd="$VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql"
+    echo $cmd; $cmd
+    cmd="$VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql"
+    echo $cmd; $cmd
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
@@ -110,6 +114,15 @@ function server-mysql() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+
+# run the voltdb server locally with vertica connector
+function server-vertica() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment_vertica.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally with postgresql connector
@@ -198,13 +211,13 @@ function async-export() {
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
         --duration=120 \
-        --servers=localhost \
+        --servers=volt15d \
         --port=21212 \
         --poolsize=100000 \
-        --ratelimit=10000 \
         --autotune=false \
         --catalogswap=false \
         --latencytarget=10
+        # --ratelimit=10000
 }
 
 # Multi-threaded synchronous benchmark sample
