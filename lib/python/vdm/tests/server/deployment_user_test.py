@@ -47,7 +47,7 @@ class DeploymentUser(unittest.TestCase):
     def setUp(self):
         """Create a deployment user"""
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+        db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator,Test", "databaseid": 1}
         response = requests.put(__url__, json=db_data, headers=headers)
 
         if response.status_code == 200:
@@ -103,21 +103,11 @@ class UpdateDeploymentUser(DeploymentUser):
         self.assertEqual(value['errors'][0], "'roles' is a required property")
         self.assertEqual(response.status_code, 200)
 
-    def test_validate_invalid_roles(self):
-        """ensure roles value is not invalid"""
-
-        db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Adminis", "databaseid": 1}
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.put(__url__,
-                                json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], "u'Adminis' is not one of ['Administrator', 'User']")
-        self.assertEqual(response.status_code, 200)
 
     def test_update_deployment_user(self):
         """ensure deployment user is updated"""
 
-        db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+        db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator,Test1", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         response = requests.post(__url__,
                                  json=db_data, headers=headers)
