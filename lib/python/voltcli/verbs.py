@@ -469,7 +469,7 @@ class ServerBundle(JavaBundle):
         if self.force_voltdb_create:
             verb.add_options(
                 cli.BooleanOption('-f', '--force', 'force',
-                                  'Start a new, empty database even if the VoltDB managed directories contain files from a previous session.'))
+                                  'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.'))
 
     def go(self, verb, runner):
         if self.check_environment_config:
