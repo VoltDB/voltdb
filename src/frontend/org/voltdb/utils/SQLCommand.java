@@ -36,10 +36,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -1117,8 +1119,10 @@ public class SQLCommand
             proc_param_counts.put(this_proc, curr_val);
         }
         params.resetRowPosition();
+        Set<String> userProcs = new HashSet<String>();
         while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
+            userProcs.add(proc_name);
             Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
@@ -1133,6 +1137,10 @@ public class SQLCommand
             HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
             argLists.put(param_count, this_params);
             procedures.put(proc_name, argLists);
+        }
+        for (String proc_name : new ArrayList<String>(procedures.keySet())) {
+            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name))
+                procedures.remove(proc_name);
         }
         classlist.clear();
         while (classes.advanceRow()) {
