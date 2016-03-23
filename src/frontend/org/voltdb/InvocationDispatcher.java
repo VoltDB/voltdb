@@ -978,8 +978,6 @@ public final class InvocationDispatcher {
             final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
             final File catalogFH = new VoltFile(path, nonce + ".jar");
 
-            log.info("STEBUG catalog file is " + catalogFH.getPath() + ", path is " + path + ", nonce is " + nonce);
-
             final byte[] catalog;
             try {
                 catalog = MiscUtils.fileToBytes(catalogFH);
@@ -1000,7 +998,7 @@ public final class InvocationDispatcher {
             SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                     alternateConnectionId, "Empty database snapshot restore catalog update"
                     );
-            InvocationClientHandler alternateHandler = new InvocationClientHandler() {
+            final InvocationClientHandler alternateHandler = new InvocationClientHandler() {
                 @Override
                 public boolean isAdmin() {
                     return handler.isAdmin();
