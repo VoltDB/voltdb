@@ -382,7 +382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     new StringBuilder("Files from a previous database session exist in the managed directories:");
             for (String nonEmptyPath : nonEmptyPaths)
                 crashMessage.append("\n  - " + nonEmptyPath);
-            crashMessage.append("\nUse the recover command to restore the previous database or use create --new" +
+            crashMessage.append("\nUse the recover command to restore the previous database or use create --force" +
                 " to start a new database session overwriting existing files.");
             VoltDB.crashLocalVoltDB(crashMessage.toString());
         }
@@ -518,7 +518,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_newVoltdb && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
+            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
                 managedPathsEmptyCheck();
 
             if (!isRejoin && !m_joining) {
