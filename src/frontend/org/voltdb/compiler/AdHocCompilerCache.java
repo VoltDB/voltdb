@@ -79,6 +79,7 @@ public class AdHocCompilerCache implements Serializable {
 
     // cache sizes determined at construction time
     final int MAX_LITERAL_ENTRIES;
+    final long MAX_LITERAL_MEM;
     final int MAX_CORE_ENTRIES;
 
     /** cache of literals to full plans */
@@ -105,7 +106,7 @@ public class AdHocCompilerCache implements Serializable {
      * Constructor with default cache sizes.
      */
     private AdHocCompilerCache() {
-        this(1000, 1000);
+        this(1000, 1000, 32*1024*1024);
     }
 
 
@@ -113,26 +114,16 @@ public class AdHocCompilerCache implements Serializable {
      * Constructor with specific cache sizes is only called directly for testing.
      *
      * @param maxLiteralEntries cache size for literals
+     * @param maxLiteralMem cache memory for literals
      * @param maxCoreEntries cache size for parameterized plans
      */
-    AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries) {
+    AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries, long maxLiteralMem) {
         MAX_LITERAL_ENTRIES = maxLiteralEntries;
+        MAX_LITERAL_MEM = maxLiteralMem;
         MAX_CORE_ENTRIES = maxCoreEntries;
 
         // an LRU cache map
-        m_literalCache = new LinkedHashMap<String, AdHocPlannedStatement>(MAX_LITERAL_ENTRIES * 2, .75f, true) {
-            private static final long serialVersionUID = 1L;
-
-            // This method is called just after a new entry has been added
-            @Override
-            public boolean removeEldestEntry(Map.Entry<String, AdHocPlannedStatement> eldest) {
-                if (size() > MAX_LITERAL_ENTRIES) {
-                    ++m_literalEvictions;
-                    return true;
-                }
-                return false;
-            }
-        };
+        m_literalCache = new MemoryBoundedLinkedHashMap<String, AdHocPlannedStatement>(MAX_LITERAL_ENTRIES, MAX_LITERAL_MEM);
 
         // an LRU cache map
         m_coreCache = new LinkedHashMap<String, List<BoundPlan> >(MAX_CORE_ENTRIES * 2, .75f, true) {
@@ -147,7 +138,71 @@ public class AdHocCompilerCache implements Serializable {
                 }
                 return false;
             }
+
         };
+    }
+
+    // define a LinkedHashMap based LRU cache bounds by both entry number and entry value on-heap size
+    // without changing Map.Entry, only works for value of type AdHocPlannedStatement
+    // only extend put, remove,clear and removeEldestEntry methods to account weight
+    public class MemoryBoundedLinkedHashMap<K, AdHocPlannedStatement> extends LinkedHashMap<K, AdHocPlannedStatement> implements Map<K, AdHocPlannedStatement>{
+       private static final long serialVersionUID = 2988383448026641836L;
+        private final int maxEntries;
+        private final long maxMemory; // in bytes
+        private long currentMemory;   // in bytes
+
+        public long getCurrentMemory() {
+            return currentMemory;
+        }
+
+        public MemoryBoundedLinkedHashMap() {
+            // default max entry of 1000
+            // default max value size of 32MB
+            this(1000, 32 * 1024 * 1024);
+        }
+
+        public MemoryBoundedLinkedHashMap(final int maxEntries) {
+            this(maxEntries, 32 * 1024 * 1024);
+        }
+
+        public MemoryBoundedLinkedHashMap(final int maxEntries, final long maxMemory) {
+            super(maxEntries * 2, .75f, true);
+            this.maxEntries = maxEntries;
+            this.maxMemory = maxMemory;
+            this.currentMemory = 0;
+        }
+
+        // This method is called just after a new entry has been added
+        @Override
+        public boolean removeEldestEntry(final Map.Entry<K, AdHocPlannedStatement> eldest) {
+            if ((size() > maxEntries) || (this.currentMemory > this.maxMemory))  {
+                ++m_literalEvictions;
+                this.currentMemory -= ((org.voltdb.compiler.AdHocPlannedStatement) eldest.getValue()).getSerializedSize();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public AdHocPlannedStatement put(K key, AdHocPlannedStatement value) {
+            this.currentMemory += ((org.voltdb.compiler.AdHocPlannedStatement) value).getSerializedSize();
+            return super.put(key,value);
+        }
+
+        @Override
+        public AdHocPlannedStatement remove(Object key) {
+            AdHocPlannedStatement value = super.remove(key);
+            if (value != null) {
+                this.currentMemory -= ((org.voltdb.compiler.AdHocPlannedStatement) value).getSerializedSize();
+            }
+            return value;
+        }
+
+        @Override
+        public void clear() {
+            super.clear();
+            this.currentMemory = 0;
+        }
     }
 
     /**

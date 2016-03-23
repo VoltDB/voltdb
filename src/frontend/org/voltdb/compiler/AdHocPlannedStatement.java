@@ -127,8 +127,9 @@ public class AdHocPlannedStatement {
 
         // sql bytes
         int sqlLength = buf.getInt();
-        if (sqlLength < 0) {
-            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Integer.MAX_VALUE);
+        //AS PER ENG-10059, there is a 1MB limit for in List Expression
+        if ((sqlLength < 0) || (sqlLength >= 1024*1024)) {
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation 1 MB");
         }
 
         byte[] sql = new byte[sqlLength];
