@@ -1,0 +1,3 @@
+six>=1.3.0
+pbr>=0.8.2,<2.0
+multi_key_dict
