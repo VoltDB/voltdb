@@ -236,7 +236,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -253,8 +253,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for '
-                                              'http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
     def test_validate_duplicate_admin_port(self):
         """
@@ -276,7 +276,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -293,8 +294,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server 127.0.1.1 for '
-                                              'admin-listener')
+            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+                                              'admin-listener' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port(self):
         """
@@ -316,7 +317,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -333,8 +335,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server 127.0.1.1 '
-                                              'for internal-listener')
+            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+                                              'for internal-listener' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port(self):
         """
@@ -356,7 +358,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -374,8 +377,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server 127.0.1.1 for '
-                                              'zookeeper-listener')
+            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+                                              'zookeeper-listener' % __host_or_ip__)
 
     def test_validate_duplicate_client_port(self):
         """
@@ -397,7 +400,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -415,8 +419,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server 127.0.1.1 for '
-                                              'client-listener')
+            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+                                              'client-listener' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port(self):
         """
@@ -438,7 +442,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -456,8 +461,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server 127.0.1.1 for '
-                                              'replication-listener')
+            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+                                              'replication-listener' % __host_or_ip__)
 
 
 class UpdateServer(Server):
@@ -532,7 +537,7 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['statusstring'], 'Given server with id 1 doesn\'t belong to database with id 2.')
+            self.assertEqual(value['statusstring'], 'Given server with id 1 doesn\'t belong to database with id %u.' %last_db_id)
 
     def test_validate_duplicate_port_update(self):
         """
@@ -592,8 +597,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server 127.0.1.1 for '
-                                              'http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
     def test_validate_duplicate_admin_port_update(self):
         """
@@ -630,8 +635,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server 127.0.1.1 for '
-                                              'admin-listener')
+            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+                                              'admin-listener' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port_update(self):
         """
@@ -668,8 +673,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server 127.0.1.1 '
-                                              'for internal-listener')
+            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+                                              'for internal-listener' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port_update(self):
         """
@@ -707,8 +712,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server 127.0.1.1 for '
-                                              'zookeeper-listener')
+            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+                                              'zookeeper-listener' % __host_or_ip__)
 
     def test_validate_duplicate_client_port_update(self):
         """
@@ -746,8 +751,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server 127.0.1.1 for '
-                                              'client-listener')
+            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+                                              'client-listener' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port_update(self):
         """
@@ -786,8 +791,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server 127.0.1.1 for '
-                                              'replication-listener')
+            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+                                              'replication-listener' % __host_or_ip__)
 
 
 class DeleteServer(unittest.TestCase):
