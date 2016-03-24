@@ -107,6 +107,10 @@ public class HTTPClientInterface {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+
+            if (m_continuation.isResumed()) {
+                return;
+            }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
             String msg = rimpl.toJSONString();
 
