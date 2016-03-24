@@ -840,21 +840,37 @@ public class ProcedureRunner {
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
         VoltType argType = VoltType.INVALID;
+        boolean isArray = false;
 
-        // is passed in parameter an array of params?
+        // argument to param for IN list will come in as array of arguments. The varbinary can also appear
+        // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
         if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
             argType = VoltType.typeFromClass(argClass.getComponentType());
-            if (argType == VoltType.TINYINT) {
-                // array of strings and ints are possible. so validation below will handle it.
-                // another case is passed in value being varbinary, which will appear as an
-                // array of bytes - TINYINT. If so, type passed in type is varbinary
-                argType = VoltType.typeFromClass(argClass);
-            }
+            isArray = true;
         }
         else {
+            if (argClass.isArray() && (argClass.getComponentType().isArray() ||     // supplied argument can be array of varbinary
+                                       argClass != byte[].class)) {                 // supplied argument is not varbinary but array of some other type
+                assert(expectedType == VoltType.VARBINARY);
+                // For in list arguments, passed in argument can be an array of
+                // varbinary. It would be nice if the information about expected type
+                // being array of types or not was available at this level and would haved
+                // helped in making logic simple and more concise. In absence of that
+                // will have to weaken the checks so that we don
+                argClass = argClass.getComponentType();
+                isArray = true;
+            }
             argType = VoltType.typeFromClass(argClass);
         }
-        if (!VoltTypeUtil.implicitTypeConvFeasible(argType, expectedType)) {
+
+        if (!VoltTypeUtil.implicitTypeConvFeasible(argType, expectedType, isArray)) {
+            if (isArray && argType == VoltType.TINYINT) {
+                // if arg type is array of tinyint, it was evaluated for array of tiny,
+                // failed and than was evaluated as varbinary. Update the evaluation type
+                // to be for varbinary for the exception msg
+                argType = VoltType.VARBINARY;
+
+            }
             throw new VoltTypeException("Procedure " + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
                                          "' to '"+ expectedType.getName() + "' for arg " + argInd +
                                          " for SQL stmt: " + stmt.getText() + "." +
@@ -875,7 +891,7 @@ public class ProcedureRunner {
 
         for (int ii = 0; ii < numParamTypes; ii++) {
             VoltType type = VoltType.get(stmtParamTypes[ii]);
-            // this handles non-null values
+            // handle non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
                 if (verifyTypeConv) {
@@ -884,7 +900,7 @@ public class ProcedureRunner {
                 continue;
             }
 
-            // this handles null values
+            // handle null values
             switch (type) {
             case TINYINT:
                 args[ii] = Byte.MIN_VALUE;
@@ -925,7 +941,6 @@ public class ProcedureRunner {
                                              " for SQL stmt: " + stmt.getText());
             }
         }
-
         return ParameterSet.fromArrayNoCopy(args);
     }
 

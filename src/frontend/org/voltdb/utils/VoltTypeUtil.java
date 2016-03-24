@@ -213,6 +213,68 @@ public abstract class VoltTypeUtil {
                                     left + "' and '" + right + "' types");
     }
 
+    // type conversion which can happen in EE that triggers comparison.
+    // this case is for arguments that supplied as array of arguments which
+    // implies that it uses In list operator and which will atmost trigger
+    // conversion between data-types involved for comparison
+    // from is the type of parameter that is passed in
+    // to is the type of parameter that it can be converted-to
+    //                                   MATRIX
+    //  from     |             to
+    //--------------------------------------------------------------------------------------------------------
+    //           |Tiny  Small  Int   BigInt  Float  Decimal  Timestamp  Varchar  VarBinary GeoPoint  Geography
+    // Tiny      | y     y      y      y       y      y         y        .          .        .          .
+    // Small     | y     y      y      y       y      y         y        .          .        .          .
+    // Int       | y     y      y      y       y      y         y        .          .        .          .
+    // BigInt    | y     y      y      y       y      y         y        .          .        .          .
+    // Float     | y     y      y      y       y      y         y        .          .        .          .
+    // Double    | y     y      y      y       y      y         y        .          .        .          .
+    // Decimal   | y     y      y      y       y      y         y        .          .        .          .
+    // Timestamp | y     y      y      y       y      y         y        .          .        .          .
+    // Varchar   | .     .      .      .       .      .         .        y          .        .          .
+    // VarBinary | .     .      .      .       .      .         .        .          y        .          .
+    // GeoPoint  | .     .      .      .       .      .         .        .          .        y          .
+    // Geography | .     .      .      .       .      .         .        .          .        .          y
+
+    private static boolean implicitTypeConvFeasible4Comparison(VoltType from, VoltType to) {
+        if (to == VoltType.INVALID || from == VoltType.INVALID) {
+            return false;
+        }
+        else if (to == from) {
+            return true;
+        }
+
+        assert(to != from);
+
+        switch (to) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+            case TIMESTAMP:
+            case DECIMAL:
+                switch (from) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case FLOAT:
+                    case TIMESTAMP:
+                    case DECIMAL:
+                        return true;
+                    default:
+                        return false;
+                }
+
+            case STRING:
+            case VARBINARY:
+            case GEOGRAPHY:
+            case GEOGRAPHY_POINT:
+            default:
+                return false;
+        }
+    }
 
     // broadest type conversion which can happen in EE
     // from is the type of parameter that is passed in
@@ -233,7 +295,7 @@ public abstract class VoltTypeUtil {
     // VarBinary | .     .      .      .       .      .         .        y          y        .          .
     // GeoPoint  | .     .      .      .       .      .         .        .          .        y          .
     // Geography | .     .      .      .       .      .         .        .          .        .          y
-    public static boolean implicitTypeConvFeasible(VoltType from, VoltType to) {
+    public static boolean implicitTypeConvFeasible(VoltType from, VoltType to, boolean isArray) {
         if (to == VoltType.INVALID || from == VoltType.INVALID) {
             return false;
         }
@@ -242,6 +304,26 @@ public abstract class VoltTypeUtil {
         }
 
         assert(to != from);
+
+        if (isArray) {
+            // if passed-in arguments are array, they can be in list arguments.
+            // For in list arguments in backend, type conversion happens during
+            // comparison. Check if the type conversion is feasible or not.
+            // Only exception to this case will be for array of tiny int as the
+            // passed in argument can array of tiny int or varbinary - both types
+            // today use the same representation which is byte[].
+            if (implicitTypeConvFeasible4Comparison(from, to)) {
+                return true;
+            }
+            else {
+                // conversion is not feasible, check for the case if user could had passed
+                // in varbinary, if so evaluate with varbinary
+                if (from != VoltType.TINYINT) {
+                    return false;
+                }
+                from = VoltType.VARBINARY;
+            }
+        }
 
         // to and from are of different type
         switch (to) {
