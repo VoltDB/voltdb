@@ -1012,7 +1012,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public native static long nativeGetRSS();
 
-    public native static byte[] getTestDRBuffer(boolean compatible, int partitionKeyValue, int partitionId, int flag);
+    /**
+     * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length
+     * @param compatible request test DR buffer of compatible version if it's set to true
+     * @param partitionId producer partition ID
+     * @param partitionKeyValues list of partition key value that specifies the desired partition key value of each txn
+     * @param flags list of DRTxnPartitionHashFlags that specifies the desired type of each txn
+     * @return payload bytes (only txns with no InvocationBuffer header)
+     */
+    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[]);
 
     /**
      * Start collecting statistics (starts timer).
