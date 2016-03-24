@@ -801,6 +801,9 @@ class ServerAPI(MethodView):
         Returns:
             Information and the status of server if it is saved otherwise the error message.
         """
+        if 'id' in request.json:
+            return make_response(jsonify({'error': 'You cannot specify \'Id\' while creating server.'}), 404)
+
         inputs = ServerInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -897,6 +900,8 @@ class ServerAPI(MethodView):
             Information of server with specified server_id after being updated
             otherwise the error message.
         """
+        if 'id' in request.json and server_id != request.json['id']:
+            return make_response(jsonify({'error': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
@@ -983,9 +988,8 @@ class DatabaseAPI(MethodView):
         Returns:
             Information and the status of database if it is saved otherwise the error message.
         """
-        sync_configuration()
-
-        Configuration.write_configuration_file()
+        if 'id' in request.json or 'members' in request.json:
+            return make_response(jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -1028,6 +1032,10 @@ class DatabaseAPI(MethodView):
         Returns:
             Information and the status of database if it is updated otherwise the error message.
         """
+        if 'members' in request.json:
+            return make_response(jsonify({'error': 'You cannot specify \'Members\' while updating database.'}), 404)
+        if 'id' in request.json and database_id != request.json['id']:
+            return make_response(jsonify({'error': 'Database Id mentioned in the payload and url doesn\'t match.'}), 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
