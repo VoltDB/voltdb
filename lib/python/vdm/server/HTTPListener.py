@@ -980,10 +980,18 @@ class DatabaseAPI(MethodView):
 
         del Global.DATABASES[database_id]
 
-        # deployment = Global.DEPLOYMENT.get(database_id)
-        #
-        # Global.DEPLOYMENT.remove(deployment)
         del Global.DEPLOYMENT[database_id]
+        user_Id = []
+        try:
+            for key, value in Global.DEPLOYMENT_USERS.iteritems():
+                if value["databaseid"] == database_id:
+                    user_Id.append(int(value['userid']))
+
+            for id in user_Id:
+                del Global.DEPLOYMENT_USERS[id]
+        except Exception, Err:
+            print Err
+
         sync_configuration()
         Configuration.write_configuration_file()
         return jsonify({'result': True})
