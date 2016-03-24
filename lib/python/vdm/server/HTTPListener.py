@@ -1773,9 +1773,9 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
+    APP.add_url_rule('/api/1.0/deployment/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>', view_func=DEPLOYMENT_USER_VIEW,
+    APP.add_url_rule('/api/1.0/deployment/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/voltdeploy/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])

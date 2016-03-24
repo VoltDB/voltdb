@@ -36,7 +36,7 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/users/1'
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/'
 
 
 class DeploymentUser(unittest.TestCase):
@@ -57,7 +57,7 @@ class DeploymentUser(unittest.TestCase):
 
     def tearDown(self):
         """Delete a deployment user"""
-        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/users/1/1/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
         response = requests.delete(url)
 
 
@@ -121,7 +121,7 @@ class UpdateDeploymentUser(DeploymentUser):
 
         db_data = {"name": "test12", "password": "admin", "plaintext": True, "roles": "Administrator", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/users/1/1/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
         response = requests.put(url,
                                  json=db_data, headers=headers)
         value = response.json()
