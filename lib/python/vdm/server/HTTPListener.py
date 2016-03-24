@@ -1528,12 +1528,13 @@ class DatabaseDeploymentAPI(MethodView):
                         Global.DEPLOYMENT_USERS = {}
                         if 'users' in req.json and 'user' in req.json['users']:
                             for user in req.json['users']['user']:
-                                Global.DEPLOYMENT_USERS[user['name']]= {
+                                Global.DEPLOYMENT_USERS[int(user['userid'])]= {
                                         'name': user['name'],
                                         'roles': user['roles'],
                                         'password': user['password'],
                                         'plaintext': user['plaintext'],
-                                        'databaseid': database_id
+                                        'databaseid': database_id,
+                                        'userid': user['userid']
                                     }
 
                         sync_configuration()
