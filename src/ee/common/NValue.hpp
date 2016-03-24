@@ -424,9 +424,6 @@ class NValue {
      */
     void castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const;
 
-    /*
-     * Out must have space for 16 bytes
-     */
     int32_t murmurHash3() const;
 
     /*
@@ -3664,9 +3661,6 @@ inline NValue NValue::op_divide(const NValue& rhs) const {
             rhs.getValueTypeString().c_str());
 }
 
-/*
- * Out must have storage for 16 bytes
- */
 inline int32_t NValue::murmurHash3() const {
     const ValueType type = getValueType();
     switch(type) {
@@ -3677,7 +3671,7 @@ inline int32_t NValue::murmurHash3() const {
     case VALUE_TYPE_SMALLINT:
     case VALUE_TYPE_TINYINT:
     case VALUE_TYPE_POINT:
-        return MurmurHash3_x64_128( m_data, 8, 0);
+        return MurmurHash3_x64_128(castAsBigIntAndGetValue());
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
     {
