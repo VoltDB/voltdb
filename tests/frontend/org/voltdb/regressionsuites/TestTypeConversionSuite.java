@@ -50,10 +50,11 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltType.GEOGRAPHY
     };
 
-    // row index provides the type converting "from"
-    // column index provides the type converting "to"
-    // to see type for column (to) or row (from), map it's index m_tableColTypeVal to get it's type
-    boolean [][] m_typeConversionMatrix =
+    // Row index provides the type converting "from"
+    // Column index provides the type converting "to"
+    // To see type for column (to) or row (from), map it's
+    // index m_tableColTypeVal to get it's type.
+    private static final boolean [][] m_typeConversionMatrix =
         {
             {true, true, true, true, true, true, true, true, false, false, false},          // TinyInt
             {true, true, true, true, true, true, true, true, false, false, false},          // SmallInt
@@ -68,11 +69,11 @@ public class TestTypeConversionSuite extends RegressionSuite {
             {false, false, false, false, false, false, false, false, false, false, true},   // POLYGON
         };
 
-    // row index provides the type converting "from" (user supplied data of certain type)
-    // column index provides the type converting "to" (the actual column type in table)
-    // to see type for column (to) or row (from), map it's index m_tableColTypeVal to get it's type
-    // this is based on allowed type conversion for comparison which in list param arguments uses
-    boolean [][] m_typeConversionMatrixInList =
+    // Row index provides the type converting "from" (user supplied data of certain type).
+    // Column index provides the type converting "to" (the actual column type in table).
+    // To see type for column (to) or row (from), map it's index m_tableColTypeVal to get it's
+    // type this is based on allowed type conversion for comparison which in list param arguments uses
+    private static final boolean [][] m_typeConversionMatrixInList =
         {
             {true, true, true, true, true, true, true, false, false, false, false},         // TinyInt
             {true, true, true, true, true, true, true, false, false, false, false},         // SmallInt
@@ -110,6 +111,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
     }
+
     public void testTypeConversion() throws IOException, ProcCallException {
         Client client = getClient();
         client.callProcedure("T.Insert", 1, 1, 1, 1, 1, new BigDecimal(1),
@@ -120,18 +122,17 @@ public class TestTypeConversionSuite extends RegressionSuite {
                              ProcToTestTypeConversion.TestAllAllowedTypeConv,
                              0, 0);
 
-
         // Use the conversion matrix to test type conversion cases that are allowed and blocked.
         // This uses non-array argument list as supplied arguments for params (except varbinary
         // that is byte[])
         int rowId = 0;
         VoltType typeToTest = VoltType.INVALID;
         String errorMsg = null;
-        for(boolean[] from: m_typeConversionMatrix) {
+        for(boolean[] fromType: m_typeConversionMatrix) {
             int colInd = 0;
             typeToTest = m_tableColTypeVal[rowId];
-            for (boolean to: from) {
-                if (to) {
+            for (boolean toType: fromType) {
+                if (toType) {
                     // type conversion feasible
                     client.callProcedure("ProcToTestTypeConversion",
                                          ProcToTestTypeConversion.TestTypeConvWithInsertProc,
@@ -181,13 +182,13 @@ public class TestTypeConversionSuite extends RegressionSuite {
             rowId++;
         }
 
-        // test cases where supplied is an array of arguments. This internally uses select statements
+        // Test cases where supplied is an array of arguments. This internally uses select statements
         // with IN predicate to test broadest conversion allowed in comparison of in list arguments
         rowId = 0;
-        for(boolean[] from: m_typeConversionMatrixInList) {
+        for(boolean[] fromType: m_typeConversionMatrixInList) {
             int colInd = 0;
             typeToTest = m_tableColTypeVal[rowId];
-            for (boolean to: from) {
+            for (boolean toType: fromType) {
                 if (rowId == 0) {
                     // currently there is known issue in EE where array of tinyInt get's interpreted as
                     // varbinary. so don't test those cases- ENG-10107. Once the ticket is fixed, enable
@@ -195,7 +196,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
                     colInd++;
                     continue;
                 }
-                if (to) {
+                if (toType) {
                     // type conversion feasible
                     client.callProcedure("ProcToTestTypeConversion",
                                          ProcToTestTypeConversion.TestTypesInList,

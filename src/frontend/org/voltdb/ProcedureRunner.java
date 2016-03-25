@@ -842,7 +842,7 @@ public class ProcedureRunner {
         VoltType argType = VoltType.INVALID;
         boolean isArray = false;
 
-        // argument to param for IN list will come in as array of arguments. The varbinary can also appear
+        // Argument to param for IN list will come in as array of arguments. The varbinary can also appear
         // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
         if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
             argType = VoltType.typeFromClass(argClass.getComponentType());
@@ -854,16 +854,17 @@ public class ProcedureRunner {
                 assert(expectedType == VoltType.VARBINARY);
                 // For in list arguments, passed in argument can be an array of
                 // varbinary. It would be nice if the information about expected type
-                // being array of types or not was available at this level and would haved
+                // being array of types or not was available at this level and would have
                 // helped in making logic simple and more concise. In absence of that
-                // will have to weaken the checks so that we don
+                // will have to weaken the checks so that we don't introduce regression
+                // as we don't know expected type of param is array or not.
                 argClass = argClass.getComponentType();
                 isArray = true;
             }
             argType = VoltType.typeFromClass(argClass);
         }
 
-        if (!VoltTypeUtil.implicitTypeConvFeasible(argType, expectedType, isArray)) {
+        if (!VoltTypeUtil.implicitTypeConversionFeasible(argType, expectedType, isArray)) {
             if (isArray && argType == VoltType.TINYINT) {
                 // if arg type is array of tinyint, it was evaluated for array of tiny,
                 // failed and than was evaluated as varbinary. Update the evaluation type

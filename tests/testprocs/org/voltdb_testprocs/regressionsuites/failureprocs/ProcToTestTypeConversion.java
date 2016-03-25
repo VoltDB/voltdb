@@ -36,36 +36,34 @@ import org.voltdb.types.TimestampType;
 
 public class ProcToTestTypeConversion extends VoltProcedure {
 
-    private final byte m_byteVal = 1;
-    private final short m_shortVal = 2;
-    private final int m_intVal = 3;
-    private final long m_bigIntVal = 4;
-    private final Long m_longInst = new Long(123);
-    private final double m_doubleVal = 1.1;
-    private final Double m_doubleInst = new Double (1.11);
-    private final Float m_floatInst = new Float(5.01);
-    private final float m_floatVal = 5.55F;
-    private final BigDecimal m_bigDecVal = new BigDecimal(1.1111);
-    private final TimestampType m_tsVal = new TimestampType(1);
-    private final String m_strNum = "1";
-    private final String m_strTs = "2012-12-01";
-    private final byte[] m_binVal = {'1', '0'};
+    private final static byte m_byteVal = 1;
+    private final static short m_shortVal = 2;
+    private final static int m_intVal = 3;
+    private final static long m_bigIntVal = 4;
+    private final static Long m_longInst = new Long(123);
+    private final static double m_doubleVal = 1.1;
+    private final static Double m_doubleInst = new Double (1.11);
+    private final static Float m_floatInst = new Float(5.01);
+    private final static float m_floatVal = 5.55F;
+    private final static BigDecimal m_bigDecVal = new BigDecimal(1.1111);
+    private final static TimestampType m_tsVal = new TimestampType(1);
+    private final static String m_strNum = "1";
+    private final static String m_strTs = "2012-12-01";
+    private final static byte[] m_binVal = {'1', '0'};
     private final static GeographyPointValue m_pt = new GeographyPointValue(0, 0);
     private final static GeographyValue m_poly = new GeographyValue("POLYGON((-102.052 41.002, -109.045 41.002, -109.045 36.333, -102.052 36.999, -102.052 41.002))");
-    private final static int m_colIndOfTimeStamp = 6;
-    private final static VoltType[] m_tableColTypeVal = {
-            VoltType.TINYINT,
-            VoltType.SMALLINT,
-            VoltType.INTEGER,
-            VoltType.BIGINT,
-            VoltType.FLOAT,
-            VoltType.DECIMAL,
-            VoltType.TIMESTAMP,
-            VoltType.STRING,
-            VoltType.VARBINARY,
-            VoltType.GEOGRAPHY_POINT,
-            VoltType.GEOGRAPHY
-    };
+    private final static VoltType[] m_tableColTypeVal = {VoltType.TINYINT,
+                                                         VoltType.SMALLINT,
+                                                         VoltType.INTEGER,
+                                                         VoltType.BIGINT,
+                                                         VoltType.FLOAT,
+                                                         VoltType.DECIMAL,
+                                                         VoltType.TIMESTAMP,
+                                                         VoltType.STRING,
+                                                         VoltType.VARBINARY,
+                                                         VoltType.GEOGRAPHY_POINT,
+                                                         VoltType.GEOGRAPHY
+                                                        };
 
     private final static SQLStmt insert = new SQLStmt ("Insert into T "
                             + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
