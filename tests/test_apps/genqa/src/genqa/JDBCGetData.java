@@ -38,19 +38,21 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import genqa.VerifierUtils.Config;
+
 public class JDBCGetData {
-    Connection conn;
+    static Connection conn;
 
     // in real test program, set these from command line options
-    final String DRIVER = "com.vertica.jdbc.Driver";
-    final String HOST_PORT = "volt15d:5433";
-    final String DB = "Test1";
-    final String USER = "dbadmin";
-    final String PASSWORD = "";
-    final String DBMS = "vertica";
-    final String CONNECTSTRING = "jdbc:" + DBMS + "://" + HOST_PORT + "/" + DB;
+    final static String DRIVER = "com.vertica.jdbc.Driver";
+    final static String HOST_PORT = "volt15d:5433";
+    final static String DB = "Test1";
+    final static String USER = "dbadmin";
+    final static String PASSWORD = "";
+    final static String DBMS = "vertica";
+    final static String CONNECTSTRING = "jdbc:" + DBMS + "://" + HOST_PORT + "/" + DB;
 
-    public JDBCGetData() {
+    public static Connection jdbcConnect(Config config) {
         try {
             Class.forName(DRIVER);
         } catch (ClassNotFoundException e) {
@@ -66,9 +68,10 @@ public class JDBCGetData {
             e.printStackTrace();
             System.exit(-1);
         }
+        return conn;
     }
 
-    public void jdbcConnect(long rowid) {
+    public void jdbcRead(long rowid) {
         try {
             // conn = DriverManager.getConnection (CONNECTSTRING, USER,
             // PASSWORD);

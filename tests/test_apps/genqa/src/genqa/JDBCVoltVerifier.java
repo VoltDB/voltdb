@@ -22,6 +22,10 @@
  */
 package genqa;
 
+import genqa.VerifierUtils.Config;
+
+import java.io.IOException;
+import java.sql.Connection;
 import java.util.Timer;
 
 import org.voltcore.logging.VoltLogger;
@@ -35,7 +39,13 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 
 public class JDBCVoltVerifier {
+    // Volt DB client handle
     static Client client;
+
+    // JDBC client handle
+    Connection conn;
+
+    static Config config;
 
     // validated command line configuration
     // static Config config;
@@ -46,7 +56,26 @@ public class JDBCVoltVerifier {
     long benchmarkStartTS;
 
 
-    public static void main() {
+    public static void main(String[] args) {
+        Client client;
+        Connection jdbcConnection;
+        int ratelimit = Integer.MAX_VALUE;
 
+        // setup configuration from command line arguments and defaults
+        Config config = new VerifierUtils.Config();
+        config.parse(JDBCVoltVerifier.class.getName(), args);
+        System.out.println("Configuration settings:");
+        System.out.println(config.getConfigDumpString());
+
+        System.out.println("Connecting to " + config.servers);
+        try {
+            client = VerifierUtils.dbconnect(config.servers, ratelimit);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        System.out.println("Connecting to the JDBC target (Vertica?)");
+        jdbcConnection = JDBCGetData.jdbcConnect(config);
     }
 }
