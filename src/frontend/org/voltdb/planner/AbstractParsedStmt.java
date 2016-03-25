@@ -453,7 +453,13 @@ public abstract class AbstractParsedStmt {
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
+
+        // Use the index produced by HSQL as a way to differentiate columns that have
+        // the same name with a single table (which can happen for subqueries containing joins).
+        int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
+        expr.setDifferentiator(differentiator);
         // Collect the unique columns used in the plan for a given scan.
+
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
         // correlated queries it may not be THIS statement but its parent

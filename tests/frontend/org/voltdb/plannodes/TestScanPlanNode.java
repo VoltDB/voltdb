@@ -161,10 +161,10 @@ public class TestScanPlanNode extends TestCase
         col4_exp.setValueType(COLTYPES[4]);
         col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
         col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
-        TupleValueExpression left = new TupleValueExpression(TABLE1, TABLE1, COLS[0], COLS[0]);
+        TupleValueExpression left = new TupleValueExpression(TABLE1, TABLE1, COLS[0], COLS[0], 0);
         left.setValueType(COLTYPES[0]);
         left.setValueSize(COLTYPES[0].getLengthInBytesForFixedTypes());
-        TupleValueExpression right = new TupleValueExpression(TABLE1, TABLE1, COLS[2], COLS[2]);
+        TupleValueExpression right = new TupleValueExpression(TABLE1, TABLE1, COLS[2], COLS[2], 0);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
         col4_exp.setLeft(left);
