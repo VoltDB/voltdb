@@ -243,7 +243,17 @@ public abstract class CLIConfig {
                 if (console == null) {
                     throw new IOException("Unable to read password from console.");
                 }
-                return new String(console.readPassword(prompt));
+                char[] val = console.readPassword("%s", prompt);
+                if (val != null)
+                {
+                    return new String(val);
+                }
+                else
+                {
+                    // Allow the user to omit the password, let the authentication
+                    // logic handle password validation
+                    return "";
+                }
             }
         }
         return pwd;
