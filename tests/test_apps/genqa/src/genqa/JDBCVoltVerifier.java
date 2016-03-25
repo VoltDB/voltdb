@@ -38,7 +38,7 @@ public class JDBCVoltVerifier {
     static Client client;
 
     // validated command line configuration
-    static Config config;
+    // static Config config;
     // Timer for periodic stats printing
     static Timer statsTimer;
     static Timer checkTimer;

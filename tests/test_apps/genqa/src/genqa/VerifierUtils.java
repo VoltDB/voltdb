@@ -45,7 +45,7 @@ public class VerifierUtils {
      * declaratively state command line options with defaults
      * and validation.
      */
-    static VoltLogger log = new VoltLogger("VerifierUtils");
+    // static VoltLogger log = new VoltLogger("VerifierUtils");
 
     public static class Config extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
@@ -83,7 +83,7 @@ public class VerifierUtils {
             // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            log.info("finished validating args");
+            System.out.println("finished validating args");
         }
     }
 
@@ -99,7 +99,7 @@ public class VerifierUtils {
     static Client dbconnect(String servers, int ratelimit) throws UnknownHostException, IOException {
         //final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
 
-        log.info("Connecting to VoltDB Interface...");
+        System.out.println("Connecting to VoltDB Interface...");
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setMaxTransactionsPerSecond(ratelimit);
         clientConfig.setReconnectOnConnectionLoss(true);
@@ -107,7 +107,7 @@ public class VerifierUtils {
 
         // for (String server: COMMA_SPLITTER.split(servers)) {
            for (String server: servers.split(",")) {
-            log.info("..." + server);
+            System.out.println("..." + server);
             client.createConnection(server);
         }
         return client;

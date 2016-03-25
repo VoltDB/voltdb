@@ -34,46 +34,95 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
 /* 4> insert into x values(1);
-   (Returned 1 rows in 0.01s)
-   5> insert into x values(2);
-   (Returned 1 rows in 0.00s)
+ (Returned 1 rows in 0.01s)
+ 5> insert into x values(2);
+ (Returned 1 rows in 0.00s)
  */
 
 public class ReadVoltRows {
-     //static VoltLogger log = new VoltLogger("ReadVoltRows");
+    // static VoltLogger log = new VoltLogger("ReadVoltRows");
     long rowid = 0;
     long numread = 0;
     Client m_client;
 
     public ReadVoltRows(Client client) {
-        //log = new VoltLogger("ReadVoltRows.readSomeRows");
+        // log = new VoltLogger("ReadVoltRows.readSomeRows");
         System.out.println("rvr constructor");
         m_client = client;
     }
 
-    public VoltTable readSomeRows(long rowid, long count) throws NoConnectionsException, IOException, ProcCallException {
-        //log = new VoltLogger("ReadVoltRows.readSomeRows");
+    public VoltTable readSomeRows(long rowid, long count)
+            throws NoConnectionsException, IOException, ProcCallException {
+        // log = new VoltLogger("ReadVoltRows.readSomeRows");
 
-        ClientResponse response = m_client.callProcedure("SelectwithLimit", rowid, count);
+        ClientResponse response = m_client.callProcedure("SelectwithLimit",
+                rowid, rowid + count - 1, count);
         if (response.getStatus() != ClientResponse.SUCCESS) {
-            System.out.println("Bad response on SelectwithLimit: " + ClientResponse.SUCCESS);
+            System.out.println("Bad response on SelectwithLimit: "
+                    + ClientResponse.SUCCESS);
             System.exit(-1);
         }
         return response.getResults()[0];
     }
 
+    public void displayTable(VoltTable t) {
+
+        final int colCount = t.getColumnCount();
+        int rowCount = 1;
+        t.resetRowPosition();
+        while (t.advanceRow()) {
+            System.out.printf("--- Row %d ---\n", rowCount++);
+
+            for (int col = 0; col < colCount; col++) {
+                System.out.printf("%s: ", t.getColumnName(col));
+                switch (t.getColumnType(col)) {
+                case TINYINT:
+                case SMALLINT:
+                case BIGINT:
+                case INTEGER:
+                    System.out.printf("%d\n", t.getLong(col));
+                    break;
+                case STRING:
+                    System.out.printf("%s\n", t.getString(col));
+                    break;
+                case DECIMAL:
+                    System.out.printf("%f\n", t.getDecimalAsBigDecimal(col));
+                    break;
+                case FLOAT:
+                    System.out.printf("%e\n", t.getDouble(col));
+                    break;
+                case GEOGRAPHY:
+                    System.out.printf("%s\n", t.getGeographyValue(col));
+                    break;
+                case GEOGRAPHY_POINT:
+                    System.out.printf("%s\n", t.getGeographyPointValue(col));
+                    break;
+                case NULL:
+                    System.out.print("null");
+                    break;
+                case TIMESTAMP:
+                    System.out.printf("%s\n", t.getTimestampAsLong(col));
+                    break;
+                default:
+                    System.out.print("Default case: "
+                            + t.getColumnType(col).toString());
+                    break;
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) {
-        VoltLogger log = new VoltLogger("ReadVoltRows.main");
+        // VoltLogger log = new VoltLogger("ReadVoltRows.main");
 
         String servers = "localhost";
         int ratelimit = 2_000_000;
         long rowid = 0;
-        long count = 1;
         Client client = null;
         ReadVoltRows rvr;
-        log.info("starting rvr");
+        System.out.println("starting rvr");
 
-        System.exit(0);
+        // System.exit(0);
         try {
             client = VerifierUtils.dbconnect(servers, ratelimit);
         } catch (IOException e) {
@@ -81,21 +130,31 @@ public class ReadVoltRows {
             e.printStackTrace();
         }
 
-        log.info("opened db connection");
+        System.out.println("opened db connection");
         rvr = new ReadVoltRows(client);
 
+        long rowCount = 0;
         VoltTable v = null;
-        try {
-            v = rvr.readSomeRows(rowid, count);
-        } catch (IOException | ProcCallException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        while (v.advanceRow()) {
-            log.info("v: " + v.toFormattedString());
-            int i = (int) v.get(0, VoltType.INTEGER);
-            log.info("i: " + i);
-        }
+        // for (int i = 0; i < 10; i++) {
+        do {
+            // System.out.println("i: " + i);
+            try {
+                v = rvr.readSomeRows(rowid, 10);
+            } catch (IOException | ProcCallException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            rowCount = v.getRowCount();
+            System.out.println("rowCount: " + rowCount + ". rowid: " + rowid);
+            rowid += 10;
+            rvr.displayTable(v);
+        } while (rowCount > 0);
+
+        // while (v.advanceRow()) {
+        // System.out.println("v: " + v.toFormattedString());
+        // int i = (int) v.get(0, VoltType.INTEGER);
+        // System.out.println("i: " + i);
+        // }
     }
 
 }
