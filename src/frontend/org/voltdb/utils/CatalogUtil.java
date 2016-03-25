@@ -2464,11 +2464,11 @@ public abstract class CatalogUtil {
         return exprsjson.isEmpty();
     }
 
-    public static Map<String, Integer> getDRTableNamePartitionColumnMapping(Database db) {
-        Map<String, Integer> res = new HashMap<String, Integer>();
+    public static Map<String, Column> getDRTableNamePartitionColumnMapping(Database db) {
+        Map<String, Column> res = new HashMap<String, Column>();
         for (Table tb : db.getTables()) {
             if (!tb.getIsreplicated() && tb.getIsdred()) {
-                res.put(tb.getTypeName(), tb.getPartitioncolumn().getIndex());
+                res.put(tb.getTypeName(), tb.getPartitioncolumn());
             }
         }
         return res;
