@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -92,15 +93,13 @@ public class HTTPClientInterface {
 
     class JSONProcCallback implements ProcedureCallback {
 
-        final Request m_request;
+        final AtomicBoolean m_complete = new AtomicBoolean(false);
         final Continuation m_continuation;
         final String m_jsonp;
 
-        public JSONProcCallback(Request request, Continuation continuation, String jsonp) {
-            assert(request != null);
-            assert(continuation != null);
+        public JSONProcCallback(Continuation continuation, String jsonp) {
+            assert continuation != null : "given continuation is null";
 
-            m_request = request;
             m_continuation = continuation;
             m_jsonp = jsonp;
         }
@@ -108,7 +107,7 @@ public class HTTPClientInterface {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
 
-            if (m_continuation.isResumed()) {
+            if (!m_complete.compareAndSet(false, true)) {
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
@@ -271,7 +270,7 @@ public class HTTPClientInterface {
             continuation.suspend(response);
             suspended = true;
 
-            JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
+            JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
             boolean success;
             if (params != null) {
                 ParameterSet paramSet = null;
