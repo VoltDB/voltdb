@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
@@ -70,7 +71,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * The message is for holding error messages.  It is inserted into the
      * table.
      */
-    private static class Border {
+    static class Border {
         Border(long pk, String name, String message, GeographyValue region) {
             m_pk = pk;
             m_name = name;
@@ -104,7 +105,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * This is the array of borders we know about. We will insert these
      * borders and then extract them.
      */
-    private static Border borders[] = {
+    static Border borders[] = {
         new Border(0, "Colorado", null,
                    new GeographyValue("POLYGON(("
                                       + "-102.052 41.002, "
@@ -134,7 +135,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
        new Border(3, "Wonderland", null, null)
     };
 
-    private static void populateBorders(Client client, Border borders[]) throws Exception {
+    private static void populateBorders(Client client, Border borders[]) throws NoConnectionsException, IOException, ProcCallException {
         for (Border b : borders) {
             client.callProcedure("borders.Insert",
                                  b.getPk(),
@@ -144,7 +145,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    private static void populateTables(Client client) throws Exception {
+    private static void populateTables(Client client) throws NoConnectionsException, IOException, ProcCallException {
         // Note: These are all WellKnownText strings.  So they should
         //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
