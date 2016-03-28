@@ -30,8 +30,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import junit.framework.Test;
-
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
@@ -43,6 +41,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
@@ -292,10 +292,10 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema[3] = new ColumnInfo("RSS", VoltType.INTEGER);
         expectedSchema[4] = new ColumnInfo("JAVAUSED", VoltType.INTEGER);
         expectedSchema[5] = new ColumnInfo("JAVAUNUSED", VoltType.INTEGER);
-        expectedSchema[6] = new ColumnInfo("TUPLEDATA", VoltType.INTEGER);
-        expectedSchema[7] = new ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER);
+        expectedSchema[6] = new ColumnInfo("TUPLEDATA", VoltType.BIGINT);
+        expectedSchema[7] = new ColumnInfo("TUPLEALLOCATED", VoltType.BIGINT);
         expectedSchema[8] = new ColumnInfo("INDEXMEMORY", VoltType.INTEGER);
-        expectedSchema[9] = new ColumnInfo("STRINGMEMORY", VoltType.INTEGER);
+        expectedSchema[9] = new ColumnInfo("STRINGMEMORY", VoltType.BIGINT);
         expectedSchema[10] = new ColumnInfo("TUPLECOUNT", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT);
         expectedSchema[12] = new ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT);

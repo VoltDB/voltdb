@@ -95,9 +95,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -1036,10 +1036,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             // data to aggregate
             long tupleCount = 0;
-            int tupleDataMem = 0;
-            int tupleAllocatedMem = 0;
+            long tupleDataMem = 0;
+            long tupleAllocatedMem = 0;
             int indexMem = 0;
-            int stringMem = 0;
+            long stringMem = 0;
 
             // update table stats
             final VoltTable[] s1 =
@@ -1054,11 +1054,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
-                    tupleAllocatedMem += (int) stats.getLong(8);
+                    tupleAllocatedMem += stats.getLong(8);
                     assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
-                    tupleDataMem += (int) stats.getLong(9);
+                    tupleDataMem += stats.getLong(9);
                     assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
-                    stringMem += (int) stats.getLong(10);
+                    stringMem += stats.getLong(10);
                 }
                 stats.resetRowPosition();
 
