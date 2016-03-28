@@ -232,12 +232,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
     return true;
 }
 
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
-{
-    throwFatalException("May not update a streamed table.");
-    return true;
-}
-
 bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 {
     size_t mark = 0;

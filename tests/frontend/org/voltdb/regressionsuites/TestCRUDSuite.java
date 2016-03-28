@@ -199,6 +199,31 @@ public class TestCRUDSuite extends RegressionSuite {
         assertEquals(0, resp.getResults()[0].asScalarLong());
     }
 
+    public void testExportTable() throws Exception {
+        final Client client = this.getClient();
+        for (int i=0; i < 10; i++) {
+            ClientResponse resp = client.callProcedure("E1.insert", i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            assertEquals(1, resp.getResults()[0].asScalarLong());
+        }
+        VoltTable[] results = client.callProcedure("@AdHoc", "SELECT * FROM EV1").getResults();
+        assertEquals(10, results[0].getRowCount());
+
+        try {
+            client.callProcedure("E1.delete", 0);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("was not found"));
+        }
+
+        try {
+            client.callProcedure("E1.update", 1, 11);
+            fail();
+        } catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("was not found"));
+        }
+    }
+
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -248,6 +273,14 @@ public class TestCRUDSuite extends RegressionSuite {
                     "CREATE TABLE p5(x BIGINT NOT NULL, PRIMARY KEY(x));"
             );
             project.addPartitionInfo("p5", "x");
+
+            project.addExport(true);
+            project.addLiteralSchema(
+                    "CREATE TABLE e1(x INTEGER NOT NULL); " +
+                    "CREATE VIEW ev1 (x, c) AS SELECT x, COUNT(*) FROM e1 GROUP BY x;"
+            );
+            project.addPartitionInfo("e1", "x");
+            project.setTableAsExportOnly("e1");
 
         } catch (IOException error) {
             fail(error.getMessage());

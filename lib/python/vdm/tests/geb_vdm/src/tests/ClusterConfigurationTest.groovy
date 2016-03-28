@@ -1023,7 +1023,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.heartbeatTimeoutField.value("0")
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
-        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Heartbeat Timeout in Advanced has changed'
@@ -1039,7 +1038,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.queryTimeoutField.value("0")
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
-        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Query Timeout in Advanced has changed'
@@ -1055,7 +1053,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.maxTempTableMemoryField.value("0")
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
-        report 'hello1'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Temp Table Memory in Advanced has changed'
@@ -1083,10 +1080,6 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Memory Limit in Advanced'
-/*        overview.memoryLimitType.click()
-        report 'old1'
-        overview.memoryLimitOptionGB.click()*/
-
         overview.memoryLimitField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
@@ -1515,6 +1508,151 @@ class ClusterConfigurationTest extends TestBase {
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+    }
+
+    def verifyCreateEditAndDeleteSecurityUsers() {
+        String username     = "usename"
+        String password     = "password"
+        String role         = "role"
+
+        when: 'Expand Security if not already expanded'
+        overview.expandSecurity()
+        then: 'Open the Add User Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.addSecurityButton.click()
+                waitFor { overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide Value For User'
+        overview.provideValueForUser(username, password, role)
+        and: 'Save the User'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        username    = "username_edited"
+        password    = "password_edited"
+        role        = "user_edited"
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'Provide value for Edit Popup'
+        overview.provideValueForUser(username, password, role)
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username and Role text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: "Delete the User"
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.deleteUserButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+
+        when: "Check Save Message"
+        checkSaveMessage()
+        try {
+            waitFor { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+
+        }
+        then: "Check No Security Available Text"
+        waitFor { overview.noSecurityAvailable.isDisplayed() }
+        waitFor { overview.noSecurityAvailable.text().equals("No security available.") }
     }
 
     def cleanup() { // called after each test

@@ -316,7 +316,7 @@ public class LocalCluster implements VoltServerConfig {
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j).
-            newVoltdb(true);
+            setForceVoltdbCreate(true);
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
@@ -413,8 +413,8 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
-    public void setNewVoltdb(boolean newVoltdb) {
-        templateCmdLine.newVoltdb(newVoltdb);
+    public void setForceVoltdbCreate(boolean newVoltdb) {
+        templateCmdLine.setForceVoltdbCreate(newVoltdb);
     }
 
     public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {

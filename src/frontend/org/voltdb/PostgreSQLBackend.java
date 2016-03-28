@@ -55,6 +55,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("int8", "BIGINT");
         m_PostgreSQLTypeNames.put("float8", "FLOAT");
         m_PostgreSQLTypeNames.put("numeric", "DECIMAL");
+        m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
         m_PostgreSQLTypeNames.put("varbit", "VARBINARY");
         m_PostgreSQLTypeNames.put("char", "CHARACTER");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
@@ -144,6 +145,18 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             = new QueryTransformer(stringConcatQuery)
             .replacementText("||").useWholeMatch().groups("plus");
 
+    // Captures the use of a VARBINARY constant, e.g. x'12AF'
+    private static final Pattern varbinaryConstant = Pattern.compile(
+            "x'(?<bytes>[0-9A-Fa-f]+)'",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a VARBINARY constant, e.g. x'12AF', which
+    // PostgreSQL does not support in that format, and replaces it with a
+    // VARBINARY constant in the format it does support, e.g. E'\\x12AF'
+    // (with lots of extra backslashes, for escaping at various levels)
+    private static final QueryTransformer varbinaryConstantTransformer
+            = new QueryTransformer(varbinaryConstant)
+            .prefix("E'\\\\\\\\x").suffix("'").groups("bytes");
+
     // Captures the use of VARCHAR(n BYTES) (in DDL)
     private static final Pattern varcharBytesDdl = Pattern.compile(
             "VARCHAR\\s*\\(\\s*(?<numBytes>\\w+)\\s+BYTES\\s*\\)",
@@ -157,17 +170,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             .prefix("VARCHAR(").suffix(")").multiplier(0.25).minimum(14)
             .groups("numBytes");
 
-    // Captures the use of VARBINARY(n)
+    // Captures the use of VARBINARY(n); however, this does not capture the use
+    // of just VARBINARY, without a number of bytes in parentheses, although
+    // VoltDB supports that syntax, because that would also capture some DDL
+    // that should not be changed, such as table names R_VARBINARY_TABLE and
+    // P_VARBINARY_TABLE
     private static final Pattern varbinaryDdl = Pattern.compile(
-            "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
+            "VARBINARY\\s*\\(\\s*\\d+\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     // Modifies a DDL statement containing VARBINARY(n), which PostgreSQL does
-    // not support, and replaces it with BIT VARYING(m), where m = n * 8
-    // (i.e., converting from bytes to bits), which it does support
+    // not support, and replaces it with BYTEA, which it does support
     private static final QueryTransformer varbinaryDdlTransformer
             = new QueryTransformer(varbinaryDdl)
-            .prefix("BIT VARYING(").suffix(")").multiplier(8.0).minimum(8)
-            .groups("numBytes");
+            .replacementText("BYTEA").useWholeMatch();
 
     // Captures the use of TINYINT (in DDL)
     private static final Pattern tinyintDdl = Pattern.compile(
@@ -277,7 +292,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return transformQuery(dml, orderByQueryTransformer,
                 avgQueryTransformer, ceilingOrFloorQueryTransformer,
                 dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
-                stringConcatQueryTransformer);
+                stringConcatQueryTransformer, varbinaryConstantTransformer);
     }
 
     /** Optionally, modifies DDL statements in such a way that PostgreSQL
