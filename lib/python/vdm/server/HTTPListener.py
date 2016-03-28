@@ -493,7 +493,7 @@ def map_deployment_users(request, user_id):
     else:
         deployment_user = Global.DEPLOYMENT_USERS.get(user_id)
 
-        if len(deployment_user) != 0:
+        if deployment_user is not None:
             deployment_user['name'] = request.json['name']
             deployment_user['password'] = request.json['password']
             deployment_user['plaintext'] = request.json['plaintext']
@@ -632,7 +632,7 @@ def allowed_file(filename):
 def get_servers_from_database_id(database_id):
     servers = []
     database = Global.DATABASES.get(database_id)
-    if len(database) == 0:
+    if database is None:
         return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
     else:
         members = database['members']
@@ -685,7 +685,7 @@ class ServerAPI(MethodView):
         if server_id is None:
             servers = []
             database = Global.DATABASES.get(database_id)
-            if len(database) == 0:
+            if database is None:
                 return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database['members']
@@ -700,7 +700,7 @@ class ServerAPI(MethodView):
             return jsonify({'members': servers})
         else:
             database = Global.DATABASES.get(database_id)
-            if len(database) == 0:
+            if database is None:
                 return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
             else:
                 members = database['members']
@@ -755,7 +755,7 @@ class ServerAPI(MethodView):
 
         # Add server to the current database
         current_database = Global.DATABASES.get(database_id)
-        if len(current_database) == 0:
+        if current_database is None:
             abort(404)
         if not request.json:
             abort(400)
@@ -776,14 +776,14 @@ class ServerAPI(MethodView):
             True if the server is deleted otherwise the error message.
         """
         database = Global.DATABASES.get(database_id)
-        if len(database) == 0:
+        if database is None:
             return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database['members']
         if server_id in members:
             # delete a single server
             server = Global.SERVERS.get(server_id)
-            if len(server) == 0:
+            if server is None:
                 return make_response(
                     jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}),
                     404)
@@ -818,7 +818,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         database = Global.DATABASES.get(database_id)
-        if len(database) == 0:
+        if database is None:
             return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database['members']
@@ -827,7 +827,7 @@ class ServerAPI(MethodView):
             if not inputs.validate():
                 return jsonify(success=False, errors=inputs.errors)
             current_server = Global.SERVERS.get(server_id)
-            if len(current_server) == 0:
+            if current_server is None:
                 abort(404)
 
             result = validate_server_ports(database_id)
@@ -892,7 +892,7 @@ class DatabaseAPI(MethodView):
         else:
             # expose a single user
             database = Global.DATABASES.get(database_id)
-            if len(database) == 0:
+            if database is None:
                 abort(404)
 
             return jsonify({'database': Global.DATABASES.get(database_id)})
@@ -949,7 +949,7 @@ class DatabaseAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         database = Global.DATABASES.get(database_id)
-        if len(database) == 0:
+        if database is None:
             abort(404)
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'],
@@ -970,7 +970,7 @@ class DatabaseAPI(MethodView):
         """
         members = []
         current_database = Global.DATABASES.get(database_id)
-        if len(current_database) == 0:
+        if current_database is None:
             abort(404)
         else:
             members = current_database['members']
@@ -1148,8 +1148,11 @@ class DeploymentUserAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        current_user = Global.DEPLOYMENT_USERS.get(user_id)
+
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
-        if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
+        if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
+                and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
@@ -1173,7 +1176,7 @@ class DeploymentUserAPI(MethodView):
             True if the user is deleted otherwise the error message.
         """
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
-        if len(current_user) == 0:
+        if current_user is None:
             return make_response(jsonify({'statusstring': 'No user found for id: %u' % user_id}), 404)
 
         del Global.DEPLOYMENT_USERS[user_id]
@@ -1444,17 +1447,16 @@ class VdmConfiguration(MethodView):
         result = Configuration.get_configuration()
         d = result['voltdeploy']['members']
         for key, value in d.iteritems():
-                try:
-                    headers = {'content-type': 'application/json'}
-                    url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (d[key]['hostname'], __PORT__)
-                    data = result
-                    response = requests.post(url, data=json.dumps(data), headers=headers)
-                except Exception, errs:
-                    print traceback.format_exc()
-                    print str(errs)
+            try:
+                headers = {'content-type': 'application/json'}
+                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (d[key]['hostname'], __PORT__)
+                data = result
+                response = requests.post(url, data=json.dumps(data), headers=headers)
+            except Exception, errs:
+                print traceback.format_exc()
+                print str(errs)
 
         if Global.DELETED_HOSTNAME != '':
-
             try:
                 headers = {'content-type': 'application/json'}
                 url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
@@ -1576,7 +1578,6 @@ class StatusDatabaseAPI(MethodView):
         serverDetails = []
         status = []
 
-        # database = [database for database in Global.DATABASES if database['id'] == database_id]
         database = Global.DATABASES.get(database_id)
         has_stalled = False
         has_run = False
@@ -1586,7 +1587,6 @@ class StatusDatabaseAPI(MethodView):
             if len(database['members']) == 0:
                 return jsonify({'status': 'errorNoMembers'})
             for server_id in database['members']:
-                # server = [server for server in Global.SERVERS if server['id'] == server_id]
                 server = Global.SERVERS.get(server_id)
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
                       (server['hostname'], __PORT__, database_id, server['id'])
@@ -1602,9 +1602,9 @@ class StatusDatabaseAPI(MethodView):
 
                 serverDetails.append({server['hostname']: response.json()})
 
-            if has_run == True:
+            if has_run:
                 status.append({'status': 'running'})
-            elif has_stalled == True:
+            elif has_stalled:
                 status.append({'status': 'stalled'})
             elif not has_run and not has_stalled:
                 status.append({'status': 'stopped'})
@@ -1619,12 +1619,10 @@ class StatusDatabaseServerAPI(MethodView):
 
     @staticmethod
     def get(database_id, server_id):
-        # database = [database for database in Global.DATABASES if database['id'] == database_id]
         database = Global.DATABASES.get(database_id)
         if not database:
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
-            # server = [server for server in Global.SERVERS if server['id'] == server_id]
             server = Global.SERVERS.get(server_id)
             if len(database['members']) == 0:
                 return jsonify({'error': 'errorNoMembers'})
@@ -1773,9 +1771,9 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/deployment/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/deployment/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/voltdeploy/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])

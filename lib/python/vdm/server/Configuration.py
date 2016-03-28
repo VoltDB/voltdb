@@ -174,7 +174,7 @@ def get_deployment(deployment, is_upload=False):
 def set_export_import_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] != 'None':
+        if deployment[field] is not None:
             new_deployment[field] = {}
             new_deployment[field]['configuration'] = {}
             if type(deployment[field]['configuration']) is list:
@@ -396,7 +396,7 @@ def set_dr_field(deployment, field, new_deployment):
 def set_users_field(deployment, field, new_deployment):
     result = 'success'
     try:
-        if deployment[field] != 'None' or deployment[field] is not None or deployment[field] != "":
+        if deployment[field] is not None:
             new_deployment[field] = {}
             if type(deployment[field]['user']) is list:
                 new_deployment[field]['user'] = []
@@ -638,16 +638,14 @@ def make_configuration_file():
         HTTPListener.Global.DEPLOYMENT[key]['users']['user'] = []
 
         d = HTTPListener.Global.DEPLOYMENT_USERS
-        for key, value1 in d.iteritems():
-            # for k, v in value.items():
-                #if k == "databaseid" and v == key:
-                HTTPListener.Global.DEPLOYMENT[value1['databaseid']]['users']['user'].append({
-                'name': d[key]['name'],
-                'roles': d[key]['roles'],
-                'plaintext': d[key]['plaintext'],
-                'password': d[key]['password'],
-                'databaseid': d[key]['databaseid'],
-                'userid': d[key]['userid']
+        for user_key, user_value in d.iteritems():
+                HTTPListener.Global.DEPLOYMENT[user_value['databaseid']]['users']['user'].append({
+                    'name': d[user_key]['name'],
+                    'roles': d[user_key]['roles'],
+                    'plaintext': d[user_key]['plaintext'],
+                    'password': d[user_key]['password'],
+                    'databaseid': d[user_key]['databaseid'],
+                    'userid': d[user_key]['userid']
                 })
 
         deployment_elem = SubElement(deployment_top, 'deployment')
