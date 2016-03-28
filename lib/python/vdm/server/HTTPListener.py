@@ -846,8 +846,10 @@ class ServerAPI(MethodView):
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'server': server, 'status': 1,
-                        'members': current_database[0]['members']}), 201
+        url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/' % \
+                                  (__IP__, __PORT__, database_id, server_id)
+        return jsonify({'status': '201', 'statusString': 'OK', 'location': url, 'server': server,
+                        'members': current_database[0]['members']})
 
     @staticmethod
     def delete(database_id, server_id):
