@@ -1023,7 +1023,9 @@ class DatabaseAPI(MethodView):
         sync_configuration()
 
         Configuration.write_configuration_file()
-        return jsonify({'database': database, 'status': 1}), 201
+        url = 'http://%s:%u/api/1.0/databases/%u' % \
+                                  (__IP__, __PORT__, database_id)
+        return jsonify({'status': '201', 'statusString': 'OK', 'location': url, 'database': database})
 
     @staticmethod
     def put(database_id):
