@@ -2030,6 +2030,23 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
     ASSERT_TRUE(false);
 }
 
+TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {
+    m_tableReplica->setTupleLimit(100);
+
+    const int total = 101;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle - 1);
+
+    EXPECT_EQ(101, m_tableReplica->activeTupleCount());
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
