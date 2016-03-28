@@ -416,7 +416,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             }
         }
         if (newTuple) {
-            drTable->insertPersistentTuple(*newTuple, true);
+            drTable->insertPersistentTuple(*newTuple, true, true);
         }
     }
 
@@ -539,7 +539,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
         tempTuple.deserializeFromDR(rowInput, pool);
         try {
-            table->insertPersistentTuple(tempTuple, true);
+            table->insertPersistentTuple(tempTuple, true, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()),
