@@ -1404,8 +1404,12 @@ class StartLocalServerAPI(MethodView):
             sid = -1
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
+            if 'blocking' in request.args:
+                is_blocking = int(request.args.get('blocking'))
+            else:
+                is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid)
+            return server.check_and_start_local_server(sid, False, is_blocking )
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1432,36 +1436,6 @@ class RecoverServerAPI(MethodView):
             server = voltdbserver.VoltDatabase(database_id)
             return server.check_and_start_local_server(sid, True)
         except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
-
-
-class RejoinServerAPI(MethodView):
-    """Class to handle request to issue recover cmd on this local server."""
-
-    @staticmethod
-    def put(database_id):
-        """
-        Issues recover cmd on this local server
-        Args:
-            database_id (int): The id of the database that should be started
-        Returns:
-            Status string indicating if the request was sent successfully
-        """
-
-        try:
-            sid = -1
-            if 'id' in request.args:
-                sid = int(request.args.get('id'))
-            if 'server_ip' in request.args:
-                server_ip = request.args.get('server_ip')
-            if 'is_blocking' in request.args:
-                is_blocking = int(request.args.get('is_blocking'))
-            server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, True, server_ip, is_blocking)
-        except Exception, err:
-            print traceback.format_exc()
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
@@ -1799,7 +1773,6 @@ def main(runner, amodule, config_dir, data_dir, server):
 
     START_LOCAL_SERVER_VIEW = StartLocalServerAPI.as_view('start_local_server_api')
     RECOVER_DATABASE_SERVER_VIEW = RecoverServerAPI.as_view('recover_server_api')
-    REJOIN_DATABASE_SERVER_VIEW = RejoinServerAPI.as_view('rejoin_server_api')
     STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
     START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
@@ -1840,9 +1813,6 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/rejoin',
-                     view_func=REJOIN_DATABASE_SERVER_VIEW, methods=['PUT'])
 
     APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
                      view_func=DEPLOYMENT_VIEW, methods=['GET'])
