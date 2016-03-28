@@ -508,12 +508,14 @@ public class TestVoltBulkLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary(20) default null" +
+                        "clm_varinary varbinary(20) default null, " +
+                        "clm_geo geography default null, " +
+                        "clm_geo_point geography_point default null " +
                         "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
-            {1,null,null,null,null,null,null,null,null}
+            {1,null,null,null,null,null,null,null,null,null,null}
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
