@@ -776,7 +776,7 @@ class ServerAPI(MethodView):
                                          404)
                 servers.append(server[0])
 
-            return jsonify({'members': servers})
+            return jsonify({'status': 200, 'statusString': 'OK', 'members': servers})
         else:
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
@@ -787,7 +787,7 @@ class ServerAPI(MethodView):
                 server = [server for server in Global.SERVERS if server['id'] == server_id]
                 if not server:
                     abort(404)
-                return jsonify({'server': make_public_server(server[0])})
+                return jsonify({'status': 200, 'statusString': 'OK', 'server': make_public_server(server[0])})
             else:
                 return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
                 server_id, database_id)})
@@ -973,13 +973,13 @@ class DatabaseAPI(MethodView):
         """
         if database_id is None:
             # return a list of users
-            return jsonify({'databases': [make_public_database(x) for x in Global.DATABASES]})
+            return jsonify({'status': 200, 'statusString': 'OK', 'databases': [make_public_database(x) for x in Global.DATABASES]})
         else:
             # expose a single user
             database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
                 abort(404)
-            return jsonify({'database': make_public_database(database[0])})
+            return jsonify({'status': 200, 'statusString': 'OK', 'database': make_public_database(database[0])})
 
     @staticmethod
     def post():
