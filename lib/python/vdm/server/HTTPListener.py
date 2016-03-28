@@ -882,7 +882,7 @@ class ServerAPI(MethodView):
                 Global.SERVERS.remove(server[0])
                 sync_configuration()
                 write_configuration_file()
-                return jsonify({'result': True})
+                return '', 204
         else:
             return make_response(
                 jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}), 404)
@@ -1079,7 +1079,7 @@ class DatabaseAPI(MethodView):
         Global.DEPLOYMENT.remove(deployment[0])
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'result': True})
+        return '', 204
 
 
 class deploymentUserAPI(MethodView):

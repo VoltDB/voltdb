@@ -72,7 +72,7 @@ class Database(unittest.TestCase):
             # Delete database
             db_url = __db_url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
