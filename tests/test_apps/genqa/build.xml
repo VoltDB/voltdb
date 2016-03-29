@@ -39,7 +39,7 @@
         <mkdir dir="${clientclasses.dir}"/>
         <javac debug="on" srcdir="${clientsrc.dir}"
             destdir="${clientclasses.dir}"
-            includes="ReadVoltRows.java,JDBCVoltVerifier.java,VerifierUtils.java">
+            includes="ReadVoltRows.java,JDBCVoltVerifier.java,VerifierUtils.java,JDBCGetData.java">
             <classpath refid="build-classpath"/>
         </javac>
     </target>

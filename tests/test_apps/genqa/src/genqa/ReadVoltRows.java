@@ -23,7 +23,12 @@
 
 package genqa;
 
+import genqa.VerifierUtils.Config;
+
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
@@ -63,6 +68,43 @@ public class ReadVoltRows {
             System.exit(-1);
         }
         return response.getResults()[0];
+    }
+
+    public void checkTable(VoltTable t, Connection jdbccon) {
+        // rowid is column 0
+        // get rowid first, then use it to pull a matching row from Vertica
+
+        long rowid = 0;
+        final int colCount = t.getColumnCount();
+        int rowCount = 1;
+        ResultSet rs;
+
+        t.resetRowPosition();
+        while (t.advanceRow()) {
+            rowid = t.getLong("rowid");
+            System.out.println("Got Volt row " + rowid);
+            rs = JDBCGetData.jdbcRead(rowid);
+            System.out.println("Got JDBC row");
+            compare(t, rs);
+        }
+    }
+
+    private void compare(VoltTable t, ResultSet rs) {
+        // iterate through columns and check data values for expected match
+        System.out.println("Preparing to compare VDB and JDBC rows:");
+        // System.out.println("VoltTable: " + t.toString());
+        // System.out.println("JDBC row: " + rs.toString());
+        try {
+            if (!rs.next()) {
+                System.out.println("In compare: no JDBC row available");
+            } else {
+                long rowid = rs.getInt("rowid");
+                System.out.println("In compare: JDBC rowid: " + rowid);
+            }
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void displayTable(VoltTable t) {
@@ -115,12 +157,23 @@ public class ReadVoltRows {
     public static void main(String[] args) {
         // VoltLogger log = new VoltLogger("ReadVoltRows.main");
 
+        // setup configuration from command line arguments and defaults
+        Config config = new VerifierUtils.Config();
+        config.parse(JDBCVoltVerifier.class.getName(), args);
+        System.out.println("Configuration settings:");
+        System.out.println(config.getConfigDumpString());
+
         String servers = "localhost";
         int ratelimit = 2_000_000;
         long rowid = 0;
         Client client = null;
         ReadVoltRows rvr;
+        JDBCGetData jdbc;
+        Connection jdbccon;
         System.out.println("starting rvr");
+
+        jdbc = new JDBCGetData();
+        jdbccon = jdbc.jdbcConnect(config);
 
         // System.exit(0);
         try {
@@ -135,7 +188,7 @@ public class ReadVoltRows {
 
         long rowCount = 0;
         VoltTable v = null;
-        // for (int i = 0; i < 10; i++) {
+
         do {
             // System.out.println("i: " + i);
             try {
@@ -156,5 +209,4 @@ public class ReadVoltRows {
         // System.out.println("i: " + i);
         // }
     }
-
 }

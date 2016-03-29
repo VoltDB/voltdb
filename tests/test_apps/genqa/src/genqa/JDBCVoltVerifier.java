@@ -30,6 +30,7 @@ import java.util.Timer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -37,6 +38,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 
 public class JDBCVoltVerifier {
     // Volt DB client handle
@@ -55,10 +57,31 @@ public class JDBCVoltVerifier {
     // Benchmark start time
     long benchmarkStartTS;
 
+    public static void getRows(ReadVoltRows rvr, Client client, Connection jdbcclient) {
+        long rowid = 0;
+        long limit = 10;
+        long rowCount = 0;
+        VoltTable v = null;
+
+        do {
+            // System.out.println("i: " + i);
+            try {
+                v = rvr.readSomeRows(rowid, 10);
+            } catch (IOException | ProcCallException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            rowCount = v.getRowCount();
+            System.out.println("rowCount: " + rowCount + ". rowid: " + rowid);
+            rowid += 10;
+            rvr.checkTable(v, jdbcclient);
+        } while (rowCount > 0);
+    }
 
     public static void main(String[] args) {
-        Client client;
+        Client client = null;
         Connection jdbcConnection;
+        ReadVoltRows rvr;
         int ratelimit = Integer.MAX_VALUE;
 
         // setup configuration from command line arguments and defaults
@@ -67,6 +90,7 @@ public class JDBCVoltVerifier {
         System.out.println("Configuration settings:");
         System.out.println(config.getConfigDumpString());
 
+
         System.out.println("Connecting to " + config.servers);
         try {
             client = VerifierUtils.dbconnect(config.servers, ratelimit);
@@ -74,8 +98,11 @@ public class JDBCVoltVerifier {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        rvr = new ReadVoltRows(client);
 
         System.out.println("Connecting to the JDBC target (Vertica?)");
         jdbcConnection = JDBCGetData.jdbcConnect(config);
+
+        getRows(rvr, client, jdbcConnection);
     }
 }

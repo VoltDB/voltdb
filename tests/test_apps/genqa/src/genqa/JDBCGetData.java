@@ -71,22 +71,24 @@ public class JDBCGetData {
         return conn;
     }
 
-    public void jdbcRead(long rowid) {
+    static ResultSet jdbcRead(long rowid) {
+        ResultSet rs = null;
         try {
             // conn = DriverManager.getConnection (CONNECTSTRING, USER,
             // PASSWORD);
             // So far so good, lets issue a query...
             Statement stmt = conn.createStatement();
-            ResultSet rs = stmt
+            rs = stmt
                     .executeQuery("SELECT * FROM export_partitioned_table where rowid = "
                             + rowid);
             ResultSetMetaData metaData = rs.getMetaData();
 
-            while (rs.next()) {
-                for (int i = 1; i <= metaData.getColumnCount(); i++) {
-                    System.out.println(i + ": " + rs.getString(i));
-                }
-            }
+
+//            while (rs.next()) {
+//                for (int i = 1; i <= metaData.getColumnCount(); i++) {
+//                    System.out.println(i + ": " + rs.getString(i));
+//                }
+//            }
             // stmt.close();
             // conn.close();
         } catch (SQLException e) {
@@ -94,5 +96,6 @@ public class JDBCGetData {
             e.printStackTrace();
             System.exit(-1);
         }
+        return rs;
     }
 }
