@@ -1364,11 +1364,21 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
-     * Return a "pretty print" representation of this table.  Output will be formatted
-     * in a tabular textual format suitable for display.
+     * Return a "pretty print" representation of this table with column names.  Output will
+     * be formatted in a tabular textual format suitable for display.
      * @return A string containing a pretty-print formatted representation of this table.
      */
     public String toFormattedString() {
+        return toFormattedString(true);
+    }
+
+    /**
+     * Return a "pretty print" representation of this table with or without column names.
+     * Output will be formatted in a tabular textual format suitable for display.
+     * @param includeColumnNames Flag to control if column names should be included or not.
+     * @return A string containing a pretty-print formatted representation of this table.
+     */
+    public String toFormattedString(boolean includeColumnNames) {
 
         final int MAX_PRINTABLE_CHARS = 30;
         // chose print width for geography column such that it can print polygon in
@@ -1429,6 +1439,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         }
 
         String pad = ""; // no pad before first column header.
+        // calculate formating space based on columns.
+        // Append column names and separator line to buffer
         for (int i = 0; i < columnCount; i++) {
             padding[i] += 1;
             // Determine the formatting string for each column
@@ -1438,22 +1450,28 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     colType == VoltType.GEOGRAPHY_POINT) ? "-" : "";
             fmt[i] = "%1$" + justification + padding[i] + "s";
 
-            // Serialize the column headers
-            sb.append(pad).append(String.format("%1$-" + padding[i] + "s",
-                    getColumnName(i)));
-            pad = " ";
+            if (includeColumnNames) {
+                // Serialize the column headers
+                sb.append(pad).append(String.format("%1$-" + padding[i] + "s",
+                        getColumnName(i)));
+                pad = " ";
             }
-        sb.append("\n");
-
-        // Serialize the separator between the column headers and the rows of data
-        pad = "";
-        for (int i = 0; i < columnCount; i++) {
-            char[] underline_array = new char[padding[i]];
-            Arrays.fill(underline_array, '-');
-            sb.append(pad).append(new String(underline_array));
-            pad = " ";
         }
-        sb.append("\n");
+
+        if (includeColumnNames) {
+            // construct separator to be used between column name header and table values
+            sb.append("\n");
+
+            // Serialize the separator between the column headers and the rows of data
+            pad = "";
+            for (int i = 0; i < columnCount; i++) {
+                char[] underline_array = new char[padding[i]];
+                Arrays.fill(underline_array, '-');
+                sb.append(pad).append(new String(underline_array));
+                pad = " ";
+            }
+            sb.append("\n");
+        }
 
         // Serialize each formatted row of data.
         resetRowPosition();

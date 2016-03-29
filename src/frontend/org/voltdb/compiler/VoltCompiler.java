@@ -1704,31 +1704,31 @@ public class VoltCompiler {
         //Get views
         List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
         if (pc == null && tlist.size() != 0) {
-            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
-                    "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-            throw new VoltCompilerException("Export table configured with materialized view without partitioned column.");
+            compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
+                    "for a materialized view. Streams support views as long as partitioned column is part of the view.");
+            throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
         }
         if (pc != null && pc.getName() != null && tlist.size() != 0) {
             for (Table t : tlist) {
                 if (t.getColumns().get(pc.getName()) == null) {
                     compilerLog.error("While configuring export, table " + t + " is a source table " +
                             "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-                    throw new VoltCompilerException("Export table configured with materialized view without partitioned column in the view.");
+                    throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
                 } else {
-                    //Set partition column of view table to partition column of export table
+                    //Set partition column of view table to partition column of stream
                     t.setPartitioncolumn(t.getColumns().get(pc.getName()));
                 }
             }
         }
         if (tableref.getMaterializer() != null)
         {
-            compilerLog.error("While configuring export, table " + tableName + " is a " +
-                                        "materialized view.  A view cannot be an export table.");
-            throw new VoltCompilerException("View configured as an export table");
+            compilerLog.error("While configuring export, " + tableName + " is a " +
+                                        "materialized view.  A view cannot be export source.");
+            throw new VoltCompilerException("View configured as export source");
         }
         if (tableref.getIndexes().size() > 0) {
-            compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
-                    "Export tables can't have indexes (including primary keys).");
+            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
+                    "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {

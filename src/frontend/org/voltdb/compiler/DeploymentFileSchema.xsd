@@ -395,14 +395,20 @@
     <xs:sequence>
       <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
         <xs:complexType>
-          <xs:attribute name="name" type="xs:string" use="required"/>
-          <xs:attribute name="roles" type="xs:string"/>
+          <xs:attribute name="name" type="userRoleNameString" use="required"/>
+          <xs:attribute name="roles" type="userRoleNameString"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
           <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+
+  <xs:simpleType name="userRoleNameString">
+	<xs:restriction base="xs:string">
+      <xs:pattern value="[\S]+"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!--  Security provider enumeration -->
   <xs:simpleType name="SecurityProviderString">

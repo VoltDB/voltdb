@@ -254,18 +254,22 @@ public class CatalogContext {
      * jar is served from a url and isn't in the classpath.
      *
      * @param procedureClassName The name of the class to load.
-     * @return A java Class variable assocated with the class.
+     * @return A java Class variable associated with the class.
      * @throws ClassNotFoundException if the class is not in the jar file.
      */
     public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
-        //System.out.println("Loading class " + procedureClassName);
+        return classForProcedure(procedureClassName, m_jarfile);
+    }
 
+    public static Class<?> classForProcedure(String procedureClassName, InMemoryJarfile jarfile)
+        throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
-        if (procedureClassName.startsWith("org.voltdb."))
+        if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
+        }
 
         // look in the catalog for the file
-        return m_jarfile.getLoader().loadClass(procedureClassName);
+        return jarfile.getLoader().loadClass(procedureClassName);
     }
 
     // Generate helpful status messages based on configuration present in the

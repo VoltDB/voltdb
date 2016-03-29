@@ -159,8 +159,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     public static class JavaClassForTest {
-        public Class forName(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException {
-            return Class.forName(name, initialize, loader);
+        public Class<?> forName(String name, boolean initialize, InMemoryJarfile jarfile) throws ClassNotFoundException {
+            return CatalogContext.classForProcedure(name, jarfile);
         }
     }
 
@@ -201,7 +201,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 JarLoader testjarloader = testjar.getLoader();
                 for (String classname : testjarloader.getClassNames()) {
                     try {
-                        m_javaClass.forName(classname, true, testjarloader);
+                        m_javaClass.forName(classname, true, testjar);
                     }
                     // LinkageError catches most of the various class loading errors we'd
                     // care about here.

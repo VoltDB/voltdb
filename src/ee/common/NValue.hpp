@@ -1599,6 +1599,42 @@ private:
         return retval;
     }
 
+    NValue castAsGeography() const {
+        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        if (isNull()) {
+            retval.setNull();
+            return retval;
+        }
+        const ValueType type = getValueType();
+        switch (type) {
+            case VALUE_TYPE_GEOGRAPHY:
+                memcpy(retval.m_data, m_data, sizeof(m_data));
+                break;
+            case VALUE_TYPE_VARCHAR:
+            default:
+                throwCastSQLException(type, VALUE_TYPE_GEOGRAPHY);
+        }
+        return retval;
+    }
+
+    NValue castAsGeographyPoint() const {
+
+        NValue retval(VALUE_TYPE_POINT);
+        if (isNull()) {
+            retval.setNull();
+            return retval;
+        }
+        const ValueType type = getValueType();
+        switch (type) {
+            case VALUE_TYPE_POINT:
+                memcpy(retval.m_data, m_data, sizeof(m_data));
+                break;
+            case VALUE_TYPE_VARCHAR:
+            default:
+                throwCastSQLException(type, VALUE_TYPE_POINT);
+        }
+        return retval;
+    }
     /**
      * Copy the arbitrary size object that this value points to as an
      * inline object in the provided tuple storage area
@@ -1727,7 +1763,7 @@ private:
     }
 
     int compareDoubleValue (const double lhsValue, const double rhsValue) const {
-        // Treat NaN values as equals and also make them smaller than neagtive infinity.
+        // Treat NaN values as equals and also make them smaller than negative infinity.
         // This breaks IEEE754 for expressions slightly.
         if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
@@ -3407,6 +3443,10 @@ inline NValue NValue::castAs(ValueType type) const {
         return castAsBinary();
     case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
+    case VALUE_TYPE_POINT:
+        return castAsGeographyPoint();
+    case VALUE_TYPE_GEOGRAPHY:
+        return castAsGeography();
     default:
         break;
     }

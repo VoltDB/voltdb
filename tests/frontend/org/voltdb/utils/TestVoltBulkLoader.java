@@ -29,8 +29,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
 
-import junit.framework.TestCase;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -43,7 +41,11 @@ import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
@@ -83,6 +85,8 @@ public class TestVoltBulkLoader extends TestCase {
     protected String reportDir = String.format("/tmp/%s_vbl", userName);
     protected String dbName = String.format("mydb_%s", userName);
     Random rnd = new Random(28);
+    protected static String geo = "polygon((0 0, 1 0, 1 1, 0 1, 0 0))";
+    protected static String geopt = "point(0 0)";
 
     public class TestFailureCallback implements BulkLoaderFailureCallBack {
         ArrayList<Integer> failureRows = new ArrayList<Integer>(20);
@@ -153,19 +157,21 @@ public class TestVoltBulkLoader extends TestCase {
                 "clm_decimal decimal default null, " +
                 "clm_float float default null, "+
                 //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null " +
+                "clm_timestamp timestamp default null, " +
+                "clm_geo geography default null," +
+                "clm_geopt geography_point default null" +
                 "); ";
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
         Object [][]myData = {
-            {1 ,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,2,2,222222,"second",3.30,"NULL",currentTime},
-            {3,3,3,333333," third ",null,3.33,currentTime},
-            {4,4,4,444444," NULL ",4.40 ,4.44,currentTime},
-            {5,5,5,5555555,"  \"abcde\"g",5.50,5.55,currentTime},
-            {6,6,"NULL",666666," sixth", 6.60, 6.66,currentTime},
-            {7,null,7,7777777," seventh", 7.70, 7.77,currentTime},
-            {11,1,1,"\"1,000\"","first",1.10,1.11,currentTime},
+            {1 ,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt},
+            {2,2,2,222222,"second",3.30,"NULL",currentTime, geo, geopt},
+            {3,3,3,333333," third ",null,3.33,currentTime, geo, geopt},
+            {4,4,4,444444," NULL ",4.40 ,4.44,currentTime, geo, geopt},
+            {5,5,5,5555555,"  \"abcde\"g",5.50,5.55,currentTime, geo, geopt},
+            {6,6,"NULL",666666," sixth", 6.60, 6.66,currentTime, geo, geopt},
+            {7,null,7,7777777," seventh", 7.70, 7.77,currentTime, geo, geopt},
+            {11,1,1,"\"1,000\"","first",1.10,1.11,currentTime, geo, geopt},
             //empty line
             {},
             //invalid lines below
@@ -191,27 +197,29 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_string varchar(20) default null, "
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
-                + //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null "
+                // + "clm_varinary varbinary(20) default null," +
+                + "clm_timestamp timestamp default null, "
+                + "clm_geo geography default null,"
+                + "clm_geopt geography_point default null"
                 + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object [][] myData = {
-            {1,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,2,2,222222,"second",3.30,null,currentTime},
-            {3,3,3,333333," third ",null,3.33,currentTime},
-            {4,4,4,444444," NULL ",4.40 ,4.44,currentTime},
-            {5,5,5,5555555,"abcdeg",5.50,5.55,currentTime},
-            {6,6,null,666666,"sixth",6.60,6.66,currentTime},
-            {7,7,7,7777777," seventh",7.70,7.77,currentTime},
-            {11, 1,1,1000,"first",1.10,1.11,currentTime},
+            {1,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt},
+            {2,2,2,222222,"second",3.30,null,currentTime, geo, geopt},
+            {3,3,3,333333," third ",null,3.33,currentTime, geo, geopt},
+            {4,4,4,444444," NULL ",4.40 ,4.44,currentTime, geo, geopt},
+            {5,5,5,5555555,"abcdeg",5.50,5.55,currentTime, geo, geopt},
+            {6,6,null,666666,"sixth",6.60,6.66,currentTime, geo, geopt},
+            {7,7,7,7777777," seventh",7.70,7.77,currentTime, geo, geopt},
+            {11, 1,1,1000,"first",1.10,1.11,currentTime, geo, geopt},
             //empty line
             {},
             //invalid lines below
             {8,8},
-            {9,9,9,900,"nine",1.10,1.11,currentTime},
-            {10,10,10,10,"second",2.20,2.22,currentTime},
-            {12,null,12,12121212,"twelveth",12.12,12.12,currentTime}
+            {9,9,9,900,"nine",1.10,1.11,currentTime, geo, geopt},
+            {10,10,10,10,"second",2.20,2.22,currentTime, geo, geopt},
+            {12,null,12,12121212,"twelveth",12.12,12.12,currentTime, geo, geopt}
         };
         Integer[] failures = {9,10};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -230,8 +238,8 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_string varchar(20) default null, "
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
-                + //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null "
+                //+ "clm_varinary varbinary(20) default null," +
+                + "clm_timestamp timestamp default null "
                 + "); ";
         //Make batch size large
         int myBatchSize = 200;
@@ -314,28 +322,30 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
                 + "clm_timestamp timestamp default null, "
+                + "clm_geo geography default null,"
+                + "clm_geopt geography_point default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); ";
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {3, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {4, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {5, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {6, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {7, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {8, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {11, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}, //Whole batch fails
-            {12, 1, 1, 11111111, "first", 1.10, 1.11, currentTime}
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {3, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {4, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {5, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {6, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {7, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {8, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {11, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}, //Whole batch fails
+            {12, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt}
         };
         Integer[] failures = {5, 6, 9, 10, 14, 15, 16};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -355,15 +365,17 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
                 + "clm_timestamp timestamp default null, "
+                + "clm_geo geography default null,"
+                + "clm_geopt geography_point default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object [][] myData = {
-            {1,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,1,1,11111111,"first",1.10,1.11,currentTime},
-            {1,1,1,11111111,"first",1.10,1.11,currentTime}
+            {1,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt},
+            {2,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt},
+            {2,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt},
+            {1,1,1,11111111,"first",1.10,1.11,currentTime, geo, geopt}
         };
         Integer[] failures = {3,4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -383,14 +395,16 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
                 + "clm_timestamp timestamp default null, "
+                + "clm_geo geography default null,"
+                + "clm_geopt geography_point default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
-            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
+            {1, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
         };
         Integer[] failures = {3};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -410,13 +424,15 @@ public class TestVoltBulkLoader extends TestCase {
                 + "clm_decimal decimal default null, "
                 + "clm_float float default null, "
                 + "clm_timestamp timestamp default null, "
+                + "clm_geo geography default null,"
+                + "clm_geopt geography_point default null, "
                 + "PRIMARY KEY(clm_integer) "
                 + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},
-            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},};
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},
+            {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime, geo, geopt},};
         Integer[] failures = {2};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
         test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
@@ -432,12 +448,14 @@ public class TestVoltBulkLoader extends TestCase {
                 "clm_bigint bigint default 0, " +
 
                 "clm_string varchar(200) default null, " +
-                "clm_timestamp timestamp default null " +
+                "clm_timestamp timestamp default null, " +
+                "clm_geo geography default null," +
+                "clm_geopt geography_point default null " +
                 "); ";
         int myBatchSize = 200;
         TimestampType timeParam = new TimestampType("7777-12-25 14:35:26");
         Object [][]myData = {
-            {1,1,1,"\"Jesus\\\"\"loves"+ "\n" +"you\"",timeParam},
+            {1,1,1,"\"Jesus\\\"\"loves"+ "\n" +"you\"",timeParam, geo, geopt},
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -456,20 +474,22 @@ public class TestVoltBulkLoader extends TestCase {
 
                 "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
-                "clm_float float default null "+
+                "clm_float float default null, " +
+                "clm_geo geography default null," +
+                "clm_geopt geography_point default null "+
                 //"clm_timestamp timestamp default null, " +
                 //"clm_varinary varbinary(20) default null" +
                 "); ";
         int myBatchSize = 200;
         //Both \N and \\N as csv input are treated as NULL
         Object [][]myData = {
-            {1,Constants.CSV_NULL,1,11111111,null,1.10,1.11},
-            {2,Constants.QUOTED_CSV_NULL,1,11111111,null,1.10,1.11},
-            {3,Constants.CSV_NULL,1,11111111,"  \\" + Constants.CSV_NULL + "  ",1.10,1.11},
-            {4,Constants.CSV_NULL,1,11111111,"  " + Constants.QUOTED_CSV_NULL + "  ",1.10,1.11},
-            {5,null,1,11111111," \"  \\" + Constants.CSV_NULL   + "  \"",1.10,1.11},
-            {6,Constants.CSV_NULL,1,11111111," \"  \\" + Constants.CSV_NULL  + " L \"",1.10,1.11},
-            {7,Constants.CSV_NULL,1,11111111,"  \"abc\\" + Constants.CSV_NULL + "\"  ",1.10,1.11}
+            {1,Constants.CSV_NULL,1,11111111,null,1.10,1.11, geo, geopt},
+            {2,Constants.QUOTED_CSV_NULL,1,11111111,null,1.10,1.11, geo, geopt},
+            {3,Constants.CSV_NULL,1,11111111,"  \\" + Constants.CSV_NULL + "  ",1.10,1.11, geo, geopt},
+            {4,Constants.CSV_NULL,1,11111111,"  " + Constants.QUOTED_CSV_NULL + "  ",1.10,1.11, geo, geopt},
+            {5,null,1,11111111," \"  \\" + Constants.CSV_NULL   + "  \"",1.10,1.11, geo, geopt},
+            {6,Constants.CSV_NULL,1,11111111," \"  \\" + Constants.CSV_NULL  + " L \"",1.10,1.11, geo, geopt},
+            {7,Constants.CSV_NULL,1,11111111,"  \"abc\\" + Constants.CSV_NULL + "\"  ",1.10,1.11, geo, geopt}
         };
         Integer[] failures = {2};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
@@ -488,12 +508,14 @@ public class TestVoltBulkLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary(20) default null" +
+                        "clm_varinary varbinary(20) default null, " +
+                        "clm_geo geography default null, " +
+                        "clm_geo_point geography_point default null " +
                         "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
-            {1,null,null,null,null,null,null,null,null}
+            {1,null,null,null,null,null,null,null,null,null,null}
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));

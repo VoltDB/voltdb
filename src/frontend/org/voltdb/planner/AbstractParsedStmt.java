@@ -404,13 +404,12 @@ public abstract class AbstractParsedStmt {
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
             VoltType vt = VoltType.typeFromString(type);
-            int size = VoltType.MAX_VALUE_LENGTH;
             assert(vt != VoltType.VOLTTABLE);
 
-            if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
-                if (vt == VoltType.NULL) size = 0;
-                else size = vt.getLengthInBytesForFixedTypes();
-            }
+            int size = (vt == VoltType.NULL) ? 0 :
+                vt.isVariableLength() ?
+                        VoltType.MAX_VALUE_LENGTH :
+                            vt.getLengthInBytesForFixedTypes();
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
             cve.setValueSize(size);
@@ -1050,10 +1049,6 @@ public abstract class AbstractParsedStmt {
 
             JoinType joinType = JoinType.get(tableNode.attributes.get("jointype"));
             assert(joinType != JoinType.INVALID);
-            if (joinType == JoinType.FULL) {
-                throw new PlanningErrorException("VoltDB does not support full outer joins");
-            }
-
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
        }
