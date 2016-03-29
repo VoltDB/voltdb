@@ -36,12 +36,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 
-//@ProcInfo
-//(
-//  partitionInfo   = "store.key:0"
-//, singlePartition = true
-//)
-
 public class PutMp extends VoltProcedure
 {
     // Checks if key exists

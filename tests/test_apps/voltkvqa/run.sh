@@ -82,25 +82,6 @@ function jars-ifneeded() {
     fi
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
-        src/voltkvqa/*.java \
-        src/voltkvqa/procedures/*.java \
-        src/voltkvqa/procedures_withexport/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar || exit 1
-    $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar || exit 1
-    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar || exit 1
-}
-
 # run the voltdb server locally
 function server() {
     jars-ifneeded
@@ -232,7 +213,7 @@ function jdbc-benchmark-c3p0() {
 }
 
 function jdbc-benchmark-tomcat() {
-    srccompile
+    jars-ifneeded
     java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
