@@ -146,25 +146,6 @@ class CreateServer(Server):
         self.assertEqual(value['error'], 'You cannot specify \'Id\' while creating server.')
         self.assertEqual(response.status_code, 404)
 
-    def test_request_with_id(self):
-        """
-        ensure server name is not empty
-        """
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-
-        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-            (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': '', 'name': 'test', 'id':3}
-        response = requests.post(url, json=data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['error'], 'You cannot specify \'Id\' while creating server.')
-        self.assertEqual(response.status_code, 404)
-
     def test_validate_host_name(self):
         """
         ensure server name is not empty

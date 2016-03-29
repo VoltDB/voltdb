@@ -47,6 +47,7 @@ import voltdbserver
 import glob
 import psutil
 import Log
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
 import voltdbclient
@@ -55,6 +56,7 @@ from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
 
+filter_log = Filter('/api/1.0/', 'GET')
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -1365,18 +1367,6 @@ class VdmConfiguration(MethodView):
                 print str(errs)
 
         if Global.DELETED_HOSTNAME != '':
-            try:
-                headers = {'content-type': 'application/json'}
-                url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
-                data = result
-                response = requests.post(url, data=json.dumps(data), headers=headers)
-                Global.DELETED_HOSTNAME = ''
-            except Exception, errs:
-                print traceback.format_exc()
-                print str(errs)
-
-        if Global.DELETED_HOSTNAME != '':
-
             try:
                 headers = {'content-type': 'application/json'}
                 url = 'http://%s:%u/api/1.0/voltdeploy/sync_configuration/' % (Global.DELETED_HOSTNAME, __PORT__)
