@@ -109,7 +109,7 @@ class VoltDatabase:
         """
         self.database_id = database_id
 
-    def start_database(self, recover=False, blocking=-1):
+    def start_database(self, recover=False):
         """
         Starts voltdb servers on all nodes configured for this database.
         Returns reponse with HTTP status code and error details json.
