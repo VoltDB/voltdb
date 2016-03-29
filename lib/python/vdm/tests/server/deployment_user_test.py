@@ -36,7 +36,7 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/users/1/test'
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/'
 
 
 class DeploymentUser(unittest.TestCase):
@@ -57,7 +57,8 @@ class DeploymentUser(unittest.TestCase):
 
     def tearDown(self):
         """Delete a deployment user"""
-        response = requests.delete(__url__)
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
+        response = requests.delete(url)
 
 
 class UpdateDeploymentUser(DeploymentUser):
@@ -65,9 +66,10 @@ class UpdateDeploymentUser(DeploymentUser):
         """Validate duplicate username"""
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
-        response = requests.put(__url__, json=db_data, headers=headers)
+        response = requests.post(__url__, json=db_data, headers=headers)
         value = response.json()
-        self.assertEqual(value['success'], False)
+        self.assertEqual(value['error'], u'user name already exists')
+
         self.assertEqual(response.status_code, 404)
 
     def test_validate_username_empty(self):
@@ -75,7 +77,7 @@ class UpdateDeploymentUser(DeploymentUser):
 
         db_data = {"password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.put(__url__,
+        response = requests.post(__url__,
                                 json=db_data, headers=headers)
         value = response.json()
         self.assertEqual(value['errors'][0], "'name' is a required property")
@@ -86,7 +88,7 @@ class UpdateDeploymentUser(DeploymentUser):
 
         db_data = {"name": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.put(__url__,
+        response = requests.post(__url__,
                                 json=db_data, headers=headers)
         value = response.json()
         self.assertEqual(value['errors'][0], "'password' is a required property")
@@ -97,7 +99,7 @@ class UpdateDeploymentUser(DeploymentUser):
 
         db_data = {"name": "voltdb", "password": "test", "plaintext": True, "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.put(__url__,
+        response = requests.post(__url__,
                                 json=db_data, headers=headers)
         value = response.json()
         self.assertEqual(value['errors'][0], "'roles' is a required property")
@@ -109,7 +111,8 @@ class UpdateDeploymentUser(DeploymentUser):
 
         db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator,Test1", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.post(__url__,
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
+        response = requests.put(url,
                                  json=db_data, headers=headers)
         value = response.json()
         self.assertEqual(value['statusstring'], "User Updated")
