@@ -260,7 +260,7 @@ public class CatalogContext {
     public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
         return classForProcedure(procedureClassName, m_jarfile);
     }
-    
+
     public static Class<?> classForProcedure(String procedureClassName, InMemoryJarfile jarfile)
         throws ClassNotFoundException {
         // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
