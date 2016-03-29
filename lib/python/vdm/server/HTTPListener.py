@@ -144,39 +144,6 @@ def make_public_deployment(deployments):
     return new_deployment
 
 
-def map_deployment_without_database_id(deployment):
-    """
-    Get the deployment information without database_id in required format.
-    Args:
-        deployment (deployment object): The first parameter.
-    Returns:
-        Deployment object in required format.
-    """
-
-    new_deployment = {}
-
-    for field in deployment:
-        if 'databaseid' not in field:
-            new_deployment[field] = deployment[field]
-
-    new_deployment['users'] = {}
-    new_deployment['users']['user'] = []
-
-    deployment_user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
-    if deployment['databaseid'] in [(d["databaseid"]) for item in deployment_user for d in item]:
-           print
-
-    if deployment_user is not None:
-        for user in deployment_user:
-            new_deployment['users']['user'].append({
-                'name': user['name'],
-                'roles': user['roles'],
-                'plaintext': user['plaintext']
-
-            })
-    return new_deployment
-
-
 def map_deployment(request, database_id):
     """
     Map the deployment information from request to deployment object in required format.
@@ -1425,8 +1392,30 @@ class DatabaseDeploymentAPI(MethodView):
             deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
             return Response(deployment_content, mimetype='text/xml')
         else:
-            deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
-            return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
+            deployment = Global.DEPLOYMENT.get(database_id)
+
+            new_deployment = deployment.copy()
+
+            new_deployment['users'] = {}
+            new_deployment['users']['user'] = []
+
+            deployment_user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
+
+            if deployment_user is not None:
+                for user in deployment_user:
+                    if user[0]['databaseid'] == database_id:
+                        new_deployment['users']['user'].append({
+                            'name': user[0]['name'],
+                            'roles': user[0]['roles'],
+                            'plaintext': user[0]['plaintext']
+
+                        })
+
+            del new_deployment['databaseid']
+
+
+
+            return jsonify({'deployment': new_deployment})
 
     @staticmethod
     def put(database_id):
@@ -1447,6 +1436,7 @@ class DatabaseDeploymentAPI(MethodView):
                 return jsonify(result)
             else:
                 return jsonify({'status': 'success'})
+
 
 class VdmAPI(MethodView):
     """
