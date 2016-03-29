@@ -269,7 +269,7 @@ public class CatalogContext {
         }
 
         // look in the catalog for the file
-        return loader.loadClass(procedureClassName);
+        return Class.forName(procedureClassName, true, loader);
     }
 
     // Generate helpful status messages based on configuration present in the
