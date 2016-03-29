@@ -124,6 +124,8 @@ class CreateServer(Server):
             if not value:
                 print "The Server list is empty"
             self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['statusString'], 'OK')
+            self.assertEqual(value['status'], 200)
 
     def test_request_with_id(self):
         """
