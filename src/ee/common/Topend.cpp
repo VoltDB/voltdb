@@ -97,6 +97,8 @@ namespace voltdb {
         this->actionType = action;
         this->deleteConflictType = deleteConflict;
         this->insertConflictType = insertConflict;
+        this->remoteClusterId = remoteClusterId;
+        this->remoteTimestamp = remoteTimestamp;
         char signature[20];
 
         if (existingMetaTableForDelete) {
