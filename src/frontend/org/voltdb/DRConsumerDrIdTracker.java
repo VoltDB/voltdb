@@ -84,11 +84,22 @@ public class DRConsumerDrIdTracker implements Serializable {
         }
     }
 
-    public DRConsumerDrIdTracker(long initialAckPoint, long spUniqueId, long mpUniqueId) {
+
+    private DRConsumerDrIdTracker(long spUniqueId, long mpUniqueId) {
         m_map = TreeRangeSet.create();
-        m_map.add(range(initialAckPoint, initialAckPoint));
         m_lastSpUniqueId = spUniqueId;
         m_lastMpUniqueId = mpUniqueId;
+    }
+
+    public static DRConsumerDrIdTracker createBufferTracker(long spUniqueId, long mpUniqueId) {
+        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId);
+        return newTracker;
+    }
+
+    public static DRConsumerDrIdTracker createPartitionTracker(long initialAckPoint, long spUniqueId, long mpUniqueId) {
+        DRConsumerDrIdTracker newTracker = new DRConsumerDrIdTracker(spUniqueId, mpUniqueId);
+        newTracker.addRange(initialAckPoint, initialAckPoint);
+        return newTracker;
     }
 
     public DRConsumerDrIdTracker(DRConsumerDrIdTracker other) {
@@ -181,6 +192,15 @@ public class DRConsumerDrIdTracker implements Serializable {
      * Add a range to the tracker.
      * @param startDrId
      * @param endDrId
+     */
+    public void addRange(long startDrId, long endDrId) {
+        m_map.add(range(startDrId, endDrId));
+    }
+
+    /**
+     * Add a range to the tracker.
+     * @param startDrId
+     * @param endDrId
      * @param spUniqueId
      * @param mpUniqueId
      */
@@ -188,7 +208,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         // Note that any given range or tracker could have either sp or mp sentinel values
         m_lastSpUniqueId = Math.max(m_lastSpUniqueId, spUniqueId);
         m_lastMpUniqueId = Math.max(m_lastMpUniqueId, mpUniqueId);
-        m_map.add(range(startDrId, endDrId));
+        addRange(startDrId, endDrId);
     }
 
     /**
@@ -304,6 +324,24 @@ public class DRConsumerDrIdTracker implements Serializable {
         }
         obj.put("drIdRanges", drIdRanges);
         return obj;
+    }
+
+    public String toShortString() {
+        if (m_map.isEmpty()) {
+            return "Empty Map";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
+        sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
+        if (m_map.isEmpty()) {
+            sb.append("[empty map]");
+        }
+        else {
+            sb.append("span [").append(DRLogSegmentId.getSequenceNumberFromDRId(getFirstDrId())).append("-");
+            sb.append(DRLogSegmentId.getSequenceNumberFromDRId(getLastDrId()));
+            sb.append(", size=").append(size()).append("]");
+        }
+        return sb.toString();
     }
 
     @Override
