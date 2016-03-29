@@ -792,7 +792,7 @@ public class SnapshotSiteProcessor {
                     jsonObj.put("isTruncation", false);
                 }
                 extraSnapshotData.mergeToZooKeeper(jsonObj, SNAP_LOG);
-                byte[] zkData = jsonObj.toString(4).getBytes("UTF-8");
+                byte[] zkData = jsonObj.toString().getBytes("UTF-8");
                 if (zkData.length > 5000000) {
                     SNAP_LOG.warn("ZooKeeper node for snapshot digest unexpectedly large: " + zkData.length);
                 }

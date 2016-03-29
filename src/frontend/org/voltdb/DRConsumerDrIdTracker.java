@@ -338,7 +338,8 @@ public class DRConsumerDrIdTracker implements Serializable {
         }
         else {
             sb.append("span [").append(DRLogSegmentId.getSequenceNumberFromDRId(getFirstDrId())).append("-");
-            sb.append(DRLogSegmentId.getSequenceNumberFromDRId(getLastDrId())).append("]");
+            sb.append(DRLogSegmentId.getSequenceNumberFromDRId(getLastDrId()));
+            sb.append(", size=").append(size()).append("]");
         }
         return sb.toString();
     }
