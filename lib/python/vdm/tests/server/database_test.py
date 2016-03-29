@@ -82,6 +82,23 @@ class CreateDatabase(Database):
     test case for database create and validation related to it
     """
 
+    def test_request_with_id_member(self):
+        """
+        ensure id and members are not allowed in payload
+        """
+        error_msg = 'You cannot specify \'Id\' or \'Members\' while creating database.'
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        data = {'name': 'test', 'id': 11}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], error_msg)
+        self.assertEqual(response.status_code, 404)
+
+        data = {'name': 'test', 'members': [2]}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], error_msg)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_db(self):
         """
@@ -122,6 +139,43 @@ class UpdateDatabase(Database):
     """
     test case for database update and validation related to it
     """
+
+    def test_request_with_id_member(self):
+        """
+        ensure id and members are not allowed in payload
+        """
+        response = requests.get(__url__)
+        value = response.json()
+
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            print 'Database id to be updated is ' + str(last_db_id)
+            url = __url__ + str(last_db_id)
+
+        response = requests.put(url, json={'name': 'test', 'members': [3]})
+        value = response.json()
+        if response.status_code == 200:
+            self.assertEqual(response.status_code, 200)
+        else:
+            self.assertEqual(value['error'], 'You cannot specify \'Members\' while updating database.')
+            self.assertEqual(response.status_code, 404)
+
+        response = requests.put(url, json={'name': 'test', 'id': 33333})
+        value = response.json()
+        if response.status_code == 200:
+            self.assertEqual(response.status_code, 200)
+        else:
+            self.assertEqual(value['error'], 'Database Id mentioned in the payload and url doesn\'t match.')
+            self.assertEqual(response.status_code, 404)
+
+        response = requests.put(url, json={'name': 'test123', 'id': last_db_id})
+        value = response.json()
+        if response.status_code == 200:
+            self.assertEqual(value['status'], 1)
+            self.assertEqual(response.status_code, 200)
+        else:
+            self.assertEqual(response.status_code, 404)
 
     def test_get_db(self):
         """

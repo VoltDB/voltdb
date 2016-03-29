@@ -65,7 +65,7 @@ class Server(unittest.TestCase):
             last_db_id = value['databases'][db_length-1]['id']
 
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
+                (__host_or_ip__, last_db_id)
 
             data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
@@ -125,6 +125,25 @@ class CreateServer(Server):
                 print "The Server list is empty"
             self.assertEqual(response.status_code, 200)
 
+    def test_request_with_id(self):
+        """
+        ensure server name is not empty
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': '', 'name': 'test', 'id':3}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], 'You cannot specify \'Id\' while creating server.')
+        self.assertEqual(response.status_code, 404)
+
     def test_validate_host_name(self):
         """
         ensure server name is not empty
@@ -138,7 +157,6 @@ class CreateServer(Server):
 
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        # url = URL + str(last_db_id)
         data = {'description': 'test', 'hostname': '', 'name': 'test'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -223,7 +241,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -231,7 +249,7 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -240,7 +258,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'http-listener': '8080'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -248,8 +266,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server test123 for '
-                                              'http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
     def test_validate_duplicate_admin_port(self):
         """
@@ -263,7 +281,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -271,7 +289,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -280,7 +299,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '21211', 'http-listener': '34'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -288,8 +307,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server test123 for '
-                                              'admin-listener')
+            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+                                              'admin-listener' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port(self):
         """
@@ -303,7 +322,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -311,7 +330,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -320,7 +340,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '3021'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -328,8 +348,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server test123 '
-                                              'for internal-listener')
+            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+                                              'for internal-listener' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port(self):
         """
@@ -343,7 +363,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -351,7 +371,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -360,7 +381,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '7181', 'replication-listener': '567'}
         response = requests.post(url, json=data, headers=headers)
@@ -369,8 +390,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server test123 for '
-                                              'zookeeper-listener')
+            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+                                              'zookeeper-listener' % __host_or_ip__)
 
     def test_validate_duplicate_client_port(self):
         """
@@ -384,7 +405,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -392,7 +413,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -401,7 +423,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '71', 'replication-listener': '55', 'client-listener': '21212'}
         response = requests.post(url, json=data, headers=headers)
@@ -410,8 +432,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server test123 for '
-                                              'client-listener')
+            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+                                              'client-listener' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port(self):
         """
@@ -425,7 +447,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         value = response.json()
@@ -433,7 +455,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Duplicate port')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -442,7 +465,7 @@ class CreateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '71', 'replication-listener': '5555'}
         response = requests.post(url, json=data, headers=headers)
@@ -451,14 +474,43 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server test123 for '
-                                              'replication-listener')
+            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+                                              'replication-listener' % __host_or_ip__)
 
 
 class UpdateServer(Server):
     """
     Update server
     """
+    def test_request_with_id(self):
+        """
+        ensure server name is not empty
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+                (__host_or_ip__,last_db_id)
+            response = requests.get(url)
+            value = response.json()
+            if value:
+                server_length = len(value['members'])
+                last_server_id = value['members'][server_length-1]['id']
+                print "ServerId to be updated is " + str(last_server_id)
+                url += str(last_server_id) + '/'
+                data = {'description': 'test123', 'hostname': __host_or_ip__,
+                        'name': 'test12345', 'id': 33333}
+                response = requests.put(url, json=data, headers=headers)
+                value = response.json()
+                self.assertEqual(value['error'], 'Server Id mentioned in the payload and url doesn\'t match.')
+                self.assertEqual(response.status_code, 404)
+            else:
+                print "The Server list is empty"
+        else:
+            print "The database list is empty"
 
     def test_validate_hostname(self):
         """
@@ -489,7 +541,7 @@ class UpdateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            db_data = {'dbId': last_db_id}
+            #db_data = {'dbId': last_db_id}
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
             response = requests.get(url)
@@ -498,9 +550,9 @@ class UpdateServer(Server):
                 server_length = len(value['members'])
                 last_server_id = value['members'][server_length-1]['id']
                 print "ServerId to be updated is " + str(last_server_id)
-                url += str(last_server_id)
-                db_data = {'description': 'test123'}
-                response = requests.put(url, db_data)
+                url += str(last_server_id) + '/'
+                data = {'description': 'test123'}
+                response = requests.put(url, json=data, headers=headers)
                 self.assertEqual(response.status_code, 200)
             else:
                 print "The Server list is empty"
@@ -517,7 +569,7 @@ class UpdateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-        url = 'http://%s:8000/api/1.0/databases/%u/servers/1' % \
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/1/' % \
             (__host_or_ip__,last_db_id)
         data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '88', 'client-listener': '88'}
@@ -527,7 +579,7 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['statusstring'], 'Given server with id 1 doesn\'t belong to database with id 2.')
+            self.assertEqual(value['statusstring'], 'Given server with id 1 doesn\'t belong to database with id %u.' %last_db_id)
 
     def test_validate_duplicate_port_update(self):
         """
@@ -563,7 +615,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
 
@@ -579,7 +631,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'http-listener': '8080'}
         response = requests.put(url, json=data, headers=headers)
         value = response.json()
@@ -587,8 +639,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server test123 for '
-                                              'http-listener')
+            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
+                                              'http-listener' % __host_or_ip__)
 
     def test_validate_duplicate_admin_port_update(self):
         """
@@ -602,7 +654,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 201:
@@ -617,7 +669,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '21211', 'http-listener': '34'}
         response = requests.put(url, json=data, headers=headers)
         value = response.json()
@@ -625,8 +677,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server test123 for '
-                                              'admin-listener')
+            self.assertEqual(value['errors'], 'Port 21211 for the same host is already used by server %s for '
+                                              'admin-listener' % __host_or_ip__)
 
     def test_validate_duplicate_internal_port_update(self):
         """
@@ -640,7 +692,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 201:
@@ -655,7 +707,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '3021'}
         response = requests.put(url, json=data, headers=headers)
         value = response.json()
@@ -663,8 +715,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server test123 '
-                                              'for internal-listener')
+            self.assertEqual(value['errors'], 'Port 3021 for the same host is already used by server %s '
+                                              'for internal-listener' % __host_or_ip__)
 
     def test_validate_duplicate_zookeeper_port_update(self):
         """
@@ -678,7 +730,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 201:
@@ -693,7 +745,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345', 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '7181', 'replication-listener': '567'}
         response = requests.put(url, json=data, headers=headers)
@@ -702,8 +754,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server test123 for '
-                                              'zookeeper-listener')
+            self.assertEqual(value['errors'], 'Port 7181 for the same host is already used by server %s for '
+                                              'zookeeper-listener' % __host_or_ip__)
 
     def test_validate_duplicate_client_port_update(self):
         """
@@ -717,7 +769,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__, last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 201:
@@ -732,7 +784,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__, last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '71', 'replication-listener': '55', 'client-listener': '21212'}
         response = requests.put(url, json=data, headers=headers)
@@ -741,8 +793,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server test123 for '
-                                              'client-listener')
+            self.assertEqual(value['errors'], 'Port 21212 for the same host is already used by server %s for '
+                                              'client-listener' % __host_or_ip__)
 
     def test_validate_duplicate_replication_port_update(self):
         """
@@ -756,7 +808,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': 'test12345'}
         response = requests.post(url, json=data, headers=headers)
 
@@ -772,7 +824,7 @@ class UpdateServer(Server):
             last_db_id = value['databases'][db_length-1]['id']
         url = 'http://%s:8000/api/1.0/databases/%u/servers/2/' % \
             (__host_or_ip__,last_db_id)
-        data = {'description': 'test', 'hostname': "test123",
+        data = {'description': 'test', 'hostname': __host_or_ip__,
                 'name': __host_or_ip__, 'admin-listener': '456', 'http-listener': '34', 'internal-listener': '63',
                 'zookeeper-listener': '71', 'replication-listener': '5555'}
         response = requests.put(url, json=data, headers=headers)
@@ -781,8 +833,8 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server test123 for '
-                                              'replication-listener')
+            self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
+                                              'replication-listener' % __host_or_ip__)
 
 
 class DeleteServer(unittest.TestCase):

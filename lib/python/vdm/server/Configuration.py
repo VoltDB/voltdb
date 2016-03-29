@@ -33,6 +33,10 @@ from collections import defaultdict
 import json
 import traceback
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
+
+from flask import jsonify
+
+from Validation import JsonInputs
 import HTTPListener
 import DeploymentConfig
 
@@ -591,7 +595,7 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        path = os.path.join(HTTPListener.Global.PATH, 'voltdeploy.xml')
+        path = os.path.join(HTTPListener.Global.CONFIG_PATH, 'voltdeploy.xml')
         f = open(path, 'w')
         f.write(main_header)
         f.close()
@@ -680,3 +684,87 @@ def print_errors(config_type, error):
     """
     print 'error (' + config_type + '): ' + str(error)
     print traceback.format_exc()
+
+
+def set_deployment_for_upload(database_id, request):
+    dep_file = request.files['file']
+    if dep_file and HTTPListener.allowed_file(dep_file.filename):
+        try:
+            content = dep_file.read()
+            o = XML(content)
+            xml_final = json.loads(json.dumps(etree_to_dict(o)))
+            if 'deployment' in xml_final and type(xml_final['deployment']) is dict:
+                deployment_data = get_deployment_for_upload(xml_final['deployment'])
+                if type(deployment_data) is dict:
+                    if 'error' in deployment_data:
+                        return {'status': 'failure', 'error': deployment_data['error']}
+                else:
+                    deployment_json = deployment_data[0]
+                req = HTTPListener.DictClass()
+                req.json = {}
+                req.json = deployment_json
+                inputs = JsonInputs(req)
+                if not inputs.validate():
+                    return {'status': 'failure', 'errors': inputs.errors}
+
+                result = check_validation_deployment(req)
+                if 'status' in result and result['status'] == 'error':
+                    return {'status': 'failure', 'error': result['error']}
+
+                HTTPListener.map_deployment(req, database_id)
+                HTTPListener.Global.DEPLOYMENT_USERS = {}
+                if 'users' in req.json and 'user' in req.json['users']:
+                    for user in req.json['users']['user']:
+                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])]= {
+                                'name': user['name'],
+                                'roles': user['roles'],
+                                'password': user['password'],
+                                'plaintext': user['plaintext'],
+                                'databaseid': database_id,
+                                'userid': user['userid']
+                            }
+
+                HTTPListener.sync_configuration()
+                write_configuration_file()
+
+            else:
+                return {'status': 'failure', 'error': 'Invalid file content.'}
+
+        except Exception as err:
+            return {'status': 'failure', 'error': 'Invalid file content.'}
+    else:
+        return {'status': 'failure', 'error': 'Invalid file type.'}
+    return {'status': 'success'}
+
+
+def check_validation_deployment(req):
+    if 'systemsettings' in req.json and 'resourcemonitor' in req.json['systemsettings']:
+        if 'memorylimit' in req.json['systemsettings']['resourcemonitor'] and \
+                            'size' in req.json['systemsettings']['resourcemonitor']['memorylimit']:
+            size = str(req.json['systemsettings']['resourcemonitor']['memorylimit']['size'])
+            response = json.loads(HTTPListener.check_size_value(size, 'memorylimit').data)
+            if 'error' in response:
+                return {'status': 'error', 'error': response['error']}
+            disk_limit_arr = []
+            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
+                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
+                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                    size = feature['size']
+                    if feature['name'] in disk_limit_arr:
+                        return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
+                    disk_limit_arr.append(feature['name'])
+                    response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
+                    if 'error' in response:
+                        return {'status': 'error', 'error': response['error']}
+        if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
+            frequency_unit = ['h', 'm', 's']
+            frequency = str(req.json['snapshot']['frequency'])
+            last_char =  frequency[len(frequency)-1]
+            if last_char not in frequency_unit:
+                return {'status': 'error', 'error': 'Snapshot: Invalid frequency value.'}
+            frequency = frequency[:-1]
+            try:
+                int_frequency = int(frequency)
+            except Exception, exp:
+                return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
+    return {'status': 'success'}
