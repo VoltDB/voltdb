@@ -48,7 +48,25 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
+    rm -rf build obj debugoutput $APPNAME*.jar voltdbroot log
+}
+
+# load schema and procedures
+function init-security() {
+    jars-ifneeded
+    sqlcmd < ddl-security.sql
+}
+
+# load schema and procedures
+function init-export() {
+    jars-ifneeded
+    sqlcmd < ddl_withexport.sql
+}
+
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 # migration away from catalog
@@ -56,10 +74,18 @@ function jars() {
     ant -f build.xml all
 }
 
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e voltkv.jar ]; then
+        jars;
+    fi
+}
+
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/voltkvqa/*.java \
         src/voltkvqa/procedures/*.java \
         src/voltkvqa/procedures_withexport/*.java
@@ -70,24 +96,22 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml || exit 1
-    $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar -p project_withexport.xml || exit 1
-    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar -p project-security.xml || exit 1
+    $VOLTDB compile --classpath obj -o $APPNAME.jar || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar || exit 1
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H `hostname` $APPNAME.jar
+    jars-ifneeded
+    $VOLTDB create -d deployment.xml -l $LICENSE -H `hostname`
+    echo Run "init" step when server startup is complete
 }
 
 function exportserver() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment_export.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment_export.xml -l $LICENSE -H $HOST
+    echo Run "init-export" step when server startup is complete
 }
 
 # run the client that drives the example
@@ -98,13 +122,13 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voltkvqa.AsyncBenchmark --help
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH voltkvqa.AsyncBenchmark --help
 }
 
 function async-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=60 \
@@ -127,13 +151,13 @@ function async-benchmark() {
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voltkvqa.SyncBenchmark --help
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH voltkvqa.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -149,11 +173,11 @@ function sync-benchmark() {
 }
 
 function http-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.HTTPBenchmark \
         --displayinterval=5 \
-        --duration=300 \
+        --duration=60 \
         --servers=localhost \
         --poolsize=100000 \
         --preload=true \
@@ -163,18 +187,18 @@ function http-benchmark() {
         --maxvaluesize=1024 \
         --usecompression=false \
         --warmup=15 \
-        --threads=250
+        --threads=35
 }
 
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voltkvqa.JDBCBenchmark --help
+    jars-ifneeded
+    java -classpath obj:$CLASSPATH voltkvqa.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -190,8 +214,8 @@ function jdbc-benchmark() {
 }
 
 function jdbc-benchmark-c3p0() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -203,13 +227,13 @@ function jdbc-benchmark-c3p0() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=c3p0 \
+        --externalConnectionPool=c3p0 \
         --threads=40
 }
 
 function jdbc-benchmark-tomcat() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -221,13 +245,13 @@ function jdbc-benchmark-tomcat() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=tomcat \
+        --externalConnectionPool=tomcat \
         --threads=40
 }
 
 function jdbc-benchmark-bonecp() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -239,13 +263,13 @@ function jdbc-benchmark-bonecp() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=bonecp \
+        --externalConnectionPool=bonecp \
         --threads=40
 }
 
 function jdbc-benchmark-hikari() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $APPNAME.jar:$CLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -257,12 +281,12 @@ function jdbc-benchmark-hikari() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --usecompression=false \
-	--externalConnectionPool=hikari \
+        --externalConnectionPool=hikari \
         --threads=40
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|init|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark-*|jdbc-benchmark-help}"
 }
 
