@@ -133,12 +133,6 @@ class StreamedTable : public Table {
         return m_sequenceNo;
     }
 
-protected:
-    // No Op
-    std::vector<uint64_t> getBlockAddresses() const {
-        return std::vector<uint64_t>();
-    }
-
 private:
     // Stats
     voltdb::TableStats *getTableStats();
