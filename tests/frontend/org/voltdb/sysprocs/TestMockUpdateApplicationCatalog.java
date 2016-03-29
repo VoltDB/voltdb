@@ -36,11 +36,9 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.TestCatalogUpdateSuite;
 import org.voltdb.sysprocs.UpdateApplicationCatalog.JavaClassForTest;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.InMemoryJarfile.JarLoader;
 
 import junit.framework.TestCase;
 
@@ -78,7 +76,7 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         assert(success);
 
         JavaClassForTest testClass = Mockito.mock(JavaClassForTest.class);
-        Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(JarLoader.class))).
+        Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(InMemoryJarfile.class))).
                      thenThrow(new UnsupportedClassVersionError("Unsupported major.minor version 52.0"));
         UpdateApplicationCatalog.setJavaClassForTest(testClass);
 

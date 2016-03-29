@@ -91,12 +91,6 @@ class Server(unittest.TestCase):
             response = requests.get(url)
             value = response.json()
             if value:
-                server_length = len(value['members'])
-                last_server_id = value['members'][server_length-1]['id']
-                print "ServerId to be deleted is " + str(last_server_id)
-                url += str(last_server_id)
-                response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
@@ -130,6 +124,27 @@ class CreateServer(Server):
             if not value:
                 print "The Server list is empty"
             self.assertEqual(response.status_code, 200)
+            self.assertEqual(value['statusString'], 'OK')
+            self.assertEqual(value['status'], 200)
+
+    def test_request_with_id(self):
+        """
+        ensure server name is not empty
+        """
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+        url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
+            (__host_or_ip__,last_db_id)
+        data = {'description': 'test', 'hostname': '', 'name': 'test', 'id':3}
+        response = requests.post(url, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], 'You cannot specify \'Id\' while creating server.')
+        self.assertEqual(response.status_code, 404)
 
     def test_request_with_id(self):
         """
