@@ -291,7 +291,7 @@ class VoltDatabase:
                 voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip ]
             else:
                 voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip ]
-        self.build_network_options(server[0], voltdb_cmd)
+        self.build_network_options(server, voltdb_cmd)
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
         outfilename = os.path.realpath(os.path.join(HTTPListener.Global.CONFIG_PATH,
