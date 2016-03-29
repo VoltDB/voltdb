@@ -1224,6 +1224,7 @@ input.drop-down-input{width:125px !important;}
 padding:5px; margin:0 0 0 10px; width:47.5%}
 .overlayText p { margin-left: 5px}
 .iconModify { float:left; padding-right:5px;}
+#errorDialog {z-index:22223;}
 /*************overwriting the bootstrap***************/
 .modal.custom .modifiedModalCreateDB {
     width:40%;

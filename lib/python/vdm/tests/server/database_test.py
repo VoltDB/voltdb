@@ -172,7 +172,7 @@ class UpdateDatabase(Database):
         response = requests.put(url, json={'name': 'test123', 'id': last_db_id})
         value = response.json()
         if response.status_code == 200:
-            self.assertEqual(value['status'], 1)
+            self.assertEqual(value['status'], 200)
             self.assertEqual(response.status_code, 200)
         else:
             self.assertEqual(response.status_code, 404)

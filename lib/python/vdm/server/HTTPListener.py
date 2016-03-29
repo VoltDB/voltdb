@@ -905,7 +905,7 @@ class ServerAPI(MethodView):
 
         database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
-            return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+            return make_response(jsonify({'statusString': 'No database found for id: %u' % database_id}), 404)
         else:
             members = database[0]['members']
         if server_id in members:
@@ -950,9 +950,9 @@ class ServerAPI(MethodView):
                 request.json.get('placement-group', current_server[0]['placement-group'])
             sync_configuration()
             Configuration.write_configuration_file()
-            return jsonify({'server': current_server[0], 'status': 1})
+            return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server[0]})
         else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+            return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
             server_id, database_id)})
 
 
@@ -1047,7 +1047,7 @@ class DatabaseAPI(MethodView):
         current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'database': current_database[0], 'status': 1})
+        return jsonify({'status': 200, 'statusString': 'OK', 'database': current_database[0]})
 
     @staticmethod
     def delete(database_id):

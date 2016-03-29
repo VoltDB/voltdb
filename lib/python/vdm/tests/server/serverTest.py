@@ -585,7 +585,7 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['statusstring'], 'Given server with id 1 doesn\'t belong to database with id %u.' %last_db_id)
+            self.assertEqual(value['statusString'], 'Given server with id 1 doesn\'t belong to database with id %u.' %last_db_id)
 
     def test_validate_duplicate_port_update(self):
         """
