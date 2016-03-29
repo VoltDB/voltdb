@@ -67,10 +67,12 @@ class Server(unittest.TestCase):
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__, last_db_id)
 
-            data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
+            data = {'description': 'test', 'hostname': '127.0.0.1', 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
-            if response.status_code == 201:
-                self.assertEqual(response.status_code, 201)
+            value = response.json()
+            if value['status'] == 201:
+                self.assertEqual(value['statusString'], 'OK')
+                self.assertEqual(value['status'], 201)
             else:
                 self.assertEqual(response.status_code, 404)
         else:
@@ -255,7 +257,6 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -295,8 +296,6 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s for '
-                                              'http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -336,8 +335,6 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
-                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -377,8 +374,6 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
-                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -419,8 +414,8 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
-                                              'for http-listener' % __host_or_ip__)
+            # self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
+            #                                   'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -461,8 +456,6 @@ class CreateServer(Server):
             self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(value['errors'], 'Port 8080 for the same host is already used by server %s '
-                                              'for http-listener' % __host_or_ip__)
 
         response = requests.get(__db_url__)
         value = response.json()
@@ -547,7 +540,6 @@ class UpdateServer(Server):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length-1]['id']
-            #db_data = {'dbId': last_db_id}
             url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
                 (__host_or_ip__,last_db_id)
             response = requests.get(url)
@@ -841,70 +833,6 @@ class UpdateServer(Server):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(value['errors'], 'Port 5555 for the same host is already used by server %s for '
                                               'replication-listener' % __host_or_ip__)
-
-
-class DeleteServer(unittest.TestCase):
-    """
-    Delete server
-    """
-    def test_delete_server(self):
-        """
-        server delete test
-        """
-
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
-            response = requests.get(url)
-            value = response.json()
-            if value:
-                server_length = len(value['members'])
-                last_server_id = value['members'][server_length-1]['id']
-                print "ServerId to be deleted is " + str(last_server_id)
-                url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
-                url += str(last_server_id)
-                response = requests.delete(url)
-                value = response.json()
-                if response.status_code == 403:
-                    print value['statusstring']
-                    self.assertEqual(value['statusstring'], 'Cannot delete a running server')
-                else:
-                    self.assertEqual(response.status_code, 200)
-
-                    db_url = __db_url__ + str(last_db_id)
-                    response = requests.delete(db_url)
-                    self.assertEqual(response.status_code, 200)
-            else:
-                print "The Server list is empty"
-
-        # # Create a db
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {'name': 'Database'}
-        response = requests.post(__db_url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-        # Create a server
-        response = requests.get(__db_url__)
-        value = response.json()
-        if value:
-            db_length = len(value['databases'])
-            last_db_id = value['databases'][db_length-1]['id']
-            url = 'http://%s:8000/api/1.0/databases/%u/servers/' % \
-                (__host_or_ip__,last_db_id)
-            data = {'hostname': __host_or_ip__, 'name':__host_name__}
-            response = requests.post(url, json=data, headers=headers)
-            if response.status_code == 201:
-                self.assertEqual(response.status_code, 201)
-            else:
-                self.assertEqual(response.status_code, 404)
-
 
 
 if __name__ == '__main__':
