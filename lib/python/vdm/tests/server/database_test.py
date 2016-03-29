@@ -109,6 +109,8 @@ class CreateDatabase(Database):
         if not value:
             print "Database list is empty."
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(value['statusString'], 'OK')
+        self.assertEqual(value['status'], 200)
 
 
     def test_validate_db_name_empty(self):
