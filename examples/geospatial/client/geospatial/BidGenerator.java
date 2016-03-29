@@ -53,9 +53,6 @@ public class BidGenerator implements Runnable {
     // A connection to the database, initialized by whoever invokes constructor
     private final Client m_client;
 
-    // A list of polygons to use in bid generation
-    private final List<GeographyValue> m_bidRegions;
-
     // The current highest bid id
     private long m_bidId;
 
@@ -68,7 +65,6 @@ public class BidGenerator implements Runnable {
     BidGenerator(Client client) throws Exception {
         m_rand = new Random(777);
         m_client = client;
-        m_bidRegions = generateRegions();
 
         NUM_ADVERTISERS = m_client.callProcedure("@AdHoc", "select count(*) from advertisers")
                 .getResults()[0].asScalarLong();
@@ -98,49 +94,6 @@ public class BidGenerator implements Runnable {
     }
 
     /**
-     * Generate a list of polygons that the bid generator can pick from
-     * when randomly generating bids.
-     */
-    private List<GeographyValue> generateRegions() {
-        List<GeographyValue> regions = new ArrayList<GeographyValue>();
-
-        // Units here are degrees.  This is around 100 yards near the equator.
-        final double MIN_SIDE_LENGTH = 0.000823451910;
-        final double MAX_SIDE_LENGTH = MIN_SIDE_LENGTH * 10.0;
-
-        final double LNG_MIN = AdBrokerBenchmark.BID_AREA_LNG_MIN;
-        final double LNG_MAX = AdBrokerBenchmark.BID_AREA_LNG_MAX - MAX_SIDE_LENGTH;
-        final double LAT_MIN = AdBrokerBenchmark.BID_AREA_LAT_MIN;
-        final double LAT_MAX = AdBrokerBenchmark.BID_AREA_LAT_MAX - MAX_SIDE_LENGTH;
-
-        for (int i = 0; i < AdBrokerBenchmark.NUM_BID_REGIONS; ++i) {
-
-            double d = m_rand.nextDouble(); // between 0 (inclusive) and 1 (exclusive)
-            double regLngMin = LNG_MIN + d * (LNG_MAX - LNG_MIN);
-            d = m_rand.nextDouble();
-            double regLatMin = LAT_MIN + d * (LAT_MAX - LAT_MIN);
-
-            // Sides of region are between 100 and 1000 yards.
-            d = m_rand.nextDouble();
-            double lngSideLength = MIN_SIDE_LENGTH + d * (MAX_SIDE_LENGTH - MIN_SIDE_LENGTH);
-            d = m_rand.nextDouble();
-            double latSideLength = MIN_SIDE_LENGTH + d * (MAX_SIDE_LENGTH - MIN_SIDE_LENGTH);
-
-            List<GeographyPointValue> ring = new ArrayList<GeographyPointValue>();
-            ring.add(new GeographyPointValue(regLngMin,                 regLatMin));
-            ring.add(new GeographyPointValue(regLngMin + lngSideLength, regLatMin));
-            ring.add(new GeographyPointValue(regLngMin + lngSideLength, regLatMin + latSideLength));
-            ring.add(new GeographyPointValue(regLngMin,                 regLatMin + latSideLength));
-            ring.add(new GeographyPointValue(regLngMin,                 regLatMin));
-            List<List<GeographyPointValue>> rings = new ArrayList<List<GeographyPointValue>>();
-            rings.add(ring);
-            regions.add(new GeographyValue(rings));
-        }
-
-        return regions;
-    }
-
-    /**
      * This is the "run" method for this Runnable subclass.
      *
      * Generate one new row for the bids table, and insert it.
@@ -149,7 +102,7 @@ public class BidGenerator implements Runnable {
     public void run() {
         long bidId = m_bidId++;
         long advertiserId = Math.abs(m_rand.nextLong()) % NUM_ADVERTISERS;
-        GeographyValue bidRegion = m_bidRegions.get(m_rand.nextInt(m_bidRegions.size()));
+        GeographyValue bidRegion = Regions.pickRandomRegion();
         TimestampType bidStartTime = new TimestampType();
         TimestampType bidEndTime = new TimestampType(
                 bidStartTime.getTime() + AdBrokerBenchmark.BID_DURATION_SECONDS * 1000000);

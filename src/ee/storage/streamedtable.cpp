@@ -165,6 +165,11 @@ void StreamedTable::dropMaterializedView(ExportMaterializedViewMetadata *targetV
 
 StreamedTable::~StreamedTable()
 {
+    // note this class has ownership of the views, even if they
+    // were allocated by VoltDBEngine
+    for (int i = 0; i < m_views.size(); i++) {
+        delete m_views[i];
+    }
     delete m_wrapper;
 }
 
@@ -224,12 +229,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
             m_views[i]->processTupleInsert(source, true);
         }
     }
-    return true;
-}
-
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
-{
-    throwFatalException("May not update a streamed table.");
     return true;
 }
 

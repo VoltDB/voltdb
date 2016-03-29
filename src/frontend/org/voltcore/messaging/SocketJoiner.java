@@ -63,6 +63,9 @@ import org.voltdb.utils.MiscUtils;
  */
 public class SocketJoiner {
 
+    private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
+    private static final int CRITICAL_CLOCKSKEW = 100;
+
     /**
      * Interface into host messenger to notify it of new connections.
      *
@@ -634,25 +637,7 @@ public class SocketJoiner {
                 processVersionJSONResponse(hostSocket, remoteAddress, localVersionString, localBuildString, activeVersions);
             }
 
-            long maxSkew = Collections.max(skews);
-            long minSkew = Collections.min(skews);
-            long overallSkew = maxSkew - minSkew;
-            if (maxSkew > 0 && minSkew > 0) {
-                overallSkew = maxSkew;
-            } else if (maxSkew < 0 && minSkew < 0) {
-                overallSkew = Math.abs(minSkew);
-            }
-            if (overallSkew > 100) {
-                VoltDB.crashLocalVoltDB("Clock skew is " + overallSkew +
-                        " which is > than the 100 millisecond limit. Make sure NTP is running.", false, null);
-            } else if (overallSkew > 10) {
-                final String msg = "Clock skew is " + overallSkew +
-                        " which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
-                hostLog.warn(msg);
-                consoleLog.warn(msg);
-            } else {
-                hostLog.info("Clock skew to across all nodes in the cluster is " + overallSkew);
-            }
+            checkClockSkew(skews);
 
             /*
              * Limit the number of active versions to 2.
@@ -692,6 +677,30 @@ public class SocketJoiner {
         } catch (Exception e) {
             hostLog.error("Failed to establish socket mesh.", e);
             throw new RuntimeException(e);
+        }
+    }
+
+    private static void checkClockSkew(List<Long> skews)
+    {
+        long maxSkew = Collections.max(skews);
+        long minSkew = Collections.min(skews);
+        long overallSkew = maxSkew - minSkew;
+        if (maxSkew > 0 && minSkew > 0) {
+            overallSkew = maxSkew;
+        } else if (maxSkew < 0 && minSkew < 0) {
+            overallSkew = Math.abs(minSkew);
+        }
+
+        if (overallSkew > MAX_CLOCKSKEW) {
+            VoltDB.crashLocalVoltDB("Clock skew is " + overallSkew +
+                    " which is > than the " + MAX_CLOCKSKEW + " millisecond limit. Make sure NTP is running.", false, null);
+        } else if (overallSkew > CRITICAL_CLOCKSKEW) {
+            final String msg = "Clock skew is " + overallSkew +
+                    " which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
+            hostLog.warn(msg);
+            consoleLog.warn(msg);
+        } else {
+            hostLog.info("Clock skew to across all nodes in the cluster is " + overallSkew);
         }
     }
 

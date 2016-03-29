@@ -63,6 +63,7 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTypeUtil;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -371,7 +372,7 @@ public class ProcedureRunner {
             else {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
-                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
+                    m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, false, paramList);
                     if (getNonVoltDBBackendIfExists() != null) {
                         // Backend handling, such as HSQL or PostgreSQL
                         VoltTable table =
@@ -604,7 +605,7 @@ public class ProcedureRunner {
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
-        queuedSQL.params = getCleanParams(stmt, args);
+        queuedSQL.params = getCleanParams(stmt, true, args);
         queuedSQL.stmt = stmt;
 
         updateCRC(queuedSQL);
@@ -684,7 +685,7 @@ public class ProcedureRunner {
                     throw new VoltAbortException(msg);
                 }
             }
-            queuedSQL.params = getCleanParams(queuedSQL.stmt, argumentParams);
+            queuedSQL.params = getCleanParams(queuedSQL.stmt, false, argumentParams);
 
             updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
@@ -837,52 +838,110 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    private final ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
+    private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
+        VoltType argType = VoltType.INVALID;
+        boolean isArray = false;
+
+        // Argument to param for IN list will come in as array of arguments. The varbinary can also appear
+        // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
+        if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
+            argType = VoltType.typeFromClass(argClass.getComponentType());
+            isArray = true;
+        }
+        else {
+            if (argClass.isArray() && (argClass.getComponentType().isArray() ||     // supplied argument can be array of varbinary
+                                       argClass != byte[].class)) {                 // supplied argument is not varbinary but array of some other type
+                assert(expectedType == VoltType.VARBINARY);
+                // For in list arguments, passed in argument can be an array of
+                // varbinary. It would be nice if the information about expected type
+                // being array of types or not was available at this level and would have
+                // helped in making logic simple and more concise. In absence of that
+                // will have to weaken the checks so that we don't introduce regression
+                // as we don't know expected type of param is array or not.
+                argClass = argClass.getComponentType();
+                isArray = true;
+            }
+            argType = VoltType.typeFromClass(argClass);
+        }
+
+        if (!VoltTypeUtil.implicitTypeConversionFeasible(argType, expectedType, isArray)) {
+            if (isArray && argType == VoltType.TINYINT) {
+                // if arg type is array of tinyint, it was evaluated for array of tiny,
+                // failed and than was evaluated as varbinary. Update the evaluation type
+                // to be for varbinary for the exception msg
+                argType = VoltType.VARBINARY;
+
+            }
+            throw new VoltTypeException("Procedure " + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
+                                         "' to '"+ expectedType.getName() + "' for arg " + argInd +
+                                         " for SQL stmt: " + stmt.getText() + "." +
+                                         " Try explicitly using a " + expectedType.getName()+ " parameter.");
+        }
+    }
+
+    private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
+
         if (inArgs.length != numParamTypes) {
             throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
                     " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
+
         for (int ii = 0; ii < numParamTypes; ii++) {
-            // this handles non-null values
+            VoltType type = VoltType.get(stmtParamTypes[ii]);
+            // handle non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
+                if (verifyTypeConv) {
+                    throwIfInfeasibleTypeConversion(stmt, args[ii].getClass(), ii, type);
+                }
                 continue;
             }
-            // this handles null values
-            VoltType type = VoltType.get(stmtParamTypes[ii]);
-            if (type == VoltType.TINYINT) {
+
+            // handle null values
+            switch (type) {
+            case TINYINT:
                 args[ii] = Byte.MIN_VALUE;
-            } else if (type == VoltType.SMALLINT) {
+                break;
+            case SMALLINT:
                 args[ii] = Short.MIN_VALUE;
-            } else if (type == VoltType.INTEGER) {
+                break;
+            case INTEGER:
                 args[ii] = Integer.MIN_VALUE;
-            } else if (type == VoltType.BIGINT) {
+                break;
+            case BIGINT:
                 args[ii] = Long.MIN_VALUE;
-            } else if (type == VoltType.FLOAT) {
+                break;
+            case FLOAT:
                 args[ii] = VoltType.NULL_FLOAT;
-            } else if (type == VoltType.TIMESTAMP) {
+                break;
+            case TIMESTAMP:
                 args[ii] = new TimestampType(Long.MIN_VALUE);
-            } else if (type == VoltType.STRING) {
+                break;
+            case STRING:
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            } else if (type == VoltType.VARBINARY) {
+                break;
+            case VARBINARY:
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            } else if (type == VoltType.DECIMAL) {
+                break;
+            case DECIMAL:
                 args[ii] = VoltType.NULL_DECIMAL;
-            } else if (type == VoltType.GEOGRAPHY_POINT) {
+                break;
+            case GEOGRAPHY_POINT:
                 args[ii] = VoltType.NULL_POINT;
-            } else if (type == VoltType.GEOGRAPHY) {
+                break;
+            case GEOGRAPHY:
                 args[ii] = VoltType.NULL_GEOGRAPHY;
-            } else {
+                break;
+            default:
                 throw new VoltAbortException("Unknown type " + type +
-                        " can not be converted to NULL representation for arg " + ii +
-                        " for SQL stmt: " + stmt.getText());
+                                             " can not be converted to NULL representation for arg " + ii +
+                                             " for SQL stmt: " + stmt.getText());
             }
         }
-
         return ParameterSet.fromArrayNoCopy(args);
     }
 
@@ -981,6 +1040,7 @@ public class ProcedureRunner {
             } catch (Exception e1) {
                 // shouldn't throw anything outside of the compiler
                 e1.printStackTrace();
+
                 return;
             }
         }

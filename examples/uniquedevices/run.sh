@@ -92,9 +92,9 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST --force"
     echo
-    voltdb create -d deployment.xml -l $LICENSE -H $HOST
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST --force
 }
 
 # load schema and procedures
@@ -119,7 +119,7 @@ function wait_for_startup() {
 # startup server in background and load schema
 function background_server_andload() {
     # run the server in the background
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST --force > nohup.log 2>&1 &
     wait_for_startup
     init
 }

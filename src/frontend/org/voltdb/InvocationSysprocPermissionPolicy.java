@@ -64,7 +64,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
                 null);
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                 new VoltTable[0],
-                "User " + user.m_name + " does not have sysproc permission",
+                "User " + user.m_name + " does not have admin permission",
                 invocation.clientHandle);
     }
 

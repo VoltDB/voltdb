@@ -51,10 +51,15 @@ function clean() {
     rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
 }
 
+# migration away from catalog
+function jars() {
+    ant -f build.xml all
+}
+
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/voltkvqa/*.java \
         src/voltkvqa/procedures/*.java \
         src/voltkvqa/procedures_withexport/*.java
@@ -75,7 +80,7 @@ function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H `hostname` $APPNAME.jar
 }
 
 function exportserver() {
@@ -97,7 +102,6 @@ function async-benchmark-help() {
     java -classpath obj:$CLASSPATH:obj voltkvqa.AsyncBenchmark --help
 }
 
-#        --servers=volt3d,volt3e,volt3f \
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
@@ -142,6 +146,24 @@ function sync-benchmark() {
         --maxvaluesize=1024 \
         --usecompression=false \
         --threads=40
+}
+
+function http-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.HTTPBenchmark \
+        --displayinterval=5 \
+        --duration=300 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+        --warmup=15 \
+        --threads=250
 }
 
 # Use this target for argument help

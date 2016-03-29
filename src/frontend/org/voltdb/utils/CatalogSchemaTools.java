@@ -96,7 +96,18 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW " + catalog_tbl.getTypeName() + " (");
         }
         else {
-            table_sb.append("CREATE TABLE " + catalog_tbl.getTypeName() + " (");
+            table_sb.append("CREATE " +
+                    ((isExportTableWithTarget != null) ? "STREAM " : "TABLE ") +
+                    catalog_tbl.getTypeName());
+            if (isExportTableWithTarget != null) {
+                if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
+                    table_sb.append(" PARTITION ON COLUMN " + catalog_tbl.getPartitioncolumn().getTypeName());
+                }
+                if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                    table_sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+                }
+            }
+            table_sb.append(" (");
         }
 
         // Columns
@@ -303,8 +314,8 @@ public abstract class CatalogSchemaTools {
         // Append the generated table schema to the canonical DDL StringBuilder
         sb.append(table_sb.toString());
 
-        // Partition Table
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
+        // Partition Table for regular tables (non-streams)
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && isExportTableWithTarget == null) {
             sb.append("PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
                     catalog_tbl.getPartitioncolumn().getTypeName() + ";\n" );
         }
@@ -363,13 +374,6 @@ public abstract class CatalogSchemaTools {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-            }
-            sb.append(";\n");
-        }
-        if (isExportTableWithTarget != null) {
-            sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
-            if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-                sb.append(" TO STREAM " + isExportTableWithTarget);
             }
             sb.append(";\n");
         }

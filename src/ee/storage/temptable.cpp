@@ -73,17 +73,6 @@ bool TempTable::insertTuple(TableTuple &source) {
     return true;
 }
 
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool)
-{
-    throwFatalException("TempTable does not support update");
-    // Some day maybe, if we find a use case:
-    // Copy the source tuple into the target
-    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
-}
-
 bool TempTable::deleteTuple(TableTuple &, bool)
 {
     throwFatalException("TempTable does not support deleting individual tuples");
@@ -92,5 +81,15 @@ bool TempTable::deleteTuple(TableTuple &, bool)
 std::string TempTable::tableType() const { return "TempTable"; }
 
 voltdb::TableStats* TempTable::getTableStats() { return NULL; }
+
+std::vector<uint64_t> TempTable::getBlockAddresses() const
+{
+    std::vector<uint64_t> blockAddresses;
+    blockAddresses.reserve(m_data.size());
+    for (std::vector<TBPtr>::const_iterator iter = m_data.begin(); iter != m_data.end(); ++iter) {
+        blockAddresses.push_back((uint64_t) (*iter)->address());
+    }
+    return blockAddresses;
+}
 
 }
