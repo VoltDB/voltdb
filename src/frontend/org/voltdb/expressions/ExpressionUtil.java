@@ -44,38 +44,28 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
-    @SafeVarargs
-    public static AbstractExpression cloneAndCombinePredicates(Collection<AbstractExpression>... colExps) {
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        for (Collection<AbstractExpression> exps : colExps) {
-            if (exps == null) {
-                continue;
-            }
-            for (AbstractExpression expr : exps) {
-                stack.add((AbstractExpression)expr.clone());
-            }
-        }
-        if (stack.isEmpty()) {
+    public static AbstractExpression cloneAndCombinePredicates(List<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
             return null;
+        }
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (AbstractExpression expr : exps) {
+            stack.add((AbstractExpression)expr.clone());
         }
         return combineStack(stack);
     }
 
     /**
      *
-     * @param colExps
+     * @param exps
      */
-    @SafeVarargs
-    public static AbstractExpression combinePredicates(Collection<AbstractExpression>... colExps) {
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        for (Collection<AbstractExpression> exps : colExps) {
-            if (exps != null) {
-                stack.addAll(exps);
-            }
-        }
-        if (stack.isEmpty()) {
+    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
             return null;
         }
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        stack.addAll(exps);
+
         return combineStack(stack);
     }
 
@@ -124,7 +114,7 @@ public abstract class ExpressionUtil {
      * @param expr
      * @return
      */
-    public static List<AbstractExpression> uncombinePredicate(AbstractExpression expr)
+    public static List<AbstractExpression> uncombine(AbstractExpression expr)
     {
         if (expr == null) {
             return new ArrayList<AbstractExpression>();
@@ -133,7 +123,7 @@ public abstract class ExpressionUtil {
             ConjunctionExpression conj = (ConjunctionExpression)expr;
             if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                 // Calculate the list for the tree or leaf on the left.
-                List<AbstractExpression> branch = uncombinePredicate(conj.getLeft());
+                List<AbstractExpression> branch = uncombine(conj.getLeft());
                 // Insert the leaf on the right at the head of that list
                 branch.add(0, conj.getRight());
                 return branch;
@@ -319,7 +309,9 @@ public abstract class ExpressionUtil {
             subExprMap.put(subExpr.m_id, subExpr);
         }
         // Now reconstruct the expression
-        return ExpressionUtil.combinePredicates(subExprMap.values());
+        ArrayList<AbstractExpression> newList = new ArrayList<AbstractExpression>();
+        newList.addAll(subExprMap.values());
+        return ExpressionUtil.combine(newList);
     }
 
     /**

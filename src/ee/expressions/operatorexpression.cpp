@@ -25,6 +25,7 @@
 #include "common/ValuePeeker.hpp"
 
 #include "common/tabletuple.h"
+#include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 

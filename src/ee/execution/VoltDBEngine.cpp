@@ -69,6 +69,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "executors/abstractexecutor.h"
+#include "executors/executorutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"

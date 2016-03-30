@@ -178,13 +178,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     /**
      * @param exps the predicates to clone and combine into one predicate
      */
-    @SafeVarargs
-    public final void setPredicate(Collection<AbstractExpression>... colExps) {
-        assert(colExps != null);
+    public void setPredicate(List<AbstractExpression> exps) {
+        assert(exps != null);
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        m_predicate = ExpressionUtil.cloneAndCombinePredicates(colExps);
+        m_predicate = ExpressionUtil.cloneAndCombinePredicates(exps);
     }
 
     protected void setScanColumns(Collection<SchemaColumn> scanColumns)
