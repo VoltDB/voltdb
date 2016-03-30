@@ -27,10 +27,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-
-import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -38,6 +34,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
+
+import junit.framework.Test;
 
 public class StatisticsTestSuiteBase extends SaveRestoreBase {
 

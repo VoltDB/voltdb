@@ -509,8 +509,7 @@
              exec PARTITIONED_TABLE.select 1",
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["null"],"type_not_null_tinyint":["4"],"type_null_smallint":["null"],"type_not_null_smallint":["6"],
                        "type_null_integer":["null"],"type_not_null_integer":["8"],"type_null_bigint":["null"],"type_not_null_bigint":["10"],
-# Note: after VMC-267 is fixed, change "1970-01-01 00:00:00.000000" to "null" (which is correct):
-                       "type_null_timestamp":["1970-01-01 00:00:00.000000"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_timestamp":["null"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
                        "type_null_float":["null"],"type_not_null_float":["14.4"],"type_null_decimal":["null"],"type_not_null_decimal":["16.600000000000"],
                        "type_null_varchar25":["null"],"type_not_null_varchar25":["b"],"type_null_varchar128":["null"],"type_not_null_varchar128":["d"],
                        "type_null_varchar1024":["null"],"type_not_null_varchar1024":["f"],

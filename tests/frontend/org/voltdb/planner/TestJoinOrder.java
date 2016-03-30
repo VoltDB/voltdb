@@ -30,6 +30,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestJoinOrder extends PlannerTestCase {
     public void testBasicJoinOrder() {
@@ -219,6 +221,25 @@ public class TestJoinOrder extends PlannerTestCase {
 
         try {
             compileWithInvalidJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T2, T1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+    }
+
+    public void testFullJoinOrder() {
+        AbstractPlanNode pn = compileSPWithJoinOrder("select * FROM T1 JOIN T2 ON T1.A = T2.B FULL JOIN T3 ON T1.A = T3.C", "T1, T2, T3");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, n.getPlanNodeType());
+        assertEquals(JoinType.FULL, ((NestLoopPlanNode) n).getJoinType());
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T3"));
+        n = n.getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, n.getPlanNodeType());
+        assertTrue(((SeqScanPlanNode)n.getChild(0)).getTargetTableName().equals("T1"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("T2"));
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1 JOIN T2 ON T1.A = T2.B FULL JOIN T3 ON T1.A = T3.C", "T3, T1, T2");
             fail();
         } catch (Exception ex) {
             assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));

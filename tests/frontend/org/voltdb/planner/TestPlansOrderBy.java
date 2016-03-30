@@ -295,7 +295,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         // DISTINCT
         failToCompile("select DISTINCT T.T_D0 from T order by T.T_D1;", "invalid ORDER BY expression");
         // GROUP BY
-        failToCompile("select T.T_D0, count(*) from T group by T.T_D0 order by T.T_D1;", "invalid ORDER BY expression");
+        failToCompile("select T.T_D0, count(*) from T group by T.T_D0 order by T.T_D1;",
+                "expression not in aggregate or GROUP BY columns: ORDER BY ");
 
         // Very edge case:
         // Order by GROUP BY columns or expressions which are not in display list

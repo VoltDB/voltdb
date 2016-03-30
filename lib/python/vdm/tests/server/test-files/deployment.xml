@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <deployment>
 <users>
-<user name="abc" password="test" plaintext="true" roles="User"/>
-<user name="xyz" password="test" plaintext="true" roles="User"/>
+<user name="abc" password="test" plaintext="true" roles="User" userid="1"/>
+<user name="xyz" password="test" plaintext="true" roles="User" userid="2"/>
 </users>
 <snapshot enabled="true" frequency="24h" prefix="AUTOSNAP" retain="2"/>
 <paths>

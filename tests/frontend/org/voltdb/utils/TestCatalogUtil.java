@@ -364,6 +364,60 @@ public class TestCatalogUtil extends TestCase {
         assertNull(joe.getGroups().get("dontexist"));
     }
 
+    public void testBadUserPasswordRoles() throws Exception {
+        final String badUsername = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "<security enabled=\"true\"/>" +
+            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "<httpd port='0'>" +
+            "<jsonapi enabled='true'/>" +
+            "</httpd>" +
+            "<users> " +
+            "<user name=\"fancy pants\" password=\"admin\" roles=\"administrator\"/>" +
+            "</users>" +
+            "</deployment>";
+
+        final String badPassword = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "<security enabled=\"true\"/>" +
+                "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                "<httpd port='0'>" +
+                "<jsonapi enabled='true'/>" +
+                "</httpd>" +
+                "<users> " +
+                "<user name=\"fancy$pants\" password=\"ad min\" roles=\"admin:!\"/>" +
+                "</users>" +
+                "</deployment>";
+
+        final String badRoles = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                "<deployment>" +
+                "<security enabled=\"true\"/>" +
+                "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                "<httpd port='0'>" +
+                "<jsonapi enabled='true'/>" +
+                "</httpd>" +
+                "<users> " +
+                "<user name=\"fancypants\" password=\"admin\" roles=\"lo uno\"/>" +
+                "</users>" +
+                "</deployment>";
+
+        File tmpRole = VoltProjectBuilder.writeStringToTempFile(badUsername);
+        String res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertTrue(res.contains("Error parsing deployment"));
+
+        tmpRole = VoltProjectBuilder.writeStringToTempFile(badPassword);
+        res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertFalse(res.contains("Error parsing deployment"));
+
+        catalog_db.getGroups().add("lo uno");
+        tmpRole = VoltProjectBuilder.writeStringToTempFile(badRoles);
+        res = CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
+        assertTrue(res.contains("Error parsing deployment"));
+    }
+
     public void testScrambledPasswords() throws Exception {
         final String depRole = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
@@ -787,8 +841,7 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
@@ -814,6 +867,17 @@ public class TestCatalogUtil extends TestCase {
         Database db = cat2.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
+
+        boolean foundStream = false;
+        for (Table catalog_tbl : db.getTables()) {
+            if (catalog_tbl.getTypeName().equalsIgnoreCase("export_data")) {
+                StringBuilder sb = new StringBuilder();
+                CatalogSchemaTools.toSchema(sb, catalog_tbl, null, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                assertTrue(sb.toString().startsWith("CREATE STREAM " + catalog_tbl.getTypeName()));
+                foundStream = true;
+            }
+        }
+        assertTrue(foundStream);
 
         assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getType(), ServerExportEnum.CUSTOM);
@@ -1188,10 +1252,8 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data TO STREAM foo;\n"
-                + "CREATE TABLE export_more_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_more_data TO STREAM bar;";
+                "CREATE STREAM export_data EXPORT TO TARGET foo ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "CREATE STREAM export_more_data EXPORT TO TARGET bar (id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
@@ -1790,8 +1852,8 @@ public class TestCatalogUtil extends TestCase {
                 + "    </export>"
                 + "</deployment>";
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-                + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n" +
+                "CREATE STREAM export_data_partitioned PARTITION ON COLUMN pgroup ( id BIGINT default 0, pgroup varchar(25) NOT NULL, value BIGINT DEFAULT 0 );";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 

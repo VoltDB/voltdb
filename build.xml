@@ -818,6 +818,8 @@ DISTRIBUTION
 <target name="dist_internal" depends="dist_internal_core">
 
     <!-- build the jars for the clients -->
+    <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -910,6 +912,8 @@ DISTRIBUTION
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
             <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
+            <include name="examples/contentionmark/run.sh"/>
+            <include name="examples/geospatial/run.sh"/>
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
@@ -1062,7 +1066,9 @@ CLEANING
     depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
              clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -2249,6 +2255,10 @@ TEST CASES
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
+    <echo>checking geospatial</echo>
+    <samplecheck app="geospatial" />
+    <echo>checking contentionmark</echo>
+    <samplecheck app="contentionmark" />
     <echo>checking json-sessions</echo>
     <samplecheck app="json-sessions" />
     <echo>checking windowing</echo>

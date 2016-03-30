@@ -924,6 +924,7 @@ ul.addServerList li:nth-child(1) {
 }
 .drAdminHeaderRight {
 	float: right;
+	width:65px;
 
 }
 .replicaWrapper {
@@ -1447,6 +1448,7 @@ ul.nav li:nth-child(1) {
 .tblCluster tr th {
 	border-top: 1px solid #CCCCCC;
 }
+.form-horizontal >.panel-group { margin:0 93px 0 0;}
 }
 @media (max-width: 991px) {
 .clusterConfigLeft {
@@ -1479,6 +1481,7 @@ ul.drList {
 }
 .modal .connectionSourceModel { overflow:auto; height:450px;}
 .modal-add-user {margin: 30% auto; width:94.5%;}
+.form-horizontal >.panel-group { margin:0;}
 
 }
  @media (min-width: 320px) and (max-width: 620px) {

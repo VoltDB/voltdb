@@ -24,12 +24,6 @@ package voltkvqa.procedures;
 
 import org.voltdb.*;
 
-@ProcInfo
-(
-  partitionInfo   = "store.key:0"
-, singlePartition = true
-)
-
 public class Remove extends VoltProcedure
 {
     // Deletes a key/value pair

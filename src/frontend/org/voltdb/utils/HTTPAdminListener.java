@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -62,8 +63,9 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -73,6 +75,7 @@ import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
 
 public class HTTPAdminListener {
@@ -280,9 +283,11 @@ public class HTTPAdminListener {
             user = u;
             permissions = p;
         }
+        @SuppressWarnings("unused")
         public String getUser() {
             return user;
         }
+        @SuppressWarnings("unused")
         public String[] getPermissions() {
             return permissions;
         }
@@ -326,8 +331,6 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
-            } finally {
-                httpClientInterface.releaseClient(authResult, false);
             }
         }
     }
@@ -459,19 +462,19 @@ public class HTTPAdminListener {
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else if (baseRequest.getRequestURI().contains("/users")) {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
-                        handleUpdateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleUpdateUser(jsonp, target, baseRequest, request, response, authResult);
                     } else if (request.getMethod().equalsIgnoreCase("PUT")) {
-                        handleCreateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleCreateUser(jsonp, target, baseRequest, request, response, authResult);
                     } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
-                        handleRemoveUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleRemoveUser(jsonp, target, baseRequest, request, response, authResult);
                     } else {
-                        handleGetUsers(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleGetUsers(jsonp, target, baseRequest, request, response);
                     }
                 } else if (baseRequest.getRequestURI().contains("/export/type")) {
                     handleGetExportTypes(jsonp, response);
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
-                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult);
                     } else {
                         //non POST
                         if (jsonp != null) {
@@ -486,8 +489,6 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
-            } finally {
-                httpClientInterface.releaseClient(authResult, false);
             }
         }
 
@@ -495,7 +496,7 @@ public class HTTPAdminListener {
         public void handleUpdateDeployment(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String deployment = request.getParameter("deployment");
             if (deployment == null || deployment.length() == 0) {
@@ -520,12 +521,20 @@ public class HTTPAdminListener {
                     return;
                 }
                 Object[] params = new Object[] { null, dep};
-                //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
                 logger.error("Failed to update deployment from API", ex);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
+                baseRequest.setHandled(true);
             }
         }
 
@@ -533,7 +542,7 @@ public class HTTPAdminListener {
         public void handleUpdateUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
             if (update == null || update.trim().length() == 0) {
@@ -573,13 +582,20 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
-                notifyOfCatalogUpdate();
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
+
             } catch (Exception ex) {
                 logger.error("Failed to update user from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -587,7 +603,7 @@ public class HTTPAdminListener {
         public void handleCreateUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
             if (update == null || update.trim().length() == 0) {
@@ -637,13 +653,19 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
-                notifyOfCatalogUpdate();
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
             } catch (Exception ex) {
                 logger.error("Failed to create user from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -651,7 +673,7 @@ public class HTTPAdminListener {
         public void handleRemoveUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             try {
                 DeploymentType newDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(getDeploymentBytes()));
@@ -679,14 +701,20 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User removed"));
-                notifyOfCatalogUpdate();
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Removed."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
             } catch (Exception ex) {
                 logger.error("Failed to update role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -694,7 +722,7 @@ public class HTTPAdminListener {
         public void handleGetUsers(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response)
                            throws IOException, ServletException {
             ObjectMapper mapper = new ObjectMapper();
             User user = null;
@@ -844,9 +872,12 @@ public class HTTPAdminListener {
         /*
          * Don't force us to look at a huge pile of threads
          */
-        final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
-        qtp.setIdleTimeout(timeout * 1000);
-        qtp.setMinThreads(1);
+        final QueuedThreadPool qtp = new QueuedThreadPool(
+                poolsize,
+                1, // minimum threads
+                timeout * 1000,
+                new LinkedBlockingQueue<>(poolsize + 16)
+                );
 
         m_server = new Server(qtp);
         m_server.setAttribute(
@@ -958,9 +989,7 @@ public class HTTPAdminListener {
         m_server = null;
     }
 
-    public void notifyOfCatalogUpdate()
-    {
-        //Notify to clean any cached clients so new security can be enforced.
+    public void notifyOfCatalogUpdate() {
         httpClientInterface.notifyOfCatalogUpdate();
     }
 }

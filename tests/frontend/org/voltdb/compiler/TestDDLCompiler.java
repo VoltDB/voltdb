@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
-import junit.framework.TestCase;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -48,6 +46,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.utils.CatalogUtil;
+
+import junit.framework.TestCase;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -804,6 +804,32 @@ public class TestDDLCompiler extends TestCase {
         tester.testFailure("create table an_unquoted_table (\"a_quoted_column_without_spaces\" integer)");
         tester.testFailure("create table an_unquoted_table (\"a quoted column with spaces\" integer)");
         tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
+    }
+
+    public void testIndexExpressions() throws Exception {
+        File jarOut = new File("indexExpressions.jar");
+        jarOut.deleteOnExit();
+
+        String tableCreation = "CREATE TABLE GEO ( ID INTEGER, REGION GEOGRAPHY ); ";
+
+        String schema[] = {
+                "CREATE INDEX POLY ON GEO ( POLYGONFROMTEXT( REGION ) );",
+                "CREATE INDEX POLY ON GEO ( VALIDPOLYGONFROMTEXT( REGION ) );",
+        };
+
+        VoltCompiler compiler = new VoltCompiler();
+        for (int ii = 0; ii < schema.length; ++ii) {
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableCreation + schema[ii]);
+            String schemaPath = schemaFile.getPath();
+
+            // compile successfully
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            assertFalse(success);
+
+            // cleanup after the test
+            jarOut.delete();
+        }
+
     }
 
     public void testAutogenDRConflictTable() {

@@ -33,6 +33,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -74,6 +75,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
@@ -279,18 +281,18 @@ public class PlanAssembler {
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
-                "Illegal to read an export table.");
+                "Illegal to read a stream.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
             if (m_parsedSelect.m_joinTree instanceof BranchNode) {
-                // The execution engine expects to see the outer table on the left side only
-                // which means that RIGHT joins need to be converted to the LEFT ones
-                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-
                 if (! m_parsedSelect.hasJoinOrder()) {
                     simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
                 }
+
+                // Convert RIGHT joins to the LEFT ones
+                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
+
             }
             m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
@@ -340,12 +342,12 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to update an export table.");
+                throw new PlanningErrorException("Illegal to update a stream.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to delete from an export table.");
+                throw new PlanningErrorException("Illegal to delete from a stream.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
@@ -1458,11 +1460,51 @@ public class PlanAssembler {
         retval.setReadOnly(false);
 
         // Iterate over each column in the table we're inserting into:
-        //   - Make sure we're supplying values for columns that require it
-        //   - Set partitioning expressions for VALUES (...) case
+        //   - Make sure we're supplying values for columns that require it.
+        //     For a normal INSERT, these are the usual non-nullable values that
+        //     don't have a default value.
+        //     For an UPSERT, the (only) required values are the primary key
+        //     components. Other required values can be supplied from the
+        //     existing row in "UPDATE mode". If some other value is required
+        //     for an INSERT, UPSERT's "INSERT mode" will throw a runtime
+        //     constraint violation as the INSERT operation tries to set the
+        //     non-nullable column to null.
+        //   - Set partitioning expressions for VALUES (...) case.
+        //     TODO: it would be good someday to do the same kind of processing
+        //      for the INSERT ... SELECT ... case, by analyzing the subquery.
+        if (m_parsedInsert.m_isUpsert) {
+            boolean hasPrimaryKey = false;
+            for (Constraint constraint : targetTable.getConstraints()) {
+                if (constraint.getType() != ConstraintType.PRIMARY_KEY.getValue()) {
+                    continue;
+                }
+                hasPrimaryKey = true;
+                boolean targetsPrimaryKey = false;
+                for (ColumnRef colRef : constraint.getIndex().getColumns()) {
+                    int primary = colRef.getColumn().getIndex();
+                    for (Column targetCol : m_parsedInsert.m_columns.keySet()) {
+                        if (targetCol.getIndex() == primary) {
+                            targetsPrimaryKey = true;
+                            break;
+                        }
+                    }
+                    if (! targetsPrimaryKey) {
+                        throw new PlanningErrorException("UPSERT on table \"" +
+                                targetTable.getTypeName() +
+                                "\" must specify a value for primary key \"" +
+                                colRef.getColumn().getTypeName() + "\".");
+                    }
+                }
+            }
+            if (! hasPrimaryKey) {
+                throw new PlanningErrorException("UPSERT is not allowed on table \"" +
+                        targetTable.getTypeName() + "\" that has no primary key.");
+            }
+        }
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
         for (Column col : targetTableColumns) {
-            boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
+            boolean needsValue = (!m_parsedInsert.m_isUpsert) &&
+                    (col.getNullable() == false) && (col.getDefaulttype() == 0);
             if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
                 // This check could be done during parsing?
                 throw new PlanningErrorException("Column " + col.getName()
@@ -2755,9 +2797,12 @@ public class PlanAssembler {
      *  For each join node n1 do:
      *    For each expression expr (join and where) at the node n1
      *      For each join node n2 descended from n1 do:
-     *          If expr rejects nulls introduced by n2 inner table,
-     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
-     *          for n2 inner and outer tables
+     *          If expr rejects nulls introduced by n2 inner table, then
+     *              - convert LEFT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to RIGHT OUTER join
+     *          If expr rejects nulls introduced by n2 outer table, then
+     *              - convert RIGHT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to LEFT OUTER join
      */
     private static void simplifyOuterJoin(BranchNode joinTree) {
         assert(joinTree != null);
@@ -2779,38 +2824,37 @@ public class PlanAssembler {
         JoinNode leftNode = joinNode.getLeftNode();
         JoinNode rightNode = joinNode.getRightNode();
         if (joinNode.getJoinType() == JoinType.LEFT) {
-            for (AbstractExpression expr : exprs) {
-                // Get all the tables underneath this node and
-                // see if the expression is NULL-rejecting for any of them
-                Collection<String> tableAliases = rightNode.generateTableJoinOrder();
-                boolean rejectNull = false;
-                for (String tableAlias : tableAliases) {
-                    if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
-                        // We are done at this level
-                        joinNode.setJoinType(JoinType.INNER);
-                        rejectNull = true;
-                        break;
-                    }
-                }
-                if (rejectNull) {
-                    break;
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.RIGHT) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.LEFT);
+            }
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                if (JoinType.FULL == joinNode.getJoinType()) {
+                    joinNode.setJoinType(JoinType.RIGHT);
+                } else {
+                    // LEFT join was just removed
+                    joinNode.setJoinType(JoinType.INNER);
                 }
             }
-        } else {
-            assert(joinNode.getJoinType() == JoinType.INNER);
         }
 
-        // Now add this node expression to the list and descend
-        // In case of outer join, the inner node adds its WHERE and JOIN expressions, while
-        // the outer node adds its WHERE ones only - the outer node does not introduce NULLs
-        List<AbstractExpression> newExprs = new ArrayList<AbstractExpression>(exprs);
-        if (leftNode.getJoinExpression() != null) {
-            newExprs.add(leftNode.getJoinExpression());
-        }
-        if (rightNode.getJoinExpression() != null) {
-            newExprs.add(rightNode.getJoinExpression());
-        }
-
+        // Now add this node expression to the list and descend. The WHERE expressions
+        // can be combined with the input list because they simplify both inner and outer nodes.
         if (leftNode.getWhereExpression() != null) {
             exprs.add(leftNode.getWhereExpression());
         }
@@ -2818,22 +2862,64 @@ public class PlanAssembler {
             exprs.add(rightNode.getWhereExpression());
         }
 
-        if (joinNode.getJoinType() == JoinType.INNER) {
-            exprs.addAll(newExprs);
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
-            if (rightNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
-            }
-        } else {
-            if (rightNode instanceof BranchNode) {
-                newExprs.addAll(exprs);
-                simplifyOuterJoinRecursively((BranchNode)rightNode, newExprs);
-            }
-            if (leftNode instanceof BranchNode) {
-                simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
-            }
+        // The JOIN expressions (ON) are only applicable to the INNER node of an outer join.
+        List<AbstractExpression> exprsForInnerNode = new ArrayList<AbstractExpression>(exprs);
+        if (leftNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(leftNode.getJoinExpression());
+        }
+        if (rightNode.getJoinExpression() != null) {
+            exprsForInnerNode.add(rightNode.getJoinExpression());
+        }
+
+        List<AbstractExpression> leftNodeExprs;
+        List<AbstractExpression> rightNodeExprs;
+        switch (joinNode.getJoinType()) {
+            case INNER:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case LEFT:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprsForInnerNode;
+                break;
+            case RIGHT:
+                leftNodeExprs = exprsForInnerNode;
+                rightNodeExprs = exprs;
+                break;
+            case FULL:
+                leftNodeExprs = exprs;
+                rightNodeExprs = exprs;
+                break;
+            default:
+                // shouldn't get there
+                leftNodeExprs = null;
+                rightNodeExprs = null;
+                assert(false);
+        }
+        if (leftNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)leftNode, leftNodeExprs);
+        }
+        if (rightNode instanceof BranchNode) {
+            simplifyOuterJoinRecursively((BranchNode)rightNode, rightNodeExprs);
         }
     }
+
+    /**
+     * Verify if an expression from the input list is NULL-rejecting for any of the tables from the list
+     * @param tableAliases list of tables
+     * @param exprs list of expressions
+     * @return TRUE if there is a NULL-rejecting expression
+     */
+    private static boolean isNullRejecting(Collection<String> tableAliases, List<AbstractExpression> exprs) {
+        for (AbstractExpression expr : exprs) {
+            for (String tableAlias : tableAliases) {
+                if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                    // We are done at this level
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

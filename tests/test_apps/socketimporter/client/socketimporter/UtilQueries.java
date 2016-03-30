@@ -58,12 +58,13 @@ public class UtilQueries {
         VoltTable importStats = statsCall(client);
         long stats[] = {0, 0, 0, 0};
 
+        // accumulate stats for all partitions
         while (importStats.advanceRow()) {
             int statnum = 0;
-            stats[statnum++] = importStats.getLong("SUCCESSES");
-            stats[statnum++] = importStats.getLong("FAILURES");
-            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
-            stats[statnum++] = importStats.getLong("RETRIES");
+            stats[statnum++] += importStats.getLong("SUCCESSES");
+            stats[statnum++] += importStats.getLong("FAILURES");
+            stats[statnum++] += importStats.getLong("OUTSTANDING_REQUESTS");
+            stats[statnum++] += importStats.getLong("RETRIES");
         }
         return stats[2];
     }

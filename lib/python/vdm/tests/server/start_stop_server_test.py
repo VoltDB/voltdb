@@ -207,7 +207,6 @@ class DefaultStartServer(ClusterDefault):
                     self.assertEqual(response.status_code, 200)
                     time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
-                    time.sleep(10)
                     print "Stopping Cluster...."
                     url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
                     (__host_or_ip__, last_db_id, last_server_id)
@@ -257,7 +256,6 @@ class StartServer(Cluster):
                     self.assertEqual(response.status_code, 200)
                     time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
-                    time.sleep(10)
                     print "Stopping Cluster...."
                     url_stop = 'http://%s:8000/api/1.0/databases/%u/servers/%u/stop' % \
                     (__host_or_ip__, last_db_id, last_server_id)
