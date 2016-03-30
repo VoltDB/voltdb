@@ -220,7 +220,7 @@ public class DRConsumerDrIdTracker implements Serializable {
      * @param mpUniqueId
      */
     public void append(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
-        assert(m_map.isEmpty() || (startDrId <= endDrId && startDrId > end(m_map.span())));
+        assert(startDrId <= endDrId && (m_map.isEmpty() || startDrId > end(m_map.span())));
 
         addRange(startDrId, endDrId, spUniqueId, mpUniqueId);
     }
@@ -353,8 +353,8 @@ public class DRConsumerDrIdTracker implements Serializable {
         sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         for (Range<Long> entry : m_map.asRanges()) {
-            sb.append("[").append(DRLogSegmentId.getSequenceNumberFromDRId(start(entry))).append(", ")
-              .append(DRLogSegmentId.getSequenceNumberFromDRId(end(entry))).append("] ");
+            sb.append("[").append(DRLogSegmentId.getDebugStringFromDRId(start(entry))).append(", ")
+              .append(DRLogSegmentId.getDebugStringFromDRId(end(entry))).append("] ");
         }
         return sb.toString();
     }
