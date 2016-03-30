@@ -36,7 +36,8 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/'
+__db_url__ = 'http://%s:8000/api/1.0/databases/' % \
+             __host_or_ip__
 
 
 class DeploymentUser(unittest.TestCase):
@@ -47,77 +48,141 @@ class DeploymentUser(unittest.TestCase):
     def setUp(self):
         """Create a deployment user"""
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator,Test", "databaseid": 1}
-        response = requests.put(__url__, json=db_data, headers=headers)
-
-        if response.status_code == 200:
-            self.assertEqual(response.status_code, 200)
+        db_data = {'name': 'testDB'}
+        response = requests.post(__db_url__, json=db_data, headers=headers)
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
         else:
             self.assertEqual(response.status_code, 404)
 
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator,Test", "databaseid": 1}
+            db_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(db_url, json=db_data, headers=headers)
+
+            if response.status_code == 200:
+                self.assertEqual(response.status_code, 200)
+            else:
+                self.assertEqual(response.status_code, 404)
+
     def tearDown(self):
         """Delete a deployment user"""
-        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
-        response = requests.delete(url)
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.get(user_url)
+            value = response.json()
+            if value:
+                user_length = len(value['deployment'])
+                last_user_id = value['deployment'][user_length-1]['userid']
+                user_delete_url = '%s%u/users/%u/' % (__db_url__, last_db_id, last_user_id)
+                response = requests.delete(user_delete_url)
+                self.assertEqual(response.status_code, 200)
+                db_url = __db_url__ + str(last_db_id)
+                response = requests.delete(db_url)
+                self.assertEqual(response.status_code, 204)
 
 
 class UpdateDeploymentUser(DeploymentUser):
     def test_validate_duplicate_username(self):
         """Validate duplicate username"""
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
-        response = requests.post(__url__, json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['error'], u'user name already exists')
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+            response = requests.post(user_url, json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['error'], u'user name already exists')
 
-        self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.status_code, 404)
+        else:
+            print "The database list is empty"
 
     def test_validate_username_empty(self):
         """ensure username value is not empty"""
 
         db_data = {"password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.post(__url__,
-                                json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], "'name' is a required property")
-        self.assertEqual(response.status_code, 200)
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "'name' is a required property")
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
 
     def test_validate_password_empty(self):
         """ensure password value is not empty"""
 
         db_data = {"name": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.post(__url__,
-                                json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], "'password' is a required property")
-        self.assertEqual(response.status_code, 200)
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "'password' is a required property")
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
 
     def test_validate_roles_empty(self):
         """ensure roles value is not empty"""
 
         db_data = {"name": "voltdb", "password": "test", "plaintext": True, "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        response = requests.post(__url__,
-                                json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['errors'][0], "'roles' is a required property")
-        self.assertEqual(response.status_code, 200)
-
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "'roles' is a required property")
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
 
     def test_update_deployment_user(self):
         """ensure deployment user is updated"""
 
         db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator,Test1", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
-        url = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1/users/1/'
-        response = requests.put(url,
-                                 json=db_data, headers=headers)
-        value = response.json()
-        self.assertEqual(value['statusstring'], "User Updated")
-        self.assertEqual(response.status_code, 200)
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.get(user_url)
+            value = response.json()
+            if value:
+                user_length = len(value['deployment'])
+                last_user_id = value['deployment'][user_length-1]['userid']
+                user_update_url = '%s%u/' % (user_url, last_user_id)
+                response = requests.put(user_update_url,
+                                         json=db_data, headers=headers)
+                value = response.json()
+                self.assertEqual(value['statusstring'], "User Updated")
+                self.assertEqual(response.status_code, 200)
 
+
+def GetLastDbId():
+    last_db_id = -1
+    response = requests.get(__db_url__)
+    value = response.json()
+    if value:
+        db_length = len(value['databases'])
+        last_db_id = value['databases'][db_length-1]['id']
+    return last_db_id
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
