@@ -220,7 +220,7 @@ public class DRConsumerDrIdTracker implements Serializable {
      * @param mpUniqueId
      */
     public void append(long startDrId, long endDrId, long spUniqueId, long mpUniqueId) {
-        assert(startDrId <= endDrId && startDrId > end(m_map.span()));
+        assert(m_map.isEmpty() || (startDrId <= endDrId && startDrId > end(m_map.span())));
 
         addRange(startDrId, endDrId, spUniqueId, mpUniqueId);
     }
