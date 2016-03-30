@@ -90,6 +90,7 @@ function server() {
 }
 
 function exportserver() {
+    jars-ifneeded
     # run the server
     $VOLTDB create -d deployment_export.xml -l $LICENSE -H $HOST
     echo Run "init-export" step when server startup is complete
