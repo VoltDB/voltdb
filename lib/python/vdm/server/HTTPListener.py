@@ -1318,13 +1318,18 @@ class SyncVdmConfiguration(MethodView):
             result = request.json
 
             databases = result['voltdeploy']['databases']
-            databases = {int(k):v for k,v in databases.items()}
+            # databases = {int(k):v for k,v in databases.items()}
+            databases = dict((int(key), value) for (key, value) in databases.items())
+
             servers = result['voltdeploy']['members']
-            servers = {int(k):v for k,v in servers.items()}
+            # servers = {int(k):v for k,v in servers.items()}
+            servers = dict((int(key), value) for (key, value) in servers.items())
             deployments = result['voltdeploy']['deployments']
-            deployments = {int(k):v for k,v in deployments.items()}
+            # deployments = {int(k):v for k,v in deployments.items()}
+            deployments = dict((int(key), value) for (key, value) in deployments.items())
             deployment_users = result['voltdeploy']['deployment_users']
-            deployment_users = {int(k):v for k,v in deployment_users.items()}
+            # deployment_users = {int(k):v for k,v in deployment_users.items()}
+            deployment_users = dict((int(key), value) for (key, value) in deployment_users.items())
 
         except Exception, errs:
             print traceback.format_exc()
