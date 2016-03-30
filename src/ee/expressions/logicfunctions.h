@@ -21,8 +21,8 @@ namespace voltdb {
 
 /** implement the 2n/2n+1-argument DECODE function */
 template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& arguments) {
-    int size = (int)arguments.size();
-    assert(size>=3);
+    int size = static_cast <int> (arguments.size());
+    assert(size >=3);
     int loopnum = ( size - 1 )/2;
     const NValue& baseval = arguments[0];
     for ( int i = 0; i < loopnum; i++ ) {

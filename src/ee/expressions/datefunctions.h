@@ -133,6 +133,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_YEAR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -144,6 +149,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MONTH>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -155,6 +165,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -166,6 +181,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_WEEK>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -179,6 +199,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEKDAY>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -190,6 +215,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -201,6 +231,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_YEAR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -212,6 +247,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_QUARTER>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -223,6 +263,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_HOUR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time;
     micros_to_time(epoch_micros, as_time);
@@ -234,6 +279,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MINUTE>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time;
     micros_to_time(epoch_micros, as_time);
@@ -245,6 +295,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time;
     micros_to_time(epoch_micros, as_time);
@@ -265,6 +320,11 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_SECOND>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     int64_t epoch_seconds = epoch_micros / 1000000;
     return getBigIntValue(epoch_seconds);
@@ -275,6 +335,11 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MILLISECOND>() const
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     int64_t epoch_milliseconds = epoch_micros / 1000;
     return getBigIntValue(epoch_milliseconds);
@@ -285,6 +350,11 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     return getBigIntValue(epoch_micros);
 }
@@ -323,6 +393,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -335,6 +410,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -348,6 +428,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -360,6 +445,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
@@ -373,6 +463,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     boost::posix_time::time_duration as_time;
@@ -387,6 +482,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     boost::posix_time::time_duration as_time;
@@ -401,6 +501,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date;
     boost::posix_time::time_duration as_time;
@@ -415,6 +520,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     if (epoch_micros < 0) {
@@ -428,6 +538,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
     if (isNull()) {
         return *this;
     }
+
+    if(getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     int64_t epoch_micros = getTimestamp();
     return getTimestampValue(epoch_micros);
 }
@@ -454,6 +569,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
     int64_t interval = number.castAsBigIntAndGetValue();
     if (interval > PTIME_MAX_YEAR_INTERVAL || interval < PTIME_MIN_YEAR_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
+
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
     boost::posix_time::ptime ts;
@@ -486,6 +605,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vect
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     return getTimestampValue(addMonths(date.getTimestamp(), 3 * interval));
 }
 
@@ -507,6 +630,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     return getTimestampValue(addMonths(date.getTimestamp(), interval));
 }
 
@@ -526,6 +653,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<N
     int64_t interval = number.castAsBigIntAndGetValue();
     if (interval > PTIME_MAX_DAY_INTERVAL || interval < PTIME_MIN_DAY_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
+
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
     boost::posix_time::ptime ts;
@@ -558,6 +689,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
 
@@ -586,6 +721,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vecto
     int64_t interval = number.castAsBigIntAndGetValue();
     if (interval > PTIME_MAX_MINUTE_INTERVAL || interval < PTIME_MIN_MINUTE_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
+
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
     boost::posix_time::ptime ts;
@@ -618,6 +757,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vecto
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
 
@@ -648,6 +791,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
 
@@ -676,6 +823,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
     int64_t interval = number.castAsBigIntAndGetValue();
     if (interval > PTIME_MAX_MICROSECOND_INTERVAL || interval < PTIME_MIN_MICROSECOND_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
+
+    if(date.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
     boost::posix_time::ptime ts;
