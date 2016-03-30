@@ -79,7 +79,8 @@ public class AdHocCompilerCache implements Serializable {
 
     // cache sizes determined at construction time
     final int MAX_LITERAL_ENTRIES;
-    final long MAX_LITERAL_MEM;
+    // max cache size for parameterized plans
+    final long MAX_LITERAL_MEM  = Long.getLong("ADHOC_COMPILER_CACHE_MAX_LITERAL_MEM_BYTES", 32*1024*1024);
     final int MAX_CORE_ENTRIES;
 
     /** cache of literals to full plans */
@@ -106,20 +107,17 @@ public class AdHocCompilerCache implements Serializable {
      * Constructor with default cache sizes.
      */
     private AdHocCompilerCache() {
-        this(1000, 1000, 32*1024*1024);
+        this(1000, 1000);
     }
-
 
     /**
      * Constructor with specific cache sizes is only called directly for testing.
      *
      * @param maxLiteralEntries cache size for literals
      * @param maxLiteralMem cache memory for literals
-     * @param maxCoreEntries cache size for parameterized plans
      */
-    AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries, long maxLiteralMem) {
+    AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries) {
         MAX_LITERAL_ENTRIES = maxLiteralEntries;
-        MAX_LITERAL_MEM = maxLiteralMem;
         MAX_CORE_ENTRIES = maxCoreEntries;
 
         // an LRU cache map
@@ -151,10 +149,6 @@ public class AdHocCompilerCache implements Serializable {
         private final long maxMemory; // in bytes
         private long currentMemory;   // in bytes
 
-        public long getCurrentMemory() {
-            return currentMemory;
-        }
-
         public MemoryBoundedLinkedHashMap() {
             // default max entry of 1000
             // default max value size of 32MB
@@ -166,6 +160,7 @@ public class AdHocCompilerCache implements Serializable {
         }
 
         public MemoryBoundedLinkedHashMap(final int maxEntries, final long maxMemory) {
+            // set accessOrder to true for LRU
             super(maxEntries * 2, .75f, true);
             this.maxEntries = maxEntries;
             this.maxMemory = maxMemory;
