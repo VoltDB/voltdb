@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -60,6 +58,8 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
+
+import junit.framework.TestCase;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -2031,9 +2031,9 @@ public class TestCatalogUtil extends TestCase {
 
         file.delete();
 
-        Map<String, Integer> mapping = CatalogUtil.getDRTableNamePartitionColumnMapping(cat.getClusters().get("cluster").getDatabases().get("database"));
+        Map<String, Column> mapping = CatalogUtil.getDRTableNamePartitionColumnMapping(cat.getClusters().get("cluster").getDatabases().get("database"));
         assertEquals(1, mapping.size());
         assertEquals(true, mapping.containsKey("B"));
-        assertEquals(0, mapping.get("B").intValue());
+        assertEquals(0, mapping.get("B").getIndex());
     }
 }
