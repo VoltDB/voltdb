@@ -97,11 +97,11 @@ class Server(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -162,11 +162,11 @@ class Cluster(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
