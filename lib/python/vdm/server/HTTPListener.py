@@ -1463,7 +1463,7 @@ class StatusDatabaseAPI(MethodView):
             return make_response(jsonify({'error': 'Not found'}), 404)
         else:
             if len(database['members']) == 0:
-                return jsonify({'status': 'errorNoMembers'})
+                return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
             for server_id in database['members']:
                 server = Global.SERVERS.get(server_id)
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
@@ -1471,26 +1471,24 @@ class StatusDatabaseAPI(MethodView):
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({'status': 'error', 'hostname': server['hostname']})
+                    return jsonify({"status": 200, "statusString": "OK", 'error': 'error', 'hostname': server['hostname']})
 
-                if response.json()['status'] == "stalled":
+                if response.json()['serverStatus']['status'] == "stalled":
                     has_stalled = True
-                elif response.json()['status'] == "running":
+                elif response.json()['serverStatus']['status'] == "running":
                     has_run = True
                 value = response.json()
+
                 if 'status' in response.json():
                     del value['status']
                     del value['statusString']
-                serverDetails.append({server['hostname']: value})
+                serverDetails.append({server['hostname']: value['serverStatus']})
 
             if has_run:
-                # status.append({'status': 'running'})
                 status = 'running'
             elif has_stalled:
-                # status.append({'status': 'stalled'})
                 status = 'stalled'
             elif not has_run and not has_stalled:
-                # status.append({'status': 'stopped'})l
                 status = 'stopped'
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
@@ -1505,19 +1503,15 @@ class StatusDatabaseServerAPI(MethodView):
     def get(database_id, server_id):
         database = Global.DATABASES.get(database_id)
         if not database:
-            return make_response(jsonify({"status": 200,
-  "statusString": "OK", 'error': 'Not found'}), 404)
+            return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
         else:
             server = Global.SERVERS.get(server_id)
             if len(database['members']) == 0:
-                return jsonify({"status": 200,
-  "statusString": "OK", 'error': 'errorNoMembers'})
+                return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
             if not server:
-                return make_response(jsonify({"status": 200,
-  "statusString": "OK", 'error': 'Not found'}), 404)
+                return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
             elif server_id not in database['members']:
-                return make_response(jsonify({"status": 200,
-  "statusString": "OK", 'error': 'Not found'}), 404)
+                return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
             else:
 
                 try:
