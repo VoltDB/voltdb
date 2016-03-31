@@ -93,6 +93,10 @@ public class DRLogSegmentId implements Serializable {
         return (drId < 0 ? drId : (drId & MAX_SEQUENCE_NUMBER));
     }
 
+    public static String getDebugStringFromDRId(long drId) {
+        return String.format("%d:%d", getClusterIdFromDRId(drId), getSequenceNumberFromDRId(drId));
+    }
+
     public static class MutableBinaryLogInfo {
         public long drId;
         public long spUniqueId;
