@@ -372,7 +372,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
+                                                                                      UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
@@ -745,4 +745,3 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
 }
 
 }
-
