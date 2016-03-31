@@ -1038,7 +1038,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long tupleCount = 0;
             long tupleDataMem = 0;
             long tupleAllocatedMem = 0;
-            int indexMem = 0;
+            long indexMem = 0;
             long stringMem = 0;
 
             // update table stats

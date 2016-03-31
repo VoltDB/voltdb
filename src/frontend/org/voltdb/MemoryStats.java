@@ -31,7 +31,7 @@ public class MemoryStats extends StatsSource {
         long tupleCount = 0;
         long tupleDataMem = 0;
         long tupleAllocatedMem = 0;
-        int indexMem = 0;
+        long indexMem = 0;
         long stringMem = 0;
         long pooledMem = 0;
     }
@@ -76,7 +76,7 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("JAVAUNUSED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.BIGINT));
-        columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
@@ -126,7 +126,7 @@ public class MemoryStats extends StatsSource {
                                               long tupleCount,
                                               long tupleDataMem,
                                               long tupleAllocatedMem,
-                                              int indexMem,
+                                              long indexMem,
                                               long stringMem,
                                               long pooledMemory) {
         PartitionMemRow pmr = new PartitionMemRow();

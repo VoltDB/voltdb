@@ -88,7 +88,7 @@ public class TestEmptySchema extends RegressionSuite
         expectedSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
         expectedSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
         expectedSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
         expectedTable = new VoltTable(expectedSchema);
 
         results = client.callProcedure("@Statistics", "INDEX", 0).getResults();

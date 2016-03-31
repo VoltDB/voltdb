@@ -294,7 +294,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema[5] = new ColumnInfo("JAVAUNUSED", VoltType.INTEGER);
         expectedSchema[6] = new ColumnInfo("TUPLEDATA", VoltType.BIGINT);
         expectedSchema[7] = new ColumnInfo("TUPLEALLOCATED", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("INDEXMEMORY", VoltType.INTEGER);
+        expectedSchema[8] = new ColumnInfo("INDEXMEMORY", VoltType.BIGINT);
         expectedSchema[9] = new ColumnInfo("STRINGMEMORY", VoltType.BIGINT);
         expectedSchema[10] = new ColumnInfo("TUPLECOUNT", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT);

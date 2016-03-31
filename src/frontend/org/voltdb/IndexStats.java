@@ -46,6 +46,6 @@ public class IndexStats extends SiteStatsSource {
         columns.add(new ColumnInfo("IS_UNIQUE", VoltType.TINYINT));
         columns.add(new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT));
         columns.add(new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT));
-        columns.add(new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER));
+        columns.add(new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT));
     }
 }
