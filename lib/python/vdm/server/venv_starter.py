@@ -217,11 +217,11 @@ def start_virtual_environment(arr, verbose=False):
         python = os.path.join(venv_dir, 'bin', 'python')
         args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
         if arr[0]['filepath'] is not None:
-            args.append('-p ' + str(arr[0]['filepath']))
+            args.append('-p' + str(arr[0]['filepath']))
         if arr[0]['configpath'] is not None:
-            args.append('-c ' + str(arr[0]['configpath']))
+            args.append('-c' + str(arr[0]['configpath']))
         if arr[0]['server'] is not None:
-            args.append('-s ' + str(arr[0]['server']))
+            args.append('-s' + str(arr[0]['server']))
         os.execvp(python, args)
     except KeyboardInterrupt:
         sys.stderr.write('\n<break>\n')
