@@ -92,7 +92,10 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    static int32_t getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t flag, char *out);
+    static int32_t getTestDRBuffer(int32_t partitionId,
+                                   std::vector<int32_t> partitionKeyValueList,
+                                   std::vector<int32_t> flagList,
+                                   char *out);
 
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);

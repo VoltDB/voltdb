@@ -84,7 +84,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     if (requireHashDelimiter) {
         io.writeByte(static_cast<int8_t>(DR_RECORD_HASH_DELIMITER));
-        io.writeInt(0);  // hash delimiter for TRUNCATE_TABLE records is always 0
+        io.writeInt(-1);  // hash delimiter for TRUNCATE_TABLE records is always -1
     }
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
@@ -479,6 +479,8 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.position(BEGIN_RECORD_HEADER_SIZE);
     extraio.writeByte(static_cast<int8_t>(m_hashFlag));
     extraio.writeInt(txnLength);
+    // if it is the replicated stream or first record is TRUNCATE_TABLE
+    // m_firstParHash will be LONG_MAX, and will be written as -1 after casting
     extraio.writeInt(static_cast<int32_t>(m_firstParHash));
 
     uint32_t crc = vdbcrc::crc32cInit();
@@ -519,14 +521,10 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, int32_t realFlag, char *outBytes) {
-    int flag = realFlag; // flag can be changed in certain cases
-    if (flag == TEST_BUFFER_REPLICATED) {
-        partitionId = 16383; // force assignment
-    }
-    else if (flag == TEST_BUFFER_MIXED) {
-        partitionKeyValue = 0; // force assignment
-    }
+int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
+    std::vector<int32_t> partitionKeyValueList,
+    std::vector<int32_t> flagList,
+    char *outBytes) {
 
     DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
@@ -547,47 +545,35 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partit
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
-    // set the partition key
-    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
 
     int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
-    for (int ii = 0; ii < 100;) {
-        if (realFlag == TEST_BUFFER_MIXED) {
-            // For MIXED flag, txn 0, 1, 10, 11 will have MULTI hash flag, other have SINGLE hash flag
-            int seqNum = ii / 5;
-            flag = (seqNum % 10 > 1) ? TEST_BUFFER_SINGLE : TEST_BUFFER_MULTI;
-        }
+    for (int ii = 0; ii < flagList.size(); ii++) {
+        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
+        tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
 
-        // All other flags indicate MP transactions
-        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, (flag == TEST_BUFFER_SINGLE) ? partitionId : 16383);
-
-        if (flag == TEST_BUFFER_SINGLE && partitionKeyValue <= 2) {
-            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + ii / 5)); // incrementing SINGLE partition key values between txns
+        if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
         }
 
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
 
-        if (flag == TEST_BUFFER_REPLICATED || flag == TEST_BUFFER_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
-        }
-
-        // multiple partition key values in this txn
-        if (flag != TEST_BUFFER_SINGLE) {
-            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue + 1));
+        if (flagList[ii] == TXN_PAR_HASH_MULTI) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii] + 1));
             for (int zz = 0; zz < 5; zz++) {
                 stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
             }
-            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
+        }
+        else if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
         }
 
         stream.endTransaction(uid);
-        ii += 5;
         lastUID = uid;
     }
 

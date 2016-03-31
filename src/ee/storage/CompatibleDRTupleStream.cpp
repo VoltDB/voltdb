@@ -451,7 +451,11 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     return false;
 }
 
-int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int32_t partitionId, char *outBytes) {
+int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
+    std::vector<int32_t> partitionKeyValueList,
+    std::vector<int32_t> flagList,
+    char *outBytes) {
+
     CompatibleDRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
@@ -471,30 +475,41 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionKeyValue, int3
                                                                 columnAllowNull);
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
-    // set the partition key
-    tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValue));
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
-    for (int ii = 0; ii < 100;) {
-        int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, partitionId);
-        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, partitionId);
+
+    int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
+    for (int ii = 0; ii < flagList.size(); ii++) {
+        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
+        tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
+
+        if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+        }
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
+
+        if (flagList[ii] == TXN_PAR_HASH_MULTI) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii] + 1));
+            for (int zz = 0; zz < 5; zz++) {
+                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            }
+        }
+        else if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+        }
+
         stream.endTransaction(uid);
-        ii += 5;
+        lastUID = uid;
     }
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, partitionId);
-    int64_t uid = UniqueId::makeIdFromComponents(100, 0, partitionId);
-    stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
-    stream.endTransaction(uid);
-
-    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, partitionId);
+    int64_t committedUID = lastUID;
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;

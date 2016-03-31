@@ -512,17 +512,6 @@ enum DRTxnPartitionHashFlag {
     TXN_PAR_HASH_SPECIAL = 4      // txn contains TRUNCATE_TABLE record(s)
 };
 
-// ------------------------------------------------------------------
-// Flags of DR Buffer for testing purpose
-// ------------------------------------------------------------------
-enum DRTestBufferFlag {
-    TEST_BUFFER_REPLICATED = 0,  // replicated table txns
-    TEST_BUFFER_SINGLE = 1,      // partitioned table txns which contain a single partition key hash
-    TEST_BUFFER_MULTI = 2,       // partitioned table txns which contain multiple partition key hashes
-    TEST_BUFFER_MIXED = 3,       // partitioned table txns which contain single or multiple partition key hashes
-    TEST_BUFFER_SPECIAL = 4      // partitioned table txns which contain TRUNCATE_TABLE record(s)
-};
-
 inline size_t rowCostForDRRecord(DRRecordType type) {
     // Warning: Currently, the PersistentTableUndo*Actions rely on
     // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}
