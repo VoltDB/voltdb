@@ -29,7 +29,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
@@ -75,7 +74,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway drGateway,
-                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -86,7 +84,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
-                null, null,consumerDRGateway);
+                null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),

@@ -416,7 +416,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
-            m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -855,7 +854,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             m_memoryStats,
                             m_commandLog,
                             m_producerDRGateway,
-                            m_consumerDRGateway,
                             iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
 
@@ -2301,7 +2299,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // initialization path
             if (createDRConsumerIfNeeded()) {
                 for (Initiator iv2init : m_iv2Initiators.values()) {
-                    iv2init.setConsumerDRGateway(m_consumerDRGateway);
+                    // We're the leader, and this consumer gateway is late to the party
+                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback)m_consumerDRGateway;
+                    callback.repairCompleted(iv2init.getPartitionId(), iv2init.getInitiatorHSId());
                 }
                 m_consumerDRGateway.initialize(false);
             }
@@ -2769,7 +2769,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private boolean createDRConsumerIfNeeded() {
         if (!m_config.m_isEnterprise
-                || !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)
+                || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }

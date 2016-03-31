@@ -28,7 +28,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
@@ -94,7 +93,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway nodeDRGateway,
-                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
@@ -119,7 +117,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, drGateway, mpPDRG, consumerDRGateway);
+                coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();
 

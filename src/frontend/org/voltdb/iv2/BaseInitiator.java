@@ -27,7 +27,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
@@ -62,7 +61,6 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-    protected ConsumerDRGateway m_consumerDRGateway = null;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
@@ -131,11 +129,9 @@ public abstract class BaseInitiator implements Initiator
                           CommandLog cl,
                           String coreBindIds,
                           PartitionDRGateway drGateway,
-                          PartitionDRGateway mpDrGateway,
-                          ConsumerDRGateway consumerDRGateway)
+                          PartitionDRGateway mpDrGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
-            m_consumerDRGateway = consumerDRGateway;
             int snapshotPriority = 6;
             if (catalogContext.cluster.getDeployment().get("deployment") != null) {
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
@@ -233,12 +229,6 @@ public abstract class BaseInitiator implements Initiator
     {
         // Durability Listeners should never be assigned to the MP Scheduler
         assert false;
-    }
-
-    @Override
-    public void setConsumerDRGateway(ConsumerDRGateway gateway) {
-        assert m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway;
-        m_consumerDRGateway = gateway;
     }
 
     abstract protected void acceptPromotion() throws Exception;
