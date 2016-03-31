@@ -17,11 +17,6 @@
 
 package org.voltdb;
 
-import java.util.concurrent.ExecutionException;
-
-import org.apache.zookeeper_voltpatches.KeeperException;
-
-
 // Interface through which the outside world can interact with the consumer side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
@@ -37,30 +32,4 @@ public interface ConsumerDRGateway extends Promotable {
 
     public void restart() throws InterruptedException;
 
-    public abstract void completePromotePartition(int partitionId);
-
-    public static class DummyConsumerDRGateway implements ConsumerDRGateway {
-        @Override
-        public void initialize(boolean resumeReplication) {}
-
-        @Override
-        public void acceptPromotion() throws InterruptedException,
-                ExecutionException, KeeperException {}
-
-        @Override
-        public void updateCatalog(CatalogContext catalog) {}
-
-        @Override
-        public boolean isActive() { return false; }
-
-        @Override
-        public void shutdown(boolean blocking) {}
-
-        @Override
-        public void restart() throws InterruptedException {}
-
-        @Override
-        public void completePromotePartition(int partitionId) {}
-
-    }
 }
