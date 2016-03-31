@@ -50,11 +50,7 @@ class DeploymentUser(unittest.TestCase):
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(__db_url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-
+        self.assertEqual(response.status_code, 201)
         response = requests.get(__db_url__)
         value = response.json()
         if value:
@@ -63,11 +59,7 @@ class DeploymentUser(unittest.TestCase):
             db_data = {"name": "test", "password": "voltdb", "plaintext": True, "roles": "Administrator,Test", "databaseid": 1}
             db_url = '%s%u/users/' % (__db_url__, last_db_id)
             response = requests.post(db_url, json=db_data, headers=headers)
-
-            if response.status_code == 200:
-                self.assertEqual(response.status_code, 200)
-            else:
-                self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
         """Delete a deployment user"""
