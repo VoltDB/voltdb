@@ -281,7 +281,7 @@ def fixTrailingNewline(f, content):
 FIX_LICENSES_LEVEL = 2
 
 def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
-    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
+    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy'):
         if f.endswith(suffix):
             break
     else:

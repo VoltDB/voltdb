@@ -1,4 +1,45 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This file contains original code and/or modifications of original code.
+ * Any modifications made by VoltDB Inc. are licensed under the following
+ * terms and conditions:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 /**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with this
+ * work for additional information regarding copyright ownership. The ASF
+ * licenses this file to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *//**
  * Created by anrai on 2/12/15.
  */
 
@@ -28,61 +69,61 @@ class AdminAdvancedTest extends TestBase {
     static boolean revertQueryTimeout = false
     static boolean revertMemorySize =false
 
-	int count = 0
+    int count = 0
     def setup() { // called before each test
         count = 0
 
-		while(count<numberOfTrials) {
-			count ++
-			try {
-				setup: 'Open VMC page'
-				to VoltDBManagementCenterPage
-				page.loginIfNeeded()
-				expect: 'to be on VMC page'
-				at VoltDBManagementCenterPage
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                setup: 'Open VMC page'
+                to VoltDBManagementCenterPage
+                page.loginIfNeeded()
+                expect: 'to be on VMC page'
+                at VoltDBManagementCenterPage
 
-				when: 'click the Admin link (if needed)'
-				page.openAdminPage()
-				then: 'should be on Admin page'
-				at AdminPage
+                when: 'click the Admin link (if needed)'
+                page.openAdminPage()
+                then: 'should be on Admin page'
+                at AdminPage
 
-				break
-			} catch (org.openqa.selenium.ElementNotVisibleException e) {
-				println("ElementNotVisibleException: Unable to Start the test")
-				println("Retrying")
-			}
-		}
+                break
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
     }
 
     def "check Advanced"() {
         int count = 0
         testStatus = false
 
-       	expect: 'at Admin Page'
+        expect: 'at Admin Page'
 
         while(count<numberOfTrials) {
-        	count ++
-        	try {
-		    	when:
-				waitFor(waitTime) {
-				   	overview.advanced.isDisplayed()
-            		overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
-				}
-				then:
-				testStatus = true
-				break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		    	println("RETRYING: WaitTimeoutException occured")
-		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
-		    	println("RETRYING: StaleElementReferenceException occured")
-		    }
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    overview.advanced.isDisplayed()
+                    overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
+                }
+                then:
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
         if(testStatus == true) {
-        	println("PASS")
+            println("PASS")
         }
         else {
-        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
-        	assert false
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+            assert false
         }
         println()
     }
@@ -606,7 +647,7 @@ class AdminAdvancedTest extends TestBase {
     def "Verify empty entry is not accepted in Memory Limit"(){
         int count = 0
         println("Test Start: Verify empty entry is not accepted in Memory Limit")
-        
+
         when:
         String memoryLimit = ""
         page.advanced.click()
@@ -638,7 +679,7 @@ class AdminAdvancedTest extends TestBase {
                 waitFor(waitTime) {
                     page.overview.memoryLimitOk.click()
                 }
-                
+
                 waitFor(waitTime) {
                     page.overview.memoryLimitError.isDisplayed()
                 }
@@ -1277,10 +1318,10 @@ class AdminAdvancedTest extends TestBase {
         then: 'should be on Admin page'
         at AdminPage
 
-        String initialPrefix 	= "DEFAULT"
-        String initialFreq		= "10"
-        String initialFreqUnit 	= "Hrs"
-        String initialRetained 	= "10"
+        String initialPrefix    = "DEFAULT"
+        String initialFreq      = "10"
+        String initialFreqUnit  = "Hrs"
+        String initialRetained  = "10"
 
         String initialHeartTimeout = "10"
         String initialQueryTimeout = "10"
@@ -1400,7 +1441,7 @@ class AdminAdvancedTest extends TestBase {
                         } catch(geb.waiting.WaitTimeoutException e) {
                         }
                     }
-                    
+
                     count = 0
                     while(count<numberOfTrials) {
                         count++
