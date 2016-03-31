@@ -774,7 +774,7 @@ class ServerAPI(MethodView):
                 del Global.SERVERS[server_id]
                 sync_configuration()
                 Configuration.write_configuration_file()
-                return jsonify({'result': True})
+                return '', 204
         else:
             return make_response(
                 jsonify({'statusstring': 'No server found for id: %u in database %u' % (server_id, database_id)}), 404)
@@ -972,7 +972,7 @@ class DatabaseAPI(MethodView):
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'result': True})
+        return '', 204
 
 
 class DeploymentUserAPI(MethodView):
