@@ -53,8 +53,9 @@
 
 namespace voltdb
 {
+    class UndoLog;
+    class ReadWriteSet;
     class AggregateExecutorBase;
-    struct CountingPostfilter;
 
     class SeqScanExecutor : public AbstractExecutor {
     public:
@@ -68,10 +69,8 @@ namespace voltdb
         bool p_execute(const NValueArray& params);
 
     private:
-
-        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
-
         AggregateExecutorBase* m_aggExec;
+
     };
 }
 

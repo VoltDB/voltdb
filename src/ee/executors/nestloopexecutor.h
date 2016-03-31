@@ -48,22 +48,29 @@
 
 #include "common/common.h"
 #include "common/valuevector.h"
-#include "executors/abstractjoinexecutor.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+class UndoLog;
+class ReadWriteSet;
+class AggregateExecutorBase;
 
 /**
  *
  */
-class NestLoopExecutor : public AbstractJoinExecutor {
+class NestLoopExecutor : public AbstractExecutor {
     public:
         NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractJoinExecutor(engine, abstract_node) { }
-    private:
-
-        bool p_init(AbstractPlanNode*, TempTableLimits* limits);
+            AbstractExecutor(engine, abstract_node) { }
+    protected:
+        bool p_init(AbstractPlanNode*,
+                    TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
+        StandAloneTupleStorage m_null_tuple;
+
+        AggregateExecutorBase* m_aggExec;
 };
 
 }

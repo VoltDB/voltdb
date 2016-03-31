@@ -210,7 +210,7 @@ public abstract class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return ExpressionUtil.combinePredicates(out);
+        return ExpressionUtil.combine(out);
     }
 
     protected void queueChildren(ArrayDeque<JoinNode> joinNodes) { }
@@ -315,10 +315,9 @@ public abstract class JoinNode implements Cloneable {
      * Reconstruct a join tree from the list of tables always appending the next node to the right.
      *
      * @param tableNodes the list of tables to build the tree from.
-     * @param JoinType the join type for all the joins
      * @return The reconstructed tree
      */
-    public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes, JoinType joinType) {
+    public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
         JoinNode root = null;
         for (JoinNode leafNode : tableNodes) {
             JoinNode node = leafNode.cloneWithoutFilters();
@@ -328,7 +327,7 @@ public abstract class JoinNode implements Cloneable {
                 // We only care about the root node id to be able to reconnect the sub-trees
                 // The intermediate node id can be anything. For the final root node its id
                 // will be set later to the original tree's root id
-                root = new BranchNode(-node.m_id, joinType, root, node);
+                root = new BranchNode(-node.m_id, JoinType.INNER, root, node);
             }
         }
         return root;

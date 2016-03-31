@@ -34,6 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -257,7 +258,7 @@ public class MaterializedViewFixInfo {
 
         collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
-        AbstractExpression aggPostExpr = ExpressionUtil.combinePredicates(aggPostExprs);
+        AbstractExpression aggPostExpr = ExpressionUtil.combine(aggPostExprs);
         // Add post filters for the reAggregation node.
         m_reAggNode.setPostPredicate(aggPostExpr);
 
@@ -390,10 +391,10 @@ public class MaterializedViewFixInfo {
             return null;
         }
 
-        // Collect all TVEs that need re-aggregation in the coordinator.
+        // Collect all TVEs that need to be do re-aggregation in coordinator.
         List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
         // Check where clause.
-        List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
+        List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
 
         for (AbstractExpression expr: exprs) {
             ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
@@ -417,7 +418,7 @@ public class MaterializedViewFixInfo {
                 aggPostExprs.add(expr);
             }
         }
-        AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(remaningExprs);
+        AbstractExpression remaningFilters = ExpressionUtil.combine(remaningExprs);
         // Update new filters for the scanNode.
         return remaningFilters;
     }
