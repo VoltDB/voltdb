@@ -256,7 +256,7 @@ public class ParameterSet implements JSONString {
 
         short count = buffer.getShort();
         if (count < 0) {
-            throw new RuntimeException("Invalid parameter length " + count + " for ParameterSet." );
+            throw new IllegalArgumentException("Invalid parameter length " + count + " for ParameterSet." );
         }
         Object[] params = new Object[count];
         byte[][] encodedStrings = null;
