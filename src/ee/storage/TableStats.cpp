@@ -42,7 +42,8 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     return columnNames;
 }
 
-// make sure to update schema in IndexStats.java when updating the index stats schema.
+// make sure to update schema in frontend sources (like TableStats.java) and tests when updating
+// the index-stats schema in here.
 void TableStats::populateTableStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
