@@ -1108,7 +1108,7 @@ class StartDatabaseAPI(MethodView):
             return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
+            return make_response(jsonify({'statusString': str(err)}),
                                  200)
 
 
@@ -1127,10 +1127,11 @@ class RecoverDatabaseAPI(MethodView):
 
         try:
             database = voltdbserver.VoltDatabase(database_id)
-            return database.start_database(True)
+            response = database.start_database(True)
+            return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
+            return make_response(jsonify({'statusString': str(err)}),
                                  500)
 
 
@@ -1153,7 +1154,9 @@ class StopDatabaseAPI(MethodView):
 
         if is_force == "true":
             server = voltdbserver.VoltDatabase(database_id)
-            return server.kill_database(database_id)
+            response = server.kill_database(database_id)
+            resp_json = json.loads(response.data)
+            return make_response(jsonify({'status': 200, 'statusString': resp_json['statusString']}))
 
         else:
             try:
@@ -1161,10 +1164,15 @@ class StopDatabaseAPI(MethodView):
                 response = server.stop_database()
                 # Don't use the response in the json we send back
                 # because voltadmin shutdown gives 'Connection broken' output
-                return response
+                resp_json = json.loads(json.loads(response.data)['statusString'])
+                resp_status = {}
+                for value in resp_json:
+                    resp_status[value] = {'status': json.loads(resp_json[value])['statusString']}
+                return make_response(jsonify({'status': 200, 'statusString': str(resp_status)}),
+                                     200)
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusstring': str(err)}),
+                return make_response(jsonify({'statusString': str(err)}),
                                      500)
 
 
@@ -1192,24 +1200,25 @@ class StopServerAPI(MethodView):
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
                 if 'Connection broken' in response.data:
-                    return make_response('SUCCESS: Server shutdown successfully.')
+                    return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown '
+                                                                                 'successfully.'}))
                 else:
-                    return response
+                    return make_response(jsonify({'status': 200, 'statusString': response.data}))
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusstring': str(err)}),
+                return make_response(jsonify({'statusString': str(err)}),
                                      500)
         else:
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.stop_server(server_id)
                 if 'Connection broken' in response:
-                    return make_response('SUCCESS: Server shutdown successfully.')
+                    return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
                 else:
-                    return response
+                    return make_response(jsonify({'status': 200, 'statusString': response}))
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusstring': str(err)}),
+                return make_response(jsonify({'statusString': str(err)}),
                                      500)
 
 
@@ -1233,10 +1242,15 @@ class StartServerAPI(MethodView):
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.start_server(server_id, False, is_blocking)
+            response = server.start_server(server_id, False, is_blocking)
+            resp_json = json.loads(response.data)
+            if response.status_code == 500:
+                return make_response(jsonify({'status': '404', 'statusString': resp_json['statusString']}), 404)
+            else:
+                return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
+            return make_response(jsonify({'statusString': str(err)}),
                                  500)
 
 
@@ -1265,7 +1279,7 @@ class StartLocalServerAPI(MethodView):
             return server.check_and_start_local_server(sid, False, is_blocking )
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
+            return make_response(jsonify({'statusString': str(err)}),
                                  500)
 
 
@@ -1287,10 +1301,11 @@ class RecoverServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, True)
+            response = server.check_and_start_local_server(sid, True)
+            return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
+            return make_response(jsonify({'statuString': str(err)}),
                                  500)
 
 
@@ -1431,7 +1446,7 @@ class DatabaseDeploymentAPI(MethodView):
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()
-            return jsonify({'deployment': deployment, 'status': 1})
+            return jsonify({'status': 200, 'statusString': 'Ok', 'deployment': deployment})
         else:
             result = Configuration.set_deployment_for_upload(database_id, request)
             if 'status' in result and result['status'] == 'failure':
