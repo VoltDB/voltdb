@@ -735,8 +735,15 @@ class ServerAPI(MethodView):
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'server': Global.SERVERS[server_id], 'status': 1,
-                        'members': current_database['members']}), 201
+        url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/' % \
+                                  (__IP__, __PORT__, database_id, server_id)
+
+        resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'server': Global.SERVERS[server_id],
+                              'members': current_database['members']}), 201)
+        resp.headers['Location'] = url
+
+        return resp
+
 
     @staticmethod
     def delete(database_id, server_id):
@@ -908,7 +915,14 @@ class DatabaseAPI(MethodView):
         sync_configuration()
 
         Configuration.write_configuration_file()
-        return jsonify({'database': Global.DATABASES.get(database_id), 'status': 1}), 201
+        url = 'http://%s:%u/api/1.0/databases/%u' % \
+                                  (__IP__, __PORT__, database_id)
+
+        resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'database': Global.DATABASES.get(database_id)}), 201)
+        resp.headers['Location'] = url
+
+        return resp
+
 
     @staticmethod
     def put(database_id):
