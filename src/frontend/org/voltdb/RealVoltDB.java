@@ -2298,10 +2298,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Perform any actions that would have been taken during the ordinary
             // initialization path
             if (createDRConsumerIfNeeded()) {
-                for (Initiator iv2init : m_iv2Initiators.values()) {
-                    // We're the leader, and this consumer gateway is late to the party
-                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback)m_consumerDRGateway;
-                    callback.repairCompleted(iv2init.getPartitionId(), iv2init.getInitiatorHSId());
+                for (int pid : m_cartographer.getPartitions()) {
+                    // Notify the consumer of leaders because it was disabled before
+                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
+                    callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                 }
                 m_consumerDRGateway.initialize(false);
             }
