@@ -46,13 +46,20 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
+import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -793,10 +800,12 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
+            System.out.println("In APIRequestHandler.handle with target=" + target);
             super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
+                System.out.println("jsonEnabled: " + m_jsonEnabled);
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
@@ -869,6 +878,7 @@ public class HTTPAdminListener {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
+        System.setProperty("org.eclipse.jetty.LEVEL", "DEBUG");
         /*
          * Don't force us to look at a huge pile of threads
          */
@@ -879,11 +889,22 @@ public class HTTPAdminListener {
                 new LinkedBlockingQueue<>(poolsize + 16)
                 );
 
+        System.out.println("----jetty log level: " + System.getProperty("org.eclipse.jetty.LEVEL"));
         m_server = new Server(qtp);
         m_server.setAttribute(
                 "org.eclipse.jetty.server.Request.maxFormContentSize",
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
+        
+        HttpConfiguration httpConfig = new HttpConfiguration();
+        httpConfig.setSecureScheme("https");
+        httpConfig.setSecurePort(8443);
+        // TODO: figure out what these are for...
+        httpConfig.setOutputBufferSize(32768);
+        httpConfig.setRequestHeaderSize(8192);
+        httpConfig.setResponseHeaderSize(8192);
+        httpConfig.setSendServerVersion(true);
+        httpConfig.setSendDateHeader(false);
 
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
@@ -901,7 +922,7 @@ public class HTTPAdminListener {
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
-            connector = new ServerConnector(m_server);
+            connector = new ServerConnector(m_server, new HttpConnectionFactory(httpConfig));
 
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
@@ -911,6 +932,43 @@ public class HTTPAdminListener {
             //open the connector here so we know if port is available and Init work can retry with next port.
             connector.open();
             m_server.addConnector(connector);
+            
+            // === jetty-https.xml ===
+            // SSL Context Factory
+            SslContextFactory sslContextFactory = new SslContextFactory();
+            sslContextFactory.setKeyStorePath("/Users/manjujames/workspaces/voltdb/keystore");
+            sslContextFactory.setKeyStorePassword("password");
+            sslContextFactory.setKeyManagerPassword("password");
+            //sslContextFactory.setTrustStorePath("/Users/manjujames/workspaces/voltdb/keystore");
+            //sslContextFactory.setTrustStorePassword("password");
+            /* TODO: Do we need this
+            sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                    "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+                    */
+
+            // SSL HTTP Configuration
+            HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
+            httpsConfig.addCustomizer(new SecureRequestCustomizer());
+
+            // SSL Connector
+            ServerConnector sslConnector = new ServerConnector(m_server,
+                new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
+                new HttpConnectionFactory(httpsConfig));
+            System.out.println("-------intf: " + intf);
+            if (intf != null && intf.length() > 0) {
+                System.out.println("Setting host to " + intf);
+                connector.setHost(intf);
+            }
+            sslConnector.setPort(8443);
+            sslConnector.setName("VoltDB-HTTPS");
+            sslConnector.open();
+            m_server.addConnector(sslConnector);
+            
+            m_server.setConnectors(new Connector[] { connector, sslConnector });
 
             //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
