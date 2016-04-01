@@ -355,7 +355,7 @@ public class ParameterConverter {
             return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param);
         }
 
-        // The following block switches on the type of the paramter desired.
+        // The following block switches on the type of the parameter desired.
         // It handles all of the paths not trapped in the code above. We can assume
         // values are not null and that most sane primitive stuff has been handled.
         // Downcasting is handled here (e.g. long => short).

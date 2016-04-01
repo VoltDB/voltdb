@@ -164,6 +164,8 @@ public abstract class CatalogUtil {
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
+    private static boolean m_exportEnabled = false;
+
     private static JAXBContext m_jc;
     private static Schema m_schema;
     static {
@@ -470,6 +472,10 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    public static boolean isExportEnabled() {
+        return m_exportEnabled;
     }
 
     public static String getExportTargetIfExportTableOrNullOtherwise(org.voltdb.catalog.Database database,
@@ -1379,6 +1385,7 @@ public abstract class CatalogUtil {
             }
 
             if (connectorEnabled) {
+                m_exportEnabled = true;
                 if (streamList.contains(targetName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
                             targetName + ".");
@@ -1389,7 +1396,7 @@ public abstract class CatalogUtil {
             }
             boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
@@ -1409,7 +1416,6 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
-            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);
@@ -2179,6 +2185,21 @@ public abstract class CatalogUtil {
                 table.getMaterializer() == null &&
                 !CatalogUtil.isTableExportOnly(catalog, table)) {
                 tables.add(table);
+                continue;
+            }
+            //Handle views which are on STREAM only partitioned STREAM allow view and must have partition
+            //column as part of view.
+            if ((table.getMaterializer() != null) && !isReplicated
+                    && (CatalogUtil.isTableExportOnly(catalog, table.getMaterializer()))) {
+                //Non partitioned export table are not allowed so it should not get here.
+                Column bpc = table.getMaterializer().getPartitioncolumn();
+                if (bpc != null) {
+                    String bPartName = bpc.getName();
+                    Column pc = table.getColumns().get(bPartName);
+                    if (pc != null) {
+                        tables.add(table);
+                    }
+                }
             }
         }
         return tables;

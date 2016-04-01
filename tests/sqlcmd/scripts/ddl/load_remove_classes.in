@@ -2,6 +2,11 @@
 drop table r if exists;
 drop table s if exists;
 drop table t if exists;
+drop table t2 if exists;
+drop table addable if exists;
+drop table dropable if exists;
+drop table prefixes if exists;
+drop table raw if exists;
 
 show classes;
 load classes sqlcmdtest-procs.jar;

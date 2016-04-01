@@ -38,6 +38,7 @@ static const double RADIUS_SQ_M = SPHERICAL_EARTH_MEAN_RADIUS_M * SPHERICAL_EART
 
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
+static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg);
 static void throwInvalidWktPoint(const std::string& input)
 {
     std::ostringstream oss;
@@ -291,17 +292,8 @@ static void readLoop(bool is_shell,
     loop->Init(points);
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
+static NValue polygonFromText(const std::string &wkt, bool doValidation)
 {
-    bool is_shell = true;
-    if (isNull()) {
-        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
-    }
-
-    int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
-    const std::string wkt(textData, textLength);
-
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
     Tokenizer::iterator it = tokens.begin();
@@ -317,6 +309,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
     ++it;
 
+    bool is_shell = true;
     std::size_t length = Polygon::serializedLengthNoLoops();
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
@@ -347,9 +340,42 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.
+    if (doValidation) {
+        std::stringstream validReason;
+        if (!poly.IsValid(&validReason)
+                || isMultiPolygon(poly, &validReason)) {
+            throwInvalidWktPoly(validReason.str());
+        }
+    }
     SimpleOutputSerializer output(storage, length);
     poly.saveToBuffer(output);
     return nval;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
+{
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    const std::string wkt(textData, textLength);
+
+    return polygonFromText(wkt, false);
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
+{
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    const std::string wkt(textData, textLength);
+
+    return polygonFromText(wkt, true);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
@@ -496,7 +522,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
 // Return true if poly has more than one shell, or has shells
 // inside holes.
 //
-static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
+static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
     auto nloops = poly.num_loops();
     int nouters = 0;
     for (int idx = 0; idx < nloops; idx += 1) {
@@ -532,8 +558,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     // Extract the polygon and check its validity.
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (!poly.IsValid()
-            || isMultiPolygon(poly)) {
+    if (!poly.IsValid(NULL)
+            || isMultiPolygon(poly, NULL)) {
         returnval = false;
     }
     return ValueFactory::getBooleanValue(returnval);

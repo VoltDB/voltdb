@@ -44,8 +44,17 @@ import venv_starter
 parser = OptionParser(usage="usage: %prog [options] filepath",
                           version="%prog 1.0")
 parser.add_option("-p", "--path",
-              action="store", type="string", dest="filepath", help="Specify file path for vdm root. Defaults to /.vdm "
-                                                                   "in home directory")
+              action="store", type="string", dest="filepath", help="Specifies the directory path for this server's "
+                                                                   "voltdbroot folder when starting the database. "
+                                                                   "The default is ./voltdeployroot in the current "
+                                                                   "working directory")
+
+parser.add_option("-c", "--config",
+                  action="store", type="string", dest="configpath", help="Specifies the directory path for the VoltDB"
+                                                                         " Deployment Manager configuration file. "
+                                                                         "The default is ~/.voltdb in the user's "
+                                                                         "home directory")
+
 parser.add_option("-s", "--server",
               action="store", type="string", dest="server", help="Specify server ip and port to connect. Defaults to "
                                                                  "0.0.0.0:8000")
@@ -59,6 +68,7 @@ parser.add_option("-v", "--virtual",
 
 arr = [{
     "filepath": options.filepath,
+    "configpath": options.configpath,
     "server": options.server,
 }]
 

@@ -176,7 +176,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 q = (ma[-1]-median)/median*100.
 
                 if failed != 0:
-                    if p<10:
+                    if abs(p) < 10:
                         color = 'yellow'
                     else:
                         color = 'red'

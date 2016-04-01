@@ -40,7 +40,6 @@ __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
 
-__url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/servers/'
 __db_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
 
 
@@ -72,7 +71,7 @@ class Database(unittest.TestCase):
             # Delete database
             db_url = __db_url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
