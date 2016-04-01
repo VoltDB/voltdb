@@ -839,10 +839,11 @@ class ServerAPI(MethodView):
                 request.json.get('placement-group', current_server['placement-group'])
             sync_configuration()
             Configuration.write_configuration_file()
-            return jsonify({'server': current_server, 'status': 1})
+            return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server[0]})
         else:
-            return jsonify({'statusstring': 'Given server with id %u doesn\'t belong to database with id %u.' % (
-                server_id, database_id)})
+            return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
+            server_id, database_id)})
+
 
 
 class DatabaseAPI(MethodView):
@@ -935,7 +936,7 @@ class DatabaseAPI(MethodView):
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'database': database, 'status': 1})
+        return jsonify({'status': 200, 'statusString': 'OK', 'database': current_database[0]})
 
     @staticmethod
     def delete(database_id):
