@@ -92,7 +92,7 @@ def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
     """
-    return make_response(jsonify( { 'statusString': statusstr } ), statuscode)
+    return make_response(jsonify({'status': statuscode, 'statusString': statusstr}), statuscode)
 
 
 class VoltdbProcess:

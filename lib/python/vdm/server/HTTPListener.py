@@ -1123,8 +1123,8 @@ class StartDatabaseAPI(MethodView):
             return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
-                                 200)
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
+                                 500)
 
 
 class RecoverDatabaseAPI(MethodView):
@@ -1221,7 +1221,7 @@ class StopServerAPI(MethodView):
                     return make_response(jsonify({'status': 200, 'statusString': response.data}))
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusString': str(err)}),
+                return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                      500)
         else:
             try:
@@ -1233,7 +1233,7 @@ class StopServerAPI(MethodView):
                     return make_response(jsonify({'status': 200, 'statusString': response}))
             except Exception, err:
                 print traceback.format_exc()
-                return make_response(jsonify({'statusString': str(err)}),
+                return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                      500)
 
 
@@ -1260,7 +1260,7 @@ class StartServerAPI(MethodView):
             response = server.start_server(server_id, False, is_blocking)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
-                return make_response(jsonify({'status': '404', 'statusString': resp_json['statusString']}), 404)
+                return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
             else:
                 return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
         except Exception, err:
@@ -1294,7 +1294,7 @@ class StartLocalServerAPI(MethodView):
             return server.check_and_start_local_server(sid, False, is_blocking )
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statusString': str(err)}),
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                  500)
 
 
@@ -1320,7 +1320,7 @@ class RecoverServerAPI(MethodView):
             return response
         except Exception, err:
             print traceback.format_exc()
-            return make_response(jsonify({'statuString': str(err)}),
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
                                  500)
 
 
