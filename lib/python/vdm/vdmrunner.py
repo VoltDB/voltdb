@@ -82,12 +82,15 @@ def main():
                           version="%prog 1.0")
     parser.add_option("-p", "--path",
                   action="store", type="string", dest="filepath")
+    parser.add_option("-c", "--configpath",
+                  action="store", type="string", dest="configpath")
     parser.add_option("-s", "--server",
                   action="store", type="string", dest="server")
     (options, args) = parser.parse_args()
 
     arr = [{
         "filepath": options.filepath,
+        "configpath": options.configpath,
         "server": options.server
     }]
 
@@ -95,10 +98,12 @@ def main():
 
 
 if __name__ == '__main__':
-  options = main()
+    options = main()
 
-  path = options[0]['filepath']
-  server = options[0]['server']
+    path = options[0]['filepath']
+    con_path = options[0]['configpath']
+    server = options[0]['server']
+
 
 org_wd = os.getcwd()
 
@@ -106,12 +111,15 @@ app_root = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.normpath(app_root))
 
 if path is None:
-    home = expanduser("~")
-    config_path = os.path.join(home, '.voltdb')
     data_path = os.path.join(org_wd, 'voltdeployroot')
 else:
-    config_path = os.path.join(path, '.voltdb')
     data_path = os.path.join(path, 'voltdeployroot')
+
+if con_path is None:
+    home = expanduser("~")
+    config_path = os.path.join(home, '.voltdb')
+else:
+    config_path = os.path.join(con_path, '.voltdb')
 
 if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
     if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
