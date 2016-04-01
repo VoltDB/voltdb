@@ -267,12 +267,12 @@ class VoltDatabase:
             url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
                       (server['hostname'], HTTPListener.__PORT__, self.database_id)
             response = requests.get(url)
-            is_running = response.json()['status'][0]['status']
+            is_running = response.json()['dbStatus']['status']
 
             server_ip = ''
             rejoin = False
             if is_running == 'running':
-                for value in response.json()['serverDetails']:
+                for value in response.json()['dbStatus']['serverStatus']:
                     for key in value:
                         status = value[key]['status']
                         if status == 'running' and key != server['hostname']:
