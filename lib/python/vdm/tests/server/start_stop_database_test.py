@@ -253,6 +253,7 @@ class StartServer(Cluster):
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
+
 class DefaultRecoverServer(Server):
     """
     Create Server
@@ -302,10 +303,10 @@ def CheckServerStatus(self, last_db_id, status):
     print "Checking status..."
     response = requests.get(status_url)
     value = response.json()
-    if value['status'] and value['status'][0]['status']:
-        print "Status: " + value['status'][0]['status']
-        self.assertEqual(value['status'][0]['status'], status)
-        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    if value['status'] and value['dbStatus']['status']:
+        print "Status: " + value['dbStatus']['status']
+        self.assertEqual(value['dbStatus']['status'], status)
+        self.assertEqual(value['dbStatus']['serverStatus'][0][__host_or_ip__]['status'], status)
     else:
         assert False
 
