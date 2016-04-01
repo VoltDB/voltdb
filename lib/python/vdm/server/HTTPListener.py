@@ -839,7 +839,7 @@ class ServerAPI(MethodView):
                 request.json.get('placement-group', current_server['placement-group'])
             sync_configuration()
             Configuration.write_configuration_file()
-            return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server[0]})
+            return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
         else:
             return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
             server_id, database_id)})
