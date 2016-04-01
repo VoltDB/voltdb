@@ -60,7 +60,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         GET_DR_TUPLESTREAM_STATE(1),
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
-        SP_JAVA_GET_DRID_TRACKER(4);
+        SP_JAVA_GET_DRID_TRACKER(4),
+        SET_DRID_TRACKER(5);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
