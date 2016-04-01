@@ -950,7 +950,7 @@ class DatabaseAPI(MethodView):
 
         sync_configuration()
         Configuration.write_configuration_file()
-        return jsonify({'status': 200, 'statusString': 'OK', 'database': current_database[0]})
+        return jsonify({'status': 200, 'statusString': 'OK', 'database': database})
 
     @staticmethod
     def delete(database_id):
