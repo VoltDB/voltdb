@@ -279,8 +279,8 @@ def CheckServerStatus(self, last_db_id, last_server_id, status):
     response = requests.get(status_url)
     value = response.json()
     if value['status'] :
-        print "Status: " + value['status']
-        self.assertEqual(value['status'], status)
+        print "Status: " + value['serverStatus']['status']
+        self.assertEqual(value['serverStatus']['status'], status)
     else:
         assert False
 

@@ -267,12 +267,12 @@ class VoltDatabase:
             url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
                       (server['hostname'], HTTPListener.__PORT__, self.database_id)
             response = requests.get(url)
-            is_running = response.json()['status'][0]['status']
+            is_running = response.json()['dbStatus']['status']
 
             server_ip = ''
             rejoin = False
             if is_running == 'running':
-                for value in response.json()['serverDetails']:
+                for value in response.json()['dbStatus']['serverStatus']:
                     for key in value:
                         status = value[key]['status']
                         if status == 'running' and key != server['hostname']:
@@ -285,14 +285,15 @@ class VoltDatabase:
             verb = 'rejoin'
 
         if verb == 'create':
-            voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary ]
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
         elif rejoin:
             if is_blocking == 1:
-                voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip ]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip]
             else:
-                voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip ]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
         else:
-            voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary]
+
         self.build_network_options(server, voltdb_cmd)
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
