@@ -850,7 +850,7 @@ class ServerAPI(MethodView):
                                   (__IP__, __PORT__, database_id, server_id)
 
         resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'server': server,
-                              'members': current_database[0]['members']}))
+                              'members': current_database[0]['members']}), 201)
         resp.headers['Location'] = url
 
         return resp
