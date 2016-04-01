@@ -111,7 +111,8 @@ public class RegressionSuite extends TestCase {
             for (final SocketChannel sc : m_clientChannels) {
                 try {
                     ConnectionUtil.closeConnection(sc);
-                } catch (final IOException e) {
+                }
+                catch (final IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -209,7 +210,8 @@ public class RegressionSuite extends TestCase {
         String listener = null;
         if (useAdmin) {
             listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-        } else {
+        }
+        else {
             listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
         }
         ClientConfig config = new ClientConfigForTest(m_username, m_password, scheme);
@@ -224,7 +226,8 @@ public class RegressionSuite extends TestCase {
         catch (ConnectException e) {
             if (useAdmin) {
                 listener = m_config.getAdminAddress(r.nextInt(m_config.getListenerCount()));
-            } else {
+            }
+            else {
                 listener = m_config.getListenerAddress(r.nextInt(m_config.getListenerCount()));
             }
             client.createConnection(listener);
@@ -395,6 +398,12 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
+    static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(sql, vt, new long[][] {{modifiedTupleCount}});
+    }
+
     static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
@@ -444,44 +453,43 @@ public class RegressionSuite extends TestCase {
                         expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
-            validateRowOfLongs(messagePrefix + " at row " + i + ", ", vt, expected[i]);
+            validateRowOfLongs(messagePrefix + " at row " + (i+1) + ", ", vt, expected[i]);
         }
     }
 
     public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
-        assertNotNull(expected);
-        assertEquals("Wrong number of rows in table.  ",
-                        expected.length, vt.getRowCount());
-        int len = expected.length;
-        for (int i=0; i < len; i++) {
-            validateRowOfLongs("at row " + i + ", ", vt, expected[i]);
-        }
+        validateTableOfLongs("", vt, expected);
     }
 
     static protected void validateRowOfLongs(String messagePrefix, VoltTable vt, long [] expected) {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
-            String message = messagePrefix + "at column " + i + ", ";
+            String message = messagePrefix + "at column " + (i+1) + ", ";
 
             long actual = -10000000;
             // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
             try {
                 actual = vt.getLong(i);
-            } catch (IllegalArgumentException ex) {
+            }
+            catch (IllegalArgumentException ex) {
                 try {
                     actual = (long) vt.getDouble(i);
-                } catch (IllegalArgumentException newEx) {
+                }
+                catch (IllegalArgumentException newEx) {
                     try {
                         actual = vt.getTimestampAsLong(i);
-                    } catch (IllegalArgumentException exTm) {
+                    }
+                    catch (IllegalArgumentException exTm) {
                         try {
                             actual = vt.getDecimalAsBigDecimal(i).longValueExact();
-                        } catch (IllegalArgumentException newerEx) {
+                        }
+                        catch (IllegalArgumentException newerEx) {
                             newerEx.printStackTrace();
                             fail(message);
                         }
-                    } catch (ArithmeticException newestEx) {
+                    }
+                    catch (ArithmeticException newestEx) {
                         newestEx.printStackTrace();
                         fail(message);
                     }
@@ -491,7 +499,8 @@ public class RegressionSuite extends TestCase {
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
                 assertEquals(message, expected[i], actual);
-            } else {
+            }
+            else {
                 VoltType type = vt.getColumnType(i);
                 assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
@@ -513,7 +522,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == Long.MIN_VALUE) {
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 assertEquals(expected[i], actual);
             }
         }
@@ -539,7 +549,8 @@ public class RegressionSuite extends TestCase {
                 String actual = vt.getString(col);
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 assertEquals(expected[i], vt.getString(col));
             }
         }
@@ -563,7 +574,8 @@ public class RegressionSuite extends TestCase {
               if (expected[i] == null) {
                   assertTrue(vt.wasNull());
                   assertEquals(null, actual);
-              } else {
+              }
+              else {
                   assertEquals(expected[i], Encoder.hexEncode(actual));
               }
           }
@@ -586,7 +598,8 @@ public class RegressionSuite extends TestCase {
               if (expected[i] == Double.MIN_VALUE) {
                   assertTrue(vt.wasNull());
                   assertEquals(null, actual);
-              } else {
+              }
+              else {
                   assertEquals(expected[i], actual, 0.00001);
               }
           }
@@ -599,19 +612,22 @@ public class RegressionSuite extends TestCase {
             BigDecimal actual = null;
             try {
                 actual = vt.getDecimalAsBigDecimal(i);
-            } catch (IllegalArgumentException ex) {
+            }
+            catch (IllegalArgumentException ex) {
                 ex.printStackTrace();
                 fail();
             }
             if (expected[i] != null) {
                 assertNotSame(null, actual);
                 assertEquals(expected[i], actual);
-            } else {
+            }
+            else {
                 if (isHSQL()) {
                     // We don't actually use this with
                     // HSQL.  So, just assert failure here.
                     fail("HSQL is not used to test the Volt DECIMAL type.");
-                } else {
+                }
+                else {
                     assertTrue(vt.wasNull());
                 }
             }
@@ -694,7 +710,8 @@ public class RegressionSuite extends TestCase {
             if (expected[i] == null) {
                 assertTrue(vt.wasNull());
                 assertEquals(null, actual);
-            } else {
+            }
+            else {
                 BigDecimal rounded = expected[i].setScale(m_defaultScale, RoundingMode.valueOf(m_defaultRoundingMode));
                 assertEquals(rounded, actual);
             }
@@ -743,7 +760,8 @@ public class RegressionSuite extends TestCase {
         if (epsilon > 0) {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
-        } else {
+        }
+        else {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude());
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude());
         }
@@ -858,7 +876,8 @@ public class RegressionSuite extends TestCase {
                 if (epsilon <= 0) {
                     String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
                     assertEquals(fullMsg, expectedValue, actualValue);
-                } else {
+                }
+                else {
                     String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
                                                          Math.abs(expectedValue - actualValue), epsilon);
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);

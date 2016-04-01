@@ -599,7 +599,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const &indexesToUpdate,
                                                      bool fallible,
@@ -763,7 +763,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
     }
-    return true;
 }
 
 /*
@@ -1724,15 +1723,6 @@ void PersistentTable::computeSmallestUniqueIndex() {
                 m_smallestUniqueIndex->getColumnIndices().size() * sizeof(int));
         m_smallestUniqueIndexCrc = vdbcrc::crc32cFinish(m_smallestUniqueIndexCrc);
     }
-}
-
-std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
-    std::vector<uint64_t> blockAddresses;
-    blockAddresses.reserve(m_data.size());
-    for(TBMap::const_iterator i = m_data.begin(); i != m_data.end(); ++i) {
-            blockAddresses.push_back((uint64_t)i->second->address());
-    }
-    return blockAddresses;
 }
 
 } // namespace voltdb

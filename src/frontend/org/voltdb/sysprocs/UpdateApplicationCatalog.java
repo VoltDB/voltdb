@@ -159,8 +159,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     public static class JavaClassForTest {
-        public Class forName(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException {
-            return Class.forName(name, initialize, loader);
+        public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
+            return CatalogContext.classForProcedure(name, jarfileLoader);
         }
     }
 

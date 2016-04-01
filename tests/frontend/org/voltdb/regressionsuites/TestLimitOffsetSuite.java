@@ -151,7 +151,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         int limits[] = new int[] { 1, 2, 5, 10, 12, 25, Integer.MAX_VALUE };
         int offsets[] = new int[] { 0, 1, 2, 5, 10, 12, 25 };
         String selecteds[] = new String[] { "*", "A.PKEY" };
-        String joinops[] = new String[] { ",", "LEFT JOIN", "RIGHT JOIN", " FULL JOIN" };
+        String joinops[] = new String[] { ",", "LEFT JOIN", "RIGHT JOIN" };
         String conditions[] = new String[] { " A.PKEY < B.PKEY ", " A.PKEY = B.PKEY ", " A.I = B.I " };
         client.callProcedure("InsertA", -1, 0);
         for (String joinop : joinops) {

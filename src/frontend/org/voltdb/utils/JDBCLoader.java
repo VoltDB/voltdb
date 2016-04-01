@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -96,8 +95,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                     ErrorInfoItem currItem;
                     currItem = m_errorInfo.take();
 
-                    if (currItem.lineNumber == -1)
+                    if (currItem.lineNumber == -1) {
                         return;
+                    }
 
                     if (currItem.errorInfo.length != 2) {
                         System.out.println("internal error, information is not enough");
@@ -136,8 +136,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             m_errorInfo.put(emptyErrorInfo);
         }
 
-        if (m_errorinfoProcessor != null)
+        if (m_errorinfoProcessor != null) {
             m_errorinfoProcessor.join();
+        }
     }
 
     @Override
@@ -320,6 +321,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         // Split server list
         final String[] serverlist = config.servers.split(",");
 
+        // If we need to prompt the user for a VoltDB password, do so.
+        config.password = cfg.readPasswordIfNeeded(config.user, config.password, "Enter VoltDB password: ");
+
         // Create connection
         final ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
@@ -348,6 +352,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             } else {
                 dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
+
+            // If we need to prompt the user for a JDBC datasource password, do so.
+            config.jdbcpassword = cfg.readPasswordIfNeeded(config.jdbcuser, config.jdbcpassword, "Enter JDBC source database password: ");
 
             //Created Source reader
             JDBCStatementReader.initializeReader(cfg, csvClient);
