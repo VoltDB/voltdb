@@ -1460,10 +1460,10 @@ class StatusDatabaseAPI(MethodView):
         has_stalled = False
         has_run = False
         if not database:
-            return make_response(jsonify({'error': 'Not found'}), 404)
+            return make_response(jsonify({"status": 404, 'error': 'Not found'}), 404)
         else:
             if len(database['members']) == 0:
-                return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
+                return jsonify({"status": 404, "statusString": "No Members"})
             for server_id in database['members']:
                 server = Global.SERVERS.get(server_id)
                 url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/status/') % \
@@ -1471,7 +1471,7 @@ class StatusDatabaseAPI(MethodView):
                 try:
                     response = requests.get(url)
                 except Exception, err:
-                    return jsonify({"status": 200, "statusString": "OK", 'error': 'error', 'hostname': server['hostname']})
+                    return jsonify({"status": 404, "statusString": "error"})
 
                 if response.json()['serverStatus']['status'] == "stalled":
                     has_stalled = True
@@ -1503,15 +1503,15 @@ class StatusDatabaseServerAPI(MethodView):
     def get(database_id, server_id):
         database = Global.DATABASES.get(database_id)
         if not database:
-            return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
+            return make_response(jsonify({"status": 404, "statusString": "Not found"}), 404)
         else:
             server = Global.SERVERS.get(server_id)
             if len(database['members']) == 0:
                 return jsonify({"status": 200, "statusString": "OK", 'error': 'errorNoMembers'})
             if not server:
-                return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
+                return make_response(jsonify({"status": 404, "statusString": "Not found"}), 404)
             elif server_id not in database['members']:
-                return make_response(jsonify({"status": 200, "statusString": "OK", 'error': 'Not found'}), 404)
+                return make_response(jsonify({"status": 404, "statusString": "Not found"}), 404)
             else:
 
                 try:
