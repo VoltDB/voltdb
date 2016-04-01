@@ -57,6 +57,11 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
             return 0
         print "ERROR: \"%s\" does not start with an approved license." % f
     else:
+        # skip hashbang, Groovy case
+        if content.startswith("#!") and f.endswith('.groovy'):
+            (ignore, content) = content.split("\n", 1)
+            content = content.lstrip()
+
         if not content.startswith("/*"):
             if content.lstrip().startswith("/*"):
                 print "ERROR: \"%s\" contains whitespace before initial comment." % f
