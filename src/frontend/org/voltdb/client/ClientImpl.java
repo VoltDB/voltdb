@@ -596,6 +596,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 if (m_backpressure) {
                     while (m_backpressure && !m_isShutdown) {
                        if (start != 0) {
+                           if (timeoutNanos <= 0) {
+                               // timeout nano value is negative or zero, indicating it timed out.
+                               return true;
+                           }
+
                             //Wait on the condition for the specified timeout remaining
                             m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
 

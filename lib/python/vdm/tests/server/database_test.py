@@ -69,7 +69,7 @@ class Database(unittest.TestCase):
             # Delete database
             db_url = __url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
@@ -106,6 +106,8 @@ class CreateDatabase(Database):
         if not value:
             print "Database list is empty."
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(value['statusString'], 'OK')
+        self.assertEqual(value['status'], 200)
 
     def test_validate_db_name_empty(self):
         """
@@ -252,7 +254,7 @@ class DeleteDatabase(unittest.TestCase):
             # Delete database
             db_url = __url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 

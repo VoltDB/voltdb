@@ -73,17 +73,6 @@ bool TempTable::insertTuple(TableTuple &source) {
     return true;
 }
 
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool)
-{
-    throwFatalException("TempTable does not support update");
-    // Some day maybe, if we find a use case:
-    // Copy the source tuple into the target
-    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
-}
-
 bool TempTable::deleteTuple(TableTuple &, bool)
 {
     throwFatalException("TempTable does not support deleting individual tuples");

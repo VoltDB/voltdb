@@ -2,6 +2,9 @@
 
 APPNAME="matviewbenchmark"
 
+DDL=ddl.sql
+STREAMVIEW="false"
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -42,6 +45,10 @@ function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
 }
 
+function jars() {
+    ant all
+}
+
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
@@ -60,9 +67,21 @@ function catalog() {
     echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
     echo
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    echo "voltdb compile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql"
+    echo
+    $VOLTDB compile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql
+
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
+
+# run the voltdb server locally
+function streamview() {
+    export APPNAME="$APPNAME-streamview"
+    STREAMVIEW="true"
+    server
+}
+    
 
 # run the voltdb server locally
 function server() {
@@ -74,14 +93,18 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo 
-    echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
+    echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar"
     echo
-    ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar
 }
 
 # run the client that drives the example
 function client() {
-    matviewbenchmark
+    matviewbenchmark "false"
+}
+
+function streamview-client() {
+    matviewbenchmark "true"
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -98,7 +121,9 @@ function matviewbenchmark() {
         --displayinterval=5 \
         --servers=localhost \
         --txn=10000000 \
+        --statsfile=streamview-`date '+%Y-%m-%d'` \
         --warmup=100000 \
+        --streamview=$1 \
         --group=5000
 }
 

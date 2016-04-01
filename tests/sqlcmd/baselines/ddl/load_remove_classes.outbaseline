@@ -8,6 +8,21 @@ Command succeeded.
 drop table t if exists;
 Command succeeded.
 
+drop table t2 if exists;
+Command succeeded.
+
+drop table addable if exists;
+Command succeeded.
+
+drop table dropable if exists;
+Command succeeded.
+
+drop table prefixes if exists;
+Command succeeded.
+
+drop table raw if exists;
+Command succeeded.
+
 --- Empty Class List -----------------------
 
 
@@ -186,7 +201,6 @@ EMPLOYEE.delete           	integer
 EMPLOYEE.insert           	integer, varchar, varchar, varchar
 EMPLOYEE.update           	integer, varchar, varchar, varchar, integer
 EMPLOYEE.upsert           	integer, varchar, varchar, varchar
-InsertEmployee            	varchar, varchar, varchar
 
 
 --- Potential Procedure Classes ----------------------------

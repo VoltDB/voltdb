@@ -92,7 +92,7 @@ class Database(unittest.TestCase):
         last_db_id = get_last_db_id()
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
 
 class XML(unittest.TestCase):
@@ -242,11 +242,11 @@ class Server(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url = __db_url__ + str(last_db_id) + '/servers/' + str(last_server_id)
                 response = requests.delete(url, json=db_data, headers=headers)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -336,7 +336,7 @@ class Deployment(unittest.TestCase):
         # Delete database
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
 
 class UpdateDatabaseDeployment(Deployment):

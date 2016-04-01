@@ -33,7 +33,7 @@ import math
 import re
 import types
 import array
-
+from binascii import hexlify
 from NotANormalizer import NotANormalizer
 from SortNulls import SortNulls
 from SQLCoverageReport import generate_html_reports
@@ -78,7 +78,7 @@ __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR
           FastSerializer.VOLTTYPE_STRING: FastSerializer.NULL_STRING_INDICATOR}
 
 def round_to_num_digits(v, num_digits):
-    # round to the total number of significant digits,
+    # round to the specified total number of significant digits,
     # regardless of where the decimal point occurs
     f = float(v)
     if f == 0.0:
@@ -94,13 +94,6 @@ def normalize_value(v, vtype, num_digits):
         return None
     elif vtype == FastSerializer.VOLTTYPE_FLOAT:
         # round to the desired number of decimal places -- accounting for significant digits before the decimal
-#         decimal_places = num_digits
-#         abs_v = abs(float(v))
-#         if abs_v >= 1.0:
-#             # round to the total number of significant digits, including the integer part
-#             decimal_places = num_digits - 1 - int(math.floor(math.log10(abs_v)))
-#         # print "DEBUG normalized float:(", round(v, decimal_places), ")"
-#         return round(v, decimal_places)
         return round_to_num_digits(v, num_digits)
     elif vtype == FastSerializer.VOLTTYPE_DECIMAL:
         # print "DEBUG normalized_to:(", decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN"), ")"
@@ -134,10 +127,17 @@ def normalize_value(v, vtype, num_digits):
                            + str(round_to_num_digits(longlat.group(2), num_digits))
                     r += ')'
             r += ')'
-#         if r != v:
-#             print "DEBUG: normalizing:", v
-#             print "DEBUG: modified to:", r
+        #if r != v:
+        #    print "DEBUG: normalizing:", v
+        #    print "DEBUG: modified to:", r
         return r
+    elif vtype == FastSerializer.VOLTTYPE_VARBINARY and v:
+        # output VARBINARY columns in a format similar to that in which they
+        # are inserted into VoltDB, e.g. x'abcd1234', and not in Python's crazy
+        # default format, e.g. array('c', '\xab\xcd\x124'); and no, that is not
+        # a typo: Python (without calling hexlify) actually changes '34' to '4'
+        # because 34 is the (hex) ASCII value of the character '4'!
+        return "x'" + hexlify(v)
     else:
         # print "DEBUG normalized pass-through:(", v, ")"
         return v

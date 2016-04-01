@@ -17,14 +17,15 @@
 
 package org.voltdb;
 
-import static org.voltdb.ClientInterface.getPartitionForProcedure;
-
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
@@ -32,9 +33,9 @@ import org.voltdb.utils.MiscUtils;
 /**
  * This class packs the parameters and dispatches the transactions.
  * Make sure responses over network thread does not touch this class.
- * @author akhanzode
  */
 public class InternalConnectionHandler {
+    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_YOMAMA_!+";
 
     public final static long SUPPRESS_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("InternalConnectionHandler");
@@ -42,20 +43,25 @@ public class InternalConnectionHandler {
     // Atomically allows the catalog reference to change between access
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
+    private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
     private final InternalClientResponseAdapter m_adapter;
+    private final ClientInterfaceHandleManager m_cihm;
 
-    private AuthSystem.AuthUser m_user;
-
-    public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
+    public InternalConnectionHandler(InternalClientResponseAdapter adapter, ClientInterfaceHandleManager cihm) {
         m_adapter = adapter;
+        m_cihm = cihm;
     }
 
     /**
      * Returns true if a table with the given name exists in the server catalog.
      */
     public boolean hasTable(String name) {
-        Table table = VoltDB.instance().getCatalogContext().tables.get(name);
+        Table table = getCatalogContext().tables.get(name);
         return (table!=null);
+    }
+
+    public ClientInterfaceHandleManager getClientInterfaceHandleManager() {
+        return m_cihm;
     }
 
     public class NullCallback implements ProcedureCallback {
@@ -68,16 +74,76 @@ public class InternalConnectionHandler {
         return callProcedure(caller, statsCollector, new NullCallback(), proc, fieldList);
     }
 
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector,
-            ProcedureCallback procCallback, AuthSystem.AuthUser user, String proc, Object... fieldList) {
-        m_user = user;
-        return callProcedure(caller, statsCollector, procCallback, proc, fieldList);
+    private CatalogContext getCatalogContext() {
+        return VoltDB.instance().getCatalogContext();
+    }
+
+    public boolean callProcedure(
+            AuthUser user,
+            boolean isAdmin,
+            int timeout,
+            ProcedureCallback cb,
+            String procName,
+            Object...args)
+    {
+
+        Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
+        if (catProc == null) {
+            String fmt = "Cannot invoke procedure %s. Procedure not found.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+
+        //Indicate backpressure or not.
+        boolean b = hasBackPressure();
+        if (b) {
+            applyBackPressure();
+        }
+
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        task.setProcName(procName);
+        task.setParams(args);
+
+        try {
+            task = MiscUtils.roundTripForCL(task);
+            task.setClientHandle(m_adapter.connectionId());
+        } catch (Exception e) {
+            String fmt = "Cannot invoke procedure %s. failed to create task.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+
+        if (timeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            task.setBatchTimeout(timeout);
+        }
+
+        int partition = -1;
+        try {
+            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            String fmt = "Can not invoke procedure %s. Partition not found.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+
+        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
+                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, m_adapter.connectionId());
+
+        if (!m_adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+        m_submitSuccessCount.incrementAndGet();
+        return true;
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
     public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector,
             ProcedureCallback procCallback, String proc, Object... fieldList) {
-        Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
+        Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
@@ -86,13 +152,10 @@ public class InternalConnectionHandler {
         }
 
         //Indicate backpressure or not.
-        boolean b = m_adapter.hasBackPressure();
+        boolean b = hasBackPressure();
         caller.setBackPressure(b);
         if (b) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {
-            }
+            applyBackPressure();
         }
 
         StoredProcedureInvocation task = new StoredProcedureInvocation();
@@ -110,7 +173,7 @@ public class InternalConnectionHandler {
         }
         int partition = -1;
         try {
-            partition = getPartitionForProcedure(catProc, task);
+            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
         } catch (Exception e) {
             String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, proc, caller);
@@ -118,11 +181,11 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        if ("@UpdateApplicationCatalog".equals(task.procName)) {
-            return m_adapter.dispatchUpdateApplicationCatalog(task, m_user, caller, procCallback);
-        }
+        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  m_adapter.connectionId());
 
-        if (!m_adapter.createTransaction(caller, proc, catProc, procCallback, statsCollector, task, partition, System.nanoTime())) {
+        final AuthUser user = getCatalogContext().authSystem.getImporterUser();
+
+        if (!m_adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, System.nanoTime())) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -130,7 +193,33 @@ public class InternalConnectionHandler {
         return true;
     }
 
-    public boolean hasBackPressure() {
-        return m_adapter.hasBackPressure();
+    private boolean hasBackPressure() {
+        final boolean b = m_adapter.hasBackPressure();
+        int prev = m_backpressureIndication.get();
+        int delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
+        int next = prev + delta;
+        while (next >= 0 && next <= 7 && !m_backpressureIndication.compareAndSet(prev, next)) {
+            prev = m_backpressureIndication.get();
+            delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
+            next = prev + delta;
+        }
+        return b;
+    }
+
+    private void applyBackPressure() {
+        final int count = m_backpressureIndication.get();
+        if (count > 0) {
+            try { // increase sleep time exponentially to a max of 128ms
+                if (count > 7) {
+                    Thread.sleep(128);
+                } else {
+                    Thread.sleep(1<<count);
+                }
+            } catch(InterruptedException e) {
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Sleep for back pressure interrupted", e);
+                }
+            }
+        }
     }
 }
