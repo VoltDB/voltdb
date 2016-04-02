@@ -17,10 +17,15 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -97,6 +102,32 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
                 context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                break;
+            }
+            case SET_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Integer, DRLogSegmentId> lastAckedIds = (Map<Integer, DRLogSegmentId>)ois.readObject();
+                    for (Entry<Integer, DRLogSegmentId> e : lastAckedIds.entrySet()) {
+                        if (!DRLogSegmentId.isEmptyDRId(e.getValue().drId)) {
+                            int producerPartitionId = e.getKey();
+                            int producerClusterId = DRLogSegmentId.getClusterIdFromDRId(e.getValue().drId);
+                            DRConsumerDrIdTracker tracker =
+                                    DRConsumerDrIdTracker.createPartitionTracker(e.getValue().drId, e.getValue().spUniqueId, e.getValue().mpUniqueId);
+                            context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
+                        }
+                    }
+                    result.addRow(STATUS_OK);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
                 break;
             }
             default:
