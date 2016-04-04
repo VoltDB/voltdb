@@ -20,7 +20,9 @@ package org.voltdb.iv2;
 import java.util.Calendar;
 import java.util.Date;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 /**
@@ -95,6 +97,9 @@ public class UniqueIdGenerator {
 
     private final long BACKWARD_TIME_FORGIVENESS_WINDOW_MS = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
 
+    private VoltLogger log = new VoltLogger("HOST");
+    private RateLimitedLogger rateLimitLog = new RateLimitedLogger(60000, log, Level.WARN);
+
     public interface Clock {
         long get();
         void sleep(long millis) throws InterruptedException;
@@ -130,7 +135,6 @@ public class UniqueIdGenerator {
         // warn if running with a simulated clock skew
         // this should only be used for testing
         if (m_timestampTestingSalt != 0) {
-            VoltLogger log = new VoltLogger("HOST");
             log.warn(String.format("Partition (id=%d) running in test mode with non-zero timestamp testing value: %d",
                      partitionId, timestampTestingSalt));
         }
@@ -186,16 +190,14 @@ public class UniqueIdGenerator {
                  * otherwise calculate an offset to add to the system clock in order to use it to
                  * continue moving forward
                  */
-                VoltLogger log = new VoltLogger("HOST");
                 double diffSeconds = (lastUsedTime - currentTime) / 1000.0;
                 String msg = String.format("UniqueIdGenerator time moved backwards from: %d to %d, a difference of %.2f seconds.",
                         lastUsedTime, currentTime, diffSeconds);
-                log.error(msg);
-                System.err.println(msg);
                 // if the diff is less than some specified amount of time, wait a bit
                 if ((lastUsedTime - currentTime) < BACKWARD_TIME_FORGIVENESS_WINDOW_MS) {
-                    log.info("This node will delay any stored procedures sent to it.");
-                    log.info(String.format("This node will resume full operation in  %.2f seconds.", diffSeconds));
+                    msg.concat("\nThis node will delay any stored procedures sent to it.");
+                    msg.concat(String.format("\nThis node will resume full operation in  %.2f seconds.", diffSeconds));
+                    rateLimitLog.log(msg, currentTime, Level.INFO);
 
                     long count = BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
                     // note, the loop should stop once lastUsedTime is PASSED, not current
@@ -208,6 +210,7 @@ public class UniqueIdGenerator {
                     // if the loop above ended because it ran too much, time is pretty darn wonky.
                     // Going to let it crash in this instance
                     if (count < 0) {
+                        log.error(msg);
                         VoltDB.crashLocalVoltDB("VoltDB was unable to recover after the system time was externally negatively adusted. " +
                                 "It is possible that there is a serious system time or NTP error. ", false, null);
                     }
@@ -221,24 +224,22 @@ public class UniqueIdGenerator {
                     //Should satisfy this constraint now
                     assert(currentTimePlusOffset > lastUsedTime);
                     double offsetSeconds = m_backwardsTimeAdjustmentOffset / 1000.0;
-                    msg = String.format(
-                            "Continuing operation by adding an offset of %.2f to system time. " +
+                    msg.concat(String.format(
+                            "\nContinuing operation by adding an offset of %.2f to system time. " +
                             "This means the time and unique IDs provided by VoltProcedure " +
                             " (getUniqueId, getTransactionId, getTransactionTime) " +
                             "will not correctly reflect wall clock time as reported by the system clock." +
                             " For severe shifts you could see duplicate " +
                             "IDs or time moving backwards when the server is" +
                             " restarted causing the offset to be discarded.",
-                            offsetSeconds);
-                    log.error(msg);
-                    System.err.println(msg);
+                            offsetSeconds));
+                    rateLimitLog.log(msg, currentTime, Level.ERROR);
                 }
             } else if (currentTime > lastUsedTime && m_backwardsTimeAdjustmentOffset != 0) {
                 //Actual wall clock time is correct, blast away the offset
                 //and switch to current time
                 m_backwardsTimeAdjustmentOffset = 0;
                 currentTimePlusOffset = currentTime;
-                VoltLogger log = new VoltLogger("HOST");
                 log.error("Host clock seems to have adjusted again to make the offset unecessary");
                 System.err.println("Host clock seems to have adjusted again to make the offset unecessary");
             }
