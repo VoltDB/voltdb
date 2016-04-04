@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import DeploymentConfig
 import HTTPListener
@@ -115,8 +102,8 @@ class VoltDatabase:
         Returns reponse with HTTP status code and error details json.
         """
         # sync deployment file first
-        HTTPListener.sync_configuration() 
-    
+        HTTPListener.sync_configuration()
+
         members = []
         current_database = HTTPListener.Global.DATABASES.get(self.database_id)
         if not current_database:
@@ -194,7 +181,7 @@ class VoltDatabase:
     def check_and_start_local_server(self, sid, recover=False, is_blocking=-1):
         """
         Checks if voltdb server is running locally and
-        starts it if the server is not running. 
+        starts it if the server is not running.
         If the server is running, this returns an error
         """
         if sid == -1:
@@ -202,14 +189,14 @@ class VoltDatabase:
 
         if self.is_voltserver_running():
             return create_response('A VoltDB Server process is already running', 500)
-    
+
         retcode = self.start_local_server(sid, recover, is_blocking)
         if (retcode == 0):
             return create_response('Success', 200)
         else:
             return create_response('Error', 500)
             # return create_response('Error starting server', 500)
-    
+
     def is_voltserver_running(self):
         """
         Checks the set of running processes to find out if voltdb server is running
@@ -222,7 +209,7 @@ class VoltDatabase:
             except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
                 #print traceback.format_exc()
                 pass
-    
+
         return False
 
     def Get_Voltdb_Process(self):
@@ -241,7 +228,7 @@ class VoltDatabase:
                 pass
 
         return VoltdbProcess
-    
+
     def start_local_server(self, sid, recover=False, is_blocking=-1):
         """
         start a local server process. recover if recover is true else create.
@@ -300,7 +287,7 @@ class VoltDatabase:
         server_data_path = self.get_volt_server_data_folder(sid)
         HTTPListener.Global.VOLT_SERVER_PATH = server_data_path
         voltserver = self.run_voltserver_process(voltdb_cmd, outfilename, server_data_path)
-    
+
         initialized = False
         rfile = open(outfilename, 'r')
         # Wait till server is ready or process exited due to error.
@@ -354,7 +341,7 @@ class VoltDatabase:
         and output file for console output
         """
         outfile = open(outfilename, 'w')
-    
+
         # Start server in a separate process
         oldwd = os.getcwd()
         os.chdir(server_data_folder)
@@ -365,7 +352,7 @@ class VoltDatabase:
                                           env=my_env, preexec_fn=ignore_signals, close_fds=True)
         finally:
             os.chdir(oldwd)
-    
+
     def get_first_hostname(self):
         """
         Gets the first hostname configured in the deployment file for a given database
@@ -374,7 +361,7 @@ class VoltDatabase:
         current_database = HTTPListener.Global.DATABASES.get(self.database_id)
         if not current_database:
             abort(404)
-    
+
         server_id = current_database['members'][0]
         server = HTTPListener.Global.SERVERS.get(server_id)
         if not server:
@@ -395,7 +382,7 @@ class VoltDatabase:
             members = current_database['members']
         if not members:
             return create_response('No servers configured for the database', 500)
-    
+
         server_id = members[0]
         server = HTTPListener.Global.SERVERS.get(server_id)
         if not server:
@@ -426,7 +413,7 @@ class VoltDatabase:
             if admin is None:
                 raise Exception('No admin users found')
             user_options = [ '-u', admin['name'], '-p', admin['password'] ]
-    
+
         voltdb_dir = get_voltdb_dir()
         voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
 
@@ -449,15 +436,15 @@ class VoltDatabase:
         return output + error
 
     def is_security_enabled(self):
-        """ 
+        """
         Looks at the deployment details and finds out if security is enabled for this database
         """
         security_config = HTTPListener.Global.DEPLOYMENT[self.database_id]['security']
         if not security_config:
             return False
-    
+
         return security_config['enabled']
-    
+
     def get_admin_user(self):
         """
         Returns an admin user configured for this user.
@@ -466,11 +453,11 @@ class VoltDatabase:
         users_outer = HTTPListener.Global.DEPLOYMENT[self.database_id]['users']
         if not users_outer:
             return None
-    
+
         users = users_outer['user']
         if not users:
             return None
-    
+
         admins = [auser for auser in users if auser['roles'] == 'Administrator']
         if not admins:
             return None
@@ -493,7 +480,7 @@ class VoltDatabase:
         server = HTTPListener.Global.SERVERS.get(server_id)
         if not server:
             return create_response('Server details not found for id ' + server_id, 404)
-    
+
         args = [ '-H', server['hostname']]
         # This needs to look at authentication and port information.
 
