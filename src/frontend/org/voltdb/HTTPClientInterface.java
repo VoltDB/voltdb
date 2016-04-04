@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.continuation.Continuation;
+import org.eclipse.jetty.continuation.ContinuationListener;
 import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.server.Request;
@@ -91,7 +92,7 @@ public class HTTPClientInterface {
         m_timeout = seconds * 1000;
     }
 
-    class JSONProcCallback implements ProcedureCallback {
+    class JSONProcCallback implements ProcedureCallback, ContinuationListener {
 
         final AtomicBoolean m_complete = new AtomicBoolean(false);
         final Continuation m_continuation;
@@ -101,6 +102,7 @@ public class HTTPClientInterface {
             assert continuation != null : "given continuation is null";
 
             m_continuation = continuation;
+            m_continuation.addContinuationListener(this);
             m_jsonp = jsonp;
         }
 
@@ -124,6 +126,21 @@ public class HTTPClientInterface {
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                 // Essentially we're closing everything down from underneath the HTTP request.
                  m_log.warn("JSON request completion exception: ", e);
+            }
+        }
+
+        @Override
+        public void onComplete(Continuation continuation) {
+            if(!m_complete.get()) {
+                m_complete.compareAndSet(false, true);
+            }
+        }
+
+        @Override
+        public void onTimeout(Continuation continuation) {
+            if (m_complete.compareAndSet(false, true)) {
+                m_continuation.setAttribute("result", m_timeoutResponse);
+                m_continuation.resume();
             }
         }
     }
