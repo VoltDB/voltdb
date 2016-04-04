@@ -963,6 +963,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             }
 
             m_builder = new VoltProjectBuilder();
+            //Increase query tmeout as long literal queries taking long time.
+            m_builder.setQueryTimeout(60000);
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
                                            "IVAL bigint default 0 not null, " +
