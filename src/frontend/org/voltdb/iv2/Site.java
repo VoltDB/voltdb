@@ -98,9 +98,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -420,13 +420,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
             if (clusterSources == null) {
                 // Don't have a tracker for this cluster
-                if (lastReceivedDRId == -1L) {
+                if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
                     return (byte)0;
                 } else {
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
                                                   "Site doesn't have tracker for this cluster while the last received is %s",
-                                                  m_partitionId,
+                                                  producerPartitionId,
                                                   DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
                     }
                 }
@@ -435,33 +435,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
                 if (targetTracker == null) {
                     // Don't have a tracker for this partition
-                    if (lastReceivedDRId == -1L) {
+                    if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
                         return (byte)0;
                     } else {
                         if (drLog.isTraceEnabled()) {
                             drLog.trace(String.format("P%d binary log site idempotency check failed. " +
                                                       "Site's tracker is null while the last received is %s",
-                                                      m_partitionId,
+                                                      producerPartitionId,
                                                       DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
                         }
                     }
                 }
                 else {
-                    if (targetTracker.size() == 0) {
-                        if (lastReceivedDRId == -1L) {
-                            return (byte)0;
-                        }
-                        else {
-                            if (drLog.isTraceEnabled()) {
-                                drLog.trace(String.format("P%d binary log site idempotency check failed. " +
-                                                          "Site's tracker is empty while the last received is %s",
-                                                          m_partitionId,
-                                                          DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
-                            }
-                            // Never advance if we expect a previous entry
-                            return (byte)1;
-                        }
-                    }
+                    assert (targetTracker.size() > 0);
 
                     final long lastDrId = targetTracker.getLastDrId();
                     if (lastDrId == lastReceivedDRId) {
@@ -476,7 +462,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (drLog.isTraceEnabled()) {
                         drLog.trace(String.format("P%d binary log site idempotency check failed. " +
                                                   "Site's tracker is %s while the last received is %s",
-                                                  m_partitionId,
+                                                  producerPartitionId,
                                                   DRLogSegmentId.getDebugStringFromDRId(lastDrId),
                                                   DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
                     }
