@@ -29,8 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.Test;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -39,6 +37,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.Test;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
 
@@ -96,9 +96,9 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
         expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
         expectedSchema[7] = new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
-        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
-        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
         expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
@@ -150,7 +150,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
         expectedSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
         expectedSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

@@ -23,6 +23,7 @@
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
+#include "common/UniqueId.hpp"
 
 #include <vector>
 #include <map>
@@ -119,16 +120,12 @@ class ExecutorContext {
         return (clusterId << 49) | (uniqueId >> 14);
     }
 
-    static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
+    static int64_t getDRTimestampFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        // Convert this into a microsecond-resolution timestamp; treat the time
-        // portion as the time in milliseconds, and the sequence number as if
-        // it is a time in microseconds
-        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
-        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
+        return UniqueId::tsCounterSinceUnixEpoch(hiddenValue & ((1LL << 49) - 1LL));
     }
 
-    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
+    static int8_t getClusterIdFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         return static_cast<int8_t>(hiddenValue >> 49);
     }
