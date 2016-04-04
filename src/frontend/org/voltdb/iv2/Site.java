@@ -422,6 +422,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // Don't have a tracker for this cluster
                 if (lastReceivedDRId == -1L) {
                     return (byte)0;
+                } else {
+                    if (drLog.isTraceEnabled()) {
+                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                  "Site doesn't have tracker for this cluster while the last received is %s",
+                                                  m_partitionId,
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                    }
                 }
             }
             else {
@@ -430,6 +437,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     // Don't have a tracker for this partition
                     if (lastReceivedDRId == -1L) {
                         return (byte)0;
+                    } else {
+                        if (drLog.isTraceEnabled()) {
+                            drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                      "Site's tracker is null while the last received is %s",
+                                                      m_partitionId,
+                                                      DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                        }
                     }
                 }
                 else {
@@ -438,6 +452,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             return (byte)0;
                         }
                         else {
+                            if (drLog.isTraceEnabled()) {
+                                drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                          "Site's tracker is empty while the last received is %s",
+                                                          m_partitionId,
+                                                          DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                            }
                             // Never advance if we expect a previous entry
                             return (byte)1;
                         }
@@ -451,6 +471,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if (lastDrId > lastReceivedDRId) {
                         // This is a duplicate
                         return (byte)-1;
+                    }
+
+                    if (drLog.isTraceEnabled()) {
+                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                  "Site's tracker is %s while the last received is %s",
+                                                  m_partitionId,
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastDrId),
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
                     }
                 }
             }
