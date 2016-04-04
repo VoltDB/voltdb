@@ -110,6 +110,12 @@ public class HTTPClientInterface {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
 
             if (!m_complete.compareAndSet(false, true)) {
+                if (clientResponse.getStatus() != ClientResponse.RESPONSE_UNKNOWN) {
+                    m_rate_limited_log.log(
+                            EstTime.currentTimeMillis(), Level.WARN, null,
+                            "Procedure response arrived for a request that was timed out by jetty"
+                            );
+                }
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
