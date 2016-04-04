@@ -205,9 +205,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1", "A1", "C");
 
-        pn = compile("select C1 FROM (SELECT A+3, C C1 FROM R1) T1 WHERE T1.C1 < 0");
+        pn = compile("select COL1 FROM (SELECT A+3, C COL1 FROM R1) T1 WHERE T1.COL1 < 0");
         pn = pn.getChild(0);
-        checkSeqScan(pn, tbName,  "C1");
+        checkSeqScan(pn, tbName,  "COL1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
         checkPredicateComparisonExpression(pn, tbName);

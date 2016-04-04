@@ -208,39 +208,36 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
 
-        // need to order the combined input schema coherently.  We make the
-        // output schema ordered: [outer table columns][inner table columns]
-        TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
-        {
-            // Right now these all need to be TVEs
+        // Resolve TVE indexes for each schema column.
+        for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
+            SchemaColumn col = m_outputSchemaPreInlineAgg.getColumns().get(i);
+
+            // These will all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
-            if (index == -1)
-            {
+            int index;
+            if (i < outer_schema.size()) {
+                index = tve.resolveColumnIndexesUsingSchema(outer_schema);
+            }
+            else {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
+
+            }
+
+            if (index == -1) {
+                throw new RuntimeException("Unable to find index for column: " +
                                                col.toString());
-                }
-                sort_cols.put(index + outer_schema.size(), col);
             }
-            else
-            {
-                sort_cols.put(index, col);
-            }
+
             tve.setColumnIndex(index);
         }
-        // rebuild the output schema from the tree-sorted columns
-        NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
-            new_output_schema.addColumn(col);
-        }
-        m_outputSchemaPreInlineAgg = new_output_schema;
+
+        // We want the output columns to be ordered like [outer table columns][inner table columns],
+        // and further ordered by TVE index within the left- and righthand sides.
+        // generateOutputSchema already places outer columns on the left and inner on the right,
+        // so we just need to order the left- and righthand sides by TVE index separately.
+        m_outputSchemaPreInlineAgg.sortByTveIndex(0, outer_schema.size());
+        m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
 
         // Finally, resolve predicates
