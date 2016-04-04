@@ -72,7 +72,7 @@ class Database(unittest.TestCase):
         # if last_db_id == 0 or last_db_id==None:
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
         # else:
         #     print "The database list is empty"
 
@@ -218,7 +218,7 @@ class Deployment(unittest.TestCase):
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
@@ -232,7 +232,7 @@ class Deployment(unittest.TestCase):
             # Delete database
             db_url = url + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 

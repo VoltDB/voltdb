@@ -69,6 +69,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "executors/abstractexecutor.h"
+#include "executors/executorutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"
@@ -162,6 +163,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_drReplicatedStream(NULL),
       m_compatibleDRStream(NULL),
       m_compatibleDRReplicatedStream(NULL),
+      m_currExecutorVec(NULL),
       m_tuplesModifiedStack()
 {
 }
@@ -493,12 +495,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
 void VoltDBEngine::resetExecutionMetadata() {
 
-    // If we get here, we've completed execution successfully, or
-    // recovered after an error.  In any case, we should be able to
-    // assert that temp tables are now cleared.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
-                                   "Output temp tables not cleaned up after execution");
-
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
     }
@@ -506,11 +502,19 @@ void VoltDBEngine::resetExecutionMetadata() {
 
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
+
     if (m_currExecutorVec == NULL) {
         // This is usually the result of some planner error producing an
         // invalid plan that can not be converted into plan nodes / executors.
         return;
     }
+
+    // If we get here, we've completed execution successfully, or
+    // recovered after an error.  In any case, we should be able to
+    // assert that temp tables are now cleared.
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
+                                   "Output temp tables not cleaned up after execution");
+
     m_currExecutorVec->resetLimitStats();
     m_currExecutorVec = NULL;
 }

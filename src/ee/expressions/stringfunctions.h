@@ -40,8 +40,9 @@ namespace voltdb {
 
 /** implement the 1-argument SQL OCTET_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
-    if (isNull())
+    if (isNull()) {
         return getNullValue();
+    }
     int32_t length;
     getObject_withoutNull(&length);
     return getIntegerValue(length);
@@ -49,8 +50,9 @@ template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
 
 /** implement the 1-argument SQL CHAR function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
-    if (isNull())
+    if (isNull()) {
         return getNullValue();
+    }
 
     unsigned int point = static_cast<unsigned int>(castAsBigIntAndGetValue());
     std::string utf8 = boost::locale::conv::utf_to_utf<char>(&point, &point + 1);
@@ -60,8 +62,9 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
-    if (isNull())
+    if (isNull()) {
         return getNullValue();
+    }
 
     int32_t lenValue;
     const char* valueChars = getObject_withoutNull(&lenValue);
@@ -70,8 +73,9 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
 
 /** implement the 1-argument SQL SPACE function */
 template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
-    if (isNull())
+    if (isNull()) {
         return getNullStringValue();
+    }
 
     int32_t count = static_cast<int32_t>(castAsBigIntAndGetValue());
     if (count < 0) {
@@ -86,8 +90,9 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
 }
 
 template<> inline NValue NValue::callUnary<FUNC_FOLD_LOWER>() const {
-    if (isNull())
+    if (isNull()) {
         return getNullStringValue();
+    }
 
     if (getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);

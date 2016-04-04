@@ -39,6 +39,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.failureprocs.BadParamTypesForTimestamp;
 import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
 /**
@@ -278,6 +279,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
         project.addProcedures(GotBadParamCountsInJava.class);
+        project.addProcedures(BadParamTypesForTimestamp.class);
     }
 
     public void testExplicitErrorUDF() throws Exception
@@ -2513,6 +2515,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             throwed = true;
         }
         assertTrue(throwed);
+    }
+
+
+
+    public void testBadParamTypeForTimeStampField() throws IOException, ProcCallException {
+        Client client = getClient();
+        // seed dummy data into table
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (10000, '2000-01-01 01:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        final int numberOfProcsToTest = BadParamTypesForTimestamp.procs.length;
+        final int numberOfValuesToTest = BadParamTypesForTimestamp.values.length;
+        for (int procEntry = 0; procEntry < numberOfProcsToTest; procEntry++) {
+            for (int valueIndexToTestWith = 0; valueIndexToTestWith < numberOfValuesToTest; valueIndexToTestWith++) {
+                verifyProcFails(client, "VOLTDB ERROR: SQL ERROR\n .* can't be cast as TIMESTAMP", "BadParamTypesForTimestamp", procEntry, valueIndexToTestWith);
+            }
+        }
     }
 
     public void testRegexpPosition() throws Exception {

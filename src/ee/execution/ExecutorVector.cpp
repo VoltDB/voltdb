@@ -47,7 +47,7 @@
 #include "VoltDBEngine.h"
 #include "executors/abstractexecutor.h"
 #include "plannodes/abstractplannode.h"
-#include "executors/executorfactory.h"
+#include "executors/executorutil.h"
 
 #include "boost/foreach.hpp"
 

@@ -1,4 +1,4 @@
-load classes voltkv.jar;
+LOAD CLASSES voltkv.jar;
 
 CREATE TABLE store
 (
@@ -12,3 +12,5 @@ CREATE PROCEDURE FROM class voltkvqa.procedures.Initialize;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures.Get;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures.Put;
 CREATE PROCEDURE PARTITION ON TABLE store COLUMN key FROM class voltkvqa.procedures.Remove;
+
+CREATE ROLE admin WITH sysproc,defaultproc,adhoc;
