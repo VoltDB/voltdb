@@ -34,7 +34,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 
-public class ExecuteTask_RO_SP extends VoltSystemProcedure {
+public class ExecuteTask_SP extends VoltSystemProcedure {
 
     @Override
     public void init() {
