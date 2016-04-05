@@ -164,9 +164,7 @@ def _build_virtual_environment(venv_dir, version, packages):
 
 def create_data_config_path(path, con_path):
     org_wd = os.getcwd()
-    app_root = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../'))
-    os.chdir(os.path.normpath(app_root))
-
+   
     if path is None:
         data_path = os.path.join(org_wd, 'voltdeployroot')
     else:
