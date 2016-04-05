@@ -170,12 +170,13 @@ def create_data_config_path(path, con_path):
     if path is None:
         data_path = os.path.join(org_wd, 'voltdeployroot')
     else:
-        data_path = os.path.join(path, 'voltdeployroot')
+        data_path = os.path.join(path)
+
     if con_path is None:
         home = expanduser("~")
         config_path = os.path.join(home, '.voltdb')
     else:
-        config_path = os.path.join(con_path, '.voltdb')
+        config_path = os.path.join(con_path)
 
     if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
         if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
