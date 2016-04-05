@@ -210,7 +210,7 @@ PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
 -- EXPORT TABLE export_done_table;
 
 -- create procedure SelectwithLimit as select * from PARTITIONED_TABLE where rowid = ? limit ?;
-create procedure SelectwithLimit as select * from PARTITIONED_TABLE where rowid between ? and ? order by rowid limit ?;
+create procedure SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 
 END_OF_BATCH

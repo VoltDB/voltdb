@@ -85,7 +85,12 @@ public class ReadVoltRows {
             System.out.println("Got Volt row " + rowid);
             rs = JDBCGetData.jdbcRead(rowid);
             System.out.println("Got JDBC row");
-            compare(t, rs);
+            try {
+                RowCompare.rowcompare(t, rs);
+            } catch (SQLException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
     }
 
