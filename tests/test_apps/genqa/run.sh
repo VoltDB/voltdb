@@ -216,8 +216,8 @@ function async-export() {
         --poolsize=100000 \
         --autotune=false \
         --catalogswap=false \
-        --latencytarget=10
-        # --ratelimit=10000
+        --latencytarget=10 \
+        --ratelimit=1000
 }
 
 # Multi-threaded synchronous benchmark sample

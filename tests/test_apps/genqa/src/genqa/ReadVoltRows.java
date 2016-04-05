@@ -38,12 +38,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
-/* 4> insert into x values(1);
- (Returned 1 rows in 0.01s)
- 5> insert into x values(2);
- (Returned 1 rows in 0.00s)
- */
-
 public class ReadVoltRows {
     // static VoltLogger log = new VoltLogger("ReadVoltRows");
     long rowid = 0;
@@ -78,6 +72,7 @@ public class ReadVoltRows {
         final int colCount = t.getColumnCount();
         int rowCount = 1;
         ResultSet rs;
+        int rowCheck = 0; // number of columns mismatching in row
 
         t.resetRowPosition();
         while (t.advanceRow()) {
@@ -86,132 +81,12 @@ public class ReadVoltRows {
             rs = JDBCGetData.jdbcRead(rowid);
             System.out.println("Got JDBC row");
             try {
-                RowCompare.rowcompare(t, rs);
+                rowCheck = RowCompare.rowcompare(t, rs);
             } catch (SQLException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
-    }
-
-    private void compare(VoltTable t, ResultSet rs) {
-        // iterate through columns and check data values for expected match
-        System.out.println("Preparing to compare VDB and JDBC rows:");
-        // System.out.println("VoltTable: " + t.toString());
-        // System.out.println("JDBC row: " + rs.toString());
-        try {
-            if (!rs.next()) {
-                System.out.println("In compare: no JDBC row available");
-            } else {
-                long rowid = rs.getInt("rowid");
-                System.out.println("In compare: JDBC rowid: " + rowid);
-            }
-        } catch (SQLException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    public void displayTable(VoltTable t) {
-
-        final int colCount = t.getColumnCount();
-        int rowCount = 1;
-        t.resetRowPosition();
-        while (t.advanceRow()) {
-            System.out.printf("--- Row %d ---\n", rowCount++);
-
-            for (int col = 0; col < colCount; col++) {
-                System.out.printf("%s: ", t.getColumnName(col));
-                switch (t.getColumnType(col)) {
-                case TINYINT:
-                case SMALLINT:
-                case BIGINT:
-                case INTEGER:
-                    System.out.printf("%d\n", t.getLong(col));
-                    break;
-                case STRING:
-                    System.out.printf("%s\n", t.getString(col));
-                    break;
-                case DECIMAL:
-                    System.out.printf("%f\n", t.getDecimalAsBigDecimal(col));
-                    break;
-                case FLOAT:
-                    System.out.printf("%e\n", t.getDouble(col));
-                    break;
-                case GEOGRAPHY:
-                    System.out.printf("%s\n", t.getGeographyValue(col));
-                    break;
-                case GEOGRAPHY_POINT:
-                    System.out.printf("%s\n", t.getGeographyPointValue(col));
-                    break;
-                case NULL:
-                    System.out.print("null");
-                    break;
-                case TIMESTAMP:
-                    System.out.printf("%s\n", t.getTimestampAsLong(col));
-                    break;
-                default:
-                    System.out.print("Default case: "
-                            + t.getColumnType(col).toString());
-                    break;
-                }
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        // VoltLogger log = new VoltLogger("ReadVoltRows.main");
-
-        // setup configuration from command line arguments and defaults
-        Config config = new VerifierUtils.Config();
-        config.parse(JDBCVoltVerifier.class.getName(), args);
-        System.out.println("Configuration settings:");
-        System.out.println(config.getConfigDumpString());
-
-        String servers = "localhost";
-        int ratelimit = 2_000_000;
-        long rowid = 0;
-        Client client = null;
-        ReadVoltRows rvr;
-        JDBCGetData jdbc;
-        Connection jdbccon;
-        System.out.println("starting rvr");
-
-        jdbc = new JDBCGetData();
-        jdbccon = jdbc.jdbcConnect(config);
-
-        // System.exit(0);
-        try {
-            client = VerifierUtils.dbconnect(servers, ratelimit);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        System.out.println("opened db connection");
-        rvr = new ReadVoltRows(client);
-
-        long rowCount = 0;
-        VoltTable v = null;
-
-        do {
-            // System.out.println("i: " + i);
-            try {
-                v = rvr.readSomeRows(rowid, 10);
-            } catch (IOException | ProcCallException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            rowCount = v.getRowCount();
-            System.out.println("rowCount: " + rowCount + ". rowid: " + rowid);
-            rowid += 10;
-            rvr.displayTable(v);
-        } while (rowCount > 0);
-
-        // while (v.advanceRow()) {
-        // System.out.println("v: " + v.toFormattedString());
-        // int i = (int) v.get(0, VoltType.INTEGER);
-        // System.out.println("i: " + i);
-        // }
+        // do something with rowCheck != 0
     }
 }
