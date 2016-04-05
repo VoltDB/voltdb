@@ -144,11 +144,17 @@ public interface VoltDBInterface
     public long getClusterCreateTime();
 
     /**
+     * @return The time the cluster's original Create start action, Recover
+     * and Rejoin doesn't change the time.
+     */
+    public long getPersistentClusterCreateTime();
+
+    /**
      * Set the time at which the cluster was created. This method is used when
      * in the Recover action and @SnapshotRestore paths to assign the cluster
      * create time that was preserved in the snapshot.
      */
-    public void setClusterCreateTime(long clusterCreateTime);
+    public void setPersistentClusterCreateTime(long clusterCreateTime);
 
     /**
      * Notify RealVoltDB that recovery is complete

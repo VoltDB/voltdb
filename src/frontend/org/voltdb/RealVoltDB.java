@@ -35,6 +35,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,6 +85,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -244,6 +246,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     volatile boolean m_joining = false;
 
     long m_clusterCreateTime;
+    long m_persistentClusterCreateTime = -1;
     boolean m_replicationActive = false;
     private ProducerDRGateway m_producerDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
@@ -2765,7 +2768,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
+                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover() || m_config.m_startAction.doesRejoin());
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
@@ -3033,16 +3036,49 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     @Override
-    public long getClusterCreateTime()
+    public long getClusterCreateTime() {
+        return m_clusterCreateTime;
+    }
+
+    // DR producer needs persistent instance timestamp from the consumer to match conversation.
+    @Override
+    public long getPersistentClusterCreateTime()
     {
+        if (m_persistentClusterCreateTime != -1) {
+            return m_persistentClusterCreateTime;
+        }
+        try {
+            byte[] data = m_messenger.getZK().getData(CoreZK.persistent_instance_ts, false, null);
+            long persistentClusterCreateTime = ByteBuffer.wrap(data).getLong();
+            assert (persistentClusterCreateTime <= m_clusterCreateTime);
+            return persistentClusterCreateTime;
+        } catch (KeeperException.NoNodeException e) {
+            return m_clusterCreateTime;
+        } catch (Exception e) {
+            hostLog.warn("Fail to get persistent instance timestamp, use current cluster create timestamp");
+        }
         return m_clusterCreateTime;
     }
 
     @Override
-    public void setClusterCreateTime(long clusterCreateTime) {
-        m_clusterCreateTime = clusterCreateTime;
-        hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
-                new Date(m_clusterCreateTime).toString() + ".");
+    public void setPersistentClusterCreateTime(long clusterCreateTime) {
+        if (clusterCreateTime == m_persistentClusterCreateTime) {
+            return;
+        }
+        ZooKeeper zk = m_messenger.getZK();
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.putLong(clusterCreateTime);
+        try {
+            if (!ZKUtil.addIfMissing(m_messenger.getZK(), CoreZK.persistent_instance_ts, CreateMode.PERSISTENT, buffer.array())) {
+                zk.setData(CoreZK.persistent_instance_ts, buffer.array(), -1);
+            }
+            m_persistentClusterCreateTime = clusterCreateTime;
+            hostLog.info("The internal DR cluster create timestamp being set to "
+                                + new Date(clusterCreateTime).toString() + ".");
+        } catch (Exception e) {
+            hostLog.warn("Failed to create persistent instance timestamp zookeeper node, if next time this node rejoins"
+                  + "cluster as a consumer, DR may not resume replication. ");
+        }
     }
 
     private File getSnapshotPath(CatalogContext catalogContext) {
