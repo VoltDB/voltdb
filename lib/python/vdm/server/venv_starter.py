@@ -41,20 +41,20 @@ import shutil
 import re
 import glob
 import copy
+from os.path import expanduser
 
 
 class G:
     """
     Globals.
     """
+    data_path = ''
+    config_path = ''
     cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
     base_dir = os.path.dirname(cmd_dir)
     script_dir = os.path.join(base_dir, 'bin')
     script_name = 'voltdeploy';
-    # Use ~/.<script> as the output directory for logging and virtual environments.
-    user_dir = os.path.expanduser(os.path.join('~', '.voltdeploy'))
-    log_path = os.path.join(user_dir, 'logs', '%s.log' % script_name)
-    module_path = os.path.realpath(__file__)
+    log_path = ''
     # Opened by main() and vmain()
     log_file = None
     verbose = False
@@ -152,6 +152,7 @@ def _build_virtual_environment(venv_dir, version, packages):
                     'Folder: %s' % venv_dir])
         args += ['--clear', '--system-site-packages', sys.platform]
         run_cmd(*args)
+        os.chdir(save_dir)
         run_cmd(pip, '--quiet', 'install', '-r', packages)
     finally:
         os.chdir(save_dir)
@@ -161,79 +162,127 @@ def _build_virtual_environment(venv_dir, version, packages):
             os.environ['LC_ALL'] = save_lc_all
 
 
-def main(arr):
-    python = 'python'
-    args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
-    if arr[0]['filepath'] is not None:
-        args.append('-p' + str(arr[0]['filepath']))
-    if arr[0]['server'] is not None:
-        args.append('-s' + str(arr[0]['server']))
-    os.execvp(python, args)
+def create_data_config_path(path, con_path):
+    org_wd = os.getcwd()
+    app_root = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../'))
+    os.chdir(os.path.normpath(app_root))
 
+    if path is None:
+        data_path = os.path.join(org_wd, 'voltdeployroot')
+    else:
+        data_path = os.path.join(path, 'voltdeployroot')
+    if con_path is None:
+        home = expanduser("~")
+        config_path = os.path.join(home, '.voltdb')
+    else:
+        config_path = os.path.join(con_path, '.voltdb')
 
-def start_virtual_environment(arr, verbose=False):
-    G.verbose = verbose;
-    start_logging()
-    # Set up virtual environment under home since it should be write-able.
-    output_dir = os.path.join(G.user_dir, 'voltdeploy')
-    # Make sure the output directory is available.
-    if not os.path.isdir(output_dir):
-        if os.path.exists(output_dir):
-            abort('Output path "%s" exists, but is not a directory.' % output_dir,
-                  'Please move or delete it before running this command again.')
-        try:
-            os.makedirs(output_dir)
-        except (IOError, OSError), e:
-            abort('Output path "%s" exists, but is not a directory.' % output_dir,
-                  'Please move or delete it before running this command again.', e)
-    venv_base = os.path.join(output_dir, 'venv')
-    venv_dir = os.path.join(venv_base, sys.platform)
-    venv_complete = False
-    version = get_version(os.path.dirname(G.script_dir))
-    try:
-        build_venv = not os.path.isdir(venv_dir)
-        if not build_venv:
-            # If the virtual environment is present check that it's current.
-            # If version.txt is not present leave it alone so that we don't
-            # get in the situation where the virtual environment gets
-            # recreated every time.
-            venv_version = get_version(venv_dir, error_abort=False)
-            if venv_version is None:
-                warning('Unable to read the version file:',
-                        [os.path.join(venv_dir, 'version.txt')],
-                        'Assuming that the virtual environment is current.',
-                        'To force a rebuild delete the virtual environment base directory:',
-                        [venv_base])
-            else:
-                build_venv = venv_version != version
-
-        packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
-        if build_venv:
-            _build_virtual_environment(venv_dir, version, packages)
+    if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
+        if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
+            G.data_path = data_path
+            G.config_path = config_path
+            G.log_path = os.path.join(G.config_path, 'logs', '%s.log' % G.script_name)
+            return {'Success': 'True'}
         else:
-            run_cmd(os.path.join(venv_dir, 'bin', 'pip'), '--quiet', 'install', '-r', packages)
-        venv_complete = True
-        # the virtual environment's Python.
-        python = os.path.join(venv_dir, 'bin', 'python')
+            return {'Error': 'Error:There is no permission to create file in this folder. '
+                             'Unable to start voltdeploy.'}
+    else:
+        try:
+            if not os.path.isdir(str(config_path)):
+                os.makedirs(config_path)
+            if not os.path.isdir(str(data_path)):
+                os.makedirs(data_path)
+            G.data_path = data_path
+            G.config_path = config_path
+            G.log_path = os.path.join(G.config_path, 'logs', '%s.log' % G.script_name)
+            return {'Success': 'True'}
+        except Exception, err:
+            return {'Error': 'Exception (%s): %s\n' % (err.__class__.__name__, str(err))}
+
+
+def main(arr):
+    path_result = create_data_config_path(arr[0]['filepath'], arr[0]['configpath'])
+    if 'Error' in path_result:
+        sys.stderr.write(path_result['Error'])
+        sys.exit(1)
+    else:
+        python = 'python'
         args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
-        if arr[0]['filepath'] is not None:
-            args.append('-p' + str(arr[0]['filepath']))
-        if arr[0]['configpath'] is not None:
-            args.append('-c' + str(arr[0]['configpath']))
+        args.append('-p' + G.data_path)
+        args.append('-c' + G.config_path)
         if arr[0]['server'] is not None:
             args.append('-s' + str(arr[0]['server']))
         os.execvp(python, args)
-    except KeyboardInterrupt:
-        sys.stderr.write('\n<break>\n')
-    finally:
-        stop_logging()
-        # Avoid confusion by cleaning up incomplete virtual environments.
-        if not venv_complete and os.path.exists(venv_dir):
-            warning('Removing incomplete virtual environment after installation failure ...')
-            shutil.rmtree(venv_dir, True)
-            return {'status': 'error', 'path_venv_python': ''}
-        else:
-            return {'status': 'success', 'path_venv_python': python}
+
+
+def start_virtual_environment(arr, verbose=False):
+    path_result = create_data_config_path(arr[0]['filepath'], arr[0]['configpath'])
+    if 'Error' in path_result:
+        sys.stderr.write(path_result['Error'])
+        sys.exit(1)
+    else:
+        G.verbose = verbose;
+        start_logging()
+        # Set up virtual environment under home since it should be write-able.
+        output_dir = os.path.join(G.config_path, 'voltdeploy')
+        # Make sure the output directory is available.
+        if not os.path.isdir(output_dir):
+            if os.path.exists(output_dir):
+                abort('Output path "%s" exists, but is not a directory.' % output_dir,
+                      'Please move or delete it before running this command again.')
+            try:
+                os.makedirs(output_dir)
+            except (IOError, OSError), e:
+                abort('Output path "%s" exists, but is not a directory.' % output_dir,
+                      'Please move or delete it before running this command again.', e)
+
+        venv_base = os.path.join(output_dir, 'venv')
+        venv_dir = os.path.join(venv_base, sys.platform)
+
+        venv_complete = False
+        version = get_version(os.path.dirname(G.script_dir))
+        try:
+            build_venv = not os.path.isdir(venv_dir)
+            if not build_venv:
+                # If the virtual environment is present check that it's current.
+                # If version.txt is not present leave it alone so that we don't
+                # get in the situation where the virtual environment gets
+                # recreated every time.
+                venv_version = get_version(venv_dir, error_abort=False)
+                if venv_version is None:
+                    warning('Unable to read the version file:',
+                            [os.path.join(venv_dir, 'version.txt')],
+                            'Assuming that the virtual environment is current.',
+                            'To force a rebuild delete the virtual environment base directory:',
+                            [venv_base])
+                else:
+                    build_venv = venv_version != version
+
+            packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
+            if build_venv:
+                _build_virtual_environment(venv_dir, version, packages)
+            else:
+                run_cmd(os.path.join(venv_dir, 'bin', 'pip'), '--quiet', 'install', '-r', packages)
+            venv_complete = True
+            # the virtual environment's Python.
+            python = os.path.join(venv_dir, 'bin', 'python')
+            args = [python, os.path.join(G.base_dir, 'lib/python/vdm/vdmrunner.py')]
+            args.append('-p' + G.data_path)
+            args.append('-c' + G.config_path)
+            if arr[0]['server'] is not None:
+                args.append('-s' + str(arr[0]['server']))
+            os.execvp(python, args)
+        except KeyboardInterrupt:
+            sys.stderr.write('\n<break>\n')
+        finally:
+            stop_logging()
+            # Avoid confusion by cleaning up incomplete virtual environments.
+            if not venv_complete and os.path.exists(venv_dir):
+                warning('Removing incomplete virtual environment after installation failure ...')
+                shutil.rmtree(venv_dir, True)
+                return {'status': 'error', 'path_venv_python': ''}
+            else:
+                return {'status': 'success', 'path_venv_python': python}
 
 
 def start_logging():
