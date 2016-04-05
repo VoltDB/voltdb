@@ -2076,6 +2076,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                    finally {
+                        m_producerDRGateway = null;
+                    }
                 }
 
                 shutdownReplicationConsumerRole();
@@ -2588,6 +2591,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_consumerDRGateway.shutdown(true);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
+            }
+            finally {
+                m_consumerDRGateway = null;
             }
         }
     }
