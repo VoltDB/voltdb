@@ -7,7 +7,7 @@ Process begin and end call events from a call center. Pair/join events in VoltDB
 
 Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. The provided HTML dashboard shows a top-N list of agents by standard deviation. It can be found in the "web" folder.
 
-Note that in order for the simulation to be interesting, this app uses unrealistic call data. The average call time is 5s by default, to make the stats interesting in a two-minute example run.
+Note that in order for the simulation to be interesting, this app uses unrealistic call data. The average call time is 5s by default to make the stats interesting in a two-minute example run.
 
 This app doesn't really show off the extraordinary throughput of VoltDB, though it will get a lot faster if you set the average call time lower and/or the number of agents higher.
 
