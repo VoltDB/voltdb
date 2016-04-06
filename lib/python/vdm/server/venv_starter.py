@@ -177,14 +177,19 @@ def create_data_config_path(path, con_path):
         config_path = os.path.join(con_path)
 
     if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
-        if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
-            G.data_path = data_path
+        if os.access(str(config_path), os.W_OK):
             G.config_path = config_path
             G.log_path = os.path.join(G.config_path, 'logs', '%s.log' % G.script_name)
-            return {'Success': 'True'}
         else:
-            return {'Error': 'Error:There is no permission to create file in this folder. '
-                             'Unable to start voltdeploy.'}
+            return {'Error': 'Error:There is no permission to create file in folder, %s.'
+                             'Unable to start voltdeploy.' % config_path}
+
+        if os.access(str(data_path), os.W_OK):
+            G.data_path = data_path
+        else:
+            return {'Error': 'Error:There is no permission to create file in folder, %s.'
+                             'Unable to start voltdeploy.' % data_path}
+        return {'Success': 'True'}
     else:
         try:
             if not os.path.isdir(str(config_path)):
