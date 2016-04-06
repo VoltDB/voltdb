@@ -33,7 +33,6 @@ import HTTPListener
 from flask import jsonify, abort, make_response
 import json
 import os
-import psutil
 import requests
 import signal
 import subprocess
@@ -214,32 +213,23 @@ class VoltDatabase:
         """
         Checks the set of running processes to find out if voltdb server is running
         """
-        for proc in psutil.process_iter():
-            try:
-                cmd = proc.cmdline()
-                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                    return True
-            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
-                #print traceback.format_exc()
-                pass
-
-        return False
+        result = False
+        process = subprocess.Popen("ps aux | grep '/usr/bin/java'", shell=True, stdout=subprocess.PIPE)
+        process_list = process.communicate()[0].split('\n')
+        process_cmd = process_list[0]
+        if '-DVDMStarted=true' in process_cmd:
+            result = True
+        return result
 
     def Get_Voltdb_Process(self):
         VoltdbProcess.isProcessRunning = False
         VoltdbProcess.processId = -1
-        for proc in psutil.process_iter():
-
-            try:
-                cmd = proc.cmdline()
-                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                    VoltdbProcess.isProcessRunning = True
-                    VoltdbProcess.processId = proc.pid
-                    return VoltdbProcess
-            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
-                # print traceback.format_exc()
-                pass
-
+        process = subprocess.Popen("ps aux | grep '/usr/bin/java'", shell=True, stdout=subprocess.PIPE)
+        process_list = process.communicate()[0].split('\n')
+        process_cmd = process_list[0]
+        if '-DVDMStarted=true' in process_cmd:
+            VoltdbProcess.isProcessRunning = True
+            VoltdbProcess.processId = process_cmd.split()[1]
         return VoltdbProcess
 
     def start_local_server(self, sid, recover=False, is_blocking=-1):
