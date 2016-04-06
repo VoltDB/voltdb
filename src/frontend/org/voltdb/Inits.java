@@ -46,6 +46,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -474,8 +475,10 @@ public class Inits {
             int httpPort = httpPortStart;
             for (; true; httpPort++) {
                 try {
+                    HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
+                            m_deployment.getHttpd().getHttps() : null;
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
                             );
                     success = true;
                     break;
