@@ -36,6 +36,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 
 /**
@@ -284,12 +285,14 @@ public class CallCenterApp {
     void sendEvent(CallEvent call) throws NoConnectionsException, IOException, ProcCallException {
         if (call.endTS == null) {
             assert(call.startTS != null);
-            client.callProcedure(/*new NullCallback(),*/ "BeginCall",
+            // null callback isn't ideal for production code, but errors are tracked
+            // here through client stats so we'll let it slide
+            client.callProcedure(new NullCallback(), "BeginCall",
                     call.agentId, call.phoneNoStr(), call.callId, call.startTS);
         }
         else {
             assert(call.startTS == null);
-            client.callProcedure(/*new NullCallback(),*/ "EndCall",
+            client.callProcedure(new NullCallback(), "EndCall",
                     call.agentId, call.phoneNoStr(), call.callId, call.endTS);
         }
     }
@@ -366,11 +369,11 @@ public class CallCenterApp {
             sendEvent(call);
         }
 
-        // print out some debugging stats
-        callSimulator.printSummary();
-
         // block until all outstanding txns return
         client.drain();
+
+        // print out some debugging stats
+        callSimulator.printSummary();
 
         // print the summary results
         printResults();
