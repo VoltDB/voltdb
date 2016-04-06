@@ -821,6 +821,7 @@ DISTRIBUTION
     <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/bank-fraud' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -921,6 +922,7 @@ DISTRIBUTION
             <include name="examples/adperformance/run.sh"/>
             <include name="examples/bank-fraud/run.sh"/>
             <include name="examples/bank-offers/run.sh"/>
+            <include name="examples/callcenter/run.sh"/>
             <include name="examples/contentionmark/run.sh"/>
             <include name="examples/geospatial/run.sh"/>
             <include name="examples/json-sessions/run.sh"/>
@@ -1080,6 +1082,7 @@ CLEANING
   <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-fraud' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -2278,6 +2281,8 @@ TEST CASES
     <samplecheck app="bank-fraud" />
     <echo>checking bank-offers</echo>
     <samplecheck app="bank-offers" />
+    <echo>checking callcenter</echo>
+    <samplecheck app="callcenter" />
     <echo>checking contentionmark</echo>
     <samplecheck app="contentionmark" />
     <echo>checking geospatial</echo>
