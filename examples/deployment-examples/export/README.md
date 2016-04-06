@@ -27,3 +27,13 @@ Instructions for exporting to Hadoop
  </configuration>
 </export>
 ```
+or 
+
+```xml
+  <export enabled="true" target="http">
+     <configuration>
+       <property name="endpoint">http://quickstart.cloudera:50070/webhdfs/v1/user/cloudera/%t/data%p-%g.%t.csv?user.name=cloudera</property>
+       <property name="type">csv</property>
+     </configuration>
+   </export>
+```

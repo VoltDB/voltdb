@@ -42,11 +42,11 @@ You can control various characteristics of the demo by modifying the parameters 
 **Speed & Duration:**
 
     --displayinterval=5           (seconds between status reports)
-    --warmup=5                    (how long to warm up before measuring 
+    --warmup=5                    (how long to warm up before measuring
                                    benchmark performance.)
     --duration=120                (benchmark duration in seconds)
     --ratelimit=20000             (run up to this rate of requests/second)
-    
+
 **Cluster Info:**
 
     --servers=$SERVERS            (host(s) client connect to, e.g.
@@ -57,29 +57,9 @@ You can control various characteristics of the demo by modifying the parameters 
 
 **Parameters Affecting Simulation:**
 
-    --sites=100                   (number of web sites where ad events may occur)
-    --pagespersite=10             (number of pages per web site)
-    --advertisers=100             (number of advertisers)
-    --campaignsperadvertiser=10   (number of campaigns per advertiser)
-    --creativespercampaign=5      (number of creatives or banners per campaign)
+    --custcount=100               (number of customers to pre-populate)
+
 
 Customizing this Example
 ---------------------------
 See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
-
-Options
--------
-You can control various characteristics of the demo by modifying the parameters passed into the NbboBenchmark java application in the "client" function within the run.sh script.
-
-Speed & Duration:
-
-    --duration=120                (benchmark duration in seconds)
-    --autotune=true               (true = ignore rate limit, run at max throughput until latency is impacted)
-                                  (false = run at the specified rate limit)
-    --ratelimit=20000             (when autotune=false, run up to this rate of requests/second)
-    --custcount=100000            (number of customers to pre-populate)
-    --vendorcount=5000            (number of vendors to pre-populate)
-
-
-
-

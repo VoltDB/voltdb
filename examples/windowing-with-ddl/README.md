@@ -1,5 +1,4 @@
-Windowing Example Using DDL
-==============
+# Windowing Example Using DDL
 
 This app is a modified form of the "windowing" app, also in the examples directory.  It does the following on a single-table schema:
 
