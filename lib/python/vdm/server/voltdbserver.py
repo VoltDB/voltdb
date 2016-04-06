@@ -224,7 +224,7 @@ class VoltDatabase:
     def Get_Voltdb_Process(self):
         VoltdbProcess.isProcessRunning = False
         VoltdbProcess.processId = -1
-        process = subprocess.Popen("ps aux | grep '/usr/bin/java'", shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
         process_cmd = process_list[0]
         if '-DVDMStarted=true' in process_cmd:
