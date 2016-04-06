@@ -104,7 +104,7 @@ public class BranchNode extends JoinNode {
         getRightNode().analyzeJoinExpressions(noneList);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
-        assert (getJoinType() != JoinType.RIGHT);
+        assert (getJoinType() == JoinType.LEFT || getJoinType() == JoinType.INNER);
 
         ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
         ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
@@ -191,21 +191,16 @@ public class BranchNode extends JoinNode {
      *  1. The OUTER WHERE expressions can be pushed down to the outer (left) child for all joins
      *    (INNER and LEFT).
      *  2. The INNER WHERE expressions can be pushed down to the inner (right) child for the INNER joins.
-     *  3. The WHERE expressions must be preserved for the FULL join type.
      * @param joinNode JoinNode
      */
     protected void pushDownExpressions(List<AbstractExpression> noneList)
     {
-        JoinType joinType = getJoinType();
-        if (joinType == JoinType.FULL) {
-            return;
-        }
         JoinNode outerNode = getLeftNode();
         if (outerNode instanceof BranchNode) {
             ((BranchNode)outerNode).pushDownExpressionsRecursively(m_whereOuterList, noneList);
         }
         JoinNode innerNode = getRightNode();
-        if (innerNode instanceof BranchNode && joinType == JoinType.INNER) {
+        if (innerNode instanceof BranchNode && getJoinType() == JoinType.INNER) {
             ((BranchNode)innerNode).pushDownExpressionsRecursively(m_whereInnerList, noneList);
         }
     }

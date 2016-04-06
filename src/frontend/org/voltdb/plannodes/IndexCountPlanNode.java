@@ -183,7 +183,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
-        List<AbstractExpression> endComparisons = ExpressionUtil.uncombinePredicate(isp.getEndExpression());
+        List<AbstractExpression> endComparisons = ExpressionUtil.uncombine(isp.getEndExpression());
         for (AbstractExpression ae: endComparisons) {
             // There should be no more end expressions after an LT or LTE has reset the end type.
             assert(endType == IndexLookupType.EQ);

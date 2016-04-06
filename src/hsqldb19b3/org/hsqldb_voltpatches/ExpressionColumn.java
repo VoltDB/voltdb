@@ -1356,6 +1356,7 @@ public class ExpressionColumn extends Expression {
         if (rangeVariable != null && rangeVariable.tableAlias != null) {
             exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
+        exp.attributes.put("index", Integer.toString(columnIndex));
         return exp;
     }
     /**********************************************************************/

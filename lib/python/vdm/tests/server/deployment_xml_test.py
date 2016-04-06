@@ -72,7 +72,7 @@ class Database(unittest.TestCase):
         # if last_db_id == 0 or last_db_id==None:
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
         # else:
         #     print "The database list is empty"
 
@@ -86,7 +86,8 @@ class XML(Database):
         """
             test valid xml
         """
-        data = requests.get(__url__)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(__url__, headers=headers)
         try:
             doc = ElementTree.fromstring(data.content)
         except:
@@ -100,8 +101,8 @@ class XML(Database):
         """
         last_db_id = get_last_db_id()
         xml_url = __db_url__ + str(last_db_id) + '/deployment/'
-
-        data = requests.get(xml_url)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(xml_url, headers=headers)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:
@@ -180,7 +181,7 @@ class Deployment(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
         last_db_id = get_last_db_id()
-        url_dep = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/' + str(last_db_id)
+        url_dep = url + str(last_db_id) + '/deployment/'
         json_data = {
             "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
@@ -217,7 +218,7 @@ class Deployment(unittest.TestCase):
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
@@ -231,7 +232,7 @@ class Deployment(unittest.TestCase):
             # Delete database
             db_url = url + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
@@ -243,8 +244,8 @@ class UpdateDeployment(Deployment):
         last_db_id = get_last_db_id()
         # Delete database
         db_url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'+str(last_db_id)+'/deployment/'
-                # url + str(last_db_id)
-        data = requests.get(db_url)
+        headers = {'Accept': 'text/xml'}
+        data = requests.get(db_url, headers=headers)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:

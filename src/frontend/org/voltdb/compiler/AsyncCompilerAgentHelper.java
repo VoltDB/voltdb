@@ -154,7 +154,14 @@ public class AsyncCompilerAgentHelper
             }
             newCatalogBytes = loadResults.getFirst().getFullJarBytes();
             retval.catalogBytes = newCatalogBytes;
-            retval.catalogHash = loadResults.getFirst().getSha1Hash();
+            retval.isForReplay = work.isForReplay();
+            if (!retval.isForReplay) {
+                retval.catalogHash = loadResults.getFirst().getSha1Hash();
+            } else {
+                retval.catalogHash = work.replayHashOverride;
+            }
+            retval.replayTxnId = work.replayTxnId;
+            retval.replayUniqueId = work.replayUniqueId;
             String newCatalogCommands =
                 CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
@@ -208,8 +215,11 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
 
+            String commands = diff.commands();
+
             // since diff commands can be stupidly big, compress them here
-            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
+            retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
+            retval.diffCommandsLength = commands.length();
             retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();
             retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();

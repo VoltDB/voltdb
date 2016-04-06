@@ -26,14 +26,17 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.base.*;
-import com.google_voltpatches.common.collect.MapMaker;
-
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.MapMaker;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -166,6 +169,12 @@ public abstract class TheHashinator {
     public abstract HashinatorType getConfigurationType();
     abstract public int pHashToPartition(VoltType type, Object obj);
     abstract protected Set<Integer> pGetPartitions();
+    abstract public int getPartitionFromHashedToken(int hashedToken);
+
+
+    static public int getPartitionFromToken(int hashedToken) {
+        return instance.get().getSecond().getPartitionFromHashedToken(hashedToken);
+    }
 
     /**
      * Returns the configuration signature

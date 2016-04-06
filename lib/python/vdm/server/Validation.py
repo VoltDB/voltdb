@@ -163,7 +163,7 @@ user_schema = {
             },
             "roles": {
                 "id": "roles",
-                "enum": ["Administrator", "User"]
+                "type":"string"
             },
             "plaintext": {
                 "id": "plaintext",
@@ -426,7 +426,6 @@ schema = {
                                     "roles": {
                                         "id": "roles",
                                         "type": "string",
-                                        "enum": ["Administrator", "User"]
                                     },
                                     "plaintext": {
                                         "id": "plaintext",

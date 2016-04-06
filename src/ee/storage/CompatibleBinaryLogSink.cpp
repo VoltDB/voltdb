@@ -372,7 +372,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
+                                                                                      UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
@@ -415,7 +415,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             }
         }
         if (newTuple) {
-            drTable->insertPersistentTuple(*newTuple, true);
+            drTable->insertPersistentTuple(*newTuple, true, true);
         }
     }
 
@@ -486,7 +486,7 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
         tempTuple.deserializeFromDR(rowInput, pool);
         try {
-            table->insertPersistentTuple(tempTuple, true);
+            table->insertPersistentTuple(tempTuple, true, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
@@ -745,4 +745,3 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
 }
 
 }
-

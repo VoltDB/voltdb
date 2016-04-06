@@ -98,11 +98,11 @@ class ClusterDefault(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -163,11 +163,11 @@ class Cluster(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -201,9 +201,9 @@ class DefaultStartServer(ClusterDefault):
                 print "Starting..."
                 response = requests.put(url)
                 value = response.json()
-                if not value['statusstring']:
+                if not value['statusString']:
                     print "The Server list is empty"
-                elif "Success" in value['statusstring']:
+                elif "Success" in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
@@ -216,8 +216,8 @@ class DefaultStartServer(ClusterDefault):
                         self.assertEqual(response.status_code, 200)
                         time.sleep(15)
                         CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
-                elif 'A VoltDB Server process is already running' in value['statusstring']:
-                    print value['statusstring']
+                elif 'A VoltDB Server process is already running' in value['statusString']:
+                    print value['statusString']
                     assert True
                 elif response.status_code == 500:
                     self.assertEqual(response.status_code, 500)
@@ -250,9 +250,9 @@ class StartServer(Cluster):
                 print "Starting..."
                 response = requests.put(url)
                 value = response.json()
-                if not value['statusstring']:
+                if not value['statusString']:
                     print "The Server list is empty"
-                elif "Success" in value['statusstring']:
+                elif "Success" in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(20)
                     CheckServerStatus(self, last_db_id, last_server_id, 'running')
@@ -265,8 +265,8 @@ class StartServer(Cluster):
                         self.assertEqual(response.status_code, 200)
                         time.sleep(15)
                         CheckServerStatus(self, last_db_id, last_server_id, 'stopped')
-                elif 'A VoltDB Server process is already running' in value['statusstring']:
-                    print value['statusstring']
+                elif 'A VoltDB Server process is already running' in value['statusString']:
+                    print value['statusString']
                     assert True
                 elif response.status_code == 500:
                     self.assertEqual(response.status_code, 500)
@@ -279,8 +279,8 @@ def CheckServerStatus(self, last_db_id, last_server_id, status):
     response = requests.get(status_url)
     value = response.json()
     if value['status'] :
-        print "Status: " + value['status']
-        self.assertEqual(value['status'], status)
+        print "Status: " + value['serverStatus']['status']
+        self.assertEqual(value['serverStatus']['status'], status)
     else:
         assert False
 

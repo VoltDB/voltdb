@@ -21,6 +21,7 @@
 #include "common/types.h"
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
@@ -42,18 +43,19 @@
 using namespace std;
 using namespace voltdb;
 
-CompatibleDRTupleStream::CompatibleDRTupleStream(int defaultBufferSize)
-    : AbstractDRTupleStream(defaultBufferSize),
+CompatibleDRTupleStream::CompatibleDRTupleStream(int partitionId, int defaultBufferSize)
+    : AbstractDRTupleStream(partitionId, defaultBufferSize),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
 
 size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
-                                                char *tableHandle,
-                                                std::string tableName,
-                                                int64_t txnId,
-                                                int64_t spHandle,
-                                                int64_t uniqueId) {
+                                              char *tableHandle,
+                                              std::string tableName,
+                                              int partitionColumn,
+                                              int64_t txnId,
+                                              int64_t spHandle,
+                                              int64_t uniqueId) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -106,6 +108,7 @@ size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
  */
 size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                               char *tableHandle,
+                                              int partitionColumn,
                                               int64_t txnId,
                                               int64_t spHandle,
                                               int64_t uniqueId,
@@ -165,6 +168,7 @@ size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
 size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                                      char *tableHandle,
+                                                     int partitionColumn,
                                                      int64_t txnId,
                                                      int64_t spHandle,
                                                      int64_t uniqueId,
@@ -447,9 +451,12 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
     return false;
 }
 
-int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
-    CompatibleDRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
-    stream.configure(42);
+int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
+    std::vector<int32_t> partitionKeyValueList,
+    std::vector<int32_t> flagList,
+    char *outBytes) {
+
+    CompatibleDRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
@@ -471,30 +478,42 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
 
     const TableIndex* index = NULL;
     std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
-    for (int ii = 0; ii < 100;) {
-        int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
-        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
+
+    int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
+    for (int ii = 0; ii < flagList.size(); ii++) {
+        int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
+        tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
+
+        if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+        }
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
+
+        if (flagList[ii] == TXN_PAR_HASH_MULTI) {
+            tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii] + 1));
+            for (int zz = 0; zz < 5; zz++) {
+                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            }
+        }
+        else if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+        }
+
         stream.endTransaction(uid);
-        ii += 5;
+        lastUID = uid;
     }
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
-    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-    stream.endTransaction(uid);
-
-    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
+    int64_t committedUID = lastUID;
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
-
 }

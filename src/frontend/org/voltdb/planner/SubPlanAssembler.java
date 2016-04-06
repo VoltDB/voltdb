@@ -275,7 +275,7 @@ public abstract class SubPlanAssembler {
             assert(false);
             return false;
         }
-        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombinePredicate(indexPredicate);
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {
@@ -1539,11 +1539,11 @@ public abstract class SubPlanAssembler {
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
-        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;

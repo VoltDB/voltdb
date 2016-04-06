@@ -24,6 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
@@ -40,9 +43,12 @@ import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Tests a mix of multi-partition and single partition procedures on a
@@ -317,6 +323,44 @@ public class TestUpdateDeployment extends RegressionSuite {
         // Try to change the schem setting
         SyncCallback cb = new SyncCallback();
         client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
+    }
+
+    public void testUpdateBadExport() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateBadExport \n-----\n\n");
+        System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
+        Map<String, String> additionalEnv = new HashMap<String, String>();
+        additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
+        LocalCluster config = new LocalCluster("catalogupdate-bad-export.jar", SITES_PER_HOST, HOSTS, K,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        TPCCProjectBuilder project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        Properties props = new Properties();
+        props.putAll(ImmutableMap.<String, String>of(
+                "type", "csv",
+                "batched", "false",
+                "with-schema", "true",
+                "complain", "true",
+                "outdir", "/tmp/" + System.getProperty("user.name")));
+        project.addExport(true /* enabled */, "custom", props);
+        // build the jarfile
+        boolean compile = config.compile(project);
+        assertTrue(compile);
+
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(project.getPathToDeployment()));
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());

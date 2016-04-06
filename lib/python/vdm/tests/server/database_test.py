@@ -58,10 +58,7 @@ class Database(unittest.TestCase):
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(__url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 201)
 
     def tearDown(self):
         response = requests.get(__url__)
@@ -72,7 +69,7 @@ class Database(unittest.TestCase):
             # Delete database
             db_url = __url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 
@@ -82,6 +79,23 @@ class CreateDatabase(Database):
     test case for database create and validation related to it
     """
 
+    def test_request_with_id_member(self):
+        """
+        ensure id and members are not allowed in payload
+        """
+        error_msg = 'You cannot specify \'Id\' or \'Members\' while creating database.'
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        data = {'name': 'test', 'id': 11}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], error_msg)
+        self.assertEqual(response.status_code, 404)
+
+        data = {'name': 'test', 'members': [2]}
+        response = requests.post(__url__, json=data, headers=headers)
+        value = response.json()
+        self.assertEqual(value['error'], error_msg)
+        self.assertEqual(response.status_code, 404)
 
     def test_get_db(self):
         """
@@ -92,7 +106,8 @@ class CreateDatabase(Database):
         if not value:
             print "Database list is empty."
         self.assertEqual(response.status_code, 200)
-
+        self.assertEqual(value['statusString'], 'OK')
+        self.assertEqual(value['status'], 200)
 
     def test_validate_db_name_empty(self):
         """
@@ -123,6 +138,34 @@ class UpdateDatabase(Database):
     test case for database update and validation related to it
     """
 
+    def test_request_with_id_member(self):
+        """
+        ensure id and members are not allowed in payload
+        """
+        response = requests.get(__url__)
+        value = response.json()
+
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            print 'Database id to be updated is ' + str(last_db_id)
+            url = __url__ + str(last_db_id)
+
+        response = requests.put(url, json={'name': 'test', 'members': [3]})
+        value = response.json()
+        self.assertEqual(value['error'], 'You cannot specify \'Members\' while updating database.')
+        self.assertEqual(response.status_code, 404)
+
+        response = requests.put(url, json={'name': 'test', 'id': 33333})
+        value = response.json()
+        self.assertEqual(value['error'], 'Database Id mentioned in the payload and url doesn\'t match.')
+        self.assertEqual(response.status_code, 404)
+
+        response = requests.put(url, json={'name': 'test123', 'id': last_db_id})
+        value = response.json()
+        self.assertEqual(value['status'], 200)
+        self.assertEqual(response.status_code, 200)
+
     def test_get_db(self):
         """
         ensure GET database list
@@ -132,7 +175,6 @@ class UpdateDatabase(Database):
         if not value:
             print "Database list is empty."
         self.assertEqual(response.status_code, 200)
-
 
     def test_validate_db_name_empty(self):
         """
@@ -149,12 +191,8 @@ class UpdateDatabase(Database):
 
         response = requests.put(url, json={'name': ''})
         value = response.json()
-        if response.status_code == 200:
-            self.assertEqual(response.status_code, 200)
-        else:
-            self.assertEqual(value['error'], 'Database name is required')
-            self.assertEqual(response.status_code, 404)
-
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(value['errors'][0], 'Database name is required.')
 
     def test_validate_db_name(self):
         """
@@ -171,11 +209,8 @@ class UpdateDatabase(Database):
 
         response = requests.put(url, json={'name': '@@@@'})
         value = response.json()
-        if response.status_code == 200:
-            self.assertEqual(response.status_code, 200)
-        else:
-            self.assertEqual(value['error'], 'Bad request')
-            self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(value['errors'][0], 'Only alphabets, numbers, _ and . are allowed.')
 
     def test_validate_update_db(self):
         """
@@ -209,10 +244,7 @@ class DeleteDatabase(unittest.TestCase):
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(__url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 201)
         # Delete db
         response = requests.get(__url__)
         value = response.json()
@@ -222,7 +254,7 @@ class DeleteDatabase(unittest.TestCase):
             # Delete database
             db_url = __url__ + str(last_db_id)
             response = requests.delete(db_url)
-            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.status_code, 204)
         else:
             print "The database list is empty"
 

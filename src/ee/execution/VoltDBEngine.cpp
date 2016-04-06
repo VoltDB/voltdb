@@ -69,6 +69,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "executors/abstractexecutor.h"
+#include "executors/executorutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"
@@ -146,6 +147,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_tupleReportThreshold(LONG_OP_THRESHOLD),
       m_lastAccessedPlanNodeType(PLAN_NODE_TYPE_INVALID),
       m_currentUndoQuantum(NULL),
+      m_partitionId(-1),
       m_hashinator(NULL),
       m_staticParams(MAX_PARAM_COUNT),
       m_pfCount(0),
@@ -162,6 +164,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_drReplicatedStream(NULL),
       m_compatibleDRStream(NULL),
       m_compatibleDRReplicatedStream(NULL),
+      m_currExecutorVec(NULL),
       m_tuplesModifiedStack()
 {
 }
@@ -216,15 +219,11 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[42] = 8; // row size
 
     // configure DR stream and DR compatible stream
-    m_drStream = new DRTupleStream(defaultDrBufferSize);
-    m_drStream->configure(partitionId);
-    m_compatibleDRStream = new CompatibleDRTupleStream(defaultDrBufferSize);
-    m_compatibleDRStream->configure(partitionId);
+    m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
+    m_compatibleDRStream = new CompatibleDRTupleStream(partitionId, defaultDrBufferSize);
     if (createDrReplicatedStream) {
-        m_drReplicatedStream = new DRTupleStream(defaultDrBufferSize);
-        m_drReplicatedStream->configure(16383);
-        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(defaultDrBufferSize);
-        m_compatibleDRReplicatedStream->configure(16383);
+        m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
+        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(16383, defaultDrBufferSize);
     }
 
     // set the DR version
@@ -493,12 +492,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
 void VoltDBEngine::resetExecutionMetadata() {
 
-    // If we get here, we've completed execution successfully, or
-    // recovered after an error.  In any case, we should be able to
-    // assert that temp tables are now cleared.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
-                                   "Output temp tables not cleaned up after execution");
-
     if (m_tuplesModifiedStack.size() != 0) {
         m_tuplesModifiedStack.pop();
     }
@@ -506,11 +499,19 @@ void VoltDBEngine::resetExecutionMetadata() {
 
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
+
     if (m_currExecutorVec == NULL) {
         // This is usually the result of some planner error producing an
         // invalid plan that can not be converted into plan nodes / executors.
         return;
     }
+
+    // If we get here, we've completed execution successfully, or
+    // recovered after an error.  In any case, we should be able to
+    // assert that temp tables are now cleared.
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(m_executorContext->allOutputTempTablesAreEmpty(),
+                                   "Output temp tables not cleaned up after execution");
+
     m_currExecutorVec->resetLimitStats();
     m_currExecutorVec = NULL;
 }
@@ -1326,10 +1327,20 @@ void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity
 // MISC FUNCTIONS
 // -------------------------------------------------
 
-bool VoltDBEngine::isLocalSite(const NValue& value)
+bool VoltDBEngine::isLocalSite(const NValue& value) const
 {
-    int index = m_hashinator->hashinate(value);
+    int32_t index = m_hashinator->hashinate(value);
     return index == m_partitionId;
+}
+
+int32_t VoltDBEngine::getPartitionForPkHash(const int32_t pkHash) const
+{
+    return m_hashinator->partitionForToken(pkHash);
+}
+
+bool VoltDBEngine::isLocalSite(const int32_t pkHash) const
+{
+    return getPartitionForPkHash(pkHash) == m_partitionId;
 }
 
 typedef std::pair<std::string, Table*> TablePair;
@@ -1729,13 +1740,17 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     return table->hashCode();
 }
 
+void VoltDBEngine::setHashinator(TheHashinator* hashinator) {
+    m_hashinator.reset(hashinator);
+}
+
 void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int32_t *configPtr, uint32_t numTokens) {
     switch (type) {
     case HASHINATOR_LEGACY:
-        m_hashinator.reset(LegacyHashinator::newInstance(config));
+        setHashinator(LegacyHashinator::newInstance(config));
         break;
     case HASHINATOR_ELASTIC:
-        m_hashinator.reset(ElasticHashinator::newInstance(config, configPtr, numTokens));
+        setHashinator(ElasticHashinator::newInstance(config, configPtr, numTokens));
         break;
     default:
         throwFatalException("Unknown hashinator type %d", type);

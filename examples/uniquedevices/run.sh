@@ -61,9 +61,9 @@ function cleanall() {
 function jars() {
     # compile java source
     javac \
-        hyperloglogsrc/org/voltdb/hll/HyperLogLog.java \
-        hyperloglogsrc/org/voltdb/hll/MurmurHash.java \
-        hyperloglogsrc/org/voltdb/hll/RegisterSet.java
+        hyperloglogsrc/org/voltdb_hll/HyperLogLog.java \
+        hyperloglogsrc/org/voltdb_hll/MurmurHash.java \
+        hyperloglogsrc/org/voltdb_hll/RegisterSet.java
     javac -classpath hyperloglogsrc:$APPCLASSPATH \
         procedures/uniquedevices/*.java
     javac -classpath hyperloglogsrc:$CLIENTCLASSPATH \
@@ -76,7 +76,7 @@ function jars() {
     # remove compiled .class files
     rm -rf \
         procedures/uniquedevices/*.class \
-        hyperloglogsrc/org/org/voltdb/hll/*.class \
+        hyperloglogsrc/org/org/voltdb_hll/*.class \
         client/uniquedevices/*.class
 }
 
@@ -92,9 +92,9 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST --new"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST --force"
     echo
-    voltdb create -d deployment.xml -l $LICENSE -H $HOST --new
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST --force
 }
 
 # load schema and procedures
@@ -119,7 +119,7 @@ function wait_for_startup() {
 # startup server in background and load schema
 function background_server_andload() {
     # run the server in the background
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST --new > nohup.log 2>&1 &
+    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST --force > nohup.log 2>&1 &
     wait_for_startup
     init
 }

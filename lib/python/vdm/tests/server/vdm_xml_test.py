@@ -37,9 +37,8 @@ import socket
 __host_name__ = socket.gethostname()
 __host_or_ip__ = socket.gethostbyname(__host_name__)
 
-__url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/voltdeploy/'
-__db_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
-__server_url__ = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
+__url__ = 'http://%s:8000/api/1.0/voltdeploy/' % __host_or_ip__
+__db_url__ = 'http://%s:8000/api/1.0/databases/' % __host_or_ip__
 
 
 def get_last_db_id():
@@ -61,7 +60,7 @@ def get_last_server_id():
         Get last Server Id
     """
 
-    url = __server_url__ + str(get_last_db_id()) + '/servers/'
+    url = __db_url__ + str(get_last_db_id()) + '/servers/'
     response = requests.get(url)
     value = response.json()
     last_server_id = 0
@@ -93,10 +92,8 @@ class Database(unittest.TestCase):
         last_db_id = get_last_db_id()
         db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
-
-URL = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
 
 class XML(unittest.TestCase):
     """
@@ -215,7 +212,7 @@ class Server(unittest.TestCase):
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
-            url = URL + str(last_db_id) + '/servers/'
+            url = __db_url__ + str(last_db_id) + '/servers/'
             data = {'description': 'test', 'hostname': __host_or_ip__, 'name': 'test'}
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 201:
@@ -236,20 +233,20 @@ class Server(unittest.TestCase):
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
             db_data = {'dbId': last_db_id}
-            url = URL + str(last_db_id) + '/servers/'
+            url = __db_url__ + str(last_db_id) + '/servers/'
             response = requests.get(url)
             value = response.json()
             if value:
                 server_length = len(value['members'])
                 last_server_id = value['members'][server_length - 1]['id']
                 print "ServerId to be deleted is " + str(last_server_id)
-                url = URL + str(last_db_id) + '/servers/' + str(last_server_id)
+                url = __db_url__ + str(last_db_id) + '/servers/' + str(last_server_id)
                 response = requests.delete(url, json=db_data, headers=headers)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -283,7 +280,7 @@ class Deployment(unittest.TestCase):
 
     def setUp(self):
         """Create a db"""
-        url = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
+        url = 'http://%s:8000/api/1.0/databases/' % __host_or_ip__
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(url, json=db_data, headers=headers)
@@ -293,7 +290,7 @@ class Deployment(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
         last_db_id = get_last_db_id()
-        url_dep = 'http://' + __host_or_ip__ + ':8000/api/1.0/deployment/' + str(last_db_id)
+        url_dep = 'http://%s:8000/api/1.0/databases/%u/deployment/' % (__host_or_ip__, last_db_id)
         json_data = {
             "cluster": {"sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
@@ -330,17 +327,16 @@ class Deployment(unittest.TestCase):
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):
         """Delte a db"""
         last_db_id = get_last_db_id()
-        url = 'http://' + __host_or_ip__ + ':8000/api/1.0/databases/'
         # Delete database
-        db_url = url + str(last_db_id)
+        db_url = __db_url__ + str(last_db_id)
         response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
 
 class UpdateDatabaseDeployment(Deployment):

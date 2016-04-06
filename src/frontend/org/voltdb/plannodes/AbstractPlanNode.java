@@ -978,23 +978,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public void explainPlan_recurse(StringBuilder sb, String indent) {
-        if (m_verboseExplainForDebugging && m_hasSignificantOutputSchema) {
-            sb.append(indent + "Detailed Output Schema: ");
-            JSONStringer stringer = new JSONStringer();
-            try
-            {
-                stringer.object();
-                outputSchemaToJSON(stringer);
-                stringer.endObject();
-                sb.append(stringer.toString());
-            }
-            catch (Exception e)
-            {
-                sb.append(indent + "CORRUPTED beyond the ability to format? " + e);
-                e.printStackTrace();
-            }
-            sb.append(indent + "from\n");
-        }
         String extraIndent = " ";
         // Except when verbosely debugging,
         // skip projection nodes basically (they're boring as all get out)
@@ -1006,7 +989,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 sb.append(indent);
             }
             String nodePlan = explainPlanForNode(indent);
-            sb.append(nodePlan + "\n");
+            sb.append(nodePlan);
+
+            if (m_verboseExplainForDebugging && m_outputSchema != null) {
+                sb.append(indent + " " + m_outputSchema.toExplainPlanString());
+            }
+
+            sb.append("\n");
         }
 
         // Agg < Proj < Limit < Scan

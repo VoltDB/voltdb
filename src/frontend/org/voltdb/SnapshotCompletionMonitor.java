@@ -220,26 +220,14 @@ public class SnapshotCompletionMonitor {
              * be used by live rejoin to initialize a starting state for applying DR
              * data
              */
-            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds = new HashMap<>();
-            final JSONObject remoteDCLastIdsObj = jsonObj.getJSONObject("remoteDCLastIds");
-            final Iterator<String> dcIdIter = remoteDCLastIdsObj.keys();
-            while (dcIdIter.hasNext()) {
-                final String dcIdKey = dcIdIter.next();
-
-                final JSONObject dataCenterIds = remoteDCLastIdsObj.getJSONObject(dcIdKey);
-
-                final HashMap<Integer, DRLogSegmentId> lastSeenIds = new HashMap<>();
-
-                final Iterator<String> partitionKeyIter = dataCenterIds.keys();
-                while (partitionKeyIter.hasNext()) {
-                    final String partitionIdString = partitionKeyIter.next();
-                    JSONObject ids = dataCenterIds.getJSONObject(partitionIdString);
-                    long drId = ids.getLong("drId");
-                    long spUniqueId = ids.getLong("spUniqueId");
-                    long mpUniqueId = ids.getLong("mpUniqueId");
-                    lastSeenIds.put(Integer.valueOf(partitionIdString), new DRLogSegmentId(drId, spUniqueId, mpUniqueId));
-                }
-                remoteDCLastIds.put(Integer.valueOf(dcIdKey), Collections.unmodifiableMap(lastSeenIds));
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastIds = new HashMap<>();
+            JSONObject consumerPartitions = jsonObj.getJSONObject("remoteDCLastIds");
+            Iterator<String> cpKeys = consumerPartitions.keys();
+            while (cpKeys.hasNext()) {
+                final String consumerPartitionIdStr = cpKeys.next();
+                final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
+                JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
+                remoteDCLastIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();

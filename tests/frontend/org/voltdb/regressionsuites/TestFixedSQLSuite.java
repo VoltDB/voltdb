@@ -693,6 +693,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9032();
         subTestENG9389();
         subTestENG9533();
+        subTestENG9796();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -2612,6 +2613,45 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 {1, 5},
                 {2, 10}
         });
+    }
+
+    /**
+     * For ENG-9796.
+     *
+     * This locks down a temporary fix for an undefined behavior bug
+     * that needs a more permanent solution.  Currently we guard
+     * against SQL statements that would produce incorrect behavior.
+     *
+     * In its current state, this test might be more appropriate as a
+     * planner test, but with any luck we'll be able to process these
+     * queries soon and so we can lock down the correct answers here.
+     * So let's leave this test here for now.
+     */
+    private void subTestENG9796() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "insert into r1 values (1, '50', 200, 300.0)");
+        client.callProcedure("@AdHoc", "insert into r1 values (2, '90', 700, 900.0)");
+        client.callProcedure("@AdHoc", "insert into r2 values (1, '50', 200, 300.0)");
+        client.callProcedure("@AdHoc", "insert into r2 values (2, '90', 700, 900.0)");
+
+        String sqlStmt;
+
+        sqlStmt = "select S1.* from (R1 join R2 using(num)) as S1, (R1 join R2 using(num)) as S2";
+        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
+                    + "and subqueries is not supported.");
+
+        sqlStmt = "select * from (select id as z, num as z from r1) as foo";
+        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
+                + "and subqueries is not supported.");
+
+        sqlStmt = "select * from (select id as z, num as z from r1) as foo order by 1";
+        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
+                + "and subqueries is not supported.");
+
+        sqlStmt = "select * from (select id * 2 as z, num * 2 as z from r1) as foo order by 1";
+        verifyStmtFails(client, sqlStmt, "This combination of \"SELECT \\* ...\" "
+                + "and subqueries is not supported.");
     }
 
     //
