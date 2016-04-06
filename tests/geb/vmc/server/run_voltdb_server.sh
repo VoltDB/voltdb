@@ -43,7 +43,7 @@ PATH=$PATH:$EXTRA_PATH
 # Start the VoltDB server
 echo "which voltdb:" `which voltdb`
 echo "Executing   : voltdb create -d $DEPLOY &"
-voltdb create -d $DEPLOY &
+voltdb create -d $DEPLOY --force &
 
 # Run sqlcmd, from the specified directory, and use it to load DDL and (stored
 # procedure) classes; make multiple attempts, until the server has successfully

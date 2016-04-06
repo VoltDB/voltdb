@@ -22,7 +22,6 @@ import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.DRLogSegmentId;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -84,10 +83,7 @@ public class StartupAlgo implements RepairAlgo
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
         m_promotionResult.set(
-                new RepairResult(
-                    TxnEgo.makeZero(m_partitionId).getTxnId(),
-                    Long.MIN_VALUE,
-                    new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE)));
+                new RepairResult(TxnEgo.makeZero(m_partitionId).getTxnId()));
     }
 
     /** Process a new repair log response */

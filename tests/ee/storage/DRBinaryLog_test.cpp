@@ -77,6 +77,29 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
+class MockHashinator : public TheHashinator {
+public:
+    static MockHashinator* newInstance() {
+        return new MockHashinator();
+    }
+
+    ~MockHashinator() {}
+
+protected:
+    int32_t hashinate(int64_t value) const {
+        return 0;
+    }
+
+    int32_t hashinate(const char *string, int32_t length) const {
+        return 0;
+    }
+
+    int32_t partitionForToken(int32_t hashCode) const {
+        // partition of VoltDBEngine super of MockVoltDBEngine is 0
+        return -1;
+    }
+};
+
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
@@ -112,6 +135,7 @@ public:
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                                                                m_exportSchema, exportColumnName,
                                                                m_exportStream, true);
+        setHashinator(MockHashinator::newInstance());
     }
     ~MockVoltDBEngine() {
         delete m_conflictExportTable;
@@ -135,10 +159,10 @@ private:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(64*1024),
-        m_drReplicatedStream(64*1024),
-        m_drStreamReplica(64*1024),
-        m_drReplicatedStreamReplica(64*1024),
+      : m_drStream(42, 64*1024),
+        m_drReplicatedStream(16383, 64*1024),
+        m_drStreamReplica(42, 64*1024),
+        m_drReplicatedStreamReplica(16383, 64*1024),
         m_undoToken(0),
         m_spHandleReplica(0),
         m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
@@ -238,10 +262,6 @@ public:
         m_otherTableWithoutIndex->setDR(true);
         m_otherTableWithIndexReplica->setDR(true);
         m_otherTableWithoutIndexReplica->setDR(true);
-
-        // allocate a new buffer and wrap it
-        m_drStream.configure(42);
-        m_drReplicatedStream.configure(16383);
 
         // create a table with different schema only on the master
         std::vector<ValueType> singleColumnType;
@@ -2008,6 +2028,23 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
         return;
     }
     ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {
+    m_tableReplica->setTupleLimit(100);
+
+    const int total = 101;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle - 1);
+
+    EXPECT_EQ(101, m_tableReplica->activeTupleCount());
 }
 
 int main() {

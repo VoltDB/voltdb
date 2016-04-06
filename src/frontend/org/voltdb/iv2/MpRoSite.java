@@ -28,6 +28,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
@@ -232,6 +233,42 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                long lastReceivedDRId)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                             long localUniqueId, DRConsumerDrIdTracker tracker)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void resetDrAppliedTracker() {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+        @Override
+        public Pair<Long, Long> getDrLastAppliedUniqueIds()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -489,6 +526,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

@@ -26,17 +26,21 @@ class TableIndex;
 
 class DRTupleStream : public voltdb::AbstractDRTupleStream {
 public:
-    //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
-    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
-    //Version(1), type(1), drId(8), checksum(4)
-    static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
-    //Version(1), type(1), table signature(8), checksum(4)
-    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
+    //Version(1), type(1), drId(8), uniqueId(8), hashFlag(1), txnLength(4), parHash(4)
+    static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 1 + 4 + 4;
+    //Version(1), type(1), drId(8), uniqueId(8)
+    static const size_t BEGIN_RECORD_HEADER_SIZE = 1 + 1 + 8 + 8;
+    //Type(1), drId(8), checksum(4)
+    static const size_t END_RECORD_SIZE = 1 + 8 + 4;
+    //Type(1), table signature(8)
+    static const size_t TXN_RECORD_HEADER_SIZE = 1 + 8;
+    //Type(1), parHash(4)
+    static const size_t HASH_DELIMITER_SIZE = 1 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 3;
+    static const uint8_t PROTOCOL_VERSION = 4;
 
-    DRTupleStream(int defaultBufferSize);
+    DRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~DRTupleStream() {
     }
@@ -47,6 +51,7 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -60,6 +65,7 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -70,6 +76,7 @@ public:
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
@@ -85,7 +92,11 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
-    static int32_t getTestDRBuffer(char *out);
+    static int32_t getTestDRBuffer(int32_t partitionId,
+                                   std::vector<int32_t> partitionKeyValueList,
+                                   std::vector<int32_t> flagList,
+                                   char *out);
+
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
@@ -103,15 +114,37 @@ private:
             size_t &rowMetadataSz,
             const std::vector<int> *&interestingColumns);
 
+    /**
+     * calculate hash for the partition key of the given tuple,
+     * partitionColumn should be an non-negative integer
+     */
+    int64_t getParHashForTuple(TableTuple& tuple, int partitionColumn);
+
+    /**
+     * check the paritition key hash of the current record
+     * and return true if it is different from the previous hash seen in the txn
+     * updates m_hashFlag based on the hashes and records the first hash in the txn
+     * first hash will be 0 if it is DR stream for replicated table
+     * or the first record is TRUNCATE_TABLE
+     */
+    bool updateParHash(bool isReplicatedTable, int64_t parHash);
+
+    const DRTxnPartitionHashFlag m_initialHashFlag;
+    DRTxnPartitionHashFlag m_hashFlag;
+    int64_t m_firstParHash;
+    int64_t m_lastParHash;
+    size_t m_beginTxnUso;
+
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
 public:
-    MockDRTupleStream() : DRTupleStream(1024) {}
+    MockDRTupleStream(int partitionId) : DRTupleStream(partitionId, 1024) {}
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
+                           int partitionColumn,
                            int64_t txnId,
                            int64_t spHandle,
                            int64_t uniqueId,
@@ -128,6 +161,7 @@ public:
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) {
