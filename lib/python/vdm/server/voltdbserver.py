@@ -216,9 +216,10 @@ class VoltDatabase:
         result = False
         process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
-        process_cmd = process_list[0]
-        if '-DVDMStarted=true' in process_cmd:
-            result = True
+        for process_cmd in process_list:
+            if '-DVDMStarted=true' in process_cmd:
+                result = True
+                break
         return result
 
     def Get_Voltdb_Process(self):
@@ -226,10 +227,11 @@ class VoltDatabase:
         VoltdbProcess.processId = -1
         process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
-        process_cmd = process_list[0]
-        if '-DVDMStarted=true' in process_cmd:
-            VoltdbProcess.isProcessRunning = True
-            VoltdbProcess.processId = process_cmd.split()[1]
+        for process_cmd in process_list:
+            if '-DVDMStarted=true' in process_cmd:
+                VoltdbProcess.isProcessRunning = True
+                VoltdbProcess.processId = process_cmd.split()[1]
+                break
         return VoltdbProcess
 
     def start_local_server(self, sid, recover=False, is_blocking=-1):
