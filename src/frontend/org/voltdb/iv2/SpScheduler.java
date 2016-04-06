@@ -148,6 +148,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
+
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;

@@ -90,7 +90,7 @@ public class PlannerTestCase extends TestCase {
         }
         catch (Exception ex) {
             ex.printStackTrace();
-            fail();
+            fail(ex.getMessage());
         }
         return cp;
     }

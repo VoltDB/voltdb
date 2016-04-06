@@ -29,6 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
@@ -317,6 +318,7 @@ public class RejoinProducer extends JoinProducerBase {
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
+                Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers = null;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
@@ -325,7 +327,7 @@ public class RejoinProducer extends JoinProducerBase {
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
                         drSequenceNumbers = event.drSequenceNumbers;
-                        VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
+                        allConsumerSiteTrackers = event.remoteDCLastIds;
 
                         // Tells EE which DR version going to use
                         siteConnection.setDRProtocolVersion(event.drVersion);
@@ -352,6 +354,7 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection,
                         exportSequenceNumbers,
                         drSequenceNumbers,
+                        allConsumerSiteTrackers,
                         m_schemaHasNoTables == false /* requireExistingSequenceNumbers */);
             }
         };

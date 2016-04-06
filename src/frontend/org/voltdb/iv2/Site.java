@@ -22,10 +22,12 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -39,6 +41,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -102,6 +105,7 @@ import vanilla.java.affinity.impl.PosixJNAAffinity;
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger drLog = new VoltLogger("DRAGENT");
 
     private static final double m_taskLogReplayRatio =
             Double.valueOf(System.getProperty("TASKLOG_REPLAY_RATIO", "0.6"));
@@ -165,6 +169,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private final PartitionDRGateway m_drGateway;
     private final PartitionDRGateway m_mpDrGateway;
+
+    /*
+     * Track the last producer-cluster unique IDs and drIds associated with an
+     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
+     *  ReplicaDRGateway on repair
+     */
+    private Map<Integer, Map<Integer, DRConsumerDrIdTracker>> m_maxSeenDrLogsBySrcPartition =
+            new HashMap<Integer, Map<Integer, DRConsumerDrIdTracker>>();
+    private long m_lastLocalSpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
+    private long m_lastLocalMpUniqueId = -1L;   // Only populated by the Site for ApplyBinaryLog Txns
 
     // Current topology
     int m_partitionId;
@@ -392,6 +406,131 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
+        }
+
+        /**
+         * Check to see if binary log is expected (start DR id adjacent to last received DR id)
+         *
+         * @return 0 expected, -1 duplicated binary log, 1 future binary log
+         */
+        @Override
+        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                             long lastReceivedDRId)
+        {
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
+            if (clusterSources == null) {
+                // Don't have a tracker for this cluster
+                if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
+                    return (byte)0;
+                } else {
+                    if (drLog.isTraceEnabled()) {
+                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                  "Site doesn't have tracker for this cluster while the last received is %s",
+                                                  producerPartitionId,
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                    }
+                }
+            }
+            else {
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
+                if (targetTracker == null) {
+                    // Don't have a tracker for this partition
+                    if (DRLogSegmentId.isEmptyDRId(lastReceivedDRId)) {
+                        return (byte)0;
+                    } else {
+                        if (drLog.isTraceEnabled()) {
+                            drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                      "Site's tracker is null while the last received is %s",
+                                                      producerPartitionId,
+                                                      DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                        }
+                    }
+                }
+                else {
+                    assert (targetTracker.size() > 0);
+
+                    final long lastDrId = targetTracker.getLastDrId();
+                    if (lastDrId == lastReceivedDRId) {
+                        // This is what we expected
+                        return (byte)0;
+                    }
+                    if (lastDrId > lastReceivedDRId) {
+                        // This is a duplicate
+                        return (byte)-1;
+                    }
+
+                    if (drLog.isTraceEnabled()) {
+                        drLog.trace(String.format("P%d binary log site idempotency check failed. " +
+                                                  "Site's tracker is %s while the last received is %s",
+                                                  producerPartitionId,
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastDrId),
+                                                  DRLogSegmentId.getDebugStringFromDRId(lastReceivedDRId)));
+                    }
+                }
+            }
+            return (byte)1;
+        }
+
+        @Override
+        public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
+                                             long localUniqueId, DRConsumerDrIdTracker tracker)
+        {
+            assert(tracker.size() > 0);
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(localUniqueId) == MpInitiator.MP_INIT_PID) {
+                m_lastLocalMpUniqueId = localUniqueId;
+            }
+            else {
+                m_lastLocalSpUniqueId = localUniqueId;
+            }
+            Map<Integer, DRConsumerDrIdTracker> clusterSources = m_maxSeenDrLogsBySrcPartition.get(producerClusterId);
+            if (clusterSources == null) {
+                clusterSources = new HashMap<Integer, DRConsumerDrIdTracker>();
+                clusterSources.put(producerPartitionId, tracker);
+                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
+            else {
+                DRConsumerDrIdTracker targetTracker = clusterSources.get(producerPartitionId);
+                if (targetTracker == null) {
+                    clusterSources.put(producerPartitionId, tracker);
+                }
+                else {
+                    targetTracker.mergeTracker(tracker);
+                }
+            }
+        }
+
+        @Override
+        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers)
+        {
+            assert(m_maxSeenDrLogsBySrcPartition.size() == 0);
+            m_maxSeenDrLogsBySrcPartition = trackers;
+        }
+
+        @Override
+        public void resetDrAppliedTracker() {
+            m_maxSeenDrLogsBySrcPartition.clear();
+            m_lastLocalSpUniqueId = -1L;
+            m_lastLocalMpUniqueId = -1L;
+        }
+
+        @Override
+        public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
+        {
+            if (drLog.isTraceEnabled()) {
+                for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : m_maxSeenDrLogsBySrcPartition.entrySet()) {
+                    for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
+                        drLog.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
+                                " contains " + e2.getValue().toShortString());
+                    }
+                }
+            }
+            return m_maxSeenDrLogsBySrcPartition;
+        }
+
+        @Override
+        public Pair<Long, Long> getDrLastAppliedUniqueIds()
+        {
+            return Pair.of(m_lastLocalSpUniqueId, m_lastLocalMpUniqueId);
         }
 
         @Override
@@ -1146,6 +1285,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
             boolean requireExistingSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
@@ -1194,6 +1334,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);
         }
 
+        if (allConsumerSiteTrackers != null) {
+            Map<Integer, Map<Integer, DRConsumerDrIdTracker>> thisConsumerSiteTrackers =
+                    allConsumerSiteTrackers.get(m_partitionId);
+            if (thisConsumerSiteTrackers != null) {
+                m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
+            }
+        }
         m_rejoinState = kStateReplayingRejoin;
         m_replayCompletionAction = replayComplete;
     }

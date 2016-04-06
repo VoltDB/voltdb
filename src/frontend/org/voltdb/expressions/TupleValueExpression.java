@@ -45,6 +45,15 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
 
+    // Tables that are not persistent tables, but those produced internally,
+    // (by subqueries for example) may contains columns whose names are the same.
+    // Consider this statement for example:
+    //     SELECT * FROM (SELECT * FROM T, T) as sub_t;
+    // If the table T has a column named "C", then the output of the subquery will
+    // have two columns named "C".  HSQL is able to tell these apart, so we use the
+    // "index" field produced by voltXML as a differentiator between identical columns.
+    private int m_differentiator = -1;
+
     private boolean m_hasAggregate = false;
     /** The statement id this TVE refers to */
     private int m_origStmtId = -1;
@@ -108,6 +117,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
         clone.m_origStmtId = m_origStmtId;
+        clone.m_differentiator = m_differentiator;
         return clone;
     }
 
@@ -167,7 +177,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     /**
-     * @return the tables
+     * @return the table name for this column reference
      */
     public String getTableName() {
         return m_tableName;
@@ -181,7 +191,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     /**
-     * @return the tables
+     * @return the table alias for this column reference
      */
     public String getTableAlias() {
         return m_tableAlias;
@@ -197,6 +207,22 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public void setTableIndex(int idx) {
         m_tableIdx = idx;
+    }
+
+    /**
+     * Get the differentiator field (a number used to make this field distinct
+     * from other column with the same name with a table schema).
+     */
+    public int getDifferentiator() {
+        return m_differentiator;
+    }
+
+    /**
+     * Set the differentiator field (a number used to make this field distinct
+     * from other column with the same name with a table schema).
+     */
+    public void setDifferentiator(int val) {
+        m_differentiator = val;
     }
 
     /**
@@ -419,9 +445,10 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     protected String getExpressionNodeNameForToString() {
-        return String.format("%s: %s.%s",
+        return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
                              super.getExpressionNodeNameForToString(),
                              chooseTwoNames(m_tableName, m_tableAlias),
-                             chooseTwoNames(m_columnName, m_columnAlias));
+                             chooseTwoNames(m_columnName, m_columnAlias),
+                             m_columnIndex, m_differentiator);
     }
 }
