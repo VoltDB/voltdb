@@ -214,7 +214,7 @@ class VoltDatabase:
         Checks the set of running processes to find out if voltdb server is running
         """
         result = False
-        process = subprocess.Popen("ps aux | grep '/usr/bin/java'", shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
         process_cmd = process_list[0]
         if '-DVDMStarted=true' in process_cmd:
