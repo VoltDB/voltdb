@@ -85,14 +85,13 @@ public class JDBCVoltVerifier {
 
         System.out.println("Connecting to " + config.servers);
         try {
-            client = VerifierUtils.dbconnect(config.servers, ratelimit);
+            client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         rvr = new ReadVoltRows(client);
 
-        System.out.println("Connecting to the JDBC target (Vertica?)");
+        System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
         jdbcConnection = JDBCGetData.jdbcConnect(config);
 
         getRows(rvr, client, jdbcConnection);

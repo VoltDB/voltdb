@@ -51,23 +51,27 @@ public class VerifierUtils {
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
-        @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 300;
+        @Option(desc = "JDBC Driver.")
+        String driver = "com.vertica.jdbc.Driver";
 
-        @Option(desc = "Maximum export TPS rate for benchmark.")
-        int ratelimit = Integer.MAX_VALUE;
+        @Option(desc = "Host:port.")
+        String host_port = "volt15d:5433";
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queries")
-        String servers = "localhost";
+        @Option(desc = "VoltDB server:port list.")
+        String vdbServers = "localhost";
 
-        @Option(desc = "Number of rows to expect to import from the Kafka topic")
-        long expected_rows = 10_000_000;
+        @Option(desc = "JDBC Database")
+        String jdbcDatabase = "Test1";
 
-        @Option(desc = "Report latency for kafka benchmark run.")
-        boolean latencyreport = false;
+        @Option(desc = "JDBC Username")
+        String jdbcUser = "dbadmin";
 
-        @Option(desc = "Test using all VoltDB datatypes (except varbin).")
-        boolean alltypes = false;
+        @Option(desc = "JDBC Password.")
+        String jdbcPassword = "";
+
+        // Get the specific dbms in case we need to handle special cases
+        @Option(desc = "Target database, e.g. vertica or postgres.")
+        String jdbcDBMS = "vertica";
 
         @Option(desc = "Set to true to use voltdb export instead of groovy loader to populate kafka topic(s).")
         boolean useexport = false;
@@ -77,11 +81,6 @@ public class VerifierUtils {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            // 0, means we're not expecting any rows -- part of new offset checking test
-            // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
-            if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             System.out.println("finished validating args");
         }
@@ -105,8 +104,7 @@ public class VerifierUtils {
         clientConfig.setReconnectOnConnectionLoss(true);
         Client client = ClientFactory.createClient(clientConfig);
 
-        // for (String server: COMMA_SPLITTER.split(servers)) {
-           for (String server: servers.split(",")) {
+        for (String server: servers.split(",")) {
             System.out.println("..." + server);
             client.createConnection(server);
         }
