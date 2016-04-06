@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# leader host for startup purposes only
+# (once running, all nodes are the same -- no leaders)
+STARTUPLEADERHOST="localhost"
+# list of cluster nodes separated by commas in host:[port] format
+SERVERS="localhost"
+
+# WEB SERVER variables
+WEB_PORT=8081
+
 # find voltdb binaries
 if [ -e ../../bin/voltdb ]; then
     # assume this is the examples folder for a kit
@@ -17,12 +26,6 @@ fi
 # java classpaths and binary paths
 source $VOLTDB_BIN/voltenv
 
-# leader host for startup purposes only
-# (once running, all nodes are the same -- no leaders)
-STARTUPLEADERHOST="localhost"
-# list of cluster nodes separated by commas in host:[port] format
-SERVERS="localhost"
-
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
     rm -rf voltdbroot log procedures/callcenter/*.class client/callcenter/*.class
@@ -32,6 +35,10 @@ function clean() {
 function cleanall() {
     clean
     rm -rf callcenter-procs.jar callcenter-client.jar
+}
+
+function webserver() {
+    cd web; python -m SimpleHTTPServer $WEB_PORT
 }
 
 # compile the source code for procedures and the client into jarfiles
