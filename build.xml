@@ -820,6 +820,7 @@ DISTRIBUTION
     <!-- build the jars for the clients -->
     <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -917,6 +918,7 @@ DISTRIBUTION
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
+            <include name="examples/callcenter/run.sh"/>
             <include name="examples/json-sessions/run.sh"/>
             <include name="examples/windowing/run.sh"/>
             <include name="examples/windowing-with-ddl/run.sh"/>
@@ -1066,6 +1068,7 @@ CLEANING
     depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
              clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -2251,6 +2254,8 @@ TEST CASES
 
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
+    <echo>checking callcenter</echo>
+    <samplecheck app="callcenter" />
     <echo>checking voltkv</echo>
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
@@ -2420,7 +2425,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
+         value="json,callcenter,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
