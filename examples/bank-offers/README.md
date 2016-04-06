@@ -15,11 +15,11 @@ Code organization
 -----------------
 The code is divided into projects:
 
-- "db": the database project, which contains the schema, stored procedures and other configurations that are compiled into a catalog and run in a VoltDB database.  
+- "db": the database project, which contains the schema, stored procedures and other configurations that are compiled into a catalog and run in a VoltDB database.
 - "client": a java client that generates tick events and records performance metrics.
 - "web": a simple web server that provides the demo dashboard.
 
-See below for instructions on running these applications.  For any questions, 
+See below for instructions on running these applications.  For any questions,
 please contact fieldengineering@voltdb.com.
 
 Pre-requisites
@@ -41,7 +41,7 @@ Single Server Instructions
 1. Start the web server
 
     ./run.sh start_web
-   
+
 2. Start the database server
 
     ./run.sh server
@@ -59,11 +59,11 @@ Optionally type Ctrl-C to close the tailing of the server log before proceeding,
 Stop the client (if it hasn't already completed)
 
     Ctrl-C
-    
+
 Stop the database
 
     voltadmin shutdown
-   
+
 Stop the web server
 
     ./run.sh stop_web
@@ -89,9 +89,9 @@ Instructions for running on a cluster
 Before running this demo on a cluster, make the following changes:
 
 1. On each server, edit the run.sh file to set the HOST variable to the name of a selected server in the cluster:
-    
+
     HOST=voltserver01
-    
+
 2. On each server, edit db/deployment-cluster.xml to change hostcount to the actual number of servers (it is defaulted to 3):
 
     <cluster hostcount="3" sitesperhost="8" kfactor="1" />
@@ -103,63 +103,16 @@ Before running this demo on a cluster, make the following changes:
 On each of the servers you should see the following output:
 
     Host id of this node is: 0
-    
+
 When all servers have joined the cluster and it becomes available you will see:
 
     Server completed initialization.
-    
+
 5. To run the client, edit the run.sh script on the server where you intend to run the client to set the SERVERS variable to a comma-separated list of the servers in the cluster (note: this could be a separate server or one of the servers in the cluster).
 
     SERVERS=voltserver01,voltserver02,voltserver03
-    
+
 6. Run the client script:
 
 	./run.sh client
-
-
-
-Instructions for exporting to CSV
----------------------------------
-1. Edit the deployment.xml file to add the following.  For an example, see the provided deployment-export-csv.xml file.
-
-```xml
-<export enabled="true" target="file">  
- <configuration>  
-  <property name="type">csv</property>  
-  <property name="nonce">MyExport</property>  
- </configuration>
-</export>
-```
-
-2. Then follow the instructions for running on a single server or cluster.
-
-
-Instructions for exporting to Hadoop
-------------------------------------
-1. Edit the deployment.xml file to add the following.  See the provided deployment-export-hortonworks.xml and deployment-export-cloudera.xml files.
-
-```xml
-  <export enabled="true" target="http">
-    <configuration>
-      <property name="endpoint">http://sandbox.hortonworks.com:50070/webhdfs/v1/%t/data%p-%g.%t.csv</property>
-      <property name="type">csv</property>
-      <property name="batch.mode">true</properoty>
-      <property name="period">120</property>
-    </configuration>
-  </export>
-```
-
-or 
-
-```xml
-  <export enabled="true" target="http">
-     <configuration>
-       <property name="endpoint">http://quickstart.cloudera:50070/webhdfs/v1/user/cloudera/%t/data%p-%g.%t.csv?user.name=cloudera</property>
-       <property name="type">csv</property>
-     </configuration>
-   </export>
-```
-
-
-2. Then follow the instructions for running on a single server or cluster.
 

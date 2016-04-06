@@ -1,5 +1,4 @@
 # Ad Performance Application
-===========================
 
 Use Case
 ---------------------------
@@ -41,6 +40,8 @@ Other run.sh Actions
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 - *run.sh webserver* : serve the web directory over http on port 8081
 
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
+
 Client Behavior Options
 ---------------------------
 You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
@@ -48,11 +49,11 @@ You can control various characteristics of the demo by modifying the parameters 
 **Speed & Duration:**
 
     --displayinterval=5           (seconds between status reports)
-    --warmup=5                    (how long to warm up before measuring 
+    --warmup=5                    (how long to warm up before measuring
                                    benchmark performance.)
     --duration=120                (benchmark duration in seconds)
     --ratelimit=20000             (run up to this rate of requests/second)
-    
+
 **Cluster Info:**
 
     --servers=$SERVERS            (host(s) client connect to, e.g.
