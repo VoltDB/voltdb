@@ -83,7 +83,7 @@ public class JDBCVoltVerifier {
         System.out.println(config.getConfigDumpString());
 
 
-        System.out.println("Connecting to " + config.servers);
+        System.out.println("Connecting to " + config.vdbServers);
         try {
             client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);
         } catch (IOException e) {
