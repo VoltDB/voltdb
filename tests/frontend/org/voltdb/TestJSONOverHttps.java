@@ -92,6 +92,7 @@ public class TestJSONOverHttps extends TestCase {
     private static final int HTTPD_PORT = 8095;
     private static final String KEYSTORE_RESOURCE = "keystore";
     private static final String KEYSTORE_PASSWD = "password";
+    private static final String KEYSTORE_PASSWD_OBFUSCATED = "OBF:1v2j1uum1xtv1zej1zer1xtn1uvk1v1v";
     private static final String KEYSTORE_SYSPROP = "javax.net.ssl.keyStore";
     private static final String KEYSTORE_PASSWD_SYSPROP = "javax.net.ssl.keyStorePassword";
     private static final String TRUSTSTORE_SYSPROP = "javax.net.ssl.trustStore";
@@ -192,6 +193,37 @@ public class TestJSONOverHttps extends TestCase {
         return res==null ? resource : res.toExternalForm();
     }
 
+    /* To obtain the obfuscated password, use jetty utility as shown below:
+     * Manjus-MacBook-Pro:voltdb manjujames$ java -cp lib/jetty-util-9.3.6.v20151106.jar org.eclipse.jetty.util.security.Password password
+     * 2016-04-07 15:40:26.608:INFO::main: Logging initialized @102ms
+     * password
+     * OBF:1v2j1uum1xtv1zej1zer1xtn1uvk1v1v
+     * MD5:5f4dcc3b5aa765d61d8327deb882cf99
+     * Manjus-MacBook-Pro:voltdb manjujames$
+     */
+    public void testObfuscatedPassword() throws Exception {
+        try {
+            System.setProperty(KEYSTORE_SYSPROP, "");
+            System.setProperty(KEYSTORE_PASSWD_SYSPROP, "");
+            System.setProperty(TRUSTSTORE_SYSPROP, "");
+            System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, null, null);
+            
+            String varString = "Procedure=foocount";
+            TestJSONInterface.Response response =
+                    TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
+            VoltTable result = response.results[0];
+            result.advanceRow();
+            assertEquals(0, result.getLong(0));
+        } finally {
+            if (m_server != null) {
+                m_server.shutdown();
+                m_server.join();
+            }
+            m_server = null;
+        }
+    }
+    
     public void testKeystoreInDeployment() throws Exception {
         try {
             System.setProperty(KEYSTORE_SYSPROP, "");
