@@ -36,6 +36,10 @@ public class CoreZK {
     // -- timestamp: (long) the timestamp at which the first zookeeper node was created
     public static final String instance_id = "/core/instance_id";
 
+    // persistent instance timestamp: (long) the timestamp at the very fist zookeeper node
+    // was created, not matter how many times the node has been recovered or rejoined
+    public static final String persistent_instance_ts = "/core/persistent_instance_ts";
+
     // hosts in the current system (ephemeral)
     public static final String hosts = "/core/hosts";
     public static final String hosts_host = "/core/hosts/host";

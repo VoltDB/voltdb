@@ -660,11 +660,16 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public long getClusterCreateTime() {
+        return 0;
+    }
+
+    @Override
+    public long getPersistentClusterCreateTime() {
         return m_clusterCreateTime;
     }
 
     @Override
-    public void setClusterCreateTime(long clusterCreateTime) {
+    public void setPersistentClusterCreateTime(long clusterCreateTime) {
         m_clusterCreateTime = clusterCreateTime;
     }
 
