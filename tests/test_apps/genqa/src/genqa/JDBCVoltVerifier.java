@@ -29,15 +29,8 @@ import java.sql.Connection;
 import java.util.Timer;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientStats;
-import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 
 public class JDBCVoltVerifier {
@@ -59,7 +52,6 @@ public class JDBCVoltVerifier {
 
     public static void getRows(ReadVoltRows rvr, Client client, Connection jdbcclient) {
         long rowid = 0;
-        long limit = 10;
         long rowCount = 0;
         VoltTable v = null;
 
@@ -93,14 +85,13 @@ public class JDBCVoltVerifier {
 
         System.out.println("Connecting to " + config.servers);
         try {
-            client = VerifierUtils.dbconnect(config.servers, ratelimit);
+            client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         rvr = new ReadVoltRows(client);
 
-        System.out.println("Connecting to the JDBC target (Vertica?)");
+        System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
         jdbcConnection = JDBCGetData.jdbcConnect(config);
 
         getRows(rvr, client, jdbcConnection);

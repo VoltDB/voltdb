@@ -63,10 +63,10 @@ CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGE
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
 , type_not_null_timestamp   TIMESTAMP     NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_varchar25       VARCHAR(32)
 , type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
@@ -91,10 +91,10 @@ CREATE TABLE  export_mirror_partitioned_table
 , type_not_null_bigint      BIGINT        NOT NULL
 , type_null_timestamp       TIMESTAMP
 , type_not_null_timestamp   TIMESTAMP     NOT NULL
-, type_null_decimal         DECIMAL
-, type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
+, type_null_decimal         DECIMAL
+, type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_varchar25       VARCHAR(32)
 , type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
@@ -210,7 +210,7 @@ PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
 -- EXPORT TABLE export_done_table;
 
 -- create procedure SelectwithLimit as select * from PARTITIONED_TABLE where rowid = ? limit ?;
-create procedure SelectwithLimit as select * from PARTITIONED_TABLE where rowid between ? and ? order by rowid limit ?;
+create procedure SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 
 END_OF_BATCH

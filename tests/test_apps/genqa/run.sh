@@ -189,8 +189,8 @@ function async-benchmark-help() {
 }
 
 function async-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
+    # srccompile
+    echo java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -210,14 +210,14 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=120 \
-        --servers=volt15d \
+        --duration=30 \
+        --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
         --autotune=false \
         --catalogswap=false \
-        --latencytarget=10
-        # --ratelimit=10000
+        --latencytarget=10 \
+        --ratelimit=1000
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -248,8 +248,8 @@ function jdbc-benchmark-help() {
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
+    # srccompile
+    echo jdbc-benchmark: java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
         --threads=40 \
         --displayinterval=5 \
         --duration=120 \

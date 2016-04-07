@@ -21,14 +21,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/* This example connects to Vertica and issues a simple select */
-
-/*
- * To run:
- *   javac -cp /home/pshaw/voltdb/voltdb/voltdbclient-6.2.jar:/home/pshaw/voltdb/lib/vertica-jdbc.jar SelectExample.java
- *   java -cp /home/pshaw/voltdb/voltdb/voltdbclient-6.2.jar:/home/pshaw/voltdb/lib/vertica-jdbc.jar:. SelectExample
- */
-
 package genqa;
 
 import java.sql.Connection;
@@ -54,17 +46,18 @@ public class JDBCGetData {
 
     public static Connection jdbcConnect(Config config) {
         try {
-            Class.forName(DRIVER);
+            Class.forName(config.driver);
         } catch (ClassNotFoundException e) {
             System.err.println("Could not find the JDBC driver class.\n");
             e.printStackTrace();
             System.exit(-1);
         }
 
+        String connectString = "jdbc:" + config.jdbcDBMS + "://" + config.host_port + "/" + config.jdbcDatabase;
         try {
-            conn = DriverManager.getConnection(CONNECTSTRING, USER, PASSWORD);
+            conn = DriverManager.getConnection(connectString, config.jdbcUser, config.jdbcPassword);
         } catch (SQLException e) {
-            System.err.println("Could not connect to the database.\n");
+            System.err.println("Could not connect to the database with connect string " + connectString + ".\n");
             e.printStackTrace();
             System.exit(-1);
         }
@@ -82,15 +75,6 @@ public class JDBCGetData {
                     .executeQuery("SELECT * FROM export_partitioned_table where rowid = "
                             + rowid);
             ResultSetMetaData metaData = rs.getMetaData();
-
-
-//            while (rs.next()) {
-//                for (int i = 1; i <= metaData.getColumnCount(); i++) {
-//                    System.out.println(i + ": " + rs.getString(i));
-//                }
-//            }
-            // stmt.close();
-            // conn.close();
         } catch (SQLException e) {
             System.err.println("Exception in DB row access.\n");
             e.printStackTrace();
