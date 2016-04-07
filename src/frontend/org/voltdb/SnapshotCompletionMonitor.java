@@ -196,6 +196,7 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
+            long clusterCreateTime = jsonObj.optLong("clusterCreateTime", -1);
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
             JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
             Iterator<String> partitionKeys = drTupleStreamJSON.keys();
@@ -246,7 +247,8 @@ public class SnapshotCompletionMonitor {
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
                                 Collections.unmodifiableMap(drMixedClusterSizeConsumerState),
-                                drVersion));
+                                drVersion,
+                                clusterCreateTime));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }

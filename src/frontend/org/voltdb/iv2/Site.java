@@ -1286,7 +1286,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
-            boolean requireExistingSequenceNumbers) {
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
         // live rejoin, will transfer to kStateRunning as usual
@@ -1295,6 +1296,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");
+        }
+
+        if (clusterCreateTime != -1) {
+            VoltDB.instance().setClusterCreateTime(clusterCreateTime);
         }
 
         for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {

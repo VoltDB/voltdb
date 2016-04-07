@@ -319,6 +319,7 @@ public class RejoinProducer extends JoinProducerBase {
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
                 Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers = null;
+                long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
@@ -328,6 +329,7 @@ public class RejoinProducer extends JoinProducerBase {
 
                         drSequenceNumbers = event.drSequenceNumbers;
                         allConsumerSiteTrackers = event.drMixedClusterSizeConsumerState;
+                        clusterCreateTime = event.clusterCreateTime;
 
                         // Tells EE which DR version going to use
                         siteConnection.setDRProtocolVersion(event.drVersion);
@@ -355,7 +357,8 @@ public class RejoinProducer extends JoinProducerBase {
                         exportSequenceNumbers,
                         drSequenceNumbers,
                         allConsumerSiteTrackers,
-                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */);
+                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */,
+                        clusterCreateTime);
             }
         };
         try {
