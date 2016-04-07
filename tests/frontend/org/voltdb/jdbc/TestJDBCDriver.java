@@ -43,11 +43,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
@@ -93,9 +91,20 @@ public class TestJDBCDriver {
             "CREATE TABLE WAREHOUSE(A1 INTEGER NOT NULL, A2 INTEGER, A3 INTEGER, A4_ID INTEGER, " +
                              "A5 INTEGER, A6 INTEGER, A7 INTEGER, A8 INTEGER, W_ID INTEGER, " +
                              "PRIMARY KEY(A1));" +
-            "CREATE TABLE ALL_TYPES(A1 TINYINT NOT NULL, A2 TINYINT, A3 SMALLINT, A4 INTEGER, A5 BIGINT, " +
-                             "A6 FLOAT, A7 VARCHAR(10), A8 VARBINARY(10), A9 TIMESTAMP, " +
-                             "A10 DECIMAL, PRIMARY KEY(A1));" +
+            "CREATE TABLE ALL_TYPES("
+                             + "A1 TINYINT NOT NULL, "
+                             + "A2 TINYINT, "
+                             + "A3 SMALLINT, "
+                             + "A4 INTEGER, "
+                             + "A5 BIGINT, "
+                             + "A6 FLOAT, "
+                             + "A7 VARCHAR(10), "
+                             + "A8 VARBINARY(10), "
+                             + "A9 TIMESTAMP, "
+                             + "A10 DECIMAL, "
+                             + "A11 GEOGRAPHY_POINT, "
+                             + "A12 GEOGRAPHY(2048), "
+                             + "PRIMARY KEY(A1));" +
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
             "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
@@ -112,7 +121,7 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("CUSTOMER", "A1");
         pb.addPartitionInfo("NUMBER_NINE", "A1");
         pb.addPartitionInfo("ALL_TYPES", "A1");
-        pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?);", "TT.A1: 0");
+        pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?,?,?);", "TT.A1: 0");
         pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
         pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
         pb.addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;");
@@ -290,13 +299,13 @@ public class TestJDBCDriver {
 
     @Test
     public void testFilterColumnByWildcard() throws SQLException {
-        tableColumnTest("CUSTOMER%", null, 26);
+        tableColumnTest("CUSTOMER%", null, 26); // columns of tables starting with "CUSTOMER"
         tableColumnTest("CUSTOMER%", "", 26);
         tableColumnTest("CUSTOMER%", "%MIDDLE", 1);
         tableColumnTest("CUSTOMER", "____", 1);
         tableColumnTest("%", "%ID", 13);
         tableColumnTest(null, "%ID", 13);
-        tableColumnTest(null, "", 74);
+        tableColumnTest(null, "", 76); // all the columns of all the tables
     }
 
     /**
@@ -431,7 +440,7 @@ public class TestJDBCDriver {
                 count++;
             }
         }
-        assertEquals(13, count);
+        assertEquals(15, count);
     }
 
     @Test
@@ -439,7 +448,7 @@ public class TestJDBCDriver {
         CallableStatement cs = conn.prepareCall("{call SelectC}");
         ResultSet results = cs.executeQuery();
         ResultSetMetaData meta = results.getMetaData();
-        assertEquals(10, meta.getColumnCount());
+        assertEquals(12, meta.getColumnCount());
         // JDBC index starts at 1!!!!!!!!!!!!!!!!!!!!!!!
         assertEquals(Byte.class.getName(), meta.getColumnClassName(1));
         assertEquals(java.sql.Types.TINYINT, meta.getColumnType(1));
@@ -513,6 +522,22 @@ public class TestJDBCDriver {
         assertEquals(12, meta.getScale(10));
         assertFalse(meta.isCaseSensitive(10));
         assertTrue(meta.isSigned(10));
+
+        assertEquals(org.voltdb.types.GeographyPointValue.class.getName(), meta.getColumnClassName(11));
+        assertEquals(java.sql.Types.OTHER, meta.getColumnType(11));
+        assertEquals("GEOGRAPHY_POINT", meta.getColumnTypeName(11));
+        assertEquals(0, meta.getPrecision(11));
+        assertEquals(0, meta.getScale(11));
+        assertFalse(meta.isCaseSensitive(11));
+        assertFalse(meta.isSigned(11));
+
+        assertEquals(org.voltdb.types.GeographyValue.class.getName(), meta.getColumnClassName(12));
+        assertEquals(java.sql.Types.OTHER, meta.getColumnType(12));
+        assertEquals("GEOGRAPHY", meta.getColumnTypeName(12));
+        assertEquals(0, meta.getPrecision(12));
+        assertEquals(0, meta.getScale(12));
+        assertFalse(meta.isCaseSensitive(12));
+        assertFalse(meta.isSigned(12));
     }
 
     @Test
@@ -551,7 +576,7 @@ public class TestJDBCDriver {
     @Test
     public void testInsertNulls() throws SQLException {
         // First inserted row contains all null values (this will cause VoltType.NULL_STRING_OR_VARBINARY to be inserted in every field)
-        CallableStatement cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
+        CallableStatement cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
         cs.setInt(1, 0);
         cs.setNull(2, Types.NULL);
         cs.setNull(3, Types.NULL);
@@ -562,9 +587,11 @@ public class TestJDBCDriver {
         cs.setNull(8, Types.NULL);
         cs.setNull(9, Types.NULL);
         cs.setNull(10, Types.NULL);
+        cs.setNull(11, Types.NULL);
+        cs.setNull(12, Types.NULL);
         cs.execute();
         // Second inserted row contains the specific type of the field causing the typed nulls to be inserted
-        cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
+        cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
         cs.setInt(1, 1);
         cs.setNull(2, Types.TINYINT);
         cs.setNull(3, Types.SMALLINT);
@@ -575,6 +602,8 @@ public class TestJDBCDriver {
         cs.setNull(8, Types.VARBINARY);
         cs.setNull(9, Types.TIMESTAMP);
         cs.setNull(10, Types.DECIMAL);
+        cs.setNull(11, Types.OTHER);
+        cs.setNull(12, Types.OTHER);
         cs.execute();
         // Call SelectC (select * from ALL_TYPES)
         cs = conn.prepareCall("{call SelectC}");
@@ -707,7 +736,6 @@ public class TestJDBCDriver {
     // return true if timeout (excecptionCalled)
     public Boolean runQueryWithTimeout(int timeQuery, int timeout)
             throws SQLException {
-        Boolean[] result = new Boolean[3];
         boolean exceptionCalled = false;
         PreparedStatement stmt = myconn
                 .prepareCall("{call ArbitraryDurationProc(?)}");
