@@ -8,20 +8,19 @@ This app does four simultaneous things on a single-table schema:
 * Check for changes in the maximum value stored in the table.
 * Periodically compute an average of values over various time windows.
 
-It does this by creating task-focused classes that implement Runnable.
-Each class has a specific job and is scheduled to run periodically in a
-threadpool. All inter-task communication is done via the main instance of
-this class.
+It does this by creating task-focused classes that implement Runnable. Each class has a specific job and is scheduled to run periodically in a threadpool. All inter-task communication is done via the main instance of this class.
 
 
 Quickstart
---------------
+---------------------------
 VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create --force" to start an empty, single-node VoltDB server.
-3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
 4. Type "./run.sh client" to run the client code.
+
+You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
 
 The default settings for the client have it keep 30 seconds worth of tuples, deleting older tuples as an ongoing process. See the section below on *run.sh Client Options* for how to run in other modes.
 
@@ -29,39 +28,56 @@ Note that the downloaded VoltDB kits include pre-compiled stored procedures and 
 
 
 Other run.sh Actions
---------------
+---------------------------
 - *run.sh* : start the server
 - *run.sh server* : start the server
-- *run.sh init* : load the schema and stored procedures
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
 - *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
-- *run.sh client* : start the client
+- *run.sh client* : start the client, more than 1 client is permitted
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 
-
-run.sh Client Options
---------------
-Near the bottom of the run.sh bash script is the section run when you type `run.sh client`. In that section is the actual shell command to run the client code, reproduced below:
-
-    java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        windowing.WindowingApp \
-        --displayinterval=5 \              # how often to print the report
-        --duration=120 \                   # how long to run for
-        --servers=localhost:21212 \        # servers to connect to
-        --maxrows=0 \                      # set to nonzero to limit by rowcount
-        --historyseconds=30 \              # set to nonzero to limit by age
-        --inline=false \                   # set to true to delete co-txn with inserts
-        --deletechunksize=100 \            # target max number of rows to delete per txn
-        --deleteyieldtime=100 \            # time to wait between non-inline deletes
-        --ratelimit=15000                  # rate limit for random inserts
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
 
-Changing these settings changes the behavior of the app. The three key options that change the *mode* the app runs in are *maxrows*, *historyseconds* and *inline*.
+Client Behavior Options
+---------------------------
+You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
+
+**Speed & Duration:**
+
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring
+                                   benchmark performance.)
+    --duration=120                (benchmark duration in seconds)
+    --ratelimit=20000             (run up to this rate of requests/second)
+
+**Cluster Info:**
+
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
+
+**Parameters Affecting Simulation:**
+
+    --maxrows=0 \                 (set to nonzero to limit by rowcount)
+    --historyseconds=30 \         (set to nonzero to limit by age)
+    --inline=false \              (set to true to delete co-txn with inserts)
+    --deletechunksize=100 \       (target max number of rows to delete per txn)
+    --deleteyieldtime=100 \       (time to wait between non-inline deletes)
+
+Changing these last settings changes the behavior of the app. The three key options that change the *mode* the app runs in are *maxrows*, *historyseconds* and *inline*.
 
 - If *maxrows* is non-zero, then the app will try to keep the most recent *maxrows* in the database by deleting older rows as newer rows are added.
 - If *historyseconds* is non-zero, then the app will try to keep rows from the most recent *historyseconds* seconds in the database by deleting rows as they age out.
 - The app won't start if both *historyseconds* and *maxrows* are non-zero. It wouldn't be too hard to support both constraints, but this functionality is omitted from this example avoid further complexity.
 - If *inline* mode is enabled, the app will delete rows in the same transaction that it inserts them in. If not enabled, the app will delete rows as an independant process from inserting rows. Both operations could even be broken into separate unix processes and run separately without much additional work.
+
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
 
 
 What do the Queries Do?

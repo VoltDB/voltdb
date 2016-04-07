@@ -3,10 +3,10 @@ Instructions for exporting to CSV
 1. Edit the deployment.xml file to add the following.  For an example, see the provided deployment-export-csv.xml file.
 
 ```xml
-<export enabled="true" target="file">  
- <configuration>  
-  <property name="type">csv</property>  
-  <property name="nonce">MyExport</property>  
+<export enabled="true" target="file">
+ <configuration>
+  <property name="type">csv</property>
+  <property name="nonce">MyExport</property>
  </configuration>
 </export>
 ```
@@ -27,7 +27,7 @@ Instructions for exporting to Hadoop
  </configuration>
 </export>
 ```
-or 
+or
 
 ```xml
   <export enabled="true" target="http">
@@ -37,3 +37,26 @@ or
      </configuration>
    </export>
 ```
+
+Instructions for running with HTTP export
+-----------------------------------------
+
+Here we run the VoltDB database configured to export rows to an HTTP destination, based on conditions set in the stored procedure, CardSwipe. See CardSwipe.java for more details.
+
+1. Start the app-metro dashboard, and browse to it on http://localhost:8081, or some other URL depending on your configuration:
+    ./run.sh start_web <port number>
+
+2. Start the export web server:
+    ./run.sh start_export_web
+
+   Exported rows can be viewed in the command line output from the web service.
+
+3. Start the VoltDB server:
+    ./run.sh export-server
+
+4. Start the client script:
+    ./run.sh client
+
+Browse to http://localhost:8081 to see the app-metro dashboard.
+
+Browse to http://localhost:8083/htmlRows to view a continuously refreshing view of the last 10 exported rows.

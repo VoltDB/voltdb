@@ -15,9 +15,11 @@ Quickstart
 VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create --force" to start an empty, single-node VoltDB server.
-3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
 4. Type "./run.sh client" to run the client code.
+
+You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
 
 The default settings for the client have it running for 2 minutes, and inserting at rows at a rate such that the table can comfortably hold 30s of tuples without any inserts hitting the row limit and failing.
 
@@ -25,28 +27,40 @@ Note that the downloaded VoltDB kits include pre-compiled stored procedures and 
 
 
 Other run.sh Actions
---------------
+---------------------------
 - *run.sh* : start the server
 - *run.sh server* : start the server
-- *run.sh init* : load the schema and stored procedures
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
 - *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
-- *run.sh client* : start the client
+- *run.sh client* : start the client, more than 1 client is permitted
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-run.sh Client Options
---------------
-Near the bottom of the run.sh bash script is the section run when you type `run.sh client`. In that section is the actual shell command to run the client code, reproduced below:
+Client Behavior Options
+---------------------------
+You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
 
-    java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        ddlwindowing.WindowingApp \
-        --displayinterval=5 \              # how often to print the report
-        --duration=120 \                   # how long to run for
-        --servers=localhost:21212 \        # servers to connect to
-        --ratelimit=20000                  # rate limit for random inserts
+**Speed & Duration:**
 
-Changing these settings changes the behavior of the app.
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring
+                                   benchmark performance.)
+    --duration=120                (benchmark duration in seconds)
+    --ratelimit=20000             (run up to this rate of requests/second)
+
+**Cluster Info:**
+
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
+
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
 
 
 How does the EXECUTE action of a LIMIT PARTITION ROWS constraint work?
