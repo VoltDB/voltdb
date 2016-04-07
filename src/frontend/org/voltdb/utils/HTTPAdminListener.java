@@ -892,7 +892,7 @@ public class HTTPAdminListener {
                 "org.eclipse.jetty.server.Request.maxFormContentSize",
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
-        
+
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -923,7 +923,7 @@ public class HTTPAdminListener {
             } else { // HTTPS
                 m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
             }
-            
+
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
 
             //"/"
@@ -976,7 +976,7 @@ public class HTTPAdminListener {
             throw new Exception(e);
         }
     }
-    
+
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
         String sysProp = System.getProperty(sysPropName);
         if (StringUtils.isNotBlank(sysProp)) {
@@ -994,7 +994,7 @@ public class HTTPAdminListener {
             }
         }
     }
-    
+
     private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
@@ -1034,7 +1034,7 @@ public class HTTPAdminListener {
         connector.setPort(port);
         connector.setName("VoltDB-HTTPS");
         connector.open();
-        
+
         return connector;
     }
 

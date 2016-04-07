@@ -97,7 +97,7 @@ public class TestJSONOverHttps extends TestCase {
     private static final String KEYSTORE_PASSWD_SYSPROP = "javax.net.ssl.keyStorePassword";
     private static final String TRUSTSTORE_SYSPROP = "javax.net.ssl.trustStore";
     private static final String TRUSTSTORE_PASSWD_SYSPROP = "javax.net.ssl.trustStorePassword";
-    
+
     private ServerThread m_server;
     private int m_port;
 
@@ -108,7 +108,7 @@ public class TestJSONOverHttps extends TestCase {
                 return true;
             }
         }).build();
-        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext, 
+        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
           SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
         Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
                 .register("http", PlainConnectionSocketFactory.getSocketFactory())
@@ -117,7 +117,7 @@ public class TestJSONOverHttps extends TestCase {
 
         // allows multi-threaded use
         PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager( socketFactoryRegistry);
-        
+
         HttpClientBuilder b = HttpClientBuilder.create();
         b.setSslcontext(sslContext);
         b.setConnectionManager(connMgr);
@@ -146,7 +146,7 @@ public class TestJSONOverHttps extends TestCase {
             return httpclient.execute(post,rh);
         }
     }
-    
+
     private void startServer(String keyStorePath, String keyStorePasswd,
                              String certStorePath, String certStorePasswd) throws IOException {
         m_port = HTTPD_PORT;
@@ -187,7 +187,7 @@ public class TestJSONOverHttps extends TestCase {
             m_server.start();
             m_server.waitForInitialization();
     }
-    
+
     private String getResourcePath(String resource) {
         URL res = this.getClass().getResource(resource);
         return res==null ? resource : res.toExternalForm();
@@ -208,7 +208,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, null, null);
-            
+
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
                     TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
@@ -223,7 +223,7 @@ public class TestJSONOverHttps extends TestCase {
             m_server = null;
         }
     }
-    
+
     public void testKeystoreInDeployment() throws Exception {
         try {
             System.setProperty(KEYSTORE_SYSPROP, "");
@@ -231,7 +231,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null);
-            
+
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
                     TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
@@ -246,7 +246,7 @@ public class TestJSONOverHttps extends TestCase {
             m_server = null;
         }
     }
-    
+
     public void testDefaultPortDeployment() throws Exception {
         try {
             System.setProperty(KEYSTORE_SYSPROP, "");
@@ -255,7 +255,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             m_port = VoltDB.DEFAULT_HTTPS_PORT;
             startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null, 0);
-            
+
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
                     TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
@@ -270,7 +270,7 @@ public class TestJSONOverHttps extends TestCase {
             m_server = null;
         }
     }
-    
+
     public void testKeystoreCertStoreInDeployment() throws Exception {
         try {
             System.setProperty(KEYSTORE_SYSPROP, "");
@@ -278,7 +278,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
-            
+
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
                     TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
@@ -293,7 +293,7 @@ public class TestJSONOverHttps extends TestCase {
             m_server = null;
         }
     }
-    
+
     public void testKeystoreCertStoreInSysProps() throws Exception {
         try {
             System.setProperty(KEYSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
@@ -301,7 +301,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, KEYSTORE_PASSWD);
             startServer("invalid", "invalid", null, null);
-            
+
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
                     TestJSONInterface.responseFromJSON(callProcOverJSON(varString, 200));
@@ -317,4 +317,3 @@ public class TestJSONOverHttps extends TestCase {
         }
     }
 }
-    
