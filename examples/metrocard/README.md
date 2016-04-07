@@ -9,108 +9,59 @@ This application performs high velocity transaction processing for metro cards. 
 
 Optionally, the project can export data using the HTTP connector. There's a simple webserver included that acts as destination for the exported rows of data.
 
-Code organization
------------------
-The code is divided into projects:
+Quickstart
+---------------------------
+VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
-- "db": the database project, which contains the schema, stored procedures and other configurations that are compiled into a catalog and run in a VoltDB database.
-- "client": a java client that loads a set of cards and then generates random card transactions a high velocity to simulate card activity.
-- "web": a web dashboard client (static html page with dynamic content)
-- "exportWebServer": a Python-based webserver configured to receive exported rows and provide, as an additional endpoint, a rolling display of the last 10 exported rows
+1. Make sure "bin" inside the VoltDB kit is in your path.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+4. Type "./run.sh client" to run the client code.
+5. Open up the index.html the "web" directory to view the status dashboard.
 
-See below for instructions on running these applications.  For any questions,
-please contact fieldengineering@voltdb.com.
+If you're running the example on a different machine than your web browser is running on, you can run `./run.sh webserver` in a new shell and then connect to your dashboard from a browser at [http://servername:8081](http://servername:8081).
 
-Pre-requisites
---------------
-Before running these scripts you need to have VoltDB 5.0 (Enterprise or Community) or later installed, and you should add the voltdb-$(VERSION)/bin directory to your PATH environment variable, for example:
+You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
 
-    export PATH="$PATH:$HOME/voltdb-ent-5.2.1/bin"
+Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
+Other run.sh Actions
+---------------------------
+- *run.sh* : start the server
+- *run.sh server* : start the server
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
+- *run.sh client* : start the client, more than 1 client is permitted
+- *run.sh clean* : remove compilation and runtime artifacts
+- *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
+- *run.sh webserver* : serve the web directory over http on port 8081
 
-Demo Instructions
------------------
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-1. Start the web server
-
-    ./run.sh start_web
-
-2. Start the database and client
-
-    ./run.sh demo
-
-3. Open a web browser to http://hostname:8081
-
-4. To stop the demo:
-
-Stop the client (if it hasn't already completed)
-
-    Ctrl-C
-
-Stop the database
-
-    voltadmin shutdown
-
-Stop the web server
-
-    ./run.sh stop_web
-
-Options
--------
+Client Behavior Options
+---------------------------
 You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
 
-Speed & Duration:
+**Speed & Duration:**
 
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring
+                                   benchmark performance.)
     --duration=120                (benchmark duration in seconds)
-    --autotune=true               (true = ignore rate limit, run at max throughput until latency is impacted)
-                                  (false = run at the specified rate limit)
-    --ratelimit=20000             (when autotune=false, run up to this rate of requests/second)
+    --ratelimit=20000             (run up to this rate of requests/second)
 
-Metadata volumes and ratios:
+**Cluster Info:**
+
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
+
+**Parameters Affecting Simulation:**
 
     --cardcount=500000            (number of metro cards created)
 
-
-Instructions for running on a cluster
--------------------------------------
-
-Before running this demo on a cluster, make the following changes:
-
-1. On each server, edit the run.sh file to set the HOST variable to the name of the **first** server in the cluster:
-
-    HOST=voltserver01
-
-2. On each server, start the database after starting the web server as in step 1 above:
-
-	./run.sh cluster-server
-
-3. On one server, Edit the run.sh script to set the SERVERS variable to a comma-separated list of the servers in the cluster
-
-    SERVERS=voltserver01,voltserver02,voltserver03
-
-4. Run the client script:
-
-	./run.sh client
-
-Instructions for running with HTTP export
------------------------------------------
-
-Here we run the VoltDB database configured to export rows to an HTTP destination, based on conditions set in the stored procedure, CardSwipe. See CardSwipe.java for more details.
-
-1. Start the app-metro dashboard, and browse to it on http://localhost:8081, or some other URL depending on your configuration:
-    ./run.sh start_web <port number>
-
-2. Start the export web server:
-    ./run.sh start_export_web
-
-   Exported rows can be viewed in the command line output from the web service.
-
-3. Start the VoltDB server:
-    ./run.sh export-server
-
-4. Start the client script:
-    ./run.sh client
-
-Browse to http://localhost:8081 to see the app-metro dashboard.
-
-Browse to http://localhost:8083/htmlRows to view a continuously refreshing view of the last 10 exported rows.
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.

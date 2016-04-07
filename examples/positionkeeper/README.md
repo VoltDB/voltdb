@@ -4,87 +4,56 @@ Use Case
 --------
 This application simulates a simple position keeper applicaton that maintains the positions of portfolios that are updated frequently as trades and price changes occur.
 
-Code organization
------------------
-The code is divided into two projects:
+Quickstart
+---------------------------
+VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
-- "db": the database project, which contains the schema, stored procedures and other configurations that are compiled into a catalog and run in a VoltDB database.  
-- "client": a java client that loads a set of cards and then generates random card transactions a high velocity to simulate card activity.
+1. Make sure "bin" inside the VoltDB kit is in your path.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+4. Type "./run.sh client" to run the client code.
 
-See below for instructions on running these applications.  For any questions, 
-please contact fieldengineering@voltdb.com.
+You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.
 
-Pre-requisites
---------------
-Before running these scripts you need to have VoltDB 4.0 (Enterprise or Community) or later installed, and you should add the voltdb-$(VERSION)/bin directory to your PATH environment variable, for example:
+Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-    export PATH="$PATH:$HOME/voltdb-ent-4.0.2/bin"
+Other run.sh Actions
+---------------------------
+- *run.sh* : start the server
+- *run.sh server* : start the server
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
+- *run.sh client* : start the client, more than 1 client is permitted
+- *run.sh clean* : remove compilation and runtime artifacts
+- *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-Instructions
-------------
+Client Behavior Options
+---------------------------
+You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
 
-1. Start the database in the background
+**Speed & Duration:**
 
-    ./start_db.sh
-     
-2. Run the client application
-
-    ./run_client.sh
-	
-Note: this client can only be run once, not repeatedly, or it will stop with unique constraint violations.  To run it again, the database needs to be stopped and restarted, or all of the tables need to be truncated.
-
-3. To stop the database and clean up temp files
-
-    voltadmin shutdown
-    ./clean.sh
-
-
-
-Options
--------
-You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the run_client.sh script.
-
-Speed & Duration:
-
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring
+                                   benchmark performance.)
     --duration=120                (benchmark duration in seconds)
-    --autotune=true               (true = ignore rate limit, run at max throughput until latency is impacted)
-                                  (false = run at the specified rate limit)
-    --ratelimit=20000             (when autotune=false, run up to this rate of requests/second)
+    --ratelimit=20000             (run up to this rate of requests/second)
 
-Use case parameters:
+**Cluster Info:**
 
-	--traders=1000                 (number of traders)
-	--secpercnt=10                 (number of securities each trader has in their portfolio)
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
 
+**Parameters Affecting Simulation:**
 
-Instructions for running on a cluster
--------------------------------------
+    --traders=1000                (number of traders)
+	--secpercnt=10                (number of securities each trader has in their portfolio)
 
-Before running this demo on a cluster, make the following changes:
-
-1. On each server, edit the start_db_cluster.sh file to set the HOST variable to the name of the **first** server in the cluster:
-    
-    HOST=voltserver01
-    
-2. On each server, edit db/deployment-cluster.xml to set hostcount to the correct number of servers:
-
-    <cluster hostcount="3" sitesperhost="8" kfactor="0" />
-	
-Also, in the same file, set the voltdbroot path to an appropriate path for your servers.
-
-4. On each server, run the start script:
-
-    ./start_db_cluster.sh
-    
-5. On one server, Edit the run_client.sh script to set the SERVERS variable to a comma-separated list of the servers in the cluster
-
-    SERVERS=voltserver01,voltserver02,voltserver03
-    
-6. Run the client script:
-
-    ./run_client.sh
-
-
-
-
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
