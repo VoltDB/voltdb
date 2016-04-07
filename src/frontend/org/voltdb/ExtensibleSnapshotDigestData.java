@@ -169,6 +169,10 @@ public class ExtensibleSnapshotDigestData {
 
     private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj) throws JSONException {
         JSONObject stateInfoMap;
+        // clusterCreateTime should be same across the cluster
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
+        assert (!jsonObj.has("clusterCreateTime") || (clusterCreateTime == jsonObj.getLong("clusterCreateTime")));
+        jsonObj.put("clusterCreateTime", clusterCreateTime);
         if (jsonObj.has("drTupleStreamStateInfo")) {
             stateInfoMap = jsonObj.getJSONObject("drTupleStreamStateInfo");
         } else {
@@ -268,6 +272,9 @@ public class ExtensibleSnapshotDigestData {
 
     private void writeDRVersionToSnapshot(JSONStringer stringer) throws IOException {
         try {
+            long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
+            stringer.key("clusterCreateTime").value(clusterCreateTime);
+
             Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
             if (iter.hasNext()) {
                 stringer.key("drVersion").value(iter.next().getValue().drVersion);
