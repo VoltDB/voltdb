@@ -160,25 +160,26 @@ public class TestMpTransactionState extends TestCase
                     depsToResumeList.get(i), createDummyParameterSet());
         }
 
-       for (int i = 0; i < depsForLocalTask.size(); i++) {
-           if (depsForLocalTask.get(i) < 0) continue;
-           plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
-       }
-       // create the FragmentResponse for the BorrowTask
-       FragmentResponseMessage resp =
-           new FragmentResponseMessage(plan.remoteWork, remoteHSIds[0]);
-       resp.setStatus(FragmentResponseMessage.SUCCESS, null);
-       for (int j = 0; j < batchSize ; j++) {
-           resp.addDependency(depsToResumeList.get(j),
-                              new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                     VoltType.BIGINT)));
-       }
-       System.out.println("BORROW RESPONSE: " + resp);
-       plan.generatedResponses.add(resp);
+        for (int i = 0; i < depsForLocalTask.size(); i++) {
+            if (depsForLocalTask.get(i) < 0) continue;
+            plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
+        }
+        // create the FragmentResponse for the BorrowTask
+        FragmentResponseMessage resp =
+        new FragmentResponseMessage(plan.remoteWork, remoteHSIds[0]);
+        resp.m_sourceHSId = buddyHSId;
+        resp.setStatus(FragmentResponseMessage.SUCCESS, null);
+        for (int j = 0; j < batchSize ; j++) {
+            resp.addDependency(depsToResumeList.get(j),
+                               new VoltTable(new VoltTable.ColumnInfo("BOGO",
+                                                                      VoltType.BIGINT)));
+        }
+        System.out.println("BORROW RESPONSE: " + resp);
+        plan.generatedResponses.add(resp);
 
-       System.out.println("LOCAL TASK: " + plan.localWork.toString());
+        System.out.println("LOCAL TASK: " + plan.localWork.toString());
 
-       return plan;
+        return plan;
     }
 
     List<Long> allHsids;
