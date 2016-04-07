@@ -1366,6 +1366,7 @@ JAVA COMPILATION
     <copy flatten='false' todir='${build.test.dir}'>
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
+            <include name="**/keystore"/>
         </fileset>
     </copy>
     <copy flatten='false' todir='${build.testproc.dir}'>

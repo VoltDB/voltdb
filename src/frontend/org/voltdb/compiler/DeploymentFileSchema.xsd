@@ -304,7 +304,7 @@
       </xs:element>
       <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
     </xs:sequence>
-    <xs:attribute name="port" type="xs:int" default="8080"/>
+    <xs:attribute name="port" type="xs:int" default="0"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 

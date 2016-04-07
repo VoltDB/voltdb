@@ -52,7 +52,6 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
@@ -802,12 +801,10 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            System.out.println("In APIRequestHandler.handle with target=" + target);
             super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
-                System.out.println("jsonEnabled: " + m_jsonEnabled);
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
@@ -877,7 +874,6 @@ public class HTTPAdminListener {
 
     public HTTPAdminListener(
             boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
-        System.out.println("********HTTPAdminListener.ctor");
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
@@ -910,7 +906,6 @@ public class HTTPAdminListener {
 
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
-        System.out.println("*****httpsType=" + httpsType);
         try {
             if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
@@ -920,7 +915,6 @@ public class HTTPAdminListener {
                 if (intf != null && intf.length() > 0) {
                     connector.setHost(intf);
                 }
-                System.out.println("****SETting port: " + port);
                 connector.setPort(port);
                 connector.setName("VoltDB-HTTPD");
                 //open the connector here so we know if port is available and Init work can retry with next port.
@@ -988,16 +982,15 @@ public class HTTPAdminListener {
         if (StringUtils.isNotBlank(sysProp)) {
             return sysProp.trim();
         } else {
-            if (store==null ||
-                    (valueType.equals("path") && StringUtils.isBlank(store.getPath())) ||
-                    (valueType.equals("password") && StringUtils.isBlank(store.getPassword())) ) {
-                if (throwForNull) {
-                    throw new RuntimeException("Keystore must be configured with password in deployment file or using system property for HTTPS");
-                } else {
-                    return null;
-                }
+            String value = null;
+            if (store!=null) {
+                value = valueType.equals("path") ? store.getPath() : store.getPassword();
+            }
+            if (StringUtils.isBlank(value) && throwForNull) {
+                    throw new RuntimeException(
+                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property");
             } else {
-                return store.getPath().trim();
+                return (value!=null) ? value.trim() : value;
             }
         }
     }
@@ -1005,14 +998,19 @@ public class HTTPAdminListener {
     private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
-        sslContextFactory.setKeyStorePath(getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeyStore(), "path", true));
+        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeyStore(), "path", true);
+        sslContextFactory.setKeyStorePath(value);
         sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeyStore(), "password", true));
-        sslContextFactory.setTrustStorePath(getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTrustStore(), "path", false));
-        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTrustStore(), "password", false));
-        //sslContextFactory.setKeyManagerPassword("password");
-        //sslContextFactory.setTrustStorePath("/Users/manjujames/workspaces/voltdb/keystore");
-        //sslContextFactory.setTrustStorePassword("password");
-        /* TODO: Do we need this
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTrustStore(), "path", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePath(value);
+        }
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTrustStore(), "password", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePassword(value);
+        }
+        /* More configurable things that we are not using for now.
+        sslContextFactory.setKeyManagerPassword("password");
         sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
                 "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
@@ -1024,25 +1022,16 @@ public class HTTPAdminListener {
         // SSL HTTP Configuration
         HttpConfiguration httpsConfig = new HttpConfiguration();
         httpsConfig.setSecureScheme("https");
-        httpsConfig.setSecurePort(8443);
-        // TODO: figure out what these are for...
-        httpsConfig.setOutputBufferSize(32768);
-        httpsConfig.setRequestHeaderSize(8192);
-        httpsConfig.setResponseHeaderSize(8192);
-        httpsConfig.setSendServerVersion(true);
-        httpsConfig.setSendDateHeader(false);
-        httpsConfig.addCustomizer(new SecureRequestCustomizer());
+        httpsConfig.setSecurePort(port);
 
         // SSL Connector
         ServerConnector connector = new ServerConnector(m_server,
             new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
             new HttpConnectionFactory(httpsConfig));
-        System.out.println("-------intf: " + intf);
         if (intf != null && intf.length() > 0) {
-            System.out.println("Setting host to " + intf);
             connector.setHost(intf);
         }
-        connector.setPort(8443);
+        connector.setPort(port);
         connector.setName("VoltDB-HTTPS");
         connector.open();
         
