@@ -309,7 +309,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             Table[] tables) throws IOException
     {
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
-        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
                 context.getCatalogCRC(),
@@ -321,7 +320,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 extraSnapshotData,
                 instId,
                 timestamp,
-                clusterCreateTime,
                 newPartitionCount,
                 context.getClusterId());
         if (completionTask != null) {
