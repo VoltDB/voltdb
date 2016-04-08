@@ -50,15 +50,15 @@ public class ExtensibleSnapshotDigestData {
      * termination path so it can publish it to ZK where it is extracted by rejoining
      * nodes
      */
-    private final Map<Integer, JSONObject> m_remoteDCLastIds;
+    private final Map<Integer, JSONObject> m_drMixedClusterSizeConsumerState;
 
     public ExtensibleSnapshotDigestData(
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
-            Map<Integer, JSONObject> remoteDCLastIds) {
+            Map<Integer, JSONObject> drMixedClusterSizeConsumerState) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
-        m_remoteDCLastIds = remoteDCLastIds;
+        m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
     }
 
     private void writeExportSequenceNumbersToSnapshot(JSONStringer stringer) throws IOException {
@@ -198,10 +198,10 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> remoteDCLastIds)
+    static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerState)
             throws JSONException {
         JSONObject clusters = new JSONObject();
-        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : remoteDCLastIds.entrySet()) {
+        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
             // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
             // from the local cluster's partition count (which is not tracked here)
             JSONObject partitions = new JSONObject();
@@ -242,14 +242,14 @@ public class ExtensibleSnapshotDigestData {
         //DR ids/unique ids for remote partitions indexed by remote datacenter id,
         //each DC has a full partition set
         JSONObject dcIdMap;
-        if (jsonObj.has("remoteDCLastIds")) {
-            dcIdMap = jsonObj.getJSONObject("remoteDCLastIds");
+        if (jsonObj.has("drMixedClusterSizeConsumerState")) {
+            dcIdMap = jsonObj.getJSONObject("drMixedClusterSizeConsumerState");
         } else {
             dcIdMap = new JSONObject();
-            jsonObj.put("remoteDCLastIds", dcIdMap);
+            jsonObj.put("drMixedClusterSizeConsumerState", dcIdMap);
         }
 
-        for (Map.Entry<Integer, JSONObject> dcEntry : m_remoteDCLastIds.entrySet()) {
+        for (Map.Entry<Integer, JSONObject> dcEntry : m_drMixedClusterSizeConsumerState.entrySet()) {
             //Last seen ids for a specific data center
             final String consumerPartitionString = dcEntry.getKey().toString();
             if (!dcIdMap.has(consumerPartitionString)) {
@@ -265,9 +265,9 @@ public class ExtensibleSnapshotDigestData {
                 stringer.key("drVersion").value(iter.next().getValue().drVersion);
             }
             writeDRTupleStreamInfoToSnapshot(stringer);
-            stringer.key("remoteDCLastIds");
+            stringer.key("drMixedClusterSizeConsumerState");
             stringer.object();
-            for (Entry<Integer, JSONObject> e : m_remoteDCLastIds.entrySet()) {
+            for (Entry<Integer, JSONObject> e : m_drMixedClusterSizeConsumerState.entrySet()) {
                 stringer.key(e.getKey().toString());    // Consumer partitionId
                 stringer.value(e.getValue());           // Trackers from that site
             }
