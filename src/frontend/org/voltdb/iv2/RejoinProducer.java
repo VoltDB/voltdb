@@ -327,7 +327,7 @@ public class RejoinProducer extends JoinProducerBase {
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
                         drSequenceNumbers = event.drSequenceNumbers;
-                        allConsumerSiteTrackers = event.remoteDCLastIds;
+                        allConsumerSiteTrackers = event.drMixedClusterSizeConsumerState;
 
                         // Tells EE which DR version going to use
                         siteConnection.setDRProtocolVersion(event.drVersion);
