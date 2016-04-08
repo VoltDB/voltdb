@@ -257,7 +257,11 @@ def start_virtual_environment(arr, verbose=False):
                 else:
                     build_venv = venv_version != version
 
-            packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
+            if sys.version_info[:2] >= (2, 7):
+                packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements.txt')
+            else:
+                packages = os.path.join(G.base_dir, 'lib/python/vdm/requirements_python_2.6.txt')
+
             if build_venv:
                 _build_virtual_environment(venv_dir, version, packages)
             else:
