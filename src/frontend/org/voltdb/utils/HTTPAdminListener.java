@@ -984,13 +984,13 @@ public class HTTPAdminListener {
         } else {
             String value = null;
             if (store!=null) {
-                value = valueType.equals("path") ? store.getPath() : store.getPassword();
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
             }
             if (StringUtils.isBlank(value) && throwForNull) {
-                    throw new RuntimeException(
+                    throw new IllegalArgumentException(
                         "To enable HTTPS, keystore must be configured with password in deployment file or using system property");
             } else {
-                return (value!=null) ? value.trim() : value;
+                return value;
             }
         }
     }
@@ -1009,14 +1009,15 @@ public class HTTPAdminListener {
         if (value!=null) {
             sslContextFactory.setTrustStorePassword(value);
         }
-        /* More configurable things that we are not using for now.
-        sslContextFactory.setKeyManagerPassword("password");
+        // exclude weak ciphers
         sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
                 "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
                 "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
                 "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
                 "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+        /* More configurable things that we are not using for now.
+        sslContextFactory.setKeyManagerPassword("password");
                 */
 
         // SSL HTTP Configuration

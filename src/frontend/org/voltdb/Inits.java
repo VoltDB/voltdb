@@ -513,10 +513,12 @@ public class Inits {
             m_rvdb.m_jsonEnabled = false;
             boolean httpsEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                httpPort = m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getHttps()!=null && m_deployment.getHttpd().getHttps().isEnabled()) {
                     httpsEnabled = true;
                 }
+                httpPort = (m_deployment.getHttpd().getPort()==null) ?
+                        (httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
+                        m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getJsonapi() != null) {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
