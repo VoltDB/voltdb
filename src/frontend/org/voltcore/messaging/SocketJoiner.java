@@ -340,6 +340,7 @@ public class SocketJoiner {
             String remoteBuildString = jsObj.getString("versionString");
 
             // send a response with version/build data of this node
+            //ANISH Add cluster name and hostCount as part of this. If clusterName mismatch bail.
             JSONObject returnJs = new JSONObject();
             returnJs.put("versionString", VoltDB.instance().getVersionString());
             returnJs.put("buildString", VoltDB.instance().getBuildString());

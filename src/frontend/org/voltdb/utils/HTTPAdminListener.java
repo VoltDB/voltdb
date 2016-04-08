@@ -77,6 +77,9 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.eclipse.jetty.server.handler.ErrorHandler;
+import org.voltdb.StatusProvider;
 
 public class HTTPAdminListener {
 
@@ -86,11 +89,16 @@ public class HTTPAdminListener {
     Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
+    private StatusProvider m_statusProvider;
 
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+    final AtomicBoolean m_ready = new AtomicBoolean(false);
 
+    class VoltNotReadyHandler extends ErrorHandler {
+
+    }
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
         VoltLogger logger = new VoltLogger("HOST");
@@ -128,18 +136,24 @@ public class HTTPAdminListener {
 
         @Override
         public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+            if (!m_ready.get()) {
+                response.setStatus(HttpServletResponse.SC_OK);
+                response.getWriter().print("<html><head><meta http-equiv=\"refresh\" content=\"10\"></head><body>VoltDB Instance is not yet ready to accept request. Please wait</body></html>");
+                rqst.setHandled(true);
+                return;
+            }
             response.setHeader("Host", getHostHeader());
         }
 
-        //Build a client response based json response
-        protected String buildClientResponse(String jsonp, byte code, String msg) {
-            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-            if (jsonp != null) {
-                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
-            }
-            return rimpl.toJSONString();
-        }
+    }
 
+        //Build a client response based json response
+    private static String buildClientResponse(String jsonp, byte code, String msg) {
+        ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+        if (jsonp != null) {
+            return String.format("%s( %s )", jsonp, rimpl.toJSONString());
+        }
+        return rimpl.toJSONString();
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -149,6 +163,7 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try{
 
                 // if this is an internal jetty retry, then just tell
@@ -250,6 +265,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             handleReportPage(baseRequest, response);
         }
 
@@ -265,6 +281,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
@@ -293,6 +310,60 @@ public class HTTPAdminListener {
         }
     }
 
+    // /management/status handler
+    class ManagementStatusHandler extends AbstractHandler {
+        private final ObjectMapper m_mapper;
+
+        public ManagementStatusHandler() {
+            m_mapper = new ObjectMapper();
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+        }
+
+        // GET on /management/status resources.
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                m_mapper.writeValue(response.getWriter(), m_statusProvider);
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+            }
+        }
+    }
+
+    // /management/status handler
+    class ManagementConfigHandler extends AbstractHandler {
+
+        public ManagementConfigHandler() {
+        }
+
+        // GET on /management/config resources.
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Got config."));
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+            }
+        }
+    }
+
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
         private final ObjectMapper m_mapper;
@@ -310,6 +381,8 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
+            super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
@@ -433,6 +506,7 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
@@ -794,6 +868,7 @@ public class HTTPAdminListener {
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
+            if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
@@ -864,11 +939,11 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(
+    public HTTPAdminListener(StatusProvider statusProvider,
             boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
-
+        m_statusProvider = statusProvider;
         /*
          * Don't force us to look at a huge pile of threads
          */
@@ -941,6 +1016,17 @@ public class HTTPAdminListener {
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
 
+            ///management/status
+            ContextHandler mgmtStatusHandler = new ContextHandler("/management/status");
+            mgmtStatusHandler.setHandler(new ManagementStatusHandler());
+            ///management/config
+            ContextHandler mgmtConfigHandler = new ContextHandler("/management/config");
+            mgmtConfigHandler.setHandler(new ManagementConfigHandler());
+
+            //Generic error till server comes up.
+            VoltNotReadyHandler eHandler = new VoltNotReadyHandler();
+            eHandler.setShowStacks(false);
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
@@ -948,13 +1034,17 @@ public class HTTPAdminListener {
                     ddlRequestHandler,
                     deploymentRequestHandler,
                     profileRequestHandler,
-                    dbMonitorHandler
+                    dbMonitorHandler,
+                    mgmtStatusHandler,
+                    mgmtConfigHandler
             });
 
             m_server.setHandler(handlers);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
+            m_server.addBean(eHandler);
+            m_server.start();
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { connector.close(); } catch (Exception e2) {}
@@ -963,9 +1053,13 @@ public class HTTPAdminListener {
         }
     }
 
+    public void setStatusProvider(StatusProvider statusProvider) {
+        m_statusProvider = statusProvider;
+    }
+
     public void start() throws Exception {
         try {
-            m_server.start();
+            m_ready.set(true);
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
