@@ -124,8 +124,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t spHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
-                                  DRRecordType type,
-                                  const std::pair<const TableIndex*, uint32_t>& indexPair)
+                                  DRRecordType type)
 {
     size_t startingUso = m_uso;
 
@@ -141,7 +140,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    tupleMaxLength = computeOffsets(type, indexPair, tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
+    tupleMaxLength = computeOffsets(type, tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -157,7 +156,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
-    writeRowTuple(tuple, rowHeaderSz, rowMetadataSz, interestingColumns, indexPair, io);
+    writeRowTuple(tuple, rowHeaderSz, rowMetadataSz, interestingColumns, io);
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
@@ -183,8 +182,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                          int64_t spHandle,
                                          int64_t uniqueId,
                                          TableTuple &oldTuple,
-                                         TableTuple &newTuple,
-                                         const std::pair<const TableIndex*, uint32_t>& indexPair) {
+                                         TableTuple &newTuple) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -201,10 +199,10 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
     DRRecordType type = DR_RECORD_UPDATE;
-    maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
+    maxLength += computeOffsets(type, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
     // No danger of replacing the second tuple by an index key, since if the type is going to change
     // it has already done so in the above computeOffsets() call
-    maxLength += computeOffsets(type, indexPair, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns);
+    maxLength += computeOffsets(type, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns);
     assert(!dummyInterestingColumns);
 
     if (!m_currBlock) {
@@ -221,8 +219,8 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
-    writeRowTuple(oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns, indexPair, io);
-    writeRowTuple(newTuple, newRowHeaderSz, newRowMetadataSz, NULL, indexPair, io);
+    writeRowTuple(oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns, io);
+    writeRowTuple(newTuple, newRowHeaderSz, newRowMetadataSz, NULL, io);
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
@@ -263,7 +261,6 @@ void DRTupleStream::writeRowTuple(TableTuple& tuple,
         size_t rowHeaderSz,
         size_t rowMetadataSz,
         const std::vector<int> *interestingColumns,
-        const std::pair<const TableIndex*, uint32_t> &indexPair,
         ExportSerializeOutput &io) {
     size_t startPos = io.position();
     // initialize the full row header to 0. This also
@@ -280,18 +277,11 @@ void DRTupleStream::writeRowTuple(TableTuple& tuple,
     tuple.serializeToDR(io, 0, nullArray, interestingColumns);
 
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
-    if (interestingColumns) {
-        // add the row length and a crc of the index used to the header
-        hdr.writeInt((int32_t)(io.position() - startPos - 2 * sizeof(int32_t)));
-        hdr.writeInt(indexPair.second);
-    } else {
-        // add the row length to the header
-        hdr.writeInt((int32_t)(io.position() - startPos - sizeof(int32_t)));
-    }
+    // add the row length to the header
+    hdr.writeInt((int32_t)(io.position() - startPos - sizeof(int32_t)));
 }
 
 size_t DRTupleStream::computeOffsets(DRRecordType &type,
-        const std::pair<const TableIndex*, uint32_t> &indexPair,
         TableTuple &tuple,
         size_t &rowHeaderSz,
         size_t &rowMetadataSz,
@@ -302,18 +292,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     switch (type) {
     case DR_RECORD_DELETE:
     case DR_RECORD_UPDATE:
-        if (indexPair.first) {
-            // The index-optimized versions of these types have values exactly
-            // 5 larger than the unoptimized versions (asserted in test)
-            // DR_RECORD_DELETE => DR_RECORD_DELETE_BY_INDEX
-            // DR_RECORD_UPDATE => DR_RECORD_UPDATE_BY_INDEX
-            type = static_cast<DRRecordType>((int)type + 5);
-            interestingColumns = &(indexPair.first->getColumnIndices());
-            rowMetadataSz += sizeof(int32_t);
-            columnCount = static_cast<int>(interestingColumns->size());
-        } else {
-            columnCount = tuple.sizeInValues();
-        }
+        columnCount = tuple.sizeInValues();
         break;
     default:
         columnCount = tuple.sizeInValues();
@@ -513,14 +492,12 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
 
-    const TableIndex* index = NULL;
-    std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
     for (int ii = 0; ii < 100;) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT);
         }
         stream.endTransaction(uid);
         ii += 5;
