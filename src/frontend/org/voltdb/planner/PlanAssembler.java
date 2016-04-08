@@ -33,6 +33,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -72,6 +73,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
@@ -1356,11 +1358,51 @@ public class PlanAssembler {
         retval.setReadOnly(false);
 
         // Iterate over each column in the table we're inserting into:
-        //   - Make sure we're supplying values for columns that require it
-        //   - Set partitioning expressions for VALUES (...) case
+        //   - Make sure we're supplying values for columns that require it.
+        //     For a normal INSERT, these are the usual non-nullable values that
+        //     don't have a default value.
+        //     For an UPSERT, the (only) required values are the primary key
+        //     components. Other required values can be supplied from the
+        //     existing row in "UPDATE mode". If some other value is required
+        //     for an INSERT, UPSERT's "INSERT mode" will throw a runtime
+        //     constraint violation as the INSERT operation tries to set the
+        //     non-nullable column to null.
+        //   - Set partitioning expressions for VALUES (...) case.
+        //     TODO: it would be good someday to do the same kind of processing
+        //      for the INSERT ... SELECT ... case, by analyzing the subquery.
+        if (m_parsedInsert.m_isUpsert) {
+            boolean hasPrimaryKey = false;
+            for (Constraint constraint : targetTable.getConstraints()) {
+                if (constraint.getType() != ConstraintType.PRIMARY_KEY.getValue()) {
+                    continue;
+                }
+                hasPrimaryKey = true;
+                boolean targetsPrimaryKey = false;
+                for (ColumnRef colRef : constraint.getIndex().getColumns()) {
+                    int primary = colRef.getColumn().getIndex();
+                    for (Column targetCol : m_parsedInsert.m_columns.keySet()) {
+                        if (targetCol.getIndex() == primary) {
+                            targetsPrimaryKey = true;
+                            break;
+                        }
+                    }
+                    if (! targetsPrimaryKey) {
+                        throw new PlanningErrorException("UPSERT on table \"" +
+                                targetTable.getTypeName() +
+                                "\" must specify a value for primary key \"" +
+                                colRef.getColumn().getTypeName() + "\".");
+                    }
+                }
+            }
+            if (! hasPrimaryKey) {
+                throw new PlanningErrorException("UPSERT is not allowed on table \"" +
+                        targetTable.getTypeName() + "\" that has no primary key.");
+            }
+        }
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
         for (Column col : targetTableColumns) {
-            boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
+            boolean needsValue = (!m_parsedInsert.m_isUpsert) &&
+                    (col.getNullable() == false) && (col.getDefaulttype() == 0);
             if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
                 // This check could be done during parsing?
                 throw new PlanningErrorException("Column " + col.getName()

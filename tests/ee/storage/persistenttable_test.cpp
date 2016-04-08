@@ -236,7 +236,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     iterator = table->iteratorDeletingAsWeGo();
     ASSERT_TRUE(iterator.next(tuple));
     ASSERT_TRUE(iterator.next(tuple));
-    srcTuple = table->getTempTupleInlined(tuple);
+    srcTuple = table->copyIntoTempTuple(tuple);
     srcTuple.setNValue(1, newStringData);
 
     table->updateTupleWithSpecificIndexes(tuple,
