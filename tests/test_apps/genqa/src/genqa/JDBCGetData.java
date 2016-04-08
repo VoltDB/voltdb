@@ -72,7 +72,7 @@ public class JDBCGetData {
             // So far so good, lets issue a query...
             Statement stmt = conn.createStatement();
             rs = stmt
-                    .executeQuery("SELECT * FROM export_partitioned_table where rowid = "
+                    .executeQuery("SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = " 
                             + rowid);
             ResultSetMetaData metaData = rs.getMetaData();
         } catch (SQLException e) {

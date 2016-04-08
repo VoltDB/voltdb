@@ -4,6 +4,7 @@ APPNAME="genqa"
 APPNAME2="genqa2"
 APPNAME3="eggenqa"
 APPNAME4="eggenqa2"
+APPNAME_EXPORT="genqa_nocat"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -38,7 +39,6 @@ ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
 CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
-VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
@@ -48,12 +48,13 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar $APPNAME_EXPORT.jar voltdbroot voltdbroot
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
+    ant -f build.xml
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
@@ -62,6 +63,7 @@ function srccompile() {
         src/$APPNAME2/procedures/*.java
     javac -classpath $CLASSPATH -d obj \
         src/customexport/*.java
+
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -69,6 +71,8 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
+    #cmd="$VOLTDB compile --classpath obj -o $APPNAME_EXPORT.jar ddl-nocat.sql"
+    #echo $cmd; $cmd
     cmd="$VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql"
     echo $cmd; $cmd
     cmd="$VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql"
@@ -77,12 +81,23 @@ function catalog() {
     echo $cmd; $cmd
     cmd="$VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql"
     echo $cmd; $cmd
+    #jar cvf sp.jar obj/*
+
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
     rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
     if [ $? != 0 ]; then exit; fi
+}
+
+function wait-for-create() {
+    let status=1
+    while [[ $status != 0  ]]; do
+        echo "show tables" | $VOLTDB_BIN/sqlcmd
+        status=$?
+        sleep 5
+    done;
 }
 
 # run the voltdb server locally
@@ -126,11 +141,25 @@ function server-vertica() {
 }
 
 # run the voltdb server locally with postgresql connector
+# to run the postgres jdbc export test manually:
+#voltadmin shutdown
+#./run.sh clean
+#./run.sh start-postgres ; # start postgres with correct database name and user credentials
+#./run.sh server-pg # start volt with a export stream to postgress
+#./run.sh async-export; #populate the database tables and export streams
+#./run.sh export-jdbc-postgres-verify ; # verify the tables are conistent between volt and postgres
+#./run.sh stop-postgres;
 function server-pg() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+
+    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+
+    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
+    sleep 5
+    wait-for-create
+    $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
 }
 
 # run the voltdb server locally
@@ -210,7 +239,7 @@ function async-export() {
     echo file:/${PWD}/../../log4j-allconsole.xml
     java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
         --displayinterval=5 \
-        --duration=30 \
+        --duration=10 \
         --servers=localhost \
         --port=21212 \
         --poolsize=100000 \
@@ -267,6 +296,23 @@ function export-on-server-verify() {
         $CLIENTLOG
 }
 
+# vertica host_port is volt15d:5433
+# posgres should be installed locally and is on post 5432
+function export-jdbc-postgres-verify() {
+    set_pgpaths
+    echo $CLASSPATH
+    # postgres connection string should be like : jdbc:postgresql://host:port/database -> jdbc:postgresql://localhost:5432:/vexport?user=vexport
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.JDBCVoltVerifier \
+        --vdbServers=localhost \
+        --driver=org.postgresql.Driver \
+        --host_port=localhost:5432 \
+        --jdbcUser=vexport \
+        --jdbcDatabase=vexport \
+        --jdbcDBMS=postgresql
+}
+
+
+
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
         genqa.ExportKafkaOnServerVerifier kafka2:2181 voltdbexport
@@ -275,6 +321,42 @@ function export-kafka-server-verify() {
 function export-rabbitmq-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
         genqa.ExportRabbitMQVerifier kafka1 test test systest
+}
+
+function set_pgpaths() {
+    export PGTMPDIR=/tmp/`whoami`/genqa/postgress
+    export PG_PATH=$(locate pg_restore | grep /bin | grep -v /usr/bin | xargs dirname)
+    export CLASSPATH=$CLASSPATH:/home/test/jdbc/postgresql-9.4.1207.jar
+}
+
+function start-postgres() {
+    set_pgpaths
+    mkdir -p $PGTMPDIR
+    echo "PGTMPDIR:" $PGTMPDIR
+    sudo chown postgres $PGTMPDIR
+    echo "PG_PATH:" $PG_PATH
+
+    alias python=python2.6
+    # Use the same version of the JDBC jar, on all platforms
+    echo "CLASSPATH:" $CLASSPATH
+
+    # Start the PostgreSQL server, in the new temp directory
+    # Note: '-o --lc-collate=C' causes varchar sorting to match VoltDB's
+    sudo su - postgres -c "$PG_PATH/initdb -A trust -D $PGTMPDIR/data --lc-collate=C"
+    sudo su - postgres -c "$PG_PATH/pg_ctl start  -D $PGTMPDIR/data -l $PGTMPDIR/postgres.log"
+
+    # create a user "vexport" that we will use for connecting to postgres through volt via jdbc
+    sudo su - postgres -c "$PG_PATH/psql -c \"create role vexport with superuser createdb login\""
+    sudo su - postgres -c "$PG_PATH/psql -c \"create database vexport\""
+}
+function stop-postgres() {
+    set_pgpaths
+    if [ -d "$PGTMPDIR" ]; then
+        sudo su - postgres -c "$PG_PATH/pg_ctl stop -m fast -D $PGTMPDIR/data"
+        #sudo su - postgres -c "ls -l $PGTMPDIR/postgres.log"
+        #sudo su - postgres -c "cat   $PGTMPDIR/postgres.log"
+        sudo rm -r $PGTMPDIR
+    fi
 }
 
 function help() {

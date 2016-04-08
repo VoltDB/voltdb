@@ -40,7 +40,7 @@ public class JDBCVoltVerifier {
     // JDBC client handle
     Connection conn;
 
-    static Config config;
+    static VerifierUtils.Config config;
 
     // validated command line configuration
     // static Config config;
@@ -49,25 +49,47 @@ public class JDBCVoltVerifier {
     static Timer checkTimer;
     // Benchmark start time
     long benchmarkStartTS;
+    static boolean FAILFAST = true;
+    /**
+     * compare each column in a batch of rows, batches are processed by this query:
+     * select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?
+     * @param rvr
+     * @param client
+     * @param jdbcclient
+     * @return
+     */
+    public static boolean processRows(ReadVoltRows rvr, Client client, Connection jdbcclient) {
 
-    public static void getRows(ReadVoltRows rvr, Client client, Connection jdbcclient) {
-        long rowid = 0;
+        int batchSize = 200;
+        long rowid = 1;
         long rowCount = 0;
         VoltTable v = null;
-
+        boolean success = true;
+        long rowCountBefore = 0;
         do {
             // System.out.println("i: " + i);
             try {
-                v = rvr.readSomeRows(rowid, 10);
+                v = rvr.readSomeRows(rowid, batchSize);
             } catch (IOException | ProcCallException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            rowCount = v.getRowCount();
-            System.out.println("rowCount: " + rowCount + ". rowid: " + rowid);
-            rowid += 10;
-            rvr.checkTable(v, jdbcclient);
+            rowCountBefore = rowCount;
+            rowCount += v.getRowCount();
+            if ( rowCountBefore == rowCount ) {
+                break;
+            }
+            System.out.println("rows processed: " + rowCount);
+            rowid += batchSize;
+            if ( ! rvr.checkTable(v, jdbcclient) ) {
+                success = false;
+                // Fail fast
+                if ( FAILFAST ) {
+                    break;
+                }
+            };
         } while (rowCount > 0);
+        return success;
     }
 
     public static void main(String[] args) {
@@ -77,13 +99,14 @@ public class JDBCVoltVerifier {
         int ratelimit = Integer.MAX_VALUE;
 
         // setup configuration from command line arguments and defaults
-        Config config = new VerifierUtils.Config();
+        VerifierUtils.Config config = new VerifierUtils.Config();
+
         config.parse(JDBCVoltVerifier.class.getName(), args);
         System.out.println("Configuration settings:");
         System.out.println(config.getConfigDumpString());
 
 
-        System.out.println("Connecting to " + config.servers);
+        System.out.println("Connecting to " + config.vdbServers);
         try {
             client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);
         } catch (IOException e) {
@@ -94,6 +117,10 @@ public class JDBCVoltVerifier {
         System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
         jdbcConnection = JDBCGetData.jdbcConnect(config);
 
-        getRows(rvr, client, jdbcConnection);
+        if ( ! processRows(rvr, client, jdbcConnection) ) {
+            System.err.println("Check Table failed, see log for errors");
+            System.exit(1);
+        }
+        System.exit(0);
     }
 }

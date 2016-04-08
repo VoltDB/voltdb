@@ -124,22 +124,37 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_not_null_bigint", String.valueOf(type_not_null_bigint), String.valueOf(bigVal));
             }
 
+
+            // a direct string comparision of volt TimeStampType.toString()
+            // and jdbc String type via ResultSet.getString() 
+            // isn't consisten, convert it to JDBC Timestamps and then compare.
+            // ex:  voltsyntax: 1970-01-10 13:56:40.549-05 
+            // postgres syntax: 1970-01-10 13:56:40.549000
+            
             TimestampType ntsVal = (TimestampType) t.get("TYPE_NULL_TIMESTAMP", VoltType.TIMESTAMP);
-            String type_null_timestamp = rs.getString("TYPE_NULL_TIMESTAMP");
-            if (!((t.wasNull() && rs.wasNull()) || ntsVal.toString().equals(type_null_timestamp.toString()))) {
-                System.out.println("JDBC TYPE_NULL_TIMESTAMP: " + type_null_timestamp);
-                System.out.println("VDB TYPE_NULL_TIMESTAMP: " + ntsVal);
-                colMisCount +=  reportMismatch("type_null_timestamp", type_null_timestamp.toString(), ntsVal.toString());
-            }
+            if ( ntsVal != null ) {
+                // compare it as string values
+                Timestamp voltTS = ntsVal.asJavaTimestamp();
+                Timestamp jdbcTS = rs.getTimestamp("TYPE_NULL_TIMESTAMP");
 
-            // TimestampType tsVal = (TimestampType) t.get("TYPE_NOT_NULL_TIMESTAMP", VoltType.TIMESTAMP);
-            String tsVal = t.get("TYPE_NOT_NULL_TIMESTAMP", VoltType.TIMESTAMP).toString();
-            String type_not_null_timestamp = rs.getString("TYPE_NOT_NULL_TIMESTAMP");
-            if (!tsVal.equals(type_not_null_timestamp)) {
-                System.out.println("VDB TYPE_NOT_NULL_TIMESTAMP: " + tsVal + ". JDBC TYPE_NOT_NULL_TIMESTAMP: " + type_not_null_timestamp);
-                colMisCount +=  reportMismatch("type_not_null_timestamp", type_not_null_timestamp.toString(), tsVal.toString());
+                if (! voltTS.toString().equals(jdbcTS.toString())) {
+                    colMisCount +=  reportMismatch("type_null_timestamp strings", jdbcTS.toString(), voltTS.toString());
+                } 
+                // compare it as microsecond time values
+                if (jdbcTS.getTime() * 1000 != ntsVal.getTime()) {
+                    colMisCount += reportMismatch("type_null_timestamp microseconds", String.valueOf(jdbcTS.getTime()*1000),
+                            String.valueOf(ntsVal.getTime()));
+                } 
+                
+            } else {
+                // if volt is null , jdbc should be null also
+                Timestamp jdbcTS = rs.getTimestamp("TYPE_NULL_TIMESTAMP");
+                if ( rs.getTimestamp("TYPE_NULL_TIMESTAMP") != null ) {
+                    colMisCount += reportMismatch("type_null_timestamp is null", String.valueOf(jdbcTS),
+                            String.valueOf(ntsVal)); 
+                }
             }
-
+           
             double nfloatVal = (double) t.get("TYPE_NULL_FLOAT", VoltType.FLOAT);
             double type_null_float = (double)rs.getFloat("TYPE_NULL_FLOAT");
             if (rs.wasNull()) {
@@ -205,12 +220,8 @@ public class RowCompare {
         } else {
             System.out.println("In rowRowCompare:compare: no JDBC row available");
         }
-        // TODO: Add row id here (pass?)
-        if (colMisCount == 0) {
-            System.out.println("Row check ok.");
-        } else {
-            System.out.println("Row check failed on " + colMisCount + " columns.");
-        }
+
+        // handle the colMisCount in the calling function
         return colMisCount;
     }
 

@@ -64,29 +64,33 @@ public class ReadVoltRows {
         return response.getResults()[0];
     }
 
-    public void checkTable(VoltTable t, Connection jdbccon) {
+    public boolean checkTable(VoltTable t, Connection jdbccon) {
         // rowid is column 0
         // get rowid first, then use it to pull a matching row from Vertica
 
         long rowid = 0;
         final int colCount = t.getColumnCount();
-        int rowCount = 1;
+        int colMismatches = 1;
         ResultSet rs;
         int rowCheck = 0; // number of columns mismatching in row
-
+        boolean success = true;
         t.resetRowPosition();
         while (t.advanceRow()) {
             rowid = t.getLong("rowid");
-            System.out.println("Got Volt row " + rowid);
+            //System.out.println("Got Volt row " + rowid);
             rs = JDBCGetData.jdbcRead(rowid);
-            System.out.println("Got JDBC row");
+            //System.out.println("Got JDBC row");
             try {
-                rowCheck = RowCompare.rowcompare(t, rs);
+                colMismatches = RowCompare.rowcompare(t, rs);
+                if (colMismatches != 0) {
+                    System.err.println("Row check failed on rowId: " + rowid + " on " + colMismatches + " columns.");
+                    success = false;
+                }
             } catch (SQLException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
-        // do something with rowCheck != 0
+        return success;
     }
 }
