@@ -179,7 +179,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     setJoinComplete(siteConnection,
                                     event.exportSequenceNumbers,
                                     event.drSequenceNumbers,
-                                    event.remoteDCLastIds,
+                                    event.drMixedClusterSizeConsumerState,
                                     false /* requireExistingSequenceNumbers */);
                 } catch (InterruptedException e) {
                     // isDone() already returned true, this shouldn't happen
