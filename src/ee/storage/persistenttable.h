@@ -269,9 +269,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
+    void updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> const &indexesToUpdate,
                                                 bool fallible=true);
 
     virtual void addIndex(TableIndex *index) {
@@ -326,10 +326,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_views;
     }
 
-    /** inlined here because it can't be inlined in base Table, as it
-     *  uses Tuple.copy.
-     */
-    TableTuple& getTempTupleInlined(TableTuple &source);
+    TableTuple& copyIntoTempTuple(TableTuple &source) {
+        assert (m_tempTuple.m_data);
+        m_tempTuple.copy(source);
+        return m_tempTuple;
+    }
 
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
@@ -866,13 +867,6 @@ PersistentTableSurgeon::DRRollback(size_t drMark) {
         }
     }
 }
-
-inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
-    assert (m_tempTuple.m_data);
-    m_tempTuple.copy(source);
-    return m_tempTuple;
-}
-
 
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 {
