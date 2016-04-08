@@ -76,6 +76,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -86,7 +87,6 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.catalog.Column;
 
 public class SnapshotUtil {
 
@@ -148,7 +148,6 @@ public class SnapshotUtil {
         ExtensibleSnapshotDigestData extraSnapshotData,
         InstanceId instanceId,
         long timestamp,
-        long clusterCreateTime,
         int newPartitionCount,
         int clusterId)
     throws IOException
@@ -186,7 +185,6 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
-                stringer.key("clusterCreateTime").value(clusterCreateTime);
 
                 extraSnapshotData.writeToSnapshotDigest(stringer);
                 stringer.endObject();
