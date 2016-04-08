@@ -172,7 +172,8 @@ public interface SiteProcedureConnection {
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
-            boolean requireExistingSequenceNumbers);
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime);
 
     public long[] getUSOForExportTable(String signature);
 

@@ -22,7 +22,6 @@ import java.util.Date;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 /**
@@ -98,7 +97,6 @@ public class UniqueIdGenerator {
     private final long BACKWARD_TIME_FORGIVENESS_WINDOW_MS = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
 
     static private VoltLogger log = new VoltLogger("HOST");
-    static private RateLimitedLogger rateLimitLog = new RateLimitedLogger(60000, log, null);
 
     public interface Clock {
         long get();
@@ -191,14 +189,13 @@ public class UniqueIdGenerator {
                  * continue moving forward
                  */
                 double diffSeconds = (lastUsedTime - currentTime) / 1000.0;
-                StringBuilder msg = new StringBuilder(
-                        String.format("UniqueIdGenerator time moved backwards from: %d to %d, a difference of %.2f seconds.",
-                        lastUsedTime, currentTime, diffSeconds));
                 // if the diff is less than some specified amount of time, wait a bit
+                StringBuilder msg = new StringBuilder(256);
                 if ((lastUsedTime - currentTime) < BACKWARD_TIME_FORGIVENESS_WINDOW_MS) {
+                    msg.append("UniqueIdGenerator time moved backwards from: %d to %d, a difference of %.2f seconds.");
                     msg.append("\nThis node will delay any stored procedures sent to it.");
-                    msg.append(String.format("\nThis node will resume full operation in  %.2f seconds.", diffSeconds));
-                    rateLimitLog.log(msg.toString(), currentTime, Level.INFO);
+                    msg.append("\nThis node will resume full operation in  %.2f seconds.");
+                    log.rateLimitedLog(60, Level.INFO, null, msg.toString(), lastUsedTime, currentTime, diffSeconds, diffSeconds );
 
                     long count = BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
                     // note, the loop should stop once lastUsedTime is PASSED, not current
@@ -223,17 +220,18 @@ public class UniqueIdGenerator {
                     currentTimePlusOffset = currentTime + m_backwardsTimeAdjustmentOffset;
                     //Should satisfy this constraint now
                     assert(currentTimePlusOffset > lastUsedTime);
-                    double offsetSeconds = m_backwardsTimeAdjustmentOffset / 1000.0;
-                    msg.append(String.format(
-                            "\nContinuing operation by adding an offset of %.2f to system time. " +
-                            "This means the time and unique IDs provided by VoltProcedure " +
-                            " (getUniqueId, getTransactionId, getTransactionTime) " +
-                            "will not correctly reflect wall clock time as reported by the system clock." +
-                            " For severe shifts you could see duplicate " +
-                            "IDs or time moving backwards when the server is" +
-                            " restarted causing the offset to be discarded.",
-                            offsetSeconds));
-                    rateLimitLog.log(msg.toString(), currentTime, Level.ERROR);
+                    double offsetSeconds = m_backwardsTimeAdjustmentOffset / 1000.0D;
+
+                    msg.append("UniqueIdGenerator time moved backwards from: %d to %d, a difference of %.2f seconds.");
+                    msg.append("\nContinuing operation by adding an offset of %.2f to system time. ");
+                    msg.append("This means the time and unique IDs provided by VoltProcedure ");
+                    msg.append(" (getUniqueId, getTransactionId, getTransactionTime) ");
+                    msg.append("will not correctly reflect wall clock time as reported by the system clock.");
+                    msg.append(" For severe shifts you could see duplicate ");
+                    msg.append("IDs or time moving backwards when the server is");
+                    msg.append(" restarted causing the offset to be discarded.");
+
+                    log.rateLimitedLog(60, Level.ERROR, null, msg.toString(), lastUsedTime, currentTime, diffSeconds, offsetSeconds);
                 }
             } else if (currentTime > lastUsedTime && m_backwardsTimeAdjustmentOffset != 0) {
                 //Actual wall clock time is correct, blast away the offset

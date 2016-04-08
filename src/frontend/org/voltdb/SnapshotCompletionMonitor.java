@@ -196,6 +196,7 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
+            long clusterCreateTime = jsonObj.optLong("clusterCreateTime", -1);
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
             JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
             Iterator<String> partitionKeys = drTupleStreamJSON.keys();
@@ -220,14 +221,14 @@ public class SnapshotCompletionMonitor {
              * be used by live rejoin to initialize a starting state for applying DR
              * data
              */
-            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> remoteDCLastIds = new HashMap<>();
-            JSONObject consumerPartitions = jsonObj.getJSONObject("remoteDCLastIds");
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> drMixedClusterSizeConsumerState = new HashMap<>();
+            JSONObject consumerPartitions = jsonObj.getJSONObject("drMixedClusterSizeConsumerState");
             Iterator<String> cpKeys = consumerPartitions.keys();
             while (cpKeys.hasNext()) {
                 final String consumerPartitionIdStr = cpKeys.next();
                 final Integer consumerPartitionId = Integer.valueOf(consumerPartitionIdStr);
                 JSONObject siteInfo = consumerPartitions.getJSONObject(consumerPartitionIdStr);
-                remoteDCLastIds.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
+                drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
@@ -245,8 +246,9 @@ public class SnapshotCompletionMonitor {
                                 truncReqId,
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
-                                Collections.unmodifiableMap(remoteDCLastIds),
-                                drVersion));
+                                Collections.unmodifiableMap(drMixedClusterSizeConsumerState),
+                                drVersion,
+                                clusterCreateTime));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }
