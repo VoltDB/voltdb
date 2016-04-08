@@ -109,14 +109,6 @@ class TempTable : public Table {
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
-    // Updating temp tuples is not required in production code
-    // -- it may be used in tests, though, for no especially good reason.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool);
-
 
     void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
