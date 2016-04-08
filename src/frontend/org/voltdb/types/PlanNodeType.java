@@ -36,6 +36,7 @@ import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.PartitionPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
@@ -91,7 +92,8 @@ public enum PlanNodeType {
     PROJECTION      (54, ProjectionPlanNode.class),
     MATERIALIZE     (55, MaterializePlanNode.class),
     LIMIT           (56, LimitPlanNode.class),
-    PARTIALAGGREGATE(57, PartialAggregatePlanNode.class)
+    PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
+    PARTITION       (58, PartitionPlanNode.class),
 
     ;
 

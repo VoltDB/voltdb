@@ -1534,6 +1534,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHavingClause(sql, true, ".v_cnt) having (column#0 > 3)");
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
+    
+    public void testENG_10032RankJSON() {
+        compile("select sum(A1) S, max(B1) M from R1 group by A1, B1 order by B1 + B1");
+    }
 
     private void checkHavingClause(String sql, boolean aggInline, Object aggPostFilters) {
         pns = compileToFragments(sql);
