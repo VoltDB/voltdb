@@ -201,7 +201,13 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             TableTuple tempTuple = table->tempTuple();
 
             ReferenceSerializeInputLE rowInput(rowData, rowLength);
-            tempTuple.deserializeFromDR(rowInput, pool);
+            try {
+                tempTuple.deserializeFromDR(rowInput, pool);
+            } catch (SerializableEEException &e) {
+                e.appendContextToMessage(" DR binary log insert on table " + table->name());
+                throw;
+            }
+
             try {
                 table->insertPersistentTuple(tempTuple, true);
             } catch (ConstraintFailureException &e) {
@@ -231,7 +237,12 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             TableTuple tempTuple = table->tempTuple();
 
             ReferenceSerializeInputLE rowInput(rowData, rowLength);
-            tempTuple.deserializeFromDR(rowInput, pool);
+            try {
+                tempTuple.deserializeFromDR(rowInput, pool);
+            } catch (SerializableEEException &e) {
+                e.appendContextToMessage(" DR binary log delete on table " + table->name());
+                throw;
+            }
 
             TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
             if (deleteTuple.isNullTuple()) {
@@ -280,7 +291,12 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             TableTuple tempTuple = table->tempTuple();
 
             ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
-            tempTuple.deserializeFromDR(oldRowInput, pool);
+            try {
+                tempTuple.deserializeFromDR(oldRowInput, pool);
+            } catch (SerializableEEException &e) {
+                e.appendContextToMessage(" DR binary log update (old tuple) on table " + table->name());
+                throw;
+            }
 
             // create the expected tuple
             TableTuple expectedTuple(table->schema());
@@ -289,7 +305,12 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             expectedTuple.copyForPersistentInsert(tempTuple, pool);
 
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-            tempTuple.deserializeFromDR(newRowInput, pool);
+            try {
+                tempTuple.deserializeFromDR(newRowInput, pool);
+            } catch (SerializableEEException &e) {
+                e.appendContextToMessage(" DR binary log update (new tuple) on table " + table->name());
+                throw;
+            }
 
             TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
             if (oldTuple.isNullTuple()) {
