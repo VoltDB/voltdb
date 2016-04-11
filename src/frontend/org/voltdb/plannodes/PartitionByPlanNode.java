@@ -16,12 +16,16 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public class PartitionPlanNode extends AggregatePlanNode {
+/**
+ * This plan node represents windowed aggregate computations.
+ * The only one we implement now is windowed RANK.  But more
+ * could be possible.
+ */
+public class PartitionByPlanNode extends HashAggregatePlanNode {
     public enum Members {
         SORT_COLUMNS,
         SORT_EXPRESSION,
-        SORT_DIRECTION,
-        GROUPBY_EXPRESSIONS
+        SORT_DIRECTION
     };
     
     @Override
@@ -34,9 +38,6 @@ public class PartitionPlanNode extends AggregatePlanNode {
         super.validate();
         
         for (AbstractExpression expr : m_sortExpressions) {
-            expr.validate();
-        }
-        for (AbstractExpression expr : m_partitionExpressions) {
             expr.validate();
         }
     }
@@ -73,9 +74,6 @@ public class PartitionPlanNode extends AggregatePlanNode {
         {
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
         }
-        for (AbstractExpression expr : m_partitionExpressions) {
-            output_tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
-        }
         for (AbstractExpression expr : m_sortExpressions) {
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
         }
@@ -89,7 +87,20 @@ public class PartitionPlanNode extends AggregatePlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return " PARTITION PLAN";
+        String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
+        StringBuilder sb = new StringBuilder(" PARTIION PLAN: " + super.explainPlanForNode(indent));
+        sb.append(indent).append("SORT BY: \n");
+        for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
+            AbstractExpression ae = m_sortExpressions.get(idx);
+            SortDirectionType dir = m_sortDirections.get(idx);
+            sb.append(indent)
+               .append(ae.explain(optionalTableName))
+               .append(": ")
+               .append(dir.name())
+               .append("\n");
+        }
+        sb.append(indent).append("PARTITION BY:\n");
+        return sb.toString();
     }
 
     @Override
@@ -109,29 +120,14 @@ public class PartitionPlanNode extends AggregatePlanNode {
             stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
             stringer.endObject();
         }
-        
-        /*
-         * Serialize the partition expressions.
-         */
-        stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
-        for (int idx = 0; idx < m_partitionExpressions.size(); idx += 1) {
-            m_partitionExpressions.get(idx).toJSONString(stringer);
-        }
         stringer.endArray();
     }
 
     @Override
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_partitionExpressions.clear();
         m_sortExpressions.clear();
         m_sortDirections.clear();
-        
-        /*
-         * Load the array of partition expressions.  The AbstractExpression class
-         * has a useful routine to do just this for us.
-         */
-        AbstractExpression.loadFromJSONArrayChild(m_partitionExpressions, jobj, Members.GROUPBY_EXPRESSIONS.name(), null);
         
         /*
          * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
@@ -148,7 +144,6 @@ public class PartitionPlanNode extends AggregatePlanNode {
         }
     }
 
-    private List<AbstractExpression> m_partitionExpressions;
     private List<AbstractExpression> m_sortExpressions;
     private List<SortDirectionType>  m_sortDirections;
 }
