@@ -543,7 +543,7 @@ public class TestJDBCDriver {
         assertEquals(org.voltdb.types.GeographyValue.class.getName(), meta.getColumnClassName(12));
         assertEquals(java.sql.Types.OTHER, meta.getColumnType(12));
         assertEquals("GEOGRAPHY", meta.getColumnTypeName(12));
-        assertEquals(0, meta.getPrecision(12));
+        assertEquals(1048576, meta.getPrecision(12));
         assertEquals(0, meta.getScale(12));
         assertFalse(meta.isCaseSensitive(12));
         assertFalse(meta.isSigned(12));

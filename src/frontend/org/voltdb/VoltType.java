@@ -266,7 +266,7 @@ public enum VoltType {
             java.sql.Types.OTHER, // JDBC type (this is used for vendor specific types)
             null, // literal prefix
             null, // literal suffix
-            null, // necessary params (like length for VARCHAR)
+            "max_length", // necessary params (like length for VARCHAR)
             false, // case sensitivity
             java.sql.DatabaseMetaData.typePredBasic, // basic where-clauses supported
             null, // signed/unsigned
@@ -1050,15 +1050,13 @@ public enum VoltType {
             col_size_radix[0] = 53;  // magic for double
             col_size_radix[1] = 2;
             break;
-        case STRING:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
         case DECIMAL:
             col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
             col_size_radix[1] = 10;
             break;
+        case STRING:
         case VARBINARY:
+        case GEOGRAPHY:
             col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
             col_size_radix[1] = null;
             break;
