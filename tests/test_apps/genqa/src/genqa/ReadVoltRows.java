@@ -45,8 +45,6 @@ public class ReadVoltRows {
     Client m_client;
 
     public ReadVoltRows(Client client) {
-        // log = new VoltLogger("ReadVoltRows.readSomeRows");
-        System.out.println("rvr constructor");
         m_client = client;
     }
 
@@ -58,7 +56,7 @@ public class ReadVoltRows {
                 rowid, rowid + count - 1, count);
         if (response.getStatus() != ClientResponse.SUCCESS) {
             System.out.println("Bad response on SelectwithLimit: "
-                    + ClientResponse.SUCCESS);
+                    + response.getStatus());
             System.exit(-1);
         }
         return response.getResults()[0];
@@ -69,25 +67,29 @@ public class ReadVoltRows {
         // get rowid first, then use it to pull a matching row from Vertica
 
         long rowid = 0;
-        final int colCount = t.getColumnCount();
         int colMismatches = 1;
         ResultSet rs;
         int rowCheck = 0; // number of columns mismatching in row
         boolean success = true;
         t.resetRowPosition();
+
         while (t.advanceRow()) {
             rowid = t.getLong("rowid");
             //System.out.println("Got Volt row " + rowid);
             rs = JDBCGetData.jdbcRead(rowid);
-            //System.out.println("Got JDBC row");
             try {
+                // check to make sure the select returned a row
+                if (!rs.isBeforeFirst()) {
+                    System.err.println("JDBC select for rowid " + rowid + " failed.");
+                    success = false;
+                    continue;
+                }
                 colMismatches = RowCompare.rowcompare(t, rs);
                 if (colMismatches != 0) {
                     System.err.println("Row check failed on rowId: " + rowid + " on " + colMismatches + " columns.");
                     success = false;
                 }
             } catch (SQLException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }

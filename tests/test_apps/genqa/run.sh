@@ -232,6 +232,10 @@ function async-benchmark() {
         --latencytarget=10
 }
 
+function clean-vertica() {
+    echo "drop table export_partitioned_table" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
+}
+
 function async-export() {
     srccompile
     rm -rf $CLIENTLOG/*
@@ -246,7 +250,7 @@ function async-export() {
         --autotune=false \
         --catalogswap=false \
         --latencytarget=10 \
-        --ratelimit=1000
+        --ratelimit=500
 }
 
 # Multi-threaded synchronous benchmark sample

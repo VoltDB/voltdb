@@ -49,6 +49,7 @@ public class JDBCVoltVerifier {
     static Timer checkTimer;
     // Benchmark start time
     long benchmarkStartTS;
+    static long rowCheckTotal = 0;
     static boolean FAILFAST = true;
     /**
      * compare each column in a batch of rows, batches are processed by this query:
@@ -61,35 +62,31 @@ public class JDBCVoltVerifier {
     public static boolean processRows(ReadVoltRows rvr, Client client, Connection jdbcclient) {
 
         int batchSize = 200;
-        long rowid = 1;
+        long rowid = 0;
         long rowCount = 0;
         VoltTable v = null;
-        boolean success = true;
-        long rowCountBefore = 0;
+        boolean checkStatus = true;
         do {
-            // System.out.println("i: " + i);
             try {
                 v = rvr.readSomeRows(rowid, batchSize);
             } catch (IOException | ProcCallException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            rowCountBefore = rowCount;
-            rowCount += v.getRowCount();
-            if ( rowCountBefore == rowCount ) {
-                break;
-            }
-            System.out.println("rows processed: " + rowCount);
+
+            rowCount = v.getRowCount();
             rowid += batchSize;
-            if ( ! rvr.checkTable(v, jdbcclient) ) {
-                success = false;
+            rowCheckTotal += rowCount;
+
+            if (rowCount > 0) {
+                checkStatus = rvr.checkTable(v, jdbcclient);
                 // Fail fast
-                if ( FAILFAST ) {
+                if ( !checkStatus && FAILFAST ) {
                     break;
                 }
-            };
+            }
+            System.out.println("Current row id: " + rowid);
         } while (rowCount > 0);
-        return success;
+        return checkStatus;
     }
 
     public static void main(String[] args) {
@@ -121,6 +118,7 @@ public class JDBCVoltVerifier {
             System.err.println("Check Table failed, see log for errors");
             System.exit(1);
         }
+        System.out.println("Total rows checked in VoltDB and JDBC Table: " + rowCheckTotal);
         System.exit(0);
     }
 }
