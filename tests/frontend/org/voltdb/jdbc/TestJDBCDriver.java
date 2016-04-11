@@ -457,6 +457,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(1));
         assertFalse(meta.isCaseSensitive(1));
         assertTrue(meta.isSigned(1));
+        assertEquals(4, meta.getColumnDisplaySize(1));
 
         assertEquals(Short.class.getName(), meta.getColumnClassName(3));
         assertEquals(java.sql.Types.SMALLINT, meta.getColumnType(3));
@@ -465,6 +466,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(3));
         assertFalse(meta.isCaseSensitive(3));
         assertTrue(meta.isSigned(3));
+        assertEquals(6, meta.getColumnDisplaySize(3));
 
         assertEquals(Integer.class.getName(), meta.getColumnClassName(4));
         assertEquals(java.sql.Types.INTEGER, meta.getColumnType(4));
@@ -473,6 +475,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(4));
         assertFalse(meta.isCaseSensitive(4));
         assertTrue(meta.isSigned(4));
+        assertEquals(11, meta.getColumnDisplaySize(4));
 
         assertEquals(Long.class.getName(), meta.getColumnClassName(5));
         assertEquals(java.sql.Types.BIGINT, meta.getColumnType(5));
@@ -481,6 +484,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(5));
         assertFalse(meta.isCaseSensitive(5));
         assertTrue(meta.isSigned(5));
+        assertEquals(20, meta.getColumnDisplaySize(5));
 
         assertEquals(Double.class.getName(), meta.getColumnClassName(6));
         assertEquals(java.sql.Types.FLOAT, meta.getColumnType(6));
@@ -489,6 +493,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(6));
         assertFalse(meta.isCaseSensitive(6));
         assertTrue(meta.isSigned(6));
+        assertEquals(8, meta.getColumnDisplaySize(6));
 
         assertEquals(String.class.getName(), meta.getColumnClassName(7));
         assertEquals(java.sql.Types.VARCHAR, meta.getColumnType(7));
@@ -497,15 +502,16 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(7));
         assertTrue(meta.isCaseSensitive(7));
         assertFalse(meta.isSigned(7));
+        assertEquals(128, meta.getColumnDisplaySize(7));
 
         assertEquals(Byte[].class.getCanonicalName(), meta.getColumnClassName(8));
         assertEquals(java.sql.Types.VARBINARY, meta.getColumnType(8));
-        assertEquals(128, meta.getColumnDisplaySize(8));
         assertEquals("VARBINARY", meta.getColumnTypeName(8));
         assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(8));
         assertEquals(0, meta.getScale(8));
         assertFalse(meta.isCaseSensitive(8));
         assertFalse(meta.isSigned(8));
+        assertEquals(128, meta.getColumnDisplaySize(8));
 
         assertEquals(Timestamp.class.getName(), meta.getColumnClassName(9));
         assertEquals(java.sql.Types.TIMESTAMP, meta.getColumnType(9));
@@ -514,6 +520,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(9));
         assertFalse(meta.isCaseSensitive(9));
         assertFalse(meta.isSigned(9));
+        assertEquals(32, meta.getColumnDisplaySize(9));
 
         assertEquals(BigDecimal.class.getName(), meta.getColumnClassName(10));
         assertEquals(java.sql.Types.DECIMAL, meta.getColumnType(10));
@@ -522,6 +529,7 @@ public class TestJDBCDriver {
         assertEquals(12, meta.getScale(10));
         assertFalse(meta.isCaseSensitive(10));
         assertTrue(meta.isSigned(10));
+        assertEquals(40, meta.getColumnDisplaySize(10));
 
         assertEquals(org.voltdb.types.GeographyPointValue.class.getName(), meta.getColumnClassName(11));
         assertEquals(java.sql.Types.OTHER, meta.getColumnType(11));
@@ -530,6 +538,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(11));
         assertFalse(meta.isCaseSensitive(11));
         assertFalse(meta.isSigned(11));
+        assertEquals(43, meta.getColumnDisplaySize(11));
 
         assertEquals(org.voltdb.types.GeographyValue.class.getName(), meta.getColumnClassName(12));
         assertEquals(java.sql.Types.OTHER, meta.getColumnType(12));
@@ -538,6 +547,7 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(12));
         assertFalse(meta.isCaseSensitive(12));
         assertFalse(meta.isSigned(12));
+        assertEquals(128, meta.getColumnDisplaySize(12));
     }
 
     @Test
