@@ -363,6 +363,11 @@ function stop-postgres() {
     fi
 }
 
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    ant all
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|async-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"

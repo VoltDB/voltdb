@@ -35,15 +35,6 @@ import genqa.VerifierUtils.Config;
 public class JDBCGetData {
     static Connection conn;
 
-    // in real test program, set these from command line options
-    final static String DRIVER = "com.vertica.jdbc.Driver";
-    final static String HOST_PORT = "volt15d:5433";
-    final static String DB = "Test1";
-    final static String USER = "dbadmin";
-    final static String PASSWORD = "";
-    final static String DBMS = "vertica";
-    final static String CONNECTSTRING = "jdbc:" + DBMS + "://" + HOST_PORT + "/" + DB;
-
     public static Connection jdbcConnect(Config config) {
         try {
             Class.forName(config.driver);
