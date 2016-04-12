@@ -72,7 +72,7 @@ public class JDBCVoltVerifier {
             try {
                 System.out.println("JDBC drop table " + t);
                 Statement stmt = jdbcConnection.createStatement();
-                String sql = "DROP TABLE " + t;
+                String sql = "DROP TABLE IF EXISTS " + t;
                 stmt.executeUpdate(sql);
             } catch (SQLException e) {
                 // TODO Auto-generated catch block
@@ -137,6 +137,9 @@ public class JDBCVoltVerifier {
         System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
         jdbcConnection = JDBCGetData.jdbcConnect(config);
 
+        // This block just drops the Vertica tables and exits.
+        // The verifier is a later pass in the system test and skips
+        // this block.
         if (config.jdbcDrop) {
             System.out.println("Drop tables only");
             boolean result = dropVerticaTables(jdbcConnection);
@@ -148,6 +151,7 @@ public class JDBCVoltVerifier {
                 System.exit(-1);
             }
         }
+
         System.out.println("Connecting to " + config.vdbServers);
         try {
             client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);

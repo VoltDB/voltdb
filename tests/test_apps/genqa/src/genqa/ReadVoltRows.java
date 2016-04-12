@@ -69,7 +69,6 @@ public class ReadVoltRows {
         long rowid = 0;
         int colMismatches = 1;
         ResultSet rs;
-        int rowCheck = 0; // number of columns mismatching in row
         boolean success = true;
         t.resetRowPosition();
 

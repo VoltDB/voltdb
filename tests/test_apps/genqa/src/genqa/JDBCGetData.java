@@ -58,14 +58,10 @@ public class JDBCGetData {
     static ResultSet jdbcRead(long rowid) {
         ResultSet rs = null;
         try {
-            // conn = DriverManager.getConnection (CONNECTSTRING, USER,
-            // PASSWORD);
-            // So far so good, lets issue a query...
             Statement stmt = conn.createStatement();
             rs = stmt
                     .executeQuery("SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = "
                             + rowid);
-            ResultSetMetaData metaData = rs.getMetaData();
         } catch (SQLException e) {
             System.err.println("Exception in DB row access.\n");
             e.printStackTrace();
