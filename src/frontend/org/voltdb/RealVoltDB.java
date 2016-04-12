@@ -170,8 +170,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
     static final String m_defaultVersionString = "4.6.11.1";
-    // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6.11.1\\E\\z";
+    // Allow V4.6.11.1 to hot upgrade V4.6.11
+    static final String m_defaultHotfixableRegexPattern = "^4.6.11(\\.1)?$";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
