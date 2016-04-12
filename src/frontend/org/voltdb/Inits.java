@@ -117,11 +117,7 @@ public class Inits {
         m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction.doesRejoin()) {
-            m_isRejoin = true;
-        } else {
-            m_isRejoin = false;
-        }
+        m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
