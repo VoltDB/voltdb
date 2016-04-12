@@ -23,6 +23,8 @@ message Reset {
 
 message Pause {
     optional int32 partitionId = 1;
+    // true is this event should unpause the partition
+    optional bool isUnpause = 2 [default = false];
 }
 
 message Connect {
