@@ -25,16 +25,23 @@ package genqa;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 import genqa.VerifierUtils.Config;
 
 public class JDBCGetData {
     static Connection conn;
+    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
+    static PreparedStatement selectStmt = null;
 
+    /**
+     * Connect and prepare the select to make the per row handling
+     * as efficient as possible, though it's still pretty pokey
+     * @param config
+     * @return
+     */
     public static Connection jdbcConnect(Config config) {
         try {
             Class.forName(config.driver);
@@ -47,6 +54,7 @@ public class JDBCGetData {
         String connectString = "jdbc:" + config.jdbcDBMS + "://" + config.host_port + "/" + config.jdbcDatabase;
         try {
             conn = DriverManager.getConnection(connectString, config.jdbcUser, config.jdbcPassword);
+            selectStmt = conn.prepareStatement(selectSql);
         } catch (SQLException e) {
             System.err.println("Could not connect to the database with connect string " + connectString + ".\n");
             e.printStackTrace();
@@ -58,10 +66,8 @@ public class JDBCGetData {
     static ResultSet jdbcRead(long rowid) {
         ResultSet rs = null;
         try {
-            Statement stmt = conn.createStatement();
-            rs = stmt
-                    .executeQuery("SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = "
-                            + rowid);
+            selectStmt.setLong(1, rowid);
+            rs = selectStmt.executeQuery();
         } catch (SQLException e) {
             System.err.println("Exception in DB row access.\n");
             e.printStackTrace();

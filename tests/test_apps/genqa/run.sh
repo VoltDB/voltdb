@@ -318,10 +318,10 @@ function export-jdbc-postgres-verify() {
 
 # vertica host_port is volt15d:5433
 function export-jdbc-vertica-verify() {
-    echo $CLASSPATH
+    CLASSPATH=$CLASSPATH:/home/test/jdbc/vertica-jdbc-7.2.1-0.jar
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.JDBCVoltVerifier \
         --vdbServers=localhost \
-        --driver=org.vertica.jdbc.Driver \
+        --driver=com.vertica.jdbc.Driver \
         --host_port=volt15d:5433 \
         --jdbcUser=dbadmin \
         --jdbcDatabase=Test1 \
