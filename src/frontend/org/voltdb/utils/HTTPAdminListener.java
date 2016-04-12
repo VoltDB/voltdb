@@ -78,7 +78,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.eclipse.jetty.server.handler.ErrorHandler;
+import org.voltdb.ConfigProvider;
 import org.voltdb.StatusProvider;
 
 public class HTTPAdminListener {
@@ -87,18 +87,16 @@ public class HTTPAdminListener {
     public static final String REALM = "VoltDBRealm";
 
     Server m_server;
-    HTTPClientInterface httpClientInterface = new HTTPClientInterface();
-    final boolean m_jsonEnabled;
+    HTTPClientInterface httpClientInterface;
+    boolean m_jsonEnabled = false;
     private StatusProvider m_statusProvider;
+    private ConfigProvider m_configProvider;
 
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
-    final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
     final AtomicBoolean m_ready = new AtomicBoolean(false);
+    final int m_timeout;
 
-    class VoltNotReadyHandler extends ErrorHandler {
-
-    }
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
         VoltLogger logger = new VoltLogger("HOST");
@@ -332,7 +330,7 @@ public class HTTPAdminListener {
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                m_mapper.writeValue(response.getWriter(), m_statusProvider);
+                m_mapper.writeValue(response.getWriter(), (StatusProvider )m_statusProvider);
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
             }
@@ -341,8 +339,12 @@ public class HTTPAdminListener {
 
     // /management/status handler
     class ManagementConfigHandler extends AbstractHandler {
+        private final ObjectMapper m_mapper;
 
         public ManagementConfigHandler() {
+            m_mapper = new ObjectMapper();
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
         // GET on /management/config resources.
@@ -352,12 +354,10 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
-            //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Got config."));
+                m_mapper.writeValue(response.getWriter(), m_configProvider);
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
             }
@@ -939,18 +939,19 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(StatusProvider statusProvider,
-            boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+    public HTTPAdminListener(String intf, int port, StatusProvider statusProvider, ConfigProvider configProvider) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
-        int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+        m_timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
         m_statusProvider = statusProvider;
+        m_configProvider = configProvider;
+
         /*
          * Don't force us to look at a huge pile of threads
          */
         final QueuedThreadPool qtp = new QueuedThreadPool(
                 poolsize,
                 1, // minimum threads
-                timeout * 1000,
+                m_timeout * 1000,
                 new LinkedBlockingQueue<>(poolsize + 16)
                 );
 
@@ -960,7 +961,6 @@ public class HTTPAdminListener {
                 new Integer(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
                 );
 
-        m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -1023,10 +1023,6 @@ public class HTTPAdminListener {
             ContextHandler mgmtConfigHandler = new ContextHandler("/management/config");
             mgmtConfigHandler.setHandler(new ManagementConfigHandler());
 
-            //Generic error till server comes up.
-            VoltNotReadyHandler eHandler = new VoltNotReadyHandler();
-            eHandler.setShowStacks(false);
-
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
@@ -1041,9 +1037,6 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
-            httpClientInterface.setTimeout(timeout);
-            m_jsonEnabled = jsonEnabled;
-            m_server.addBean(eHandler);
             m_server.start();
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
@@ -1057,22 +1050,25 @@ public class HTTPAdminListener {
         m_statusProvider = statusProvider;
     }
 
-    public void start() throws Exception {
+    public void start(boolean jsonEnabled) throws Exception {
         try {
+            m_jsonEnabled = jsonEnabled;
+            if (m_jsonEnabled) {
+                httpClientInterface = new HTTPClientInterface();
+                httpClientInterface.setTimeout(m_timeout);
+            }
             m_ready.set(true);
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            //We only throw exception to halt and we expect to mustListen;
-            if (m_mustListen) {
-                throw new Exception(e);
-            }
         }
     }
 
     public void stop() {
-        httpClientInterface.stop();
+        if (httpClientInterface != null) {
+            httpClientInterface.stop();
+        }
 
         try {
             m_server.stop();
@@ -1084,6 +1080,8 @@ public class HTTPAdminListener {
     }
 
     public void notifyOfCatalogUpdate() {
-        httpClientInterface.notifyOfCatalogUpdate();
+        if (httpClientInterface != null) {
+            httpClientInterface.notifyOfCatalogUpdate();
+        }
     }
 }

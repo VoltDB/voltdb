@@ -144,6 +144,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 
 /**
@@ -219,6 +220,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
 
     private StatusTracker m_statusTracker;
+    private ConfigTracker m_configTracker;
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -318,6 +320,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
+    private boolean m_deploymentAutomationAvailable = false;
 
     volatile String m_localMetadata = "";
 
@@ -390,20 +393,99 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    boolean setupAdminListener(DeploymentType deployment, VoltDB.Configuration config, StatusProvider statusProvider, ConfigProvider configProvider) {
+            // start the httpd dashboard/jsonapi. A port value of -1 means disabled
+            // by the deployment.xml configuration.
+            int httpPort = -1;
+            if ((deployment.getHttpd() != null) && (deployment.getHttpd().isEnabled())) {
+                httpPort = deployment.getHttpd().getPort();
+                if (deployment.getHttpd().getJsonapi() != null) {
+                    m_jsonEnabled = deployment.getHttpd().getJsonapi().isEnabled();
+                }
+            }
+            String intf = "";
+            boolean auto = true;
+            // if set by cli use that.
+            if (config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
+                intf = config.m_httpPortInterface;
+                httpPort = config.m_httpPort;
+                auto = false;
+                // if not set by the user, just find a free port
+            } else if (httpPort == Constants.HTTP_PORT_AUTO) {
+                // if not set scan for an open port starting with the default
+                httpPort = VoltDB.DEFAULT_HTTP_PORT;
+            } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
+                if (!deployment.getHttpd().isEnabled()) {
+                    return false;
+                }
+                auto = false;
+            }
+            return setupHttpServer(intf, httpPort, auto, statusProvider, configProvider);
+    }
+
+    //Setup http server with given port and interface
+    private boolean setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, StatusProvider statusProvider, ConfigProvider configProvider) {
+
+        boolean success = false;
+        int httpPort = httpPortStart;
+        for (; true; httpPort++) {
+            try {
+                m_adminListener = new HTTPAdminListener(httpInterface, httpPort, statusProvider, configProvider);
+                success = true;
+            } catch (Exception e1) {
+                hostLog.error("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                return false;
+            }
+            if (!findAny || success) {
+                break;
+            }
+        }
+        if (!success) {
+            m_httpPortExtraLogMessage = String.format(
+                    "HTTP service unable to bind to ports %d through %d",
+                    httpPortStart, httpPort - 1);
+            m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
+            return false;
+        }
+        m_config.m_httpPort = httpPort;
+        return true;
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
+     * @param config
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
-            //Start the HTTP server get deployment from voltdbroot
-
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
+
+            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+
+            // Replay command line args that we can see
+            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+            sb.append(System.getProperty("sun.java.command", "[not available]"));
+            hostLog.info(sb.toString());
+
+            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+            sb.delete(0, sb.length()).append("Command line JVM arguments:");
+            for (String iarg : iargs)
+                sb.append(" ").append(iarg);
+            if (iargs.size() > 0) hostLog.info(sb.toString());
+            else hostLog.info("No JVM command line args known.");
+
+            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
+            sb.append(System.getProperty("java.class.path", "[not available]"));
+            hostLog.info(sb.toString());
+
+            m_statusTracker = new StatusTracker("nomadic", m_buildString, m_versionString, config.m_isEnterprise);
+            //Start the HTTP server get deployment from voltdbroot
+
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // If there's no deployment provide a default and put it under voltdbroot.
@@ -414,6 +496,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
                 }
+            } else {
+                if (config.isPrimed()) {
+                    hostLog.info("This is a primed cluster.");
+                    // If you start with -D we assume that you are a primed cluster and we do following.
+                    // deployment must be primed and we can read it as standalone.
+                    // Host count is available externally on cli or picked up from previous configuration.
+                }
+            }
+            DeploymentType deployment = readPrimedDeployment(config.m_pathToDeployment);
+            try {
+                m_configTracker = new ConfigTracker(deployment);
+                m_deploymentAutomationAvailable = setupAdminListener(deployment, config, m_statusTracker, m_configTracker);
+            } catch (Exception ex) {
+                hostLog.warn("You are running with management interface disabled, deployment automation will not be available.");
+                m_deploymentAutomationAvailable = false;
             }
 
             // set the mode first thing
@@ -426,7 +523,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_safeMpTxnId = Long.MAX_VALUE;
             m_lastSeenMpTxnId = Long.MIN_VALUE;
             m_clientInterface = null;
-            m_adminListener = null;
             m_commandLog = new DummyCommandLog();
             m_messenger = null;
             m_opsRegistrar = new OpsRegistrar();
@@ -475,24 +571,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
-            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
-
-            // Replay command line args that we can see
-            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
-            sb.append(System.getProperty("sun.java.command", "[not available]"));
-            hostLog.info(sb.toString());
-
-            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
-                sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
-
-            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
-            sb.append(System.getProperty("java.class.path", "[not available]"));
-            hostLog.info(sb.toString());
-
             // use CLI overrides for testing hotfix version compatibility
             if (m_config.m_versionStringOverrideForTest != null) {
                 m_versionString = m_config.m_versionStringOverrideForTest;
@@ -504,11 +582,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
+            m_statusTracker.setNodeState(NodeState.WAITINGFORLEADER);
             buildClusterMesh(isRejoin || m_joining);
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
-
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
@@ -699,11 +777,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(this, 1);
-            m_statusTracker = new StatusTracker(this.m_catalogContext);
+            Inits inits = new Inits(m_statusTracker, this, 1);
             inits.doInitializationWork();
-
-            m_adminListener.setStatusProvider(m_statusTracker);
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
@@ -1596,6 +1671,94 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    DeploymentType readPrimedDeployment(String primedDeployment) {
+        /*
+         * Debate with the cluster what the deployment file should be
+         */
+        try {
+            byte deploymentBytes[] = null;
+
+            try {
+                deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(primedDeployment);
+            } catch (Exception ex) {
+                //Let us get bytes from ZK
+            }
+
+            if (deploymentBytes == null) {
+                hostLog.error("Deployment information could not be obtained from cluster node or locally");
+                VoltDB.crashLocalVoltDB("No such deployment file: "
+                        + primedDeployment, false, null);
+            }
+            DeploymentType deployment =
+                CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            // wasn't a valid xml deployment file
+            if (deployment == null) {
+                hostLog.error("Not a valid XML deployment file at URL: " + primedDeployment);
+                VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
+                        + primedDeployment, false, null);
+            }
+
+            /*
+             * Check for invalid deployment file settings (enterprise-only) in the community edition.
+             * Trick here is to print out all applicable problems and then stop, rather than stopping
+             * after the first one is found.
+             */
+            if (!m_config.m_isEnterprise) {
+                boolean shutdownDeployment = false;
+                boolean shutdownAction = false;
+
+                // check license features for community version
+                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
+                    consoleLog.error("K-Safety is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
+                    consoleLog.error("Snapshots are not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
+                    consoleLog.error("Command logging is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getExport() != null) && Boolean.TRUE.equals(deployment.getExport().isEnabled())) {
+                    consoleLog.error("Export is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                // check the start action for the community edition
+                if (m_config.m_startAction != StartAction.CREATE) {
+                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
+                            "\" is not supported in the community edition of VoltDB.");
+                    shutdownAction = true;
+                }
+
+                // if the process needs to stop, try to be helpful
+                if (shutdownAction || shutdownDeployment) {
+                    String msg = "This process will exit. Please run VoltDB with ";
+                    if (shutdownDeployment) {
+                        msg += "a deployment file compatible with the community edition";
+                    }
+                    if (shutdownDeployment && shutdownAction) {
+                        msg += " and ";
+                    }
+
+                    if (shutdownAction && !shutdownDeployment) {
+                        msg += "the CREATE start action";
+                    }
+                    msg += ".";
+
+                    VoltDB.crashLocalVoltDB(msg, false, null);
+                }
+            }
+            return deployment;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     void collectLocalNetworkMetadata() {
         boolean threw = false;
         JSONStringer stringer = new JSONStringer();
@@ -1991,6 +2154,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
+                m_statusTracker.setNodeState(NodeState.REJOINING);
                 if (!m_joinCoordinator.startJoin(m_catalogContext.database)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
@@ -2502,7 +2666,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         try {
             if (m_adminListener != null) {
-                m_adminListener.start();
+                m_adminListener.start(m_jsonEnabled);
             }
         } catch (Exception e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
@@ -2695,7 +2859,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         try {
             if (m_adminListener != null) {
-                m_adminListener.start();
+                m_adminListener.start(m_jsonEnabled);
             }
         } catch (Exception e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);

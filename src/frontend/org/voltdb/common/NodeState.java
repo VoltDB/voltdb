@@ -26,7 +26,6 @@ public enum NodeState {
     WAITINGFORLEADER, //Waiting for leader none of the nodes are up
     RECOVERING,
     REJOINING,
-    INITIALIZED,
     PAUSED,
     UPDATING,
     UP,

@@ -460,7 +460,11 @@ public class VoltDB {
                     m_pathToCatalog = arg.substring("catalog ".length());
                 }
                 else if (arg.equals("deployment")) {
-                    m_pathToDeployment = args[++i];
+                    if (m_pathToDeployment != null) {
+                        System.out.println("Deployment already set with root option.");
+                    } else {
+                        m_pathToDeployment = args[++i];
+                    }
                 }
                 else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
@@ -484,7 +488,12 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbCreate = true;
-                else {
+                else if (arg.equalsIgnoreCase("voltdbroot")) {
+                    // See if you can get this from somewhere standard.
+                    m_pathToDeployment = args[++i].concat("/config_log/deployment.xml");
+                    m_startAction = StartAction.RECOVER;
+                    m_primed = true;
+                } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
@@ -522,6 +531,10 @@ public class VoltDB {
             }
         }
 
+        private boolean m_primed = false;
+        public boolean isPrimed() {
+            return m_primed;
+        }
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
