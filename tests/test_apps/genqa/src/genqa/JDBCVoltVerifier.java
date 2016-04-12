@@ -26,6 +26,8 @@ import genqa.VerifierUtils.Config;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Timer;
 
 import org.voltcore.logging.VoltLogger;
@@ -51,6 +53,36 @@ public class JDBCVoltVerifier {
     long benchmarkStartTS;
     static long rowCheckTotal = 0;
     static boolean FAILFAST = true;
+
+    /**
+     * The Vertica installation is static and shared, so we need to remove
+     * tables before each run.
+     * @param jdbcConnection
+     * @return
+     */
+    private static boolean dropVerticaTables(Connection jdbcConnection) {
+        final String[] verticaTables = {
+            "EXPORT_DONE_TABLE",
+            "EXPORT_PARTITIONED_TABLE",
+            "EXPORT_REPLICATED_TABLE",
+            "EXPORT_SKINNY_PARTITIONED_TABLE"
+        };
+
+        for (String t: verticaTables) {
+            try {
+                System.out.println("JDBC drop table " + t);
+                Statement stmt = jdbcConnection.createStatement();
+                String sql = "DROP TABLE " + t;
+                stmt.executeUpdate(sql);
+            } catch (SQLException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * compare each column in a batch of rows, batches are processed by this query:
      * select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?
@@ -102,18 +134,28 @@ public class JDBCVoltVerifier {
         System.out.println("Configuration settings:");
         System.out.println(config.getConfigDumpString());
 
+        System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
+        jdbcConnection = JDBCGetData.jdbcConnect(config);
 
+        if (config.jdbcDrop) {
+            System.out.println("Drop tables only");
+            boolean result = dropVerticaTables(jdbcConnection);
+            if (result) {
+                System.out.println("Drop tables successful.");
+                System.exit(0);
+            } else {
+                System.out.println("Drop tables finished with errors.");
+                System.exit(-1);
+            }
+        }
         System.out.println("Connecting to " + config.vdbServers);
         try {
             client = VerifierUtils.dbconnect(config.vdbServers, ratelimit);
         } catch (IOException e) {
             e.printStackTrace();
         }
+
         rvr = new ReadVoltRows(client);
-
-        System.out.println("Connecting to the JDBC target " + config.jdbcDBMS);
-        jdbcConnection = JDBCGetData.jdbcConnect(config);
-
         if ( ! processRows(rvr, client, jdbcConnection) ) {
             System.err.println("Check Table failed, see log for errors");
             System.exit(1);

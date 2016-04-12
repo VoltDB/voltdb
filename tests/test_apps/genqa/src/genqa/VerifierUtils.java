@@ -69,6 +69,9 @@ public class VerifierUtils {
         @Option(desc = "JDBC Password.")
         String jdbcPassword = "";
 
+        @Option(desc = "Drop Vertica tables.")
+        boolean jdbcDrop = false;
+
         // Get the specific dbms in case we need to handle special cases
         @Option(desc = "Target database, e.g. vertica or postgres.")
         String jdbcDBMS = "vertica";

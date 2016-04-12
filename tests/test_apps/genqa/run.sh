@@ -142,13 +142,14 @@ function server-vertica() {
 
 # run the voltdb server locally with postgresql connector
 # to run the postgres jdbc export test manually:
-#voltadmin shutdown
-#./run.sh clean
-#./run.sh start-postgres ; # start postgres with correct database name and user credentials
-#./run.sh server-pg # start volt with a export stream to postgress
-#./run.sh async-export; #populate the database tables and export streams
-#./run.sh export-jdbc-postgres-verify ; # verify the tables are conistent between volt and postgres
-#./run.sh stop-postgres;
+# voltadmin shutdown
+# ./run.sh clean
+# ./run.sh start-postgres ; # start postgres with correct database name and user credentials
+# ./run.sh server-pg # start volt with a export stream to postgress
+# ./run.sh async-export; #populate the database tables and export streams
+# ./run.sh export-jdbc-postgres-verify ; # verify the tables are conistent between volt and postgres
+# ./run.sh stop-postgres;
+
 function server-pg() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
@@ -315,7 +316,30 @@ function export-jdbc-postgres-verify() {
         --jdbcDBMS=postgresql
 }
 
+# vertica host_port is volt15d:5433
+function export-jdbc-vertica-verify() {
+    echo $CLASSPATH
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.JDBCVoltVerifier \
+        --vdbServers=localhost \
+        --driver=org.vertica.jdbc.Driver \
+        --host_port=volt15d:5433 \
+        --jdbcUser=dbadmin \
+        --jdbcDatabase=Test1 \
+        --jdbcDBMS=vertica
+}
 
+# drop vertica tables so that the JDBC test will create them fresh
+function jdbc-drop-vertica-tables() {
+    # echo $CLASSPATH
+    echo java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.JDBCVoltVerifier \
+        --jdbcDrop=true \
+        --vdbServers=localhost \
+        --driver=com.vertica.jdbc.Driver \
+        --host_port=volt15d:5433 \
+        --jdbcUser=dbadmin \
+        --jdbcDatabase=Test1 \
+        --jdbcDBMS=vertica
+}
 
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
