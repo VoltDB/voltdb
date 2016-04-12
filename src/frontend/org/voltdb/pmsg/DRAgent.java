@@ -1590,6 +1590,10 @@ public final class DRAgent {
     // optional int32 partitionId = 1;
     boolean hasPartitionId();
     int getPartitionId();
+    
+    // optional bool isUnpause = 2 [default = false];
+    boolean hasIsUnpause();
+    boolean getIsUnpause();
   }
   public static final class Pause extends
       com.google.protobuf.GeneratedMessage
@@ -1630,8 +1634,19 @@ public final class DRAgent {
       return partitionId_;
     }
     
+    // optional bool isUnpause = 2 [default = false];
+    public static final int ISUNPAUSE_FIELD_NUMBER = 2;
+    private boolean isUnpause_;
+    public boolean hasIsUnpause() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    public boolean getIsUnpause() {
+      return isUnpause_;
+    }
+    
     private void initFields() {
       partitionId_ = 0;
+      isUnpause_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -1648,6 +1663,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         output.writeInt32(1, partitionId_);
       }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeBool(2, isUnpause_);
+      }
       getUnknownFields().writeTo(output);
     }
     
@@ -1660,6 +1678,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt32Size(1, partitionId_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(2, isUnpause_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -1787,6 +1809,8 @@ public final class DRAgent {
         super.clear();
         partitionId_ = 0;
         bitField0_ = (bitField0_ & ~0x00000001);
+        isUnpause_ = false;
+        bitField0_ = (bitField0_ & ~0x00000002);
         return this;
       }
       
@@ -1829,6 +1853,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000001;
         }
         result.partitionId_ = partitionId_;
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        result.isUnpause_ = isUnpause_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -1847,6 +1875,9 @@ public final class DRAgent {
         if (other == org.voltdb.pmsg.DRAgent.Pause.getDefaultInstance()) return this;
         if (other.hasPartitionId()) {
           setPartitionId(other.getPartitionId());
+        }
+        if (other.hasIsUnpause()) {
+          setIsUnpause(other.getIsUnpause());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -1884,6 +1915,11 @@ public final class DRAgent {
               partitionId_ = input.readInt32();
               break;
             }
+            case 16: {
+              bitField0_ |= 0x00000002;
+              isUnpause_ = input.readBool();
+              break;
+            }
           }
         }
       }
@@ -1907,6 +1943,27 @@ public final class DRAgent {
       public Builder clearPartitionId() {
         bitField0_ = (bitField0_ & ~0x00000001);
         partitionId_ = 0;
+        onChanged();
+        return this;
+      }
+      
+      // optional bool isUnpause = 2 [default = false];
+      private boolean isUnpause_ ;
+      public boolean hasIsUnpause() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      public boolean getIsUnpause() {
+        return isUnpause_;
+      }
+      public Builder setIsUnpause(boolean value) {
+        bitField0_ |= 0x00000002;
+        isUnpause_ = value;
+        onChanged();
+        return this;
+      }
+      public Builder clearIsUnpause() {
+        bitField0_ = (bitField0_ & ~0x00000002);
+        isUnpause_ = false;
         onChanged();
         return this;
       }
@@ -7078,39 +7135,40 @@ public final class DRAgent {
       "e\030\001 \002(\006\022\r\n\005count\030\002 \002(\006\"-\n\003Ack\022\023\n\013partiti" +
       "onId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\013Snapsho" +
       "tReq\022\r\n\005nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitio" +
-      "nId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n" +
-      "\013partitionId\030\001 \001(\005\"\036\n\007Connect\022\023\n\013partiti" +
-      "onId\030\001 \001(\005\"3\n\tSubscribe\022\023\n\013partitionId\030\001" +
-      " \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"\376\002\n\010Response\022\026\n\002" +
-      "id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030\002 \001(\0162\036.pms" +
-      "g.Response.ReplicationMode\022\031\n\021snapshotTi",
-      "mestamp\030\003 \001(\006\022\026\n\016instanceIdHash\030\004 \001(\006\022\017\n" +
-      "\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg." +
-      "NodeInfo\022\034\n\024globalPartitionCount\030\007 \001(\005\022*" +
-      "\n\rpartitionInfo\030\010 \003(\0132\023.pmsg.PartitionIn" +
-      "fo\022\021\n\006status\030\t \001(\005:\0010\"i\n\017ReplicationMode" +
-      "\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED\020\002\022\027\n\023SY" +
-      "NCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVA" +
-      "ILABLE\020\005\"@\n\010NodeInfo\022\020\n\010hostname\030\001 \001(\t\022\016" +
-      "\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC\030\003 \001(\006\"\360\001\n\rP" +
-      "artitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\031\n\021las",
-      "tSentTimestamp\030\002 \001(\006\022\030\n\020lowestTupleIndex" +
-      "\030\003 \001(\003\022\032\n\022lastSentTupleIndex\030\004 \001(\003\022\027\n\017to" +
-      "talTupleCount\030\005 \001(\003\022\036\n\026outstandingBuffer" +
-      "Count\030\006 \001(\003\022\034\n\024outstandingByteCount\030\007 \001(" +
-      "\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\"\274\003" +
-      "\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.Ctrl" +
-      "Envelope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n" +
-      "\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.p" +
-      "msg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n" +
-      "\010response\030\006 \001(\0132\016.pmsg.Response\022&\n\013snaps",
-      "hotReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\036\n\007conne" +
-      "ct\030\010 \001(\0132\r.pmsg.Connect\022\"\n\tsubscribe\030\t \001" +
-      "(\0132\017.pmsg.Subscribe\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n" +
-      "\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPON" +
-      "SE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020" +
-      "\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRI" +
-      "BE\020\nB\032\n\017org.voltdb.pmsgB\007DRAgent"
+      "nId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\"6\n\005Pause\022\023\n" +
+      "\013partitionId\030\001 \001(\005\022\030\n\tisUnpause\030\002 \001(\010:\005f" +
+      "alse\"\036\n\007Connect\022\023\n\013partitionId\030\001 \001(\005\"3\n\t" +
+      "Subscribe\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimest" +
+      "amp\030\002 \001(\006\"\376\002\n\010Response\022\026\n\002id\030\001 \002(\0132\n.pms" +
+      "g.UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Response.Rep",
+      "licationMode\022\031\n\021snapshotTimestamp\030\003 \001(\006\022" +
+      "\026\n\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030\005 \001(\t" +
+      "\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024gl" +
+      "obalPartitionCount\030\007 \001(\005\022*\n\rpartitionInf" +
+      "o\030\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006status\030\t" +
+      " \001(\005:\0010\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026\n\022" +
+      "SYNCING_REPLICATED\020\002\022\027\n\023SYNCING_PARTITIO" +
+      "NED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010No" +
+      "deInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005" +
+      "\022\022\n\ncatalogCRC\030\003 \001(\006\"\360\001\n\rPartitionInfo\022\023",
+      "\n\013partitionId\030\001 \001(\005\022\031\n\021lastSentTimestamp" +
+      "\030\002 \001(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022last" +
+      "SentTupleIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030" +
+      "\005 \001(\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022\034\n" +
+      "\024outstandingByteCount\030\007 \001(\003\022\020\n\010isPaused\030" +
+      "\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\"\274\003\n\014CtrlEnvelope" +
+      "\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022" +
+      "\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.p" +
+      "msg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005p" +
+      "ause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(",
+      "\0132\016.pmsg.Response\022&\n\013snapshotReq\030\007 \001(\0132\021" +
+      ".pmsg.SnapshotReq\022\036\n\007connect\030\010 \001(\0132\r.pms" +
+      "g.Connect\022\"\n\tsubscribe\030\t \001(\0132\017.pmsg.Subs" +
+      "cribe\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PA" +
+      "USE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSH" +
+      "OT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC" +
+      "\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.vo" +
+      "ltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -7154,7 +7212,7 @@ public final class DRAgent {
           internal_static_pmsg_Pause_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Pause_descriptor,
-              new java.lang.String[] { "PartitionId", },
+              new java.lang.String[] { "PartitionId", "IsUnpause", },
               org.voltdb.pmsg.DRAgent.Pause.class,
               org.voltdb.pmsg.DRAgent.Pause.Builder.class);
           internal_static_pmsg_Connect_descriptor =
