@@ -13,7 +13,7 @@
 # Process name ( For display )
 NAME=voltdeploy
 # Daemon name, where is the actual executable
-DAEMON=/home/sujeshakya/GitHubVoltdb/voltdb_one/voltdb/bin/voltdeploy
+DAEMON=/home/sujeshakya/GitHubVoltdb1/voltdb_one/voltdb/bin/voltdeploy
 # pid file for the daemon
 PIDFILE=/var/run/voltdeploy.pid
 
@@ -66,9 +66,19 @@ case $1 in
    log_end_msg 0
   fi
   ;;
+  reload)
+   # Reload the process. Basically sending some signal to a daemon to reload
+   # it configurations.
+   if [ -e $PIDFILE ]; then
+    start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE
+    log_success_msg "$NAME process reloaded successfully"
+   else
+    log_failure_msg "$PIDFILE does not exists"
+   fi
+  ;;
  *)
   # For invalid arguments, print the usage message.
-  echo "Usage: $0 {start|stop|restart|status}"
+  echo "Usage: $0 {start|stop|restart|reload|status}"
   exit 2
   ;;
 esac

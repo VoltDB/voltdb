@@ -54,6 +54,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+import signal
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -67,6 +68,16 @@ __IP__ = "localhost"
 __PORT__ = 8000
 
 ALLOWED_EXTENSIONS = ['xml']
+
+
+def receive_signal(signum, stack):
+
+    config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
+    Configuration.convert_xml_to_json(config_path)
+    sync_configuration()
+    # print 'Received:', signum
+
+signal.signal(signal.SIGHUP, receive_signal)
 
 
 @APP.errorhandler(400)
