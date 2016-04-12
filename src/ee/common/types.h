@@ -218,7 +218,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_MATERIALIZE      = 55,
     PLAN_NODE_TYPE_LIMIT            = 56,
     PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
-	PLAN_NODE_TYPE_PARTITIONBY      = 58
+    PLAN_NODE_TYPE_PARTITIONBY      = 58
 };
 
 // ------------------------------------------------------------------

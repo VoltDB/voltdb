@@ -103,7 +103,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PARTITIONBY:
-    	VOLT_ERROR(" PartitionByExecutor not defined yet.");
+        VOLT_ERROR(" PartitionByExecutor not defined yet.");
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);

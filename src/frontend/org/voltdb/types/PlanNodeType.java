@@ -93,8 +93,7 @@ public enum PlanNodeType {
     MATERIALIZE     (55, MaterializePlanNode.class),
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
-    PARTITION       (58, PartitionByPlanNode.class),
-
+    PARTITIONBY     (58, PartitionByPlanNode.class),
     ;
 
     private final int val;

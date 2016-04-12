@@ -207,8 +207,8 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // PartitionBy
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_PARTITIONBY):
-        	ret = new voltdb::PartitionByPlanNode(voltdb::PLAN_NODE_TYPE_HASHAGGREGATE);
-        	break;
+            ret = new voltdb::PartitionByPlanNode();
+            break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }
 
