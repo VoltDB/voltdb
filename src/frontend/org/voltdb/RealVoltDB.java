@@ -2760,6 +2760,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
         }
         m_config.m_replicationRole = role;
