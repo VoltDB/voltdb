@@ -100,41 +100,9 @@ def main():
 if __name__ == '__main__':
     options = main()
 
-    path = options[0]['filepath']
-    con_path = options[0]['configpath']
+    data_path = options[0]['filepath']
+    config_path = options[0]['configpath']
     server = options[0]['server']
 
+    HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
 
-org_wd = os.getcwd()
-
-app_root = os.path.dirname(os.path.abspath(__file__))
-os.chdir(os.path.normpath(app_root))
-
-if path is None:
-    data_path = os.path.join(org_wd, 'voltdeployroot')
-else:
-    data_path = os.path.join(path, 'voltdeployroot')
-
-if con_path is None:
-    home = expanduser("~")
-    config_path = os.path.join(home, '.voltdb')
-else:
-    config_path = os.path.join(con_path, '.voltdb')
-
-if os.path.isdir(str(config_path)) and os.path.isdir(str(data_path)):
-    if os.access(str(config_path), os.W_OK) and os.access(str(data_path), os.W_OK):
-        HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
-    else:
-        sys.stderr.write('Error: There is no permission to create file in this folder. '
-                         'Unable to start voltdeploy.')
-        sys.exit(1)
-else:
-    try:
-        if not os.path.isdir(str(config_path)):
-            os.makedirs(config_path)
-        if not os.path.isdir(str(data_path)):
-            os.makedirs(data_path)
-        HTTPListener.main(runner, HTTPListener, config_path, data_path, server)
-    except Exception, err:
-        sys.stderr.write('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
-        sys.exit(1)

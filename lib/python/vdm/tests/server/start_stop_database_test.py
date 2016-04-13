@@ -173,7 +173,7 @@ class Cluster(unittest.TestCase):
             print "The database list is empty"
 
 
-class DefaultStartServer(Server):
+class Default_01_StartServer(Server):
     """
     Create Server
     """
@@ -254,7 +254,7 @@ class StartServer(Cluster):
                 self.assertEqual(response.status_code, 500)
 
 
-class DefaultRecoverServer(Server):
+class Default_02_RecoverServer(Server):
     """
     Create Server
     """

@@ -37,7 +37,7 @@ public:
 
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 3;
 
-    CompatibleDRTupleStream(int defaultBufferSize);
+    CompatibleDRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~CompatibleDRTupleStream() {}
 
@@ -47,6 +47,7 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -60,6 +61,7 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
@@ -70,6 +72,7 @@ public:
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
@@ -84,7 +87,10 @@ public:
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
-    static int32_t getTestDRBuffer(char *out);
+    static int32_t getTestDRBuffer(int32_t partitionId,
+                                   std::vector<int32_t> partitionKeyValueList,
+                                   std::vector<int32_t> flagList,
+                                   char *out);
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 

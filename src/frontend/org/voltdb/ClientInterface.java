@@ -127,11 +127,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
-    public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
+    // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
     public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
-    public static final long EXECUTE_TASK_CID            = Long.MIN_VALUE + 6;
+    public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
+    public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
-    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
+    // PerPartition cids
+    private static long setBaseValue(int offset) { return offset << 14; }
+    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + setBaseValue(1);
+    public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
+    public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -175,9 +180,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final RateLimitedClientNotifier m_notifier = new RateLimitedClientNotifier();
 
     private final Cartographer m_cartographer;
-
-    //This validator will verify params or per procedure invocation vaidation.
-    private final InvocationValidator m_invocationValidator;
 
     //Dispatched strore procedure invocations
     private final InvocationDispatcher m_dispatcher;
@@ -932,6 +934,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return clientResponse.getClass().getName();
         }
 
+        public ClientResponseImpl getClientResponse() {
+            return clientResponse;
+        }
+
         /**
          * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
@@ -1089,7 +1095,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1223,7 +1228,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        m_invocationValidator.setReplicationRole(role);
+        m_dispatcher.setReplicationRole(role);
     }
 
     /**

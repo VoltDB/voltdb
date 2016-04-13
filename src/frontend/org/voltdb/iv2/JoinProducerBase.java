@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
@@ -171,11 +172,14 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
-                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                     Map<Integer, Long> drSequenceNumbers,
-                                     boolean requireExistingSequenceNumbers)
+                                   Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                   Map<Integer, Long> drSequenceNumbers,
+                                   Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+                                   boolean requireExistingSequenceNumbers,
+                                   long clusterCreateTime)
     {
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers, requireExistingSequenceNumbers);
+        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers,
+                allConsumerSiteTrackers, requireExistingSequenceNumbers, clusterCreateTime);
     }
 
     protected void registerSnapshotMonitor(String nonce) {

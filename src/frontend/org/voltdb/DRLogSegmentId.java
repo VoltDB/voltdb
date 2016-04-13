@@ -69,6 +69,10 @@ public class DRLogSegmentId implements Serializable {
         return ((long)1 << 63) | ((long)clusterId << 55) | MAX_SEQUENCE_NUMBER;
     }
 
+    public static long makeInitialAckDRId(int clusterId) {
+        return makeDRIdFromComponents(clusterId, 0L) - 1L;
+    }
+
     public static boolean isEmptyDRId (long drId) {
         return (drId >>> 63) == 1L;
     }
@@ -87,6 +91,10 @@ public class DRLogSegmentId implements Serializable {
 
     public static long getSentinelOrSeqNumFromDRId(long drId) {
         return (drId < 0 ? drId : (drId & MAX_SEQUENCE_NUMBER));
+    }
+
+    public static String getDebugStringFromDRId(long drId) {
+        return String.format("%d:%d", getClusterIdFromDRId(drId), getSequenceNumberFromDRId(drId));
     }
 
     public static class MutableBinaryLogInfo {

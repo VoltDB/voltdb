@@ -74,8 +74,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
@@ -118,6 +116,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
@@ -1229,7 +1229,7 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            ParameterSet pset = ParameterSet.fromArrayNoCopy(30000);
+            ParameterSet pset = ParameterSet.fromArrayNoCopy(14_000);
             String response = callProcOverJSON("DelayProc", pset, null, null, false);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
