@@ -56,12 +56,12 @@ function clean() {
 function srccompile() {
     ant -f build.xml
     mkdir -p obj
-    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
-    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/$APPNAME2/procedures/*.java
-    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/customexport/*.java
 
     # stop if compilation fails

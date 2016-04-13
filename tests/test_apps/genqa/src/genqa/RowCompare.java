@@ -70,9 +70,9 @@ public class RowCompare {
             // we already checked key and value via SELECT; now work through the rest of the types
             // not_null rows are simple compares. nullable types need to check for null as well
 
-            byte ntiVal = (byte) t.get(TYPE_NULL_TINYINT-1, VoltType.TINYINT);
+            byte ntiVal = (byte) t.get("TYPE_NULL_TINYINT", VoltType.TINYINT);
             // System.out.println("Volt TYPE_NULL_TINYINT: " + ntiVal);
-            byte type_null_tinyint = rs.getByte(TYPE_NULL_TINYINT);
+            byte type_null_tinyint = rs.getByte("TYPE_NULL_TINYINT");
             if (rs.wasNull()) {
                 type_null_tinyint = org.voltdb.VoltType.NULL_TINYINT;
             }
@@ -81,14 +81,14 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_null_tinyint", String.valueOf(type_null_tinyint), String.valueOf(ntiVal));
             }
 
-            byte tiVal = (byte) t.get(TYPE_NOT_NULL_TINYINT-1, VoltType.TINYINT);
-            byte type_not_null_tinyint = rs.getByte(TYPE_NOT_NULL_TINYINT);
+            byte tiVal = (byte) t.get("TYPE_NOT_NULL_TINYINT", VoltType.TINYINT);
+            byte type_not_null_tinyint = rs.getByte("TYPE_NOT_NULL_TINYINT");
             if (tiVal != type_not_null_tinyint) {
                 colMisCount +=  reportMismatch("type_not_null_tinyint", String.valueOf(type_not_null_tinyint), String.valueOf(tiVal));
             }
 
-            short nsiVal = (short) t.get(TYPE_NULL_SMALLINT-1, VoltType.SMALLINT);
-            short type_null_smallint = rs.getShort(TYPE_NULL_SMALLINT);
+            short nsiVal = (short) t.get("TYPE_NULL_SMALLINT", VoltType.SMALLINT);
+            short type_null_smallint = rs.getShort("TYPE_NULL_SMALLINT");
             if (rs.wasNull()) {
                 type_null_smallint = org.voltdb.VoltType.NULL_SMALLINT;
             }
@@ -96,14 +96,14 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_null_smallint", String.valueOf(type_null_smallint), String.valueOf(nsiVal));
             }
 
-            short siVal = (short) t.get(TYPE_NOT_NULL_SMALLINT-1, VoltType.SMALLINT);
-            short type_not_null_smallint = rs.getShort(TYPE_NOT_NULL_SMALLINT);
+            short siVal = (short) t.get("TYPE_NOT_NULL_SMALLINT", VoltType.SMALLINT);
+            short type_not_null_smallint = rs.getShort("TYPE_NOT_NULL_SMALLINT");
             if (siVal != type_not_null_smallint ) {
                 colMisCount +=  reportMismatch("type_not_null_smallint", String.valueOf(type_not_null_smallint), String.valueOf(siVal));
             }
 
-            int nintVal = (int) t.get(TYPE_NULL_INTEGER-1, VoltType.INTEGER);
-            int type_null_integer = rs.getInt(TYPE_NULL_INTEGER);
+            int nintVal = (int) t.get("TYPE_NULL_INTEGER", VoltType.INTEGER);
+            int type_null_integer = rs.getInt("TYPE_NULL_INTEGER");
             if (rs.wasNull()) {
                 type_null_integer = org.voltdb.VoltType.NULL_INTEGER;
             }
@@ -111,14 +111,14 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_null_integer", String.valueOf(type_null_integer), String.valueOf(nintVal));
             }
 
-            int intVal = (int) t.get(TYPE_NOT_NULL_INTEGER-1, VoltType.INTEGER);
-            int type_not_null_integer = rs.getInt(TYPE_NOT_NULL_INTEGER);
+            int intVal = (int) t.get("TYPE_NOT_NULL_INTEGER", VoltType.INTEGER);
+            int type_not_null_integer = rs.getInt("TYPE_NOT_NULL_INTEGER");
             if (intVal != type_not_null_integer ) {
                 colMisCount +=  reportMismatch("type_not_null_integer", String.valueOf(type_not_null_integer), String.valueOf(intVal));
             }
 
-            long nbigVal = (long) t.get(TYPE_NULL_BIGINT-1, VoltType.BIGINT);
-            long type_null_bigint = rs.getLong(TYPE_NULL_BIGINT);
+            long nbigVal = (long) t.get("TYPE_NULL_BIGINT", VoltType.BIGINT);
+            long type_null_bigint = rs.getLong("TYPE_NULL_BIGINT");
             if (rs.wasNull()) {
                 type_null_bigint = org.voltdb.VoltType.NULL_BIGINT;
             }
@@ -126,8 +126,8 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_null_bigint", String.valueOf(type_null_bigint), String.valueOf(nbigVal));
             }
 
-            long bigVal = (long) t.get(TYPE_NOT_NULL_BIGINT-1, VoltType.BIGINT);
-            long type_not_null_bigint = rs.getLong(TYPE_NOT_NULL_BIGINT);
+            long bigVal = (long) t.get("TYPE_NOT_NULL_BIGINT", VoltType.BIGINT);
+            long type_not_null_bigint = rs.getLong("TYPE_NOT_NULL_BIGINT");
             if (bigVal != type_not_null_bigint ) {
                 colMisCount +=  reportMismatch("type_not_null_bigint", String.valueOf(type_not_null_bigint), String.valueOf(bigVal));
             }
@@ -138,11 +138,11 @@ public class RowCompare {
             // ex: volt syntax: 1970-01-10 13:56:40.549-05
             // postgres syntax: 1970-01-10 13:56:40.549000
 
-            TimestampType ntsVal = (TimestampType) t.get(TYPE_NULL_TIMESTAMP-1, VoltType.TIMESTAMP);
+            TimestampType ntsVal = (TimestampType) t.get("TYPE_NULL_TIMESTAMP", VoltType.TIMESTAMP);
             if ( ntsVal != null ) {
                 // compare it as string values
                 Timestamp voltTS = ntsVal.asJavaTimestamp();
-                Timestamp jdbcTS = rs.getTimestamp(TYPE_NULL_TIMESTAMP);
+                Timestamp jdbcTS = rs.getTimestamp("TYPE_NULL_TIMESTAMP");
 
                 if (! voltTS.toString().equals(jdbcTS.toString())) {
                     colMisCount +=  reportMismatch("type_null_timestamp strings", jdbcTS.toString(), voltTS.toString());
@@ -155,15 +155,15 @@ public class RowCompare {
 
             } else {
                 // if volt is null, jdbc should be null also
-                Timestamp jdbcTS = rs.getTimestamp(TYPE_NULL_TIMESTAMP);
-                if ( rs.getTimestamp(TYPE_NULL_TIMESTAMP) != null ) {
+                Timestamp jdbcTS = rs.getTimestamp("TYPE_NULL_TIMESTAMP");
+                if ( rs.getTimestamp("TYPE_NULL_TIMESTAMP") != null ) {
                     colMisCount += reportMismatch("type_null_timestamp is null", String.valueOf(jdbcTS),
                             String.valueOf(ntsVal));
                 }
             }
 
-            double nfloatVal = (double) t.get(TYPE_NULL_FLOAT-1, VoltType.FLOAT);
-            double type_null_float = (double)rs.getFloat(TYPE_NULL_FLOAT);
+            double nfloatVal = (double) t.get("TYPE_NULL_FLOAT", VoltType.FLOAT);
+            double type_null_float = (double)rs.getFloat("TYPE_NULL_FLOAT");
             if (rs.wasNull()) {
                 type_null_float = org.voltdb.VoltType.NULL_FLOAT;
             }
@@ -171,56 +171,56 @@ public class RowCompare {
                 colMisCount +=  reportMismatch("type_null_float", String.valueOf(type_null_float), String.valueOf(nfloatVal));
             }
 
-            double floatVal = (double) t.get(TYPE_NOT_NULL_FLOAT-1, VoltType.FLOAT);
-            double type_not_null_float = (double)rs.getFloat(TYPE_NOT_NULL_FLOAT);
+            double floatVal = (double) t.get("TYPE_NOT_NULL_FLOAT", VoltType.FLOAT);
+            double type_not_null_float = (double)rs.getFloat("TYPE_NOT_NULL_FLOAT");
             if (Math.abs(floatVal - type_not_null_float) > 0.0001) {
                 colMisCount +=  reportMismatch("type_not_null_float", String.valueOf(type_not_null_float), String.valueOf(floatVal));
             }
 
-            BigDecimal ndecimalVal = (BigDecimal) t.get(TYPE_NULL_DECIMAL-1, VoltType.DECIMAL);
-            BigDecimal type_null_decimal = rs.getBigDecimal(TYPE_NULL_DECIMAL);
+            BigDecimal ndecimalVal = (BigDecimal) t.get("TYPE_NULL_DECIMAL", VoltType.DECIMAL);
+            BigDecimal type_null_decimal = rs.getBigDecimal("TYPE_NULL_DECIMAL");
             if (!(ndecimalVal == null && rs.wasNull()) && !ndecimalVal.equals(type_null_decimal)) {
                 colMisCount +=  reportMismatch("type_null_decimal", type_null_decimal.toString(), ndecimalVal.toString());
             }
 
-            BigDecimal decimalVal = (BigDecimal) t.get(TYPE_NOT_NULL_DECIMAL-1, VoltType.DECIMAL);
-            BigDecimal type_not_null_decimal = rs.getBigDecimal(TYPE_NOT_NULL_DECIMAL);
+            BigDecimal decimalVal = (BigDecimal) t.get("TYPE_NOT_NULL_DECIMAL", VoltType.DECIMAL);
+            BigDecimal type_not_null_decimal = rs.getBigDecimal("TYPE_NOT_NULL_DECIMAL");
             if (!decimalVal.equals(type_not_null_decimal)) {
                 colMisCount +=  reportMismatch("type_not_null_decimal", type_not_null_decimal.toString(), decimalVal.toString());
             }
 
-            String nstring25Val = (String) t.get(TYPE_NULL_VARCHAR25-1, VoltType.STRING);
-            String type_null_varchar25 = rs.getString(TYPE_NULL_VARCHAR25);
+            String nstring25Val = (String) t.get("TYPE_NULL_VARCHAR25", VoltType.STRING);
+            String type_null_varchar25 = rs.getString("TYPE_NULL_VARCHAR25");
             if (!(nstring25Val == null && rs.wasNull()) && !nstring25Val.equals(type_null_varchar25)) {
                 colMisCount +=  reportMismatch("type_null_varchar25", type_null_varchar25, nstring25Val);
             }
 
-            String string25Val = (String) t.get(TYPE_NOT_NULL_VARCHAR25-1, VoltType.STRING);
-            String type_not_null_varchar25 = rs.getString(TYPE_NOT_NULL_VARCHAR25);
+            String string25Val = (String) t.get("TYPE_NOT_NULL_VARCHAR25", VoltType.STRING);
+            String type_not_null_varchar25 = rs.getString("TYPE_NOT_NULL_VARCHAR25");
             if (!string25Val.equals(type_not_null_varchar25)) {
                 colMisCount +=  reportMismatch("type_not_null_varchar25", type_not_null_varchar25, string25Val);
             }
 
-            String nstring128Val = (String) t.get(TYPE_NULL_VARCHAR128-1, VoltType.STRING);
-            String type_null_varchar128 = rs.getString(TYPE_NULL_VARCHAR128);
+            String nstring128Val = (String) t.get("TYPE_NULL_VARCHAR128", VoltType.STRING);
+            String type_null_varchar128 = rs.getString("TYPE_NULL_VARCHAR128");
             if (!(nstring128Val == null && rs.wasNull()) && ! nstring128Val.equals(type_null_varchar128)) {
                 colMisCount +=  reportMismatch("type_null_varchar128", type_null_varchar128, nstring128Val);
             }
 
-            String string128Val = (String) t.get(TYPE_NOT_NULL_VARCHAR128-1, VoltType.STRING);
-            String type_not_null_varchar128 = rs.getString(TYPE_NOT_NULL_VARCHAR128);
+            String string128Val = (String) t.get("TYPE_NOT_NULL_VARCHAR128", VoltType.STRING);
+            String type_not_null_varchar128 = rs.getString("TYPE_NOT_NULL_VARCHAR128");
             if (!string128Val.equals(type_not_null_varchar128)) {
                 colMisCount +=  reportMismatch("type_not_null_varchar128", type_not_null_varchar128, string128Val);
             }
 
-            String nstring1024Val = (String) t.get(TYPE_NULL_VARCHAR1024-1, VoltType.STRING);
-            String type_null_varchar1024 = rs.getString(TYPE_NULL_VARCHAR1024);
+            String nstring1024Val = (String) t.get("TYPE_NULL_VARCHAR1024", VoltType.STRING);
+            String type_null_varchar1024 = rs.getString("TYPE_NULL_VARCHAR1024");
             if (!(nstring1024Val == null && rs.wasNull()) && !nstring1024Val.equals(type_null_varchar1024)) {
                 colMisCount +=  reportMismatch("type_null_varchar1024", type_null_varchar1024, nstring1024Val);
             }
 
-            String string1024Val = (String) t.get(TYPE_NOT_NULL_VARCHAR1024-1, VoltType.STRING);
-            String type_not_null_varchar1024 = rs.getString(TYPE_NOT_NULL_VARCHAR1024);
+            String string1024Val = (String) t.get("TYPE_NOT_NULL_VARCHAR1024", VoltType.STRING);
+            String type_not_null_varchar1024 = rs.getString("TYPE_NOT_NULL_VARCHAR1024");
             if (!string1024Val.equals(type_not_null_varchar1024)) {
                 colMisCount += reportMismatch("type_not_null_varchar1024", type_not_null_varchar1024, string1024Val);
             }
