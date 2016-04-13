@@ -3,7 +3,6 @@ CREATE TABLE Store
     keyspace VARBINARY(128)  NOT NULL
 ,   key      VARCHAR(128)    NOT NULL
 ,   value    VARBINARY(2056) NOT NULL
-,   LIMIT PARTITION ROWS 40000 execute (evict from Store with blockcount = 10 and blocksize = 250000)
 ,   PRIMARY KEY (keyspace, key)
 );
 -- 10m row loaded, 100m operations
