@@ -102,6 +102,11 @@ public class StateMachineSnipits extends ZKTestBase {
         }
 
         @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
+        }
+
+        @Override
         protected void setInitialState(ByteBuffer currentAgreedState)
         {
         }
@@ -198,6 +203,11 @@ public class StateMachineSnipits extends ZKTestBase {
         }
 
         @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
+        }
+
+        @Override
         protected void setInitialState(ByteBuffer currentAgreedState)
         {
             m_cb.membersAdded(getCurrentMembers());
@@ -245,6 +255,11 @@ public class StateMachineSnipits extends ZKTestBase {
 
         protected StateMachine(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
+        }
+
+        @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return m_startingState;
         }
 
         @Override
@@ -345,6 +360,11 @@ public class StateMachineSnipits extends ZKTestBase {
 
         public Task(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
+        }
+
+        @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
         }
 
         @Override
