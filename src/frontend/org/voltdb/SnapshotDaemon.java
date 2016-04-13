@@ -605,7 +605,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              *
              * TRAIL [TruncSnap:5] wait 10 secs to process request
              */
-            m_es.schedule(new Runnable() {
+            final StartAction startAction = VoltDB.instance().getConfig().m_startAction;
+            final Runnable truncationSnapshotRunnable = new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -614,7 +615,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
                     }
                 }
-            }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
+            };
+            /*
+             * Initialize shuts down as it finishes with the initial truncation snapshot, thus
+             * alleviating the danger of having requests heaping on each other.
+             */
+            if (startAction == StartAction.INITIALIZE) {
+                m_es.submit(truncationSnapshotRunnable);
+            } else {
+                m_es.schedule(truncationSnapshotRunnable, m_truncationGatheringPeriod, TimeUnit.SECONDS);
+            }
             return;
         } else {
             /*
