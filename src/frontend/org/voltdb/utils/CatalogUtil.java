@@ -954,18 +954,20 @@ public abstract class CatalogUtil {
     /**
      * Given the deployment object generate the XML
      * @param deployment
+     * @param indent
      * @return XML of deployment object.
      * @throws IOException
      */
-    public static String getDeployment(DeploymentType deployment) throws IOException {
+    public static String getDeployment(DeploymentType deployment, boolean indent) throws IOException {
         try {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
             Marshaller marshaller = m_jc.createMarshaller();
             marshaller.setSchema(m_schema);
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -979,6 +981,17 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+
+    /**
+     * Given the deployment object generate the XML
+     * @param deployment
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
     }
 
     /**
@@ -1089,7 +1102,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
-    private static void validateDirectory(String type, File path) {
+    public static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
