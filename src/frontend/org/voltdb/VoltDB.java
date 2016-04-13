@@ -37,8 +37,10 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -234,6 +236,12 @@ public class VoltDB {
         /** Allow starting voltdb with non-empty managed directories. */
         public boolean m_forceVoltdbCreate = false;
 
+        /** cluster name designation */
+        public String m_clusterName = "_fast_";
+
+        /** command line provided voltdbroot */
+        public File m_voltdbRoot = new VoltFile("voltdbroot");
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -410,6 +418,9 @@ public class VoltDB {
                     m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
 
+                else if (arg.equals("initialize")) {
+                    m_startAction = StartAction.INITIALIZE;
+                }
                 else if (arg.equals("create")) {
                     m_startAction = StartAction.CREATE;
                 } else if (arg.equals("recover")) {
@@ -460,11 +471,7 @@ public class VoltDB {
                     m_pathToCatalog = arg.substring("catalog ".length());
                 }
                 else if (arg.equals("deployment")) {
-                    if (m_pathToDeployment != null) {
-                        System.out.println("Deployment already set with root option.");
-                    } else {
-                        m_pathToDeployment = args[++i];
-                    }
+                    m_pathToDeployment = args[++i];
                 }
                 else if (arg.equals("license")) {
                     m_pathToLicense = args[++i];
@@ -488,12 +495,29 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbCreate = true;
+                else if (arg.equalsIgnoreCase("clustername"))
+                    m_clusterName = args[++i].trim();
                 else if (arg.equalsIgnoreCase("voltdbroot")) {
-                    // See if you can get this from somewhere standard.
-                    m_pathToDeployment = args[++i].concat("/config_log/deployment.xml");
-                    m_startAction = StartAction.RECOVER;
-                    m_primed = true;
-                } else {
+                    m_voltdbRoot = new VoltFile(args[++i]);
+                    if (!"voltdbroot".equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot,"voltdbroot");
+                    }
+                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
+                        hostLog.fatal("Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
+                        System.out.println("Please refer to VoltDB documentation for command line usage.");
+                        System.out.flush();
+                        System.exit(-1);
+                    }
+                    try {
+                        CatalogUtil.validateDirectory("voltdbroot", m_voltdbRoot);
+                    } catch (RuntimeException e) {
+                        hostLog.fatal(e.getMessage(),e);
+                        System.out.println("Please refer to VoltDB documentation for command line usage.");
+                        System.out.flush();
+                        System.exit(-1);
+                    }
+                }
+                else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
@@ -531,10 +555,6 @@ public class VoltDB {
             }
         }
 
-        private boolean m_primed = false;
-        public boolean isPrimed() {
-            return m_primed;
-        }
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
@@ -565,7 +585,7 @@ public class VoltDB {
 
             // require deployment file location
             if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
-                    && m_startAction != StartAction.JOIN) {
+                    && m_startAction != StartAction.JOIN && m_startAction != StartAction.INITIALIZE) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;

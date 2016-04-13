@@ -26,6 +26,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
@@ -35,6 +36,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,6 +54,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -68,6 +71,7 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -140,6 +144,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -346,6 +351,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private LatencyHistogramStats m_latencyHistogramStats;
 
+    private File getConfigLogDirectory() {
+        return new VoltFile(m_config.m_voltdbRoot, "config_log");
+    }
+
+    private File getConfigLogDeployment() {
+        return new VoltFile(getConfigLogDirectory(), "deployment.xml");
+    }
+
     @Override
     public LicenseApi getLicenseApi() {
         return m_licenseApi;
@@ -483,7 +496,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             sb.append(System.getProperty("java.class.path", "[not available]"));
             hostLog.info(sb.toString());
 
-            m_statusTracker = new StatusTracker("nomadic", m_buildString, m_versionString, config.m_isEnterprise);
+            m_statusTracker = new StatusTracker(config.m_clusterName, m_buildString, m_versionString, config.m_isEnterprise);
             //Start the HTTP server get deployment from voltdbroot
 
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
@@ -491,26 +504,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
-                    config.m_pathToDeployment = setupDefaultDeployment(hostLog);
+                    config.m_pathToDeployment = setupDefaultDeployment(hostLog, m_config.m_voltdbRoot);
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
                 }
-            } else {
-                if (config.isPrimed()) {
-                    hostLog.info("This is a primed cluster.");
-                    // If you start with -D we assume that you are a primed cluster and we do following.
-                    // deployment must be primed and we can read it as standalone.
-                    // Host count is available externally on cli or picked up from previous configuration.
-                }
             }
-            DeploymentType deployment = readPrimedDeployment(config.m_pathToDeployment);
-            try {
-                m_configTracker = new ConfigTracker(deployment);
-                m_deploymentAutomationAvailable = setupAdminListener(deployment, config, m_statusTracker, m_configTracker);
-            } catch (Exception ex) {
-                hostLog.warn("You are running with management interface disabled, deployment automation will not be available.");
-                m_deploymentAutomationAvailable = false;
+            if (config.m_startAction != StartAction.INITIALIZE) {
+                DeploymentType deployment = readPrimedDeployment(config.m_pathToDeployment);
+                try {
+                    m_configTracker = new ConfigTracker(deployment);
+                    m_deploymentAutomationAvailable = setupAdminListener(deployment, config, m_statusTracker, m_configTracker);
+                } catch (Exception ex) {
+                    hostLog.warn("You are running with management interface disabled, deployment automation will not be available.");
+                    m_deploymentAutomationAvailable = false;
+                }
             }
 
             // set the mode first thing
@@ -551,10 +559,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = false;
-            if (config.m_startAction.doesRejoin()) {
-                isRejoin = true;
-            }
+            boolean isRejoin = config.m_startAction.doesRejoin();
             m_rejoining = isRejoin;
             m_rejoinDataPending = isRejoin || config.m_startAction == StartAction.JOIN;
 
@@ -582,7 +587,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            m_statusTracker.setNodeState(NodeState.WAITINGFORLEADER);
+            // STEDO: inject command log priming here. Question how can we recover with no truncation snapshot?
+
             buildClusterMesh(isRejoin || m_joining);
 
             //Register dummy agents immediately
@@ -599,7 +605,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
+            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories())
                 managedPathsEmptyCheck();
 
             if (!isRejoin && !m_joining) {
@@ -1028,7 +1034,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
 
             // warn the user on the console if k=0 or if no command logging
-            if (m_configuredReplicationFactor == 0) {
+            if (m_configuredReplicationFactor == 0 && m_config.m_startAction != StartAction.INITIALIZE) {
                 consoleLog.warn("This is not a highly available cluster. K-Safety is set to 0.");
             }
             if (!usingCommandLog) {
@@ -1205,6 +1211,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     }
                 }
             }
+        } catch (SessionExpiredException e) {
+            if (m_config.m_startAction != StartAction.INITIALIZE) {
+                hostLog.error("Failed to validate the start actions", e);
+            }
         } catch (KeeperException e) {
             hostLog.error("Failed to validate the start actions", e);
         } catch (InterruptedException e) {
@@ -1213,17 +1223,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private class ConfigLogging implements Runnable {
+
         private void logConfigInfo() {
             hostLog.info("Logging config info");
 
-            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
-
-            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
-            File configInfoDir = new File(pathToConfigInfoDir);
+            File configInfoDir = getConfigLogDirectory();
             configInfoDir.mkdirs();
 
-            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
-            File configInfo = new File(pathToConfigInfo);
+            File configInfo = new File(configInfoDir, "config.json");
 
             byte jsonBytes[] = null;
             try {
@@ -1286,19 +1293,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
 
         private void logCatalogAndDeployment() {
-            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
-            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
-            new File(pathToConfigInfoDir).mkdirs();
+
+            File configInfoDir = getConfigLogDirectory();
+            configInfoDir.mkdirs();
 
             try {
-                m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
+                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
             } catch (IOException e) {
-                hostLog.error("Failed to log catalog: " + e.getMessage());
+                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
                 e.printStackTrace();
             }
+            logDeployment();
+        }
+
+        private void logDeployment() {
+            File configInfoDir = getConfigLogDirectory();
+            configInfoDir.mkdirs();
 
             try {
-                File deploymentFile = new File(pathToConfigInfoDir, "deployment.xml");
+                File deploymentFile = getConfigLogDeployment();
                 if (deploymentFile.exists()) {
                     deploymentFile.delete();
                 }
@@ -1306,7 +1319,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 fileOutputStream.write(m_catalogContext.getDeploymentBytes());
                 fileOutputStream.close();
             } catch (Exception e) {
-                hostLog.error("Failed to log deployment file: " + e.getMessage());
+                hostLog.error("Failed to log deployment file: " + e.getMessage(), e);
                 e.printStackTrace();
             }
         }
@@ -1468,6 +1481,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    private void stageDeploymentFile(DeploymentType dt) {
+        File depFH = new VoltFile(m_config.m_voltdbRoot, "_DEPLOYMENT");
+        try (FileWriter fw = new FileWriter(depFH)) {
+            fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
+        } catch (IOException|RuntimeException e) {
+            VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
+        }
+    }
+
+    private void unstageDeploymentFile() {
+        try {
+            Files.copy(new VoltFile(m_config.m_voltdbRoot, "_DEPLOYMENT"), getConfigLogDeployment());
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to initialize voltdbroot " + m_config.m_voltdbRoot.getPath(), false, e);
+            return;
+        }
+    }
+
+    private void stageClusterNameDesignation() {
+        File depFH = new VoltFile(m_config.m_voltdbRoot, "_CLUSTERNAME");
+        try (PrintWriter pw = new PrintWriter(new FileWriter(depFH),true)) {
+            pw.println(m_config.m_clusterName);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage cluster name designtion", false, e);
+        }
+    }
+
+    private SnapshotCompletionInterest initializeInterest = new SnapshotCompletionInterest() {
+        @Override
+        public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
+            if (m_config.m_startAction == StartAction.INITIALIZE) {
+                unstageDeploymentFile();
+                stageClusterNameDesignation();
+                hostLog.info("Initialized VoltDB on " + m_config.m_voltdbRoot.getPath());
+                internalShutdown();
+            }
+            return null;
+        }
+    };
+
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -1480,6 +1533,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(m_config.m_pathToDeployment);
             } catch (Exception ex) {
                 //Let us get bytes from ZK
+            }
+            DeploymentType deployment = null;
+            /*
+             * For new startup mode override host count and voltdbroot
+             */
+            if (m_config.m_startAction == StartAction.INITIALIZE) {
+                deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+                // TODO: this where you would hook the static configuration primer
+                deployment.getPaths().getVoltdbroot().setPath(m_config.m_voltdbRoot.getPath());
+                // override host count so that the deployment is compiled it wont fail cluster config validations
+                // and preserve the value of kfactor
+                int forcedHostCount = deployment.getCluster().getKfactor() + 1;
+                if (deployment.getCluster().getHostcount() < forcedHostCount) {
+                    deployment.getCluster().setHostcount(forcedHostCount);
+                }
+                // make the config log deployment the definitive deployment
+                m_config.m_pathToDeployment = getConfigLogDeployment().getPath();
+                // stage the deployment file
+                stageDeploymentFile(deployment);
+
+                // come up briefly as single machine as it needs a
+                // a command log truncation snapshot to come up with a restore
+                // restore will work on empty truncation snapshot even if we modify
+                // host count and k-factor
+                deployment.getCluster().setHostcount(1);
+                deployment.getCluster().setKfactor(0);
+                deployment.getCluster().setSitesperhost(1);
+
+                m_snapshotCompletionMonitor.addInterest(initializeInterest);
+                deploymentBytes = CatalogUtil.getDeployment(deployment).getBytes(StandardCharsets.UTF_8);
             }
 
             try {
@@ -1532,15 +1615,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("No such deployment file: "
                         + m_config.m_pathToDeployment, false, null);
             }
-            DeploymentType deployment =
-                CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+
+            if (deployment == null) {
+                deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            }
+
             // wasn't a valid xml deployment file
             if (deployment == null) {
                 hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
                 VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
                         + m_config.m_pathToDeployment, false, null);
             }
-
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
              * Trick here is to print out all applicable problems and then stop, rather than stopping
@@ -2796,6 +2881,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_localMetadata;
     }
 
+    private void internalShutdown() {
+        Thread shutdownThread = new Thread() {
+            @Override
+            public void run() {
+                boolean die = false;
+                try {
+                    die = shutdown(this);
+                } catch (InterruptedException e) {
+                    new VoltLogger("HOST").error(
+                            "Exception while attempting to shutdown VoltDB from shutdown sysproc",
+                            e);
+                }
+                if (die) {
+                    if (m_config.m_startAction != StartAction.INITIALIZE) {
+                        new VoltLogger("HOST").warn("VoltDB shutting down as requested by @Shutdown command.");
+                    }
+                    System.exit(0);
+                }
+                else {
+                    try {
+                        Thread.sleep(10000);
+                    }
+                    catch (InterruptedException e) {}
+                }
+            }
+        };
+        shutdownThread.start();
+    }
+
     @Override
     public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
 
@@ -3079,24 +3193,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * @throws IOException
      */
     static String setupDefaultDeployment(VoltLogger logger) throws IOException {
+        return setupDefaultDeployment(logger, CatalogUtil.getVoltDbRoot(null));
+    }
 
-        // Since there's apparently no deployment to override the path to voltdbroot it should be
-        // safe to assume it's under the working directory.
-        // CatalogUtil.getVoltDbRoot() creates the voltdbroot directory as needed.
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(null);
-        String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
-        File deploymentXMLFile = new File(pathToDeployment);
+    /**
+     * Create default deployment.xml file in voltdbroot if the deployment path is null.
+     *
+     * @return pathto default deployment file
+     * @throws IOException
+     */
+   static String setupDefaultDeployment(VoltLogger logger, File voltdbroot) throws IOException {
+        File configInfoDir = new VoltFile(voltdbroot, "config_log");
+        configInfoDir.mkdirs();
 
-        logger.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
-        BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
-        for (String line : defaultDeploymentXML) {
-            bw.write(line);
-            bw.newLine();
+        File depFH = new VoltFile(configInfoDir, "deployment.xml");
+        if (!depFH.exists()) {
+            logger.info("Generating default deployment file \"" + depFH.getAbsolutePath() + "\"");
+
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(depFH))) {
+                for (String line : defaultDeploymentXML) {
+                    bw.write(line);
+                    bw.newLine();
+                }
+            } finally {
+            }
         }
-        bw.flush();
-        bw.close();
 
-        return deploymentXMLFile.getAbsolutePath();
+        return depFH.getAbsolutePath();
     }
 
     /*
