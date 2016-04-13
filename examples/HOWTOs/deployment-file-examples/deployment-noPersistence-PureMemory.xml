@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file config will not write
+    a command log or a truncation snapshot to disk.
+
+    If the entire cluster fails, data can only be
+    recovered back to a manual snapshot, if one exists.
+
+    See:
+    https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
+-->
+<deployment>
+    <cluster hostcount="1"/>
+    <commandlog enabled="false" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>
