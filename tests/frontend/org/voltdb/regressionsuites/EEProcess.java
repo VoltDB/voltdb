@@ -72,6 +72,7 @@ public class EEProcess {
         args.add("--leak-check=full");
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
+        args.add("--track-origins=yes");
         args.add("--error-exitcode=-1");
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant

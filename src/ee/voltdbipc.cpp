@@ -411,12 +411,13 @@ VoltDBIPC::~VoltDBIPC() {
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {
     int8_t result = kErrorCode_None;
-
-    if (0)
+    int nc = (int) ntohl(cmd->command);
+    if (1 && nc != 6 && nc != 10 && nc != 5 && nc != 24 && nc !=4 )
         std::cout << "IPC client command: " << ntohl(cmd->command) << std::endl;
 
     // commands must match java's ExecutionEngineIPC.Command
     // could enumerate but they're only used in this one place.
+    // printf("Start IPC command %d\n", ntohl(cmd->command));
     switch (ntohl(cmd->command)) {
       case 0:
         result = initialize(cmd);
@@ -481,6 +482,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 24:
           threadLocalPoolAllocations();
+          result = kErrorCode_None;
+          break;
+      case 25:
+          getUSOForExportTable(cmd);
           result = kErrorCode_None;
           break;
       case 27:
@@ -606,12 +611,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
+        std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
-
+        std::memset(m_tupleBuffer, 0, m_tupleBufferSize);
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
                                  cs->partitionId,
@@ -1239,7 +1245,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeInputBE in1(inptr, sz);
 
         // Pass 1 - calculate size and allow for status code byte and count length integers.
-        size_t outputSize = 1;
+        size_t outputSize = 1 + sizeof(int32_t) + sizeof(int64_t); // status code + buffercount + remaining
         for (size_t i = 0; i < bufferCount; i++) {
             in1.readLong(); in1.readInt(); // skip address and offset, used for jni only
             outputSize += in1.readInt() + 4;
@@ -1285,18 +1291,23 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         offset = 1 + sizeof(int32_t);
         *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
         offset += sizeof(int64_t);
-        if (remaining > 0) {
+        printf("tableStreamSerializeMore, bufferCount %d, bufferCount2 %d, m_tupleBuffer %d, "
+                "remaining %zd, positions.size() %zd \n",
+                htonl(bufferCount), bufferCount, *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]), htonll(remaining), positions.size() );
+        if (remaining >= 0) {
             std::vector<int>::const_iterator ipos;
             for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
                 int length = *ipos;
                 *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
                 offset += length + sizeof(int32_t);
             }
-        } else {
+        }
+        if (remaining <= 0) {
             // If we failed or finished, we've set the count, so stop right there.
             outputSize = offset;
         }
-
+        //printf("tableStreamSerializeMore, outputSize %zd, offset %zd, remaining %zd\n",
+        //        outputSize, offset, remaining);
         // Ship it.
         writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
 
@@ -1341,6 +1352,7 @@ void VoltDBIPC::exportAction(struct ipc_command *cmd) {
 }
 
 void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
+    printf("Start getUSOForExportTable\n");
     get_uso *get = (get_uso*)cmd;
 
     m_engine->resetReusedResultOutputBuffer();
@@ -1359,6 +1371,7 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
     // write the poll data. It is at least 4 bytes of length prefix.
     seqNo = htonll(seqNo);
     writeOrDie(m_fd, (unsigned char*)&seqNo, sizeof(seqNo));
+    printf("Finish getUSOForExportTable\n");
 }
 
 void VoltDBIPC::hashinate(struct ipc_command* cmd) {
@@ -1521,6 +1534,8 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         m_engine->executeTask(taskId, task->task);
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
+        printf("executeTask %d, result is %s, result length is %d\n", ntohl(cmd->command),resultsBuffer, responseLength);
+        resultsBuffer[0] = kErrorCode_Success;
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
     } catch (const FatalException& e) {
         crashVoltDB(e);
@@ -1629,10 +1644,10 @@ void *eethread(void *ptr) {
 
         // size at least length + command
         if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
-            printf("bytesread=%zx cmd=%d msgsize=%d\n",
-                   bytesread, cmd->command, ntohl(cmd->msgsize));
+            printf("sizeof=%zd bytesread=%zx cmd=%d msgsize=%d\n",
+                    sizeof(struct ipc_command), bytesread, ntohl(cmd->command), ntohl(cmd->msgsize));
             for (int ii = 0; ii < bytesread; ++ii) {
-                printf("%x ", data[ii]);
+                printf("bytesread data %d is %x ", ii, data[ii]);
             }
             assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
         }

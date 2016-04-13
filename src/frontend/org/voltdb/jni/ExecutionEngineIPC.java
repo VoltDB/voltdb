@@ -448,6 +448,31 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             resultTablesLengthBytes.flip();
 
             final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            final boolean dirty  = dirtyBytes.get() > 0;
+            if (dirty)
+                m_dirty = true;
+
+            if (resultTablesLength <= 0) {
+                System.out.println("resultTablesLength: " + resultTablesLength
+                        + " tables size " + tables.length);
+                return;
+            } else {
+                System.out.println("resultTablesLength: " + resultTablesLength
+                        + " tables size " + tables.length);
+
+            }
+
             final ByteBuffer resultTablesBuffer = ByteBuffer
                     .allocate(resultTablesLength);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -458,11 +483,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             resultTablesBuffer.flip();
-
-            // check if anything was changed
-            final boolean dirty = resultTablesBuffer.get() > 0;
-            if (dirty)
-                m_dirty = true;
 
             for (int ii = 0; ii < tables.length; ii++) {
                 final int dependencyCount = resultTablesBuffer.getInt(); // ignore the table count
@@ -1255,7 +1275,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             countBuffer.flip();
             final int count = countBuffer.getInt();
-            assert count == outputBuffers.size();
+            System.out.println("count: " + count + " outputBuffers.size() " + outputBuffers.size());
 
             // Get the remaining tuple count.
             ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
@@ -1267,26 +1287,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             remainingBuffer.flip();
             final long remaining = remainingBuffer.getLong();
-
-            final int[] serialized = new int[count];
+            System.out.println("remaining: " + remaining);
+            final int[] serialized;
+            assert count == outputBuffers.size();
+            if (count > 0) {
+                serialized = new int[count];
+            } else {
+                serialized = new int[]{0};
+            }
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                System.out.println("read " + i);
                 while (lengthBuffer.hasRemaining()) {
                     int read = m_connection.m_socketChannel.read(lengthBuffer);
+                    System.out.println("read " + i + " : " + read);
                     if (read == -1) {
                         throw new EOFException();
                     }
                 }
                 lengthBuffer.flip();
                 serialized[i] = lengthBuffer.getInt();
-
+                System.out.println("serialized " + i + " : " + serialized[i]);
                 ByteBuffer view = outputBuffers.get(i).b().duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {
                     m_connection.m_socketChannel.read(view);
                 }
             }
-
+            System.out.println("finished reamining :" + serialized);
             return Pair.of(remaining, serialized);
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
@@ -1342,20 +1370,27 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.flip();
             m_connection.write();
 
+            System.out.println("Start getUSOForExportTable: " + tableSignature);
             ByteBuffer results = ByteBuffer.allocate(16);
-            while (results.remaining() > 0)
+            while (results.remaining() > 0) {
                 m_connection.m_socketChannel.read(results);
+            }
             results.flip();
 
             retval = new long[2];
             retval[0] = results.getLong();
             retval[1] = results.getLong();
 
+            System.out.println("getUSOForExportTable: " + tableSignature
+                    // + ", result: " + result
+                    + ", retval[0]: " + retval[0]
+                    + ", retval[1]: " + retval[1]);
         } catch (final IOException e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
 
-        return null;
+        return retval;
     }
 
     @Override

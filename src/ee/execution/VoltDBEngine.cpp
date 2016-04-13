@@ -481,8 +481,10 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // write dirty-ness of the batch and number of dependencies output to the FRONT of
     // the result buffer
     if (last) {
-        m_resultOutput.writeIntAt(m_startOfResultBuffer,
-            static_cast<int32_t>((m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)));
+        int32_t numResultDependenciesCountOffsetTemp = static_cast<int32_t>
+            (m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t);
+        assert(numResultDependenciesCountOffsetTemp > 0);
+        m_resultOutput.writeIntAt(m_startOfResultBuffer,numResultDependenciesCountOffsetTemp);
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
@@ -1806,6 +1808,8 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     if (m_executorContext->drReplicatedStream()) {
         size += 3 * sizeof(int64_t);
     }
+    printf("VoltDBEngine::collectDRTupleStreamStateInfo result length is %d\n",
+            (int) size);
     m_resultOutput.writeInt(static_cast<int32_t>(size));
     DRCommittedInfo drInfo = m_executorContext->drStream()->getLastCommittedSequenceNumberAndUniqueIds();
     m_resultOutput.writeLong(drInfo.seqNum);

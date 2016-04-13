@@ -677,9 +677,9 @@ public class ExportManager
                         return;
                     }
                     if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        assert(false);
                         exportLog.error("Could not a find an export generation " + exportGeneration +
                         ". Should be impossible. Discarding export data");
+                        assert(false);
                     }
                 }
                 return;

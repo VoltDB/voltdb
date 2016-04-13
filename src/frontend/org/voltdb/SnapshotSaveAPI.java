@@ -198,6 +198,7 @@ public class SnapshotSaveAPI
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
             Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
+            System.out.println("Got PartitionID: " + partitionId + " for tr:" + partitionTxnId);
             SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
             m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
             m_remoteDataCenterLastIds.put(partitionId, perSiteRemoteDataCenterDrIds);
