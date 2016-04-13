@@ -659,10 +659,11 @@ public class Inits {
                 }
 
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
-                m_statusTracker.setNodeState(NodeState.RECOVERING);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-
+                if (catalog != null) {
+                    m_statusTracker.setNodeState(NodeState.RECOVERING);
+                }
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {
