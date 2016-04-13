@@ -290,7 +290,7 @@ public class ExportManager
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
         if (forceCreate) {
-            em.clearOverflowPath(catalogContext);
+            em.clearOverflowData(catalogContext);
         }
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
@@ -392,9 +392,11 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
     }
 
-    private void clearOverflowPath(CatalogContext catContext) throws ExportManager.SetupException {
+    private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
         String overflowDir = catContext.catalog.getClusters().get("cluster").getExportoverflow();
         try {
+            exportLog.info(
+                String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
             VoltFile.recursivelyDelete(new File(overflowDir), false);
         } catch(IOException e) {
             String msg = String.format("Error cleaning out export overflow directory %s: %s",
