@@ -75,6 +75,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
@@ -1393,6 +1394,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
+        DRCatalogDiffEngine diffEngine = new DRCatalogDiffEngine(m_context.catalog, context.catalog);
+        boolean incompatibleCatalogChange = false;
+        if (!diffEngine.supported()) {
+            incompatibleCatalogChange = true;
+        }
+
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
