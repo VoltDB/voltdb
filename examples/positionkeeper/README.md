@@ -2,7 +2,7 @@
 
 Use Case
 --------
-This application simulates a simple position keeper applicaton that maintains the positions of portfolios that are updated frequently as trades and price changes occur.
+This application simulates a simple position keeper application that maintains the positions of portfolios that are updated frequently as trades and price changes occur.
 
 Quickstart
 ---------------------------
