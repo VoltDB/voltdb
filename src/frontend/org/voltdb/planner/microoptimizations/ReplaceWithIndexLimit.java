@@ -191,7 +191,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // there are extra startCondition / endCondition, some filters are not equality
         // 2. Handle equality filters and one other comparison operator (<, <=, >, >=), see comments below
         if (ispn.getLookupType() != IndexLookupType.EQ &&
-                Math.abs(ispn.getSearchKeyExpressions().size() - ExpressionUtil.uncombine(ispn.getEndExpression()).size()) > 1) {
+                Math.abs(ispn.getSearchKeyExpressions().size() - ExpressionUtil.uncombinePredicate(ispn.getEndExpression()).size()) > 1) {
             return plan;
         }
 
@@ -201,10 +201,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         List<AbstractExpression> exprs;
         int numOfSearchKeys = ispn.getSearchKeyExpressions().size();
         if (ispn.getLookupType() == IndexLookupType.LT || ispn.getLookupType() == IndexLookupType.LTE) {
-            exprs = ExpressionUtil.uncombine(ispn.getInitialExpression());
+            exprs = ExpressionUtil.uncombinePredicate(ispn.getInitialExpression());
             numOfSearchKeys -= 1;
         } else {
-            exprs = ExpressionUtil.uncombine(ispn.getEndExpression());
+            exprs = ExpressionUtil.uncombinePredicate(ispn.getEndExpression());
         }
         int numberOfExprs = exprs.size();
 
@@ -316,7 +316,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                     (ispn.getLookupType() == IndexLookupType.LT || ispn.getLookupType() == IndexLookupType.LTE)){
                 ispn.setLookupType(IndexLookupType.GTE);
                 ispn.removeLastSearchKey();
-                ispn.addEndExpression(ExpressionUtil.uncombine(ispn.getInitialExpression()).get(numberOfExprs - 1));
+                ispn.addEndExpression(ExpressionUtil.uncombinePredicate(ispn.getInitialExpression()).get(numberOfExprs - 1));
                 ispn.resetPredicate();
             }
             // add an inline LIMIT plan node to this index scan plan node
@@ -333,7 +333,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             if (sortDirection == SortDirectionType.DESC &&
                     !ispn.getSearchKeyExpressions().isEmpty() &&
                     exprs.isEmpty() &&
-                    ExpressionUtil.uncombine(ispn.getInitialExpression()).isEmpty()) {
+                    ExpressionUtil.uncombinePredicate(ispn.getInitialExpression()).isEmpty()) {
                 AbstractExpression newPredicate = new ComparisonExpression();
                 if (ispn.getLookupType() == IndexLookupType.GT)
                     newPredicate.setExpressionType(ExpressionType.COMPARE_GREATERTHAN);
