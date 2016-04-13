@@ -60,7 +60,7 @@ public class MpTransactionState extends TransactionState
 
     final Iv2InitiateTaskMessage m_initiationMsg;
 
-    LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
+    final LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
         new LinkedBlockingDeque<FragmentResponseMessage>();
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables =
@@ -181,7 +181,7 @@ public class MpTransactionState extends TransactionState
         }
     }
 
-    private Map<Integer, Set<Long>>
+    private static Map<Integer, Set<Long>>
     createTrackedDependenciesFromTask(FragmentTaskMessage task,
                                       List<Long> expectedHSIds)
     {
@@ -258,7 +258,17 @@ public class MpTransactionState extends TransactionState
         }
         m_mbox.send(m_buddyHSId, borrowmsg);
 
-        FragmentResponseMessage msg = pollForResponses();
+        FragmentResponseMessage msg;
+        while (true){
+            msg = pollForResponses();
+            if (msg.m_sourceHSId == m_buddyHSId) {
+                break;
+            } else {
+                // It's possible to receive stale responses from remote sites on restart,
+                // ignore those
+                assert m_isRestart;
+            }
+        }
         m_localWork = null;
 
         // Build results from the FragmentResponseMessage

@@ -44,7 +44,7 @@
 /* This code was originally sourced from https://github.com/addthis/stream-lib
    in December 2014. */
 
-package org.voltdb.hll;
+package org.voltdb_hll;
 
 /**
  * This is a very fast, non-cryptographic hash suitable for general hash-based

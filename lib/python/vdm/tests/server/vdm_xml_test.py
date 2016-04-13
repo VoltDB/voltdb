@@ -313,7 +313,7 @@ class Deployment(unittest.TestCase):
         response = requests.put(url_dep,
                                 json=json_data)
         value = response.json()
-        self.assertEqual(value['status'], 1)
+        self.assertEqual(value['status'], 200)
         self.assertEqual(response.status_code, 200)
 
     def tearDown(self):

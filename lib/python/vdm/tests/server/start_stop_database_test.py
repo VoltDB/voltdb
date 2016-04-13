@@ -160,7 +160,7 @@ class Cluster(unittest.TestCase):
             print "The database list is empty"
 
 
-class DefaultStartServer(Server):
+class Default_01_StartServer(Server):
     """
     Create Server
     """
@@ -180,9 +180,9 @@ class DefaultStartServer(Server):
             print "Starting..."
             response = requests.put(url)
             value = response.json()
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "The Server list is empty"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -192,7 +192,7 @@ class DefaultStartServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
@@ -221,9 +221,9 @@ class StartServer(Cluster):
             response = requests.put(url)
             print "Starting...."
             value = response.json()
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "error"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -233,14 +233,15 @@ class StartServer(Cluster):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
-class DefaultRecoverServer(Server):
+
+class Default_02_RecoverServer(Server):
     """
     Create Server
     """
@@ -261,11 +262,11 @@ class DefaultRecoverServer(Server):
             response = requests.put(url)
             value = response.json()
 
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "Error"
-            elif "FATAL: VoltDB Community Edition" in value['statusstring']:
+            elif "FATAL: VoltDB Community Edition" in value['statusString']:
                 print "Voltdb recover is only supported in Enterprise Edition"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -275,7 +276,7 @@ class DefaultRecoverServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
@@ -289,10 +290,10 @@ def CheckServerStatus(self, last_db_id, status):
     print "Checking status..."
     response = requests.get(status_url)
     value = response.json()
-    if value['status'] and value['status'][0]['status']:
-        print "Status: " + value['status'][0]['status']
-        self.assertEqual(value['status'][0]['status'], status)
-        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    if value['status'] and value['dbStatus']['status']:
+        print "Status: " + value['dbStatus']['status']
+        self.assertEqual(value['dbStatus']['status'], status)
+        self.assertEqual(value['dbStatus']['serverStatus'][0][__host_or_ip__]['status'], status)
     else:
         assert False
 

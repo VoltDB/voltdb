@@ -296,7 +296,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
 
-    void insertPersistentTuple(TableTuple &source, bool fallible);
+    void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)

@@ -416,7 +416,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
-            m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -855,7 +854,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             m_memoryStats,
                             m_commandLog,
                             m_producerDRGateway,
-                            m_consumerDRGateway,
                             iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
 
@@ -2078,6 +2076,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                    finally {
+                        m_producerDRGateway = null;
+                    }
                 }
 
                 shutdownReplicationConsumerRole();
@@ -2300,8 +2301,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Perform any actions that would have been taken during the ordinary
             // initialization path
             if (createDRConsumerIfNeeded()) {
-                for (Initiator iv2init : m_iv2Initiators.values()) {
-                    iv2init.setConsumerDRGateway(m_consumerDRGateway);
+                for (int pid : m_cartographer.getPartitions()) {
+                    // Notify the consumer of leaders because it was disabled before
+                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
+                    callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                 }
                 m_consumerDRGateway.initialize(false);
             }
@@ -2574,6 +2577,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
         }
         m_config.m_replicationRole = role;
@@ -2588,6 +2592,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_consumerDRGateway.shutdown(true);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
+            }
+            finally {
+                m_consumerDRGateway = null;
             }
         }
     }
@@ -2759,7 +2766,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
@@ -2769,7 +2776,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private boolean createDRConsumerIfNeeded() {
         if (!m_config.m_isEnterprise
-                || !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)
+                || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }

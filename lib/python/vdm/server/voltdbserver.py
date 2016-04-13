@@ -20,7 +20,6 @@ import HTTPListener
 from flask import jsonify, abort, make_response
 import json
 import os
-import psutil
 import requests
 import signal
 import subprocess
@@ -79,7 +78,7 @@ def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
     """
-    return make_response(jsonify( { 'statusstring': statusstr } ), statuscode)
+    return make_response(jsonify({'status': statuscode, 'statusString': statusstr}), statuscode)
 
 
 class VoltdbProcess:
@@ -134,7 +133,7 @@ class VoltDatabase:
                 response = requests.put(url)
                 if response.status_code != requests.codes.ok:
                     failed = True
-                server_status[curr['hostname']] = json.loads(response.text)['statusstring']
+                server_status[curr['hostname']] = json.loads(response.text)['statusString']
             except Exception, err:
                 failed = True
                 print traceback.format_exc()
@@ -144,10 +143,10 @@ class VoltDatabase:
             url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
                   (curr['hostname'], HTTPListener.__PORT__, self.database_id)
             response = requests.get(url)
-            return create_response(response.text, 200)
+            return make_response(jsonify({'status': 200, 'statusString': response.text}), 200)
         else:
-            return create_response('Start request sent successfully to servers: ' +
-                                   json.dumps(server_status), 200)
+            return make_response(jsonify({'status': 200, 'statusString': 'Start request sent successfully to servers: ' +
+                                                                         json.dumps(server_status)}), 200)
 
     def start_server(self, server_id, recover=False, is_blocking=-1):
         """
@@ -173,7 +172,7 @@ class VoltDatabase:
             url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u&blocking=%u') % \
                               (server['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id, is_blocking)
             response = requests.put(url)
-            return create_response(json.loads(response.text)['statusstring'], response.status_code)
+            return create_response(json.loads(response.text)['statusString'], response.status_code)
         except Exception, err:
             print traceback.format_exc()
             return create_response(str(err), 500)
@@ -201,32 +200,25 @@ class VoltDatabase:
         """
         Checks the set of running processes to find out if voltdb server is running
         """
-        for proc in psutil.process_iter():
-            try:
-                cmd = proc.cmdline()
-                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                    return True
-            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
-                #print traceback.format_exc()
-                pass
-
-        return False
+        result = False
+        process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
+        process_list = process.communicate()[0].split('\n')
+        for process_cmd in process_list:
+            if '-DVDMStarted=true' in process_cmd:
+                result = True
+                break
+        return result
 
     def Get_Voltdb_Process(self):
         VoltdbProcess.isProcessRunning = False
         VoltdbProcess.processId = -1
-        for proc in psutil.process_iter():
-
-            try:
-                cmd = proc.cmdline()
-                if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
-                    VoltdbProcess.isProcessRunning = True
-                    VoltdbProcess.processId = proc.pid
-                    return VoltdbProcess
-            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
-                # print traceback.format_exc()
-                pass
-
+        process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
+        process_list = process.communicate()[0].split('\n')
+        for process_cmd in process_list:
+            if '-DVDMStarted=true' in process_cmd:
+                VoltdbProcess.isProcessRunning = True
+                VoltdbProcess.processId = process_cmd.split()[1]
+                break
         return VoltdbProcess
 
     def start_local_server(self, sid, recover=False, is_blocking=-1):
@@ -254,12 +246,12 @@ class VoltDatabase:
             url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
                       (server['hostname'], HTTPListener.__PORT__, self.database_id)
             response = requests.get(url)
-            is_running = response.json()['status'][0]['status']
+            is_running = response.json()['dbStatus']['status']
 
             server_ip = ''
             rejoin = False
             if is_running == 'running':
-                for value in response.json()['serverDetails']:
+                for value in response.json()['dbStatus']['serverStatus']:
                     for key in value:
                         status = value[key]['status']
                         if status == 'running' and key != server['hostname']:
@@ -271,13 +263,16 @@ class VoltDatabase:
         elif rejoin:
             verb = 'rejoin'
 
-        if not rejoin:
-            voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
-        else:
+        if verb == 'create':
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
+        elif rejoin:
             if is_blocking == 1:
-                voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip ]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip]
             else:
-                voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip ]
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
+        else:
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary]
+
         self.build_network_options(server, voltdb_cmd)
 
         G.OUTFILE_COUNTER = G.OUTFILE_COUNTER + 1
@@ -517,7 +512,7 @@ class VoltDatabase:
                 response = requests.put(url)
                 if (response.status_code != requests.codes.ok):
                     failed = True
-                server_status[curr['hostname']] = json.loads(response.text)['statusstring']
+                server_status[curr['hostname']] = json.loads(json.loads(response.text)['statusString'])['statusString']
             except Exception, err:
                 failed = True
                 print traceback.format_exc()

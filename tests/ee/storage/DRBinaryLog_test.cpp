@@ -77,6 +77,29 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
+class MockHashinator : public TheHashinator {
+public:
+    static MockHashinator* newInstance() {
+        return new MockHashinator();
+    }
+
+    ~MockHashinator() {}
+
+protected:
+    int32_t hashinate(int64_t value) const {
+        return 0;
+    }
+
+    int32_t hashinate(const char *string, int32_t length) const {
+        return 0;
+    }
+
+    int32_t partitionForToken(int32_t hashCode) const {
+        // partition of VoltDBEngine super of MockVoltDBEngine is 0
+        return -1;
+    }
+};
+
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
@@ -112,6 +135,7 @@ public:
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
                                                                m_exportSchema, exportColumnName,
                                                                m_exportStream, true);
+        setHashinator(MockHashinator::newInstance());
     }
     ~MockVoltDBEngine() {
         delete m_conflictExportTable;
@@ -135,10 +159,10 @@ private:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_drStream(64*1024),
-        m_drReplicatedStream(64*1024),
-        m_drStreamReplica(64*1024),
-        m_drReplicatedStreamReplica(64*1024),
+      : m_drStream(42, 64*1024),
+        m_drReplicatedStream(16383, 64*1024),
+        m_drStreamReplica(42, 64*1024),
+        m_drReplicatedStreamReplica(16383, 64*1024),
         m_undoToken(0),
         m_spHandleReplica(0),
         m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
@@ -196,9 +220,9 @@ public:
         m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
 
         m_table->setDR(true);
-        m_tableReplica->setDR(true);
+        m_tableReplica->setDR(false);
         m_replicatedTable->setDR(true);
-        m_replicatedTableReplica->setDR(true);
+        m_replicatedTableReplica->setDR(false);
 
         std::vector<ValueType> otherColumnTypes;
         std::vector<int32_t> otherColumnLengths;
@@ -238,10 +262,6 @@ public:
         m_otherTableWithoutIndex->setDR(true);
         m_otherTableWithIndexReplica->setDR(true);
         m_otherTableWithoutIndexReplica->setDR(true);
-
-        // allocate a new buffer and wrap it
-        m_drStream.configure(42);
-        m_drReplicatedStream.configure(16383);
 
         // create a table with different schema only on the master
         std::vector<ValueType> singleColumnType;
@@ -501,9 +521,16 @@ public:
         }
     }
 
-    TableTuple verifyExistingTableForDelete(TableTuple &existingTuple) {
+    TableTuple verifyExistingTableForDelete(TableTuple &existingTuple, bool existingOlder) {
+        Table *metaTable = m_topend.existingMetaRowsForDelete.get();
+        TableTuple tempMetaTuple(metaTable->schema());
+        TableIterator metaIter = metaTable->iterator();
+        EXPECT_EQ(true, metaIter.next(tempMetaTuple));
+        EXPECT_EQ(existingOlder, ValuePeeker::peekAsBigInt(tempMetaTuple.getNValue(metaTable->columnIndex("TIMESTAMP"))) < m_topend.remoteTimestamp);
+
         TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleForDR(existingTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
+
         return tuple;
     }
 
@@ -1374,7 +1401,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingTupleRowsForDelete->activeTupleCount());
-    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTuple);
+    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTuple, true);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
     /*TableTuple exportTuple2 = */verifyExpectedTableForDelete(expectedTuple);
@@ -1639,14 +1666,14 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
  * |      | insert 24 (pk), 2321 (uk), Y            | insert 24 (pk), 2321 (uk), Y             |
  * |      | insert 72 (pk), 345 (uk), Z             | insert 72 (pk), 345 (uk), Z              |
  * | T71  |                                         | update <42, 55555, X> to <42, 12345, X>  |
- * | T72  | update <42, 55555, X> to <42, 12345, X> |                                          |
+ * | T72  | update <42, 55555, X> to <42, 54321, X> |                                          |
  *
  * DB B reports: <DELETE timestamp mismatch>
  * existingRow: <42, 12345, X>
  * expectedRow: <42, 55555, X>
  *               <INSERT no conflict>
  * existingRow: <null>
- * newRow:      <42, 12345, X>
+ * newRow:      <42, 54321, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     m_engine->setIsActiveActiveDREnabled(true);
@@ -1682,7 +1709,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
 
     // update the same row on master then wait to trigger conflict on replica
     beginTxn(m_engine, 101, 101, 100, 72);
-    TableTuple tempNewTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
+    TableTuple tempNewTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 54321);
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple newTuple (m_table->schema());
     boost::shared_array<char> newData;
@@ -1698,7 +1725,91 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingTupleRowsForDelete->activeTupleCount());
-    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTuple);
+    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTuple, true);
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
+    /*TableTuple exportTuple2 = */verifyExpectedTableForDelete(expectedTuple);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingTupleRowsForInsert.get() == NULL);
+    EXPECT_EQ(1, m_topend.newTupleRowsForInsert->activeTupleCount());
+    /*TableTuple exportTuple3 = */verifyNewTableForInsert(newTuple);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
+}
+
+/*
+ * Conflict detection test case - Update Timestamp Mismatch Rejected
+ *
+ * | Time | DB A                                    | DB B                                     |
+ * |------+-----------------------------------------+------------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X           | insert 42 (pk), 55555 (uk), X            |
+ * |      | insert 24 (pk), 2321 (uk), Y            | insert 24 (pk), 2321 (uk), Y             |
+ * |      | insert 72 (pk), 345 (uk), Z             | insert 72 (pk), 345 (uk), Z              |
+ * | T71  | update <42, 55555, X> to <42, 12345, X> |                                          |
+ * | T72  |                                         | update <42, 55555, X> to <42, 54321, X>  |
+ *
+ * DB B reports: <DELETE timestamp mismatch>
+ * existingRow: <42, 54321, X>
+ * expectedRow: <42, 55555, X>
+ *               <INSERT no conflict>
+ * existingRow: <null>
+ * newRow:      <42, 12345, X>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchRejected) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    m_engineReplica->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert one row on both side
+    beginTxn(m_engine, 99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(m_engine, true);
+    flushAndApply(99);
+
+    // update one row on replica
+    beginTxn(m_engine, 100, 100, 99, 71);
+    TableTuple tempNewTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple newTuple (m_table->schema());
+    boost::shared_array<char> newData;
+    newData = deepCopy(tempNewTuple, newTuple, newData);
+    StackCleaner newTupleCleaner(newTuple);
+    endTxn(m_engine, true);
+    flush(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(m_engine, 101, 101, 100, 72);
+    TableTuple tempExistingTuple = updateTupleFirstAndSecondColumn(m_tableReplica, tempExpectedTuple, 42, 54321);
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTuple (m_tableReplica->schema());
+    boost::shared_array<char> existingData;
+    existingData = deepCopy(tempExistingTuple, existingTuple, existingData);
+    StackCleaner existingTupleCleaner(existingTuple);
+    endTxn(m_engine, true);
+    // trigger a update timestamp mismatch conflict
+    flushAndApply(101);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingTupleRowsForDelete->activeTupleCount());
+    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTuple, false);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
     /*TableTuple exportTuple2 = */verifyExpectedTableForDelete(expectedTuple);
@@ -1784,7 +1895,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingTupleRowsForDelete->activeTupleCount());
-    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTupleFirst);
+    /*TableTuple exportTuple1 = */verifyExistingTableForDelete(existingTupleFirst, true);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
     /*TableTuple exportTuple2 = */verifyExpectedTableForDelete(expectedTuple);
@@ -1917,6 +2028,23 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
         return;
     }
     ASSERT_TRUE(false);
+}
+
+TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {
+    m_tableReplica->setTupleLimit(100);
+
+    const int total = 101;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle - 1);
+
+    EXPECT_EQ(101, m_tableReplica->activeTupleCount());
 }
 
 int main() {

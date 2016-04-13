@@ -113,7 +113,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     // Post-filters that got eliminated by exactly matched partial index filters
-    private List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
+    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
 
     public IndexScanPlanNode() {
         super();

@@ -236,16 +236,16 @@ public class TestDeterminism extends PlannerTestCase {
 
     public void testDeterminismOfJoin() {
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.a, X.c, X.b, Y.a");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.b, X.a, Y.a, X.c");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.z, X.a, X.c, X.b, Y.a");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z, X.z + Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from tuniqcombo X, tunique Y",
                 "order by 4, X.z, X.a, X.c, X.b, Y.a");
         assertPlanDeterminismNeedsOrdering(
                 "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.a, X.c, X.b, Y.a",
@@ -257,14 +257,14 @@ public class TestDeterminism extends PlannerTestCase {
                 "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.z, X.a, X.c, X.b, Y.a",
                 ", X.z, Y.z", "order by l, m, n");
         assertPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a",
+                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a",
                 ", Y.z", "order by 1, 2, 3, 4");
         assertPlanNeedsSaferDeterminismCombo(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y where X.a = Y.a");
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y where X.a = Y.a");
         assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from tuniqcombo X, tunique Y order by X.a, X.b, Y.a");
+            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.b, Y.a");
         assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a");
+            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a");
     }
 
     public void testDeterminismOfSelectOrderGroupKeys() {
@@ -318,11 +318,11 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testDeterminismOfJoinOrderAll() {
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a",
+        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
                 "order by 1, 2, 3");
         assertPlanDeterminismNeedsOrdering("select X.a l, X.z m, Y.z n from ttree X, tunique Y where X.a = Y.a",
                 "order by Y.z, X.a, X.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a",
+        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
                 "order by 3, 2, 1");
     }
 

@@ -766,7 +766,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
             value = response.json()
-            self.assertEqual(value['status'], 1)
+            self.assertEqual(value['status'], 200)
             self.assertEqual(response.status_code, 200)
 
 
