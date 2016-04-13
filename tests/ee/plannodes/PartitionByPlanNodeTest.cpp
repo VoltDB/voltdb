@@ -24,7 +24,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/**
+    /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership. The ASF
@@ -94,8 +94,8 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         const char *jsonString = jsonStrings[idx];
         PlannerDomRoot root(jsonString);
         PlannerDomValue obj(root.rootObject());
-        PartitionByPlanNode *pn = dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj));
-        EXPECT_TRUE(pn != NULL);
+        boost::shared_ptr<voltdb::PartitionByPlanNode> pn(dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
+        EXPECT_TRUE(pn.get() != NULL);
         const std::vector<AbstractExpression*> &partitionByExprs = pn->getGroupByExpressions();
         const std::vector<AbstractExpression*> &sortExprs = pn->getSortExpressions();
         const std::vector<SortDirectionType> &sortDirs = pn->getSortDirections();
