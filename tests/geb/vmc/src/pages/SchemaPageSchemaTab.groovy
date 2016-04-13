@@ -34,32 +34,32 @@ import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase;
  */
 class SchemaPageSchemaTab extends SchemaPage {
     static content = {
-		requiredId		{ $(checkId) }
+        requiredId      { $(checkId) }
         schemaTable { $('#schematable') }
 
-        ascending		{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
-        descending		{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
+        ascending       { $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
+        descending      { $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
 
-        row					{ $(class:"primaryrow") }
+        row                 { $(class:"primaryrow") }
 
 
-        viewDdlSource		{ $("#ddlSource") }
+        viewDdlSource       { $("#ddlSource") }
 
-        searchName			{ $(class:"tablesorter-filter", 0) }
+        searchName          { $(class:"tablesorter-filter", 0) }
 
-        test			{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap tbody") }
+        test            { $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap tbody") }
 
-        name			{ $(class:"tablesorter-header-inner", text:"Name" ) }
-        type			{ $(class:"tablesorter-header-inner", text:"Type" ) }
-        partitioning	{ $(class:"tablesorter-header-inner", text:"Partitioning" ) }
-        columns			{ $(class:"tablesorter-header-inner", text:"Columns" ) }
-        indexes			{ $(class:"tablesorter-header-inner", text:"Indexes" ) }
-        pkey			{ $(class:"tablesorter-header-inner", text:"PKey" ) }
-        tuplelimit		{ $(class:"tablesorter-header-inner", text:"TupleLimit" ) }
-        expandallcheck	{ $("#s > div > div.dataBlockContent > div > div > label", text:"Expand All")}
-        expandedcheck	{$("#s > div > div.dataBlockContent > div")}
+        name            { $(class:"tablesorter-header-inner", text:"Name" ) }
+        type            { $(class:"tablesorter-header-inner", text:"Type" ) }
+        partitioning    { $(class:"tablesorter-header-inner", text:"Partitioning" ) }
+        columns         { $(class:"tablesorter-header-inner", text:"Columns" ) }
+        indexes         { $(class:"tablesorter-header-inner", text:"Indexes" ) }
+        pkey            { $(class:"tablesorter-header-inner", text:"PKey" ) }
+        tuplelimit      { $(class:"tablesorter-header-inner", text:"TupleLimit" ) }
+        expandallcheck  { $("#s > div > div.dataBlockContent > div > div > label", text:"Expand All")}
+        expandedcheck   {$("#s > div > div.dataBlockContent > div")}
         documentationLink { $("#iconDoc") }
-        generatedbytxt	{$("#catalogContainer > div.documentation > span")}
+        generatedbytxt  {$("#catalogContainer > div.documentation > span")}
         expandedlist    { $(class:"togglex")}
         expandedlistbox { $(class:"invert")}
         expandedlist1   { $(class:"togglex",1)}
@@ -67,8 +67,8 @@ class SchemaPageSchemaTab extends SchemaPage {
         refreshtableschema      { $("#MenuCatalog > div > button", text:"Refresh")}
 
 
-        header          	{ module Header }
-        footer          	{ module Footer }
+        header              { module Header }
+        footer              { module Footer }
     }
     static at = {
         schemaSubTab.displayed
@@ -76,7 +76,7 @@ class SchemaPageSchemaTab extends SchemaPage {
         schemaTable.displayed
     }
 
-	String checkId = "#s-"+ getTablename()
+    String checkId = "#s-"+ getTablename()
 
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
@@ -89,7 +89,7 @@ class SchemaPageSchemaTab extends SchemaPage {
     Map<String,List<String>> getSchemaTableByColumn(ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.AS_IS) {
         return getTableByColumn(schemaTable, colHeaderFormat)
     }
-    
+
     /**
      * Returns the contents of the "Schema" table, on the Schema tab of the
      * Schema page of the VMC, by row, as a List<List<String>>.
@@ -104,8 +104,8 @@ class SchemaPageSchemaTab extends SchemaPage {
 
 
     /*
-	 * refresh and send tablename into the search tablename box
-	 */
+     * refresh and send tablename into the search tablename box
+     */
     def boolean sendTablename(String tablename) {
         refresh.click()
         waitFor(20,10) { searchName.displayed }

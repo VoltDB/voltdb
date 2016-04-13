@@ -35,88 +35,88 @@ import vmcTest.pages.*
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
 class SqlQueriesExportTest extends TestBase {
-	def setup() {
+    def setup() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()
         then: 'should be on SQL Query page'
-        at SqlQueryPage 
+        at SqlQueryPage
     }
 
-    
+
     def "Check HTML export"() {
-    	String createQuery = page.getQueryToCreateTable()
-    	String deleteQuery = page.getQueryToDeleteTable()
-    	String tablename = page.getTablename()
-    
-    	when: 'set create query in the box'
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'set create query in the box'
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-    	
-    	when: 'set select query in the box'
-    	page.setQueryText("SELECT * FROM " + tablename)
-    	then: 'run the query'
-    	page.runQuery()
-    	
-    	page.qrFormatDropDown.value("HTML")
-    	waitFor(30)	{ resultHtml.isDisplayed() }
-		
-    	when: 'set delete query in the box'
+
+        when: 'set select query in the box'
+        page.setQueryText("SELECT * FROM " + tablename)
+        then: 'run the query'
+        page.runQuery()
+
+        page.qrFormatDropDown.value("HTML")
+        waitFor(30) { resultHtml.isDisplayed() }
+
+        when: 'set delete query in the box'
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-	
+
     }
-   
+
      def "Check CSV export"() {
-     	String createQuery = page.getQueryToCreateTable()
-    	String deleteQuery = page.getQueryToDeleteTable()
-    	String tablename = page.getTablename()
-    	
-    	when: 'set create query in the box'
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'set create query in the box'
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-    	
-    	when: 'set select query in the box'
-    	page.setQueryText("SELECT * FROM " + tablename)
-    	then: 'run the query'
-    	page.runQuery()
-    
-    	page.qrFormatDropDown.value("CSV")
-    	waitFor(30)	{ resultCsv.isDisplayed() }
-    	
-    	when: 'set delete query in the box'
+
+        when: 'set select query in the box'
+        page.setQueryText("SELECT * FROM " + tablename)
+        then: 'run the query'
+        page.runQuery()
+
+        page.qrFormatDropDown.value("CSV")
+        waitFor(30) { resultCsv.isDisplayed() }
+
+        when: 'set delete query in the box'
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-	
+
     }
-    
+
      def "Check Monospace export"() {
-     	String createQuery = page.getQueryToCreateTable()
-    	String deleteQuery = page.getQueryToDeleteTable()
-    	String tablename = page.getTablename()
-    	
-    	when: 'set create query in the box'
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
+
+        when: 'set create query in the box'
         page.setQueryText(createQuery)
         then: 'run the query'
         page.runQuery()
-    	
-    	when: 'set select query in the box'
-    	page.setQueryText("SELECT * FROM " + tablename)
-    	then: 'run the query'
-    	page.runQuery()
-    	
-    	page.qrFormatDropDown.value("Monospace")
-		waitFor(30)	{ resultMonospace.isDisplayed() }
-		
-    	when: 'set delete query in the box'
+
+        when: 'set select query in the box'
+        page.setQueryText("SELECT * FROM " + tablename)
+        then: 'run the query'
+        page.runQuery()
+
+        page.qrFormatDropDown.value("Monospace")
+        waitFor(30) { resultMonospace.isDisplayed() }
+
+        when: 'set delete query in the box'
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
     }
-    
+
     def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
