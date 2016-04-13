@@ -2306,7 +2306,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
                     callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                 }
-                m_consumerDRGateway.initialize(false);
+                // If this is @UAC cl replay, don't initialize DR consumer until
+                // cluster recover finished.
+                if (m_mode != OperationMode.INITIALIZING) {
+                    m_consumerDRGateway.initialize(false);
+                }
             }
             // 6.2. If we are a DR replica, we may care about a
             // deployment update
