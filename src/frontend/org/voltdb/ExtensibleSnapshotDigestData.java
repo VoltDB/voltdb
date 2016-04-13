@@ -205,16 +205,17 @@ public class ExtensibleSnapshotDigestData {
     static public JSONObject serializeSiteConsumerDrIdTrackersToJSON(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> drMixedClusterSizeConsumerState)
             throws JSONException {
         JSONObject clusters = new JSONObject();
-        if (drMixedClusterSizeConsumerState != null) {
-            for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
-                // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
-                // from the local cluster's partition count (which is not tracked here)
-                JSONObject partitions = new JSONObject();
-                for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
-                    partitions.put(e2.getKey().toString(), e2.getValue().toJSON());
-                }
-                clusters.put(e.getKey().toString(), partitions);
+        if (drMixedClusterSizeConsumerState == null) {
+            return clusters;
+        }
+        for (Map.Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e : drMixedClusterSizeConsumerState.entrySet()) {
+            // The key is the remote Data Center's partitionId. HeteroTopology implies a different partition count
+            // from the local cluster's partition count (which is not tracked here)
+            JSONObject partitions = new JSONObject();
+            for (Map.Entry<Integer, DRConsumerDrIdTracker> e2 : e.getValue().entrySet()) {
+                partitions.put(e2.getKey().toString(), e2.getValue().toJSON());
             }
+            clusters.put(e.getKey().toString(), partitions);
         }
         return clusters;
     }
