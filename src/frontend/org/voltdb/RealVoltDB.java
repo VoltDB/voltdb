@@ -2577,6 +2577,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
         }
         m_config.m_replicationRole = role;
@@ -2765,7 +2766,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);

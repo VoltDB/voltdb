@@ -549,7 +549,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             if (res > 0) {
                 allTablesEmpty = false
                 // TODO: improve this (to get max values, and insert/delete above them)
-                //def 
+                //def
                 //minValuesForEachTable.put(tables[i], getFirstColumnAndMaxValue(tables[i]))
             }
         }

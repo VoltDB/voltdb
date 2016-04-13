@@ -1212,6 +1212,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         case java.sql.Types.VARCHAR:
         case java.sql.Types.VARBINARY:
         case java.sql.Types.TIMESTAMP:
+        case java.sql.Types.OTHER:
             switch (toType) {
             case java.sql.Types.VARCHAR:
                 return true;
