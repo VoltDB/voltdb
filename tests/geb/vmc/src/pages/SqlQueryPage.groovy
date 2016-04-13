@@ -75,25 +75,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryexecutionerror     { $("#queryDatabasePausedInnerErrorPopup > div.overlay-title", text:"Query Execution Error")}
         queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}
 
-        htmltableresult 	    { $("#table_r0_html_0")}
-        createerrorresult	    { $("#resultHtml > span")}
-        htmlresultallcolumns	{ $("#table_r0_html_0 > thead")}
+        htmltableresult         { $("#table_r0_html_0")}
+        createerrorresult       { $("#resultHtml > span")}
+        htmlresultallcolumns    { $("#table_r0_html_0 > thead")}
 
-        htmlresultselect	    { $("#table_r0_html_0 > thead > tr")}
-        refreshquery		    { $("#tabMain > button", text:"Refresh")}
+        htmlresultselect        { $("#table_r0_html_0 > thead > tr")}
+        refreshquery            { $("#tabMain > button", text:"Refresh")}
 
         //options
-        htmlOptions				{ $("option", text:"HTML") }
-        csvOptions				{ $("option", text:"CSV") }
-        monospaceOptions		{ $("option", text:"Monospace") }
+        htmlOptions             { $("option", text:"HTML") }
+        csvOptions              { $("option", text:"CSV") }
+        monospaceOptions        { $("option", text:"Monospace") }
 
         // for view
-        checkview		{ $("#tabMain > ul > li.active > a")}
+        checkview       { $("#tabMain > ul > li.active > a")}
 
         //result
-        resultHtml		{ $("#resultHtml") }
-        resultCsv		{ $("#resultCsv") }
-        resultMonospace	{ $("#resultMonospace") }
+        resultHtml      { $("#resultHtml") }
+        resultCsv       { $("#resultCsv") }
+        resultMonospace { $("#resultMonospace") }
 
         errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
     }
@@ -582,8 +582,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
-	 * click DbMonitor tab to go to Db Monitor
-	 */
+     * click DbMonitor tab to go to Db Monitor
+     */
     def boolean gotoDbMonitor() {
         header.tabDBMonitor.click()
     }
@@ -615,8 +615,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
-	 *	Get delete query
-	 */
+     *  Get delete query
+     */
     def String getQueryToDeleteTable() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
@@ -673,8 +673,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
-	 *	Get delete query
-	 */
+     *  Get delete query
+     */
     def String getQueryToDeleteView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
         String line;
