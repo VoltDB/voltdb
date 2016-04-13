@@ -44,7 +44,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.common.Constants;
+import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -53,7 +53,6 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
-import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -69,6 +68,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
+    final StatusTracker m_statusTracker;
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
@@ -112,16 +112,13 @@ public class Inits {
         }
     }
 
-    Inits(RealVoltDB rvdb, int threadCount) {
+    Inits(StatusTracker statusTracker, RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
+        m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction.doesRejoin()) {
-            m_isRejoin = true;
-        } else {
-            m_isRejoin = false;
-        }
+        m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
@@ -463,74 +460,6 @@ public class Inits {
         }
     }
 
-    class StartHTTPServer extends InitWork {
-        StartHTTPServer() {
-        }
-
-        //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
-
-            boolean success = false;
-            int httpPort = httpPortStart;
-            for (; true; httpPort++) {
-                try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
-                            );
-                    success = true;
-                    break;
-                } catch (Exception e1) {
-                    if (mustListen) {
-                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
-                        System.exit(-1);
-                    }
-                }
-                if (!findAny) {
-                    break;
-                }
-            }
-            if (!success) {
-                m_rvdb.m_httpPortExtraLogMessage = String.format(
-                        "HTTP service unable to bind to ports %d through %d",
-                        httpPortStart, httpPort - 1);
-                if (mustListen) {
-                    System.exit(-1);
-                }
-                m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
-                return;
-            }
-            m_config.m_httpPort = httpPort;
-        }
-
-        @Override
-        public void run() {
-            // start the httpd dashboard/jsonapi. A port value of -1 means disabled
-            // by the deployment.xml configuration.
-            int httpPort = -1;
-            m_rvdb.m_jsonEnabled = false;
-            if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                httpPort = m_deployment.getHttpd().getPort();
-                if (m_deployment.getHttpd().getJsonapi() != null) {
-                    m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
-                }
-            }
-            // if set by cli use that.
-            if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
-                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
-                // if not set by the user, just find a free port
-            } else if (httpPort == Constants.HTTP_PORT_AUTO) {
-                // if not set scan for an open port starting with the default
-                httpPort = VoltDB.DEFAULT_HTTP_PORT;
-                setupHttpServer("", httpPort, true, false);
-            } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
-                if (!m_deployment.getHttpd().isEnabled()) {
-                    return;
-                }
-                setupHttpServer("", httpPort, false, true);
-            }
-        }
-    }
-
     class SetupAdminMode extends InitWork {
         SetupAdminMode() {
         }
@@ -728,7 +657,9 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-
+                if (catalog != null) {
+                    m_statusTracker.setNodeState(NodeState.RECOVERING);
+                }
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {

@@ -58,7 +58,7 @@
           <xs:enumeration value="ddl"/>
       </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on id -->
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">

@@ -104,15 +104,18 @@ public class ResourceUsageMonitor implements Runnable
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
             SyncCallback cb = new SyncCallback();
-            getConnectionHadler().callProcedure(getInternalUser(), true, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@Pause");
-            try {
-                cb.waitForResponse();
-            } catch (InterruptedException e) {
-                m_logger.error("Interrupted while pausing cluster for resource overusage", e);
-            }
-            ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
-            if (r.getStatus() != ClientResponse.SUCCESS) {
-                m_logger.error("Unable to pause cluster for resource overusage: " + r.getStatusString());
+            if (getConnectionHadler().callProcedure(getInternalUser(), true, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@Pause")) {
+                try {
+                    cb.waitForResponse();
+                } catch (InterruptedException e) {
+                    m_logger.error("Interrupted while pausing cluster for resource overusage", e);
+                }
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() != ClientResponse.SUCCESS) {
+                    m_logger.error("Unable to pause cluster for resource overusage: " + r.getStatusString());
+                }
+            } else {
+                m_logger.error("Unable to pause cluster for resource overusage: failed to invoke @Pause");
             }
         }
     }

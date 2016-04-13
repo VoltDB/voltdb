@@ -437,6 +437,14 @@ class ServerBundle(JavaBundle):
                              'specify the location of the deployment file',
                              default = None))
         verb.add_options(
+            cli.StringOption('-D', '--dbroot', 'voltdbroot',
+                             'specify the location of voltdbroot',
+                             default = None))
+        verb.add_options(
+            cli.StringOption('-N', '--name', 'clustername',
+                             'specify the the cluster designation name',
+                             default = None))
+        verb.add_options(
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
@@ -537,7 +545,11 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
-        if self.subcommand in ('create'):
+        if runner.opts.voltdbroot:
+            final_args.extend(['voltdbroot', runner.opts.voltdbroot])
+        if runner.opts.clustername:
+            final_args.extend(['clustername', runner.opts.clustername])
+        if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])
         if runner.args:
