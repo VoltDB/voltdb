@@ -362,6 +362,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return null;
     }
 
+    private void clearManagedPaths() {
+        // Clear out contents for a fresh db create.
+        // For now, we only clean out export overflow directory
+        String exportOverflowDir = m_catalogContext.getDeployment().getPaths().getExportoverflow().getPath();
+        try {
+            File file = new File(exportOverflowDir);
+            if (!file.isAbsolute()) {
+                String voltdbRoot = m_catalogContext.getDeployment().getPaths().getVoltdbroot().getPath();
+                file = new VoltFile(voltdbRoot, exportOverflowDir);
+            }
+            VoltFile.recursivelyDelete(file, false);
+        } catch(IOException e) {
+            String crashMsg = String.format("Error cleaning out export overflow directory %s: %s",
+                    exportOverflowDir, e.getMessage());
+            VoltDB.crashLocalVoltDB(crashMsg, true, e);
+        }
+    }
+
     private void managedPathsEmptyCheck() {
         PathsType paths = m_catalogContext.getDeployment().getPaths();
         String voltDbRoot = paths.getVoltdbroot().getPath();
@@ -517,8 +535,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
-                managedPathsEmptyCheck();
+            if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE) {
+                if (config.m_forceVoltdbCreate) {
+                    clearManagedPaths();
+                } else  {
+                    managedPathsEmptyCheck();
+                }
+            }
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
