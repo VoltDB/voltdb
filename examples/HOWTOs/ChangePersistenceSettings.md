@@ -7,6 +7,31 @@ VoltDB supports the following persistence options:
 - Asynchronous command-log with periodic truncation snapshots.
 - Synchronous command-log with periodic truncation snapshots.
 
+How to Use a Deployment File
+-----------------------------------------
+
+In order to change the default persistence settings, you're going to need to start the server with a deployment file. 
+
+When you start without one, the server uses a default 1-node deployment file and writes it out to the voltdbroot folder. If you've already run a VoltDB example, you can probably find this default file there. It should have the following contents:
+
+```xml
+<?xml version="1.0"?>
+<deployment>
+   <cluster hostcount="1" />
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+</deployment>
+```
+
+So copy that file up one level, or simply create a file named `deployment.xml` with the contents above. You can even borrow a file from the `/examples/HOWTOs/deployment-file-examples` directory.
+
+To start with a deployment file add `-d path/to/deployment.xml` to the VoltDB startup command. For example:
+
+```bash
+voltdb create --force -d deployment.xml
+```
+
 Command Logging
 -----------------------------------------
 
@@ -57,6 +82,3 @@ https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
 
 Using VoltDB Appendix E.2.: The Structure of the Deployment File
 https://docs.voltdb.com/UsingVoltDB/ConfigStructure.php
-
-
-
