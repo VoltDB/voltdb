@@ -283,11 +283,15 @@ public class ExportManager
             int myHostId,
             CatalogContext catalogContext,
             boolean isRejoin,
+            boolean forceCreate,
             HostMessenger messenger,
             List<Integer> partitions)
             throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
+        if (forceCreate) {
+            em.clearOverflowPath(catalogContext);
+        }
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
 
         m_self = em;
@@ -386,6 +390,21 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
+    }
+
+    private void clearOverflowPath(CatalogContext catContext) throws ExportManager.SetupException {
+        String overflowDir = catContext.catalog.getClusters().get("cluster").getExportoverflow();
+        try {
+            VoltFile.recursivelyDelete(new File(overflowDir), false);
+        } catch(IOException e) {
+            String msg = String.format("Error cleaning out export overflow directory %s: %s",
+                    overflowDir, e.getMessage());
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug(msg, e);
+            }
+            throw new ExportManager.SetupException(msg);
+        }
+
     }
 
     public void startPolling(CatalogContext catalogContext) {
