@@ -236,4 +236,6 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
         classpath.append(path)
     for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], 'extension', '*.jar')):
         classpath.append(path)
+    for path in glob.glob(os.path.join(os.environ['VOLTDB_LIB'], 'kinesis', '*.jar')):
+        classpath.append(path)
     utility.verbose_info('Classpath: %s' % ':'.join(classpath))

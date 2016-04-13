@@ -1124,6 +1124,7 @@ public abstract class CatalogUtil {
             case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             case ELASTICSEARCH: exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient"; break;
+            case KINESISFIREHOSE: exportClientClassName = "org.voltdb.exportclient.KinesisFirehoseExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 exportClientClassName = exportConfiguration.getExportconnectorclass();

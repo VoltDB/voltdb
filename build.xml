@@ -139,6 +139,7 @@
     </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
+        <include name='kinesis/*.jars' />
         <exclude name='ant.jar' />
         <exclude name='classes-java1.7.jar' />
     </fileset>
