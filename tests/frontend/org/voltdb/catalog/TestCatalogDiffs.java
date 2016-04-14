@@ -1282,21 +1282,33 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testModifyDRTableColumn() throws IOException {
+        String originalSchema = "\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 INTEGER NOT NULL);" +
+                                "\nPARTITION TABLE A ON COLUMN C1;" +
+                                "\nDR TABLE A;";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 INTEGER NOT NULL);" +
-                                 "\nPARTITION TABLE A ON COLUMN C1;" +
-                                 "\nDR TABLE A;");
+        builder.addLiteralSchema(originalSchema);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
-        // Here we make C2 wider, because making it narrower requires the table to be empty
-        // and verifyDiff() expects the catalog update to be supported in any case
         builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 BIGINT;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
+        // Does not require empty table as C2 is made wider
         verifyDiff(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(originalSchema);
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr3.jar"));
+        catOriginal = catalogForJar(testDir +  File.separator + "dr3.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 TINYINT;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr4.jar"));
+        catUpdated = catalogForJar(testDir + File.separator + "dr4.jar");
+        
+        // Requires empty table as C2 is made narrower
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testExportConfigStreamTargetAttribute() throws Exception {
