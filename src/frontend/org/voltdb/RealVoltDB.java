@@ -605,8 +605,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories())
-                managedPathsEmptyCheck();
+            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories() && !config.m_forceVoltdbCreate) {
+                    managedPathsEmptyCheck();
+            }
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
