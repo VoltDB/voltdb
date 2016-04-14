@@ -197,8 +197,10 @@ public class VoltFile extends File {
         if (deleteRoot) {
             recursivelyDelete(file);
         } else {
-            for (File f : file.listFiles()) {
-                recursivelyDelete(f);
+            if (file.isDirectory()) {
+                for (File f : file.listFiles()) {
+                    recursivelyDelete(f);
+                }
             }
         }
     }
