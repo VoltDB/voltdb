@@ -1262,7 +1262,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testRemoveDRTableColumn() throws IOException {
@@ -1278,23 +1278,25 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testModifyDRTableColumn() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 INTEGER NOT NULL);" +
                                  "\nPARTITION TABLE A ON COLUMN C1;" +
                                  "\nDR TABLE A;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
-        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 INTEGER;");
+        // Here we make C2 wider, because making it narrower requires the table to be empty
+        // and verifyDiff() expects the catalog update to be supported in any case
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 BIGINT;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testExportConfigStreamTargetAttribute() throws Exception {
