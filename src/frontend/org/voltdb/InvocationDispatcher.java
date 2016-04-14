@@ -950,6 +950,10 @@ public final class InvocationDispatcher {
         return null;
     }
 
+    public void setReplicationRole(ReplicationRole role) {
+        m_invocationValidator.setReplicationRole(role);
+    }
+
     private final static void transmitResponseMessage(ClientResponse r, Connection ccxn, long handle) {
         ClientResponseImpl response = ClientResponseImpl.class.cast(r);
         response.setClientHandle(handle);

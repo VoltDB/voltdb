@@ -233,25 +233,46 @@ public enum VoltType {
             "java.lang.Boolean"), // getObject return type
 
     /**
-     * Point type, for a geographical point (lat, long)
+     * Point type, for a geographical point (long, lat)
      */
-    GEOGRAPHY_POINT ((byte)26,
+    GEOGRAPHY_POINT (
+            (byte)26, // enum value
             GeographyPointValue.getLengthInBytes(),
-            "GEOGRAPHY_POINT",
-            new Class[] {GeographyPointValue.class},
-            GeographyPointValue[].class,
-            'P'), // 'p' was taken by timestamp
+            "GEOGRAPHY_POINT", // SQL name
+            new Class[] {GeographyPointValue.class}, // Java types supported in conversion
+            GeographyPointValue[].class, // vector type
+            'P', // signature char
+            java.sql.Types.OTHER, // JDBC type (this is used for vendor specific types)
+            null, // literal prefix
+            null, // literal suffix
+            null, // necessary params (like length for VARCHAR)
+            false, // case sensitivity
+            java.sql.DatabaseMetaData.typePredBasic, // basic where-clauses supported
+            null, // signed/unsigned
+            null, // min scale
+            null, // max scale
+            "org.voltdb.types.GeographyPointValue"), // JDBC getObject return type
 
     /**
      * Geography type, for geographical objects (polygons, etc)
      */
-    GEOGRAPHY ((byte)27,
-            -1, // length in bytes (variable length)
-            "GEOGRAPHY",
-            new Class[] {GeographyValue.class},
-            GeographyValue[].class,
-            'g');
-
+    GEOGRAPHY (
+            (byte)27, // enum value
+            -1, // variable length
+            "GEOGRAPHY", // SQL name
+            new Class[] {GeographyValue.class}, // Java types supported in conversion
+            GeographyValue[].class, // vector type
+            'g', // signature char
+            java.sql.Types.OTHER, // JDBC type (this is used for vendor specific types)
+            null, // literal prefix
+            null, // literal suffix
+            "max_length", // necessary params (like length for VARCHAR)
+            false, // case sensitivity
+            java.sql.DatabaseMetaData.typePredBasic, // basic where-clauses supported
+            null, // signed/unsigned
+            null, // min scale
+            null, // max scale
+            "org.voltdb.types.GeographyValue"); // JDBC getObject return type
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
      * <code>STRING</code> or <code>VARBINARY</code>
@@ -319,8 +340,12 @@ public enum VoltType {
 
     // Constructor for JDBC-visible types.  Only types constructed in this way will
     // appear in the JDBC getTypeInfo() metadata.
-    private VoltType(byte val, int lengthInBytes, String sqlString,
-                     Class<?>[] classes, Class<?> vectorClass, char signatureChar,
+    private VoltType(byte val,
+                     int lengthInBytes,
+                     String sqlString,
+                     Class<?>[] classes,
+                     Class<?> vectorClass,
+                     char signatureChar,
                      int dataType,
                      String literalPrefix,
                      String literalSuffix,
@@ -1025,15 +1050,13 @@ public enum VoltType {
             col_size_radix[0] = 53;  // magic for double
             col_size_radix[1] = 2;
             break;
-        case STRING:
-            col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
-            col_size_radix[1] = null;
-            break;
         case DECIMAL:
             col_size_radix[0] = VoltDecimalHelper.kDefaultPrecision;
             col_size_radix[1] = 10;
             break;
+        case STRING:
         case VARBINARY:
+        case GEOGRAPHY:
             col_size_radix[0] = VoltType.MAX_VALUE_LENGTH;
             col_size_radix[1] = null;
             break;
@@ -1070,11 +1093,11 @@ public enum VoltType {
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
 
     private static final class NullPointSigil{}
-    /** Null value for <code>POINT</code>. */
+    /** Null value for <code>GEOGRAPHY_POINT</code>. */
     public static final NullPointSigil NULL_POINT = new NullPointSigil();
 
     private static final class NullGeographySigil{}
-    /** Null value for <code>POINT</code>. */
+    /** Null value for <code>GEOGRAPHY</code>. */
     public static final NullGeographySigil NULL_GEOGRAPHY = new NullGeographySigil();
 
     /**

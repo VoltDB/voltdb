@@ -181,9 +181,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    //This validator will verify params or per procedure invocation vaidation.
-    private final InvocationValidator m_invocationValidator;
-
     //Dispatched strore procedure invocations
     private final InvocationDispatcher m_dispatcher;
 
@@ -1098,7 +1095,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1232,7 +1228,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        m_invocationValidator.setReplicationRole(role);
+        m_dispatcher.setReplicationRole(role);
     }
 
     /**

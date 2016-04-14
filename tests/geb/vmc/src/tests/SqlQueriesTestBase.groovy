@@ -63,7 +63,7 @@ class SqlQueriesTestBase extends TestBase {
             println '... second open attempt succeeded, at: ' + sdf.format(new Date())
         }
     }
-    
+
     /**
      * Runs, on the specified SqlQueryPage, the specified query, and returns
      * the result. (Also, if DEBUG is true, prints: the query, the result, an

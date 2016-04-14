@@ -6,6 +6,10 @@ Example Projects
 
 The following projects are included in the examples directory:
 
+### callcenter ###
+  
+The Callcenter VoltDB application processes begin and end call events from a call center. Pair/join events in VoltDB create a definitive record of completed calls. Note that this app uses unrealistic call data -- the average call time is 5s by default -- to make the simulation interesting in a two-minute example run.
+
 ### contentionmark ###
   
 ContentionMark is a small VoltDB application that measures VoltDB throughput under extreme contention. By default, ContentionMark creates one row, thenupdates it as fast as VoltDB will let it, one transaction per update.

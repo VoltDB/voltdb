@@ -517,8 +517,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_forceVoltdbCreate && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
-                managedPathsEmptyCheck();
+            if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE && !config.m_forceVoltdbCreate) {
+                    managedPathsEmptyCheck();
+            }
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -2306,7 +2307,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
                     callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                 }
-                m_consumerDRGateway.initialize(false);
+                // If this is @UAC cl replay, don't initialize DR consumer until
+                // cluster recover finished.
+                if (m_mode != OperationMode.INITIALIZING) {
+                    m_consumerDRGateway.initialize(false);
+                }
             }
             // 6.2. If we are a DR replica, we may care about a
             // deployment update
@@ -2577,6 +2582,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
         }
         m_config.m_replicationRole = role;
