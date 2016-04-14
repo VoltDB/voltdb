@@ -51,7 +51,7 @@ import sys, os, subprocess
 
 def collect(runner):
     if int(runner.opts.days) == 0:
-    print >> sys.stderr, "ERROR: '0' is invalid entry for option --days"
+        print >> sys.stderr, "ERROR: '0' is invalid entry for option --days"
         sys.exit(-1)
 
     os.environ["PATH"] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join("voltdb", "bin") in s)
