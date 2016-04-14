@@ -1,5 +1,17 @@
-Examples Guide
-================
+# Examples Guide
+
+VoltDB provides a number of examples here to help people learn what is possible with VoltDB and how to use certain features. Some of these examples are specifically constructed to show specific patterns and features, while others are based on real world applications. These examples may be simplified in the interest of making them better learning tools.
+
+All of the examples in the download kit for VoltDB are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.
+
+Clearly these examples do not cover the complete set of VoltDB features or use cases; we do expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, send email to askanengineer@voltdb.com.
+
+
+HOWTOs
+--------------------------
+
+The HOWTOs directory provides short guides on how to use the examples to test out different features and configurations. For example, there are short guides to run an example in a three-node cluster, or with different durability settings. There is also a subdirectory of example deployment files.
+
 
 Example Projects
 --------------------------

@@ -1,6 +1,6 @@
-# Change Persistence Settings
+# Change Durability Settings
 
-VoltDB supports the following persistence options:
+VoltDB supports the following persistence/durability options:
 
 - No disk persistence.
 - Periodic cluster-wide snapshots.
