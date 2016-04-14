@@ -131,7 +131,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("@SystemCatalog", "TYPEINFO").getResults();
-        assertEquals(10, results[0].getRowCount()); // Will break if we add a type, hopefully gets
+        assertEquals(12, results[0].getRowCount()); // Will break if we add a type, hopefully gets
                                                    // type-adder to double-check they've got things right
         assertEquals(18, results[0].getColumnCount());
         System.out.println(results[0]);

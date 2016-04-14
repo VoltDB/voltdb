@@ -57,10 +57,10 @@ class TestBase extends GebReportingSpec {
     static final int MAX_SECS_WAIT_FOR_PAGE = 60
     static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
 
-	static int numberOfTrials 	= 20
-	static int waitTime 		= 30
-	boolean testStatus 			= false
-	
+    static int numberOfTrials   = 20
+    static int waitTime         = 30
+    boolean testStatus          = false
+
     static Boolean doesDBMonitorPageOpenFirst = null
     @Shared boolean firstDebugMessage = true
 
@@ -234,7 +234,7 @@ class TestBase extends GebReportingSpec {
      * Optionally (if DEBUG is true), prints a list of items (found somewhere
      * in the UI); and, also optionally (depending on the <i>compare</i>
      * argument), compares that list to a list of expected items.
-     * 
+     *
      * @param typesToCompare - the type of items being compared (e.g. 'Tables'
      * or 'System Stored Procedures'), for print output purposes.
      * @param fileName - the name (perhaps including the path) of the file
@@ -287,6 +287,6 @@ class TestBase extends GebReportingSpec {
     }
 
     def cleanupSpec() {
-        
+
     }
 }
