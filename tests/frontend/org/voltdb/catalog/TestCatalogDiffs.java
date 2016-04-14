@@ -1306,7 +1306,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 TINYINT;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr4.jar"));
         catUpdated = catalogForJar(testDir + File.separator + "dr4.jar");
-        
+
         // Requires empty table as C2 is made narrower
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
