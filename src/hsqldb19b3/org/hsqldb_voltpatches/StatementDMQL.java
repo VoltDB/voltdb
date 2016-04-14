@@ -1298,6 +1298,11 @@ public abstract class StatementDMQL extends Statement {
      * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
      * we can pick the first table which contains the input column. In case of OUTER joins, we must
      * the OUTER table - if it's a null-able column the outer join must return them.
+     * In case of a FULL join, a USING column expression must be replaced with the
+     * COALESCE(leftTable.C, rightTable.C) expression which will be done at a later stage by the
+     * AbstractParsedStmt. Here we only add an additional attribute "jointype" set to "full" to aid
+     * the AbstractParsedStmt.
+     * 
      * @param columns list of columns to resolve
      * @return rvs list of range variables
      */
@@ -1318,12 +1323,18 @@ public abstract class StatementDMQL extends Statement {
 
                     // If there is an OUTER join we need to pick the outer table
                     if (rv.isRightJoin == true) {
-                        // this is the outer table. no need to search further.
-                        table = rv.getTable().getName().name;
-                        if (rv.tableAlias != null) {
-                            tableAlias = rv.tableAlias.name;
+                        if (rv.isLeftJoin == true) {
+                            // this is a full join.  
+                            columnElmt.attributes.put("jointype", "full");
                         } else {
-                            tableAlias = null;
+                            // this is the outer table. no need to search
+                            // further.
+                            table = rv.getTable().getName().name;
+                            if (rv.tableAlias != null) {
+                                tableAlias = rv.tableAlias.name;
+                            } else {
+                                tableAlias = null;
+                            }
                         }
                         break;
                     } else if (rv.isLeftJoin == false) {

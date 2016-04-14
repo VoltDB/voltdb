@@ -726,7 +726,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = expr;
         }
 
-        if (child.name.equals("columnref")) {
+        boolean usingColumn = child.hasValue("using", "true") && child.hasValue("jointype", "full");
+        if (child.name.equals("columnref") && !usingColumn) {
             col.expression = colExpr;
             col.columnName = child.attributes.get("column");
             col.tableName = child.attributes.get("table");
@@ -791,8 +792,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(groupbyCol.expression != null);
         ExpressionUtil.finalizeValueTypes(groupbyCol.expression);
         groupbyCol.groupBy = true;
+        boolean usingColumn = groupByNode.hasValue("using", "true") && groupByNode.hasValue("jointype", "full");
 
-        if (groupByNode.name.equals("columnref"))
+        if (groupByNode.name.equals("columnref") && !usingColumn)
         {
             groupbyCol.alias = groupByNode.attributes.get("alias");
             groupbyCol.columnName = groupByNode.attributes.get("column");

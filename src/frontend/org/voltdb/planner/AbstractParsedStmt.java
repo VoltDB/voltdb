@@ -439,7 +439,15 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
-
+        boolean usingColumn = exprNode.hasValue("using", "true") && exprNode.hasValue("jointype", "full");
+        if (usingColumn) {
+            // This is a "USING" columnref expression from a FULL join. Need to convert it to the
+            // COALESCE(COL1, COL2) expressions
+            assert(2 == exprNode.children.size());
+            AbstractExpression leftColExpr = parseExpressionTree(exprNode.children.get(0));
+            AbstractExpression rightColExpr = parseExpressionTree(exprNode.children.get(1));
+            return ExpressionUtil.buildCoalesceExpresion(leftColExpr, rightColExpr);
+        }
         String tableName = exprNode.attributes.get("table");
         if (tableName == null) {
             assert(m_DDLIndexedTable != null);

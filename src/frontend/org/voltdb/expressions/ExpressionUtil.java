@@ -386,6 +386,19 @@ public abstract class ExpressionUtil {
         } else if (exprType == ExpressionType.OPERATOR_IS_NULL) {
             // IS NOT NULL is NULL rejecting -- IS NULL is not
             return false;
+        } else if (expr.hasAnySubexpressionOfType(ExpressionType.OPERATOR_ALTERNATIVE)) {
+            // COALESCE expression is a sub-expression
+            // For example, COALESCE (C1, C2) > 0
+            List<AbstractExpression> coalesceExprs = expr.findAllSubexpressionsOfType(ExpressionType.OPERATOR_ALTERNATIVE);
+            for (AbstractExpression coalesceExpr : coalesceExprs) {
+                if (containsMatchingTVE(coalesceExpr, tableAlias)) {
+                    // This table is part of the COALESCE expression - not NULL - rejecting
+                    return false;
+                }
+            }
+            // If we get there it means that the tableAlias is not part of any of COALESCE expression
+            // still need to check the catch all case
+            return containsMatchingTVE(expr, tableAlias);
         } else {
             // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
             // it contains a TVE with the matching table name then it is NULL rejection expression?
@@ -398,6 +411,43 @@ public abstract class ExpressionUtil {
             // of reasons and may need special casing here.
             return containsMatchingTVE(expr, tableAlias);
         }
+    }
+
+    /**
+     * Construct a COALESCE (IF left IS NULL THEN right ELSE left) expression out of two abstract expressions.
+     * The two expression must have compatible types
+     *
+     * @param leftExpr
+     * @param rightExpr
+     * @return COALESCE expression
+     */
+    public static AbstractExpression buildCoalesceExpresion(AbstractExpression leftExpr, AbstractExpression righExpr) {
+        VoltType leftType = leftExpr.getValueType();
+        VoltType rightType = righExpr.getValueType();
+        VoltType superType;
+        int superSize;
+        // Pick a type that is able to hold both results without losing a precision.
+        if (leftType.canExactlyRepresentAnyValueOf(rightType)) {
+            superType = leftType;
+            superSize = ((TupleValueExpression) leftExpr).getValueSize();
+        } else {
+            // HSQL rejects COALESCE expressions with incompatible types
+            assert (rightType.canExactlyRepresentAnyValueOf(leftType));
+            superType = rightType;
+            superSize = ((TupleValueExpression) righExpr).getValueSize();
+        }
+        AbstractExpression altExpr = new OperatorExpression(ExpressionType.OPERATOR_ALTERNATIVE, righExpr, leftExpr);
+        altExpr.setValueType(superType);
+        altExpr.setValueSize(superSize);
+
+        AbstractExpression isnullExpr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, leftExpr, null);
+        isnullExpr.setValueType(VoltType.BIGINT);
+        isnullExpr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+
+        AbstractExpression coalesceExpr = new OperatorExpression(ExpressionType.OPERATOR_CASE_WHEN, isnullExpr, altExpr);
+        coalesceExpr.setValueType(superType);
+        coalesceExpr.setValueSize(superSize);
+        return coalesceExpr;
     }
 
     /**
