@@ -1,0 +1,34 @@
+################################################################################
+#
+# This file is used, together with sql-grammar.txt, to redefine (overwrite)
+# certain symbols defined in that file, to their non-geospatial (ng-)
+# alternative values, for use with SQLCoverage, to avoid certain issues with
+# Geospatial types (point & polygon, i.e. GEOGRAPHY_POINT & GEOGRAPHY);
+# namely, that their values cannot be simply compared between VoltDB and
+# PostgreSQL/PostGIS, since VoltDB returns them in WKT (well-known text)
+# format, whereas PostgreSQL/PostGIS uses WKB (well-known binary); also,
+# currently they do not work with the Python client, which can cause
+# SQLCoverage to crash.
+#
+################################################################################
+#
+non-int-str-column-name ::= {ng-non-int-str-column-name}
+random-type-value       ::= {ng-random-type-value}
+in-or-up-sert-values    ::= {ng-in-or-up-sert-values}
+in-or-up-sert-select    ::= {ng-in-or-up-sert-select}
+insert-values-multiple  ::= {ng-insert-values-multiple}
+insert-values-all       ::= {ng-insert-values-all}
+insert-values-backward  ::= {ng-insert-values-backward}
+insert-select-multiple  ::= {ng-insert-select-multiple}
+insert-select-all       ::= {ng-insert-select-all}
+insert-select-backward  ::= {ng-insert-select-backward}
+star                    ::= {ng-star}
+point-value             ::= {ng-point-value}
+polygon-value           ::= {ng-polygon-value}
+
+# Also, eliminate TOP clauses, since PostgreSQL does not support them
+top-clause              ::= []
+
+# And, redefine UPSERT to be INSERT [or UPDATE??], since PostgreSQL does not
+# support UPSERT (nor does HSQLDBB, I think??)
+upsert-statement        ::= {insert-statement}

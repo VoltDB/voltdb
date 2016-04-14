@@ -1,0 +1,430 @@
+################################################################################
+#
+# This file defines the grammar for SQL statements of various types. The
+# first section (Table names and Column names) is specific to the DDL table
+# definitions that are used, along with this file, to test VoltDB; but most of
+# the rest (with certain exceptions, like table and column aliases, and polygon
+# values) is (intended to be) completely general, albeit it will need to be
+# added to whenever new SQL functions or other features are added to VoltDB.
+#
+# The parser that interprets this file understands only a few simple rules:
+#   1. The ::= symbol means "is defined as".
+#   2. The {foo} syntax means to use symbol "foo", which is defined somewhere
+#      in this file, using "::="; recursive definitions are allowed, though of
+#      course a non-recursive option must also be available, to avoid infinite
+#      recursion.
+#   3. The | symbol means "or" (actually, XOR), with an equal probability of
+#      each possible option being chosen; if you want unequal probabilities,
+#      list some options more than once. The | must be preceded and followed by
+#      a space (otherwise the || concatenation operator would be impossible
+#      without some sort of escape symbol, which I did not want to get into).
+#   4. Something in brackets, such as [foo], is optional, with a 50-50 chance
+#      of being included; If you want to make something optional less likely,
+#      add more brackets, e.g., [[foo]] has only a 25% chance of being included.
+#   5. You cannot include | inside brackets, so [foo | bar] will not work
+#      properly, though the reverse, e.g. foo [aaa] | [bbb] bar is fine; to
+#      achieve the same effect as [foo | bar] use [foo-or-bar], with:
+#          {foo-or-bar} :== foo | bar
+#      See "all-or-distinct" for one example of this.
+#
+################################################################################
+
+# Table and view names used in the DDL associated with this test
+table-name              ::= P1 | R1
+# TODO: actually define some views
+view-name               ::= P1 | R1
+
+# Column names used in the DDL, of every possible data type
+int-column-name         ::= ID | TINY | SMALL | INT | BIG
+# Listing "int-column-name" more than once makes it more likely
+numeric-column-name     ::= NUM | DEC | {int-column-name} | {int-column-name}
+string-column-name      ::= VCHAR | VCHAR_INLINE_MAX | VCHAR_INLINE
+timestamp-column-name   ::= TIME
+varbinary-column-name   ::= VARBIN
+point-column-name       ::= POINT
+polygon-column-name     ::= POLYGON
+geo-column-name         ::= {point-column-name} | {polygon-column-name}
+non-int-str-column-name ::= {timestamp-column-name} | {varbinary-column-name} | {point-column-name} | {polygon-column-name}
+column-name             ::= {numeric-column-name} | {string-column-name} | {non-int-str-column-name}
+column-list             ::= {column-name} [, {column-list}]
+
+################################################################################
+# Any (non-DDL) SQL statement:
+# (Listing "select-statement" more than once makes it more likely)
+#
+# TODO: add UPDATE, DELETE (& TRUNCATE??), once defined:
+sql-statement           ::= {insert-statement} | {upsert-statement} | {select-statement} | {select-statement}
+
+################################################################################
+# Grammar rules for an INSERT statement:
+################################################################################
+insert-statement        ::= {insert-values-statement} | {insert-select-statement}
+# Putting "({column-list})" in more than one set of brackets makes it less likely
+insert-clause           ::= INSERT INTO {table-name} [[({column-list})]]
+# Listing "simple-insert-values" or "simple-insert-select" more than once makes it more likely
+#insert-values-statement ::= {insert-clause} VALUES ({values-list}) | {simple-insert-values} | {simple-insert-values} | {simple-insert-values}
+#insert-select-statement ::= {insert-clause} {select-statement}     | {simple-insert-select} | {simple-insert-select} | {simple-insert-select}
+insert-values-statement ::= {simple-insert-values}
+insert-select-statement ::= {simple-insert-select}
+# Listing "ordered-values-list" more than once makes it more likely
+values-list             ::= {random-order-value-list} | {ordered-values-list} | {ordered-values-list}
+ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
+                            {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
+                            {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value}
+random-order-value-list ::= {random-type-value} [, {random-order-value-list}]
+random-type-value       ::= {integer-value} | {numeric-value} | {string-value} | {timestamp-value} | \
+                            {varbinary-value}  | {point-value}   | {polygon-value}
+simple-insert-values    ::= IN{in-or-up-sert-values}
+simple-insert-select    ::= IN{in-or-up-sert-select}
+in-or-up-sert-values    ::= {insert-values-id-num}    | {insert-values-id-str}   | {insert-values-id-time} | \
+                            {insert-values-id-varbin} | {insert-values-id-point} | {insert-values-id-poly} | \
+                            {insert-values-multiple}  | {insert-values-all}      | {insert-values-backward}
+in-or-up-sert-select    ::= {insert-select-id-num}    | {insert-select-id-str}   | {insert-select-id-time} | \
+                            {insert-select-id-varbin} | {insert-select-id-point} | {insert-select-id-poly} | \
+                            {insert-select-multiple}  | {insert-select-all}      | {insert-select-backward}
+
+# We leave the IN off of INSERT here, so these can also be used for UPSERT
+insert-values-id-num    ::= SERT INTO {table-name} (ID, {numeric-column-name})   VALUES ({integer-non-null-value}, {numeric-value})
+insert-values-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})    VALUES ({integer-non-null-value}, {string-value})
+insert-values-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name}) VALUES ({integer-non-null-value}, {timestamp-value})
+insert-values-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name}) VALUES ({integer-non-null-value}, {varbinary-value})
+insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})     VALUES ({integer-non-null-value}, {point-value})
+insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})   VALUES ({integer-non-null-value}, {polygon-value})
+
+insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {integer-non-null-value}, \
+                            {numeric-value}, {string-value}, {timestamp-value}, {varbinary-value}, {point-value}, {polygon-value} )
+insert-values-all       ::= SERT INTO {table-name} ( \
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON \
+                            ) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
+                            {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, {timestamp-value}, \
+                            {varbinary-value}, {point-value}, {polygon-value} )
+insert-values-backward  ::= SERT INTO {table-name} ( \
+                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID \
+                            ) VALUES ( {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, {string-value}, \
+                            {string-value}, {string-value}, {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
+                            {integer-value}, {byte-value}, {integer-non-null-value} )
+
+insert-select-id-num    ::= SERT INTO {table-name} (ID, {numeric-column-name})   SELECT {int-column-name}, {numeric-column-name}   FROM {table-reference}
+insert-select-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})    SELECT {int-column-name}, {string-column-name}    FROM {table-reference}
+insert-select-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name}) SELECT {int-column-name}, {timestamp-column-name} FROM {table-reference}
+insert-select-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name}) SELECT {int-column-name}, {varbinary-column-name} FROM {table-reference}
+insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})     SELECT {int-column-name}, {point-column-name}     FROM {table-reference}
+insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})   SELECT {int-column-name}, {polygon-column-name}   FROM {table-reference}
+
+insert-select-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
+                            {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) SELECT {int-column-name}, \
+                            {numeric-column-name}, {string-column-name}, {timestamp-column-name}, {varbinary-column-name}, \
+                            {point-column-name}, {polygon-column-name} FROM {table-reference}
+insert-select-all       ::= SERT INTO {table-name} ( \
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON ) SELECT \
+                            ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN, POINT, POLYGON FROM {table-reference}
+insert-select-backward  ::= SERT INTO {table-name} ( \
+                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID ) SELECT \
+                            POLYGON, POINT, VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-reference}
+
+################################################################################
+# Grammar rules for an UPSERT statement (almost identical to INSERT):
+################################################################################
+upsert-statement        ::= {upsert-values-statement} | {upsert-select-statement}
+# Putting "({column-list})" in more than one set of brackets makes it less likely
+upsert-clause           ::= UPSERT INTO {table-name} [[({column-list})]]
+# Listing "simple-upsert-values" or "simple-upsert-select" more than once makes it more likely
+#upsert-values-statement ::= {upsert-clause} VALUES ({values-list}) | {simple-upsert-values} | {simple-upsert-values} | {simple-upsert-values}
+#upsert-select-statement ::= {upsert-clause} {select-statement}     | {simple-upsert-select} | {simple-upsert-select} | {simple-upsert-select}
+upsert-values-statement ::= {simple-upsert-values}
+upsert-select-statement ::= {simple-upsert-select}
+simple-upsert-values    ::= UP{in-or-up-sert-values}
+simple-upsert-select    ::= UP{in-or-up-sert-select}
+
+################################################################################
+# Grammar rules for a SELECT statement:
+################################################################################
+select-statement        ::= {select-statement} {set-operator} {select-statement} | {basic-select-statement}
+set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
+# Putting the "top-clause" and "all-or-distinct" in more than one set of brackets makes them less likely
+basic-select-statement  ::= SELECT [[[{top-clause}]]] [[{all-or-distinct}]] {select-list} FROM {table-references} \
+                            [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{sort-clause}]
+
+all-or-distinct         ::= ALL | DISTINCT
+select-list             ::= {select-list-item} [, {select-list}]
+select-list-item        ::= {star} | {column-expression} [[AS] {column-alias}]
+column-expression       ::= {column-name} | {selection-expression}
+column-reference        ::= {column-name} | {column-alias}
+# Listing "table-reference" more than once makes it more likely
+table-references        ::= {table-reference} [, {table-references}] | {table-reference} | {table-reference}
+table-reference         ::= {table-name} [[AS] {table-alias}] | {view-name} [[AS] {table-alias}] | {sub-query} [AS] {table-alias} | \
+                            {table-name} [[AS] {table-alias}] | {view-name} [[AS] {table-alias}] | \
+                            {table-name} [[AS] {table-alias}] | {view-name} [[AS] {table-alias}]
+sub-query               ::= ({select-statement})
+
+# Defining these separately so that they can optionally be overridden, for use
+# with SQLCoverage, to avoid syntax (TOP) not supported by PostgreSQL, and
+# issues with Geospatial types (point & polygon), where using * can be a problem
+top-clause              ::= TOP {non-negative-int-value}
+star                    ::= *
+
+where-clause            ::= WHERE {boolean-expression}
+# TODO: simplified, non-recursive, for now:
+#boolean-expression      ::= [NOT] {boolean-type-expr} [{and-or} {boolean-expression}]
+boolean-expression      ::= [NOT] {boolean-type-expr} [{and-or} {boolean-type-expr}]
+and-or                  ::= AND | OR
+
+# TODO: allow for multi-joins (on more than 2 tables)
+join-clause             ::= [{join-type}] JOIN {table-reference} [{join-condition}]
+join-type               ::= INNER | {left-or-right} [OUTER]
+left-or-right           ::= LEFT | RIGHT
+join-condition          ::= ON {join-expression} | USING {column-reference}
+# TODO: probably should be more specific (e.g. equi-join)
+join-expression         ::= {boolean-expression}
+
+group-clause            ::= GROUP BY  {group-by-list}  [HAVING {boolean-expression}]
+sort-clause             ::= [ORDER BY {order-by-list}] [LIMIT {non-negative-int-value} [OFFSET {non-negative-int-value}]]
+group-by-list           ::= {column-reference} [                , {group-by-list}]
+order-by-list           ::= {column-reference} [{asc-or-desc}] [, {order-by-list}]
+asc-or-desc             ::= ASC | DESC
+
+# TODO: add more expression types, and boolean expression types,
+# using different data types (varbinary, point, polygon)
+selection-expression    ::= COUNT(*) | {numeric-expression} | {string-expression} | {timestamp-expression}
+boolean-type-expr       ::= {column-expression} IS [NOT] NULL | {boolean-numeric-expr} | {boolean-string-expr} | \
+                            {boolean-timestamp-expr}
+boolean-numeric-expr    ::= {numeric-expression} {comparison-operator} {numeric-expression}
+boolean-string-expr     ::= {string-expression} {comparison-operator} {string-expression}
+boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression}
+comparison-operator     ::= = | <> | != | < | > | <= | >=
+
+# These are obviously not the complete lists of all possible table and column
+# aliases, but using a short list makes it more likely that when you refer to
+# one it is one that was actually defined
+table-alias             ::= T1 | T2 | T3
+column-alias            ::= C1 | C2 | C3
+
+################################################################################
+# Numeric constant values, functions, operators and expressions
+#
+digit                   ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+non-negative-int-value  ::= {digit}[{digit}[{digit}][{digit}]]
+integer-non-null-value  ::= [-]{non-negative-int-value}
+numeric-non-null-value  ::= {integer-non-null-value}[.{non-negative-int-value}[{non-negative-int-value}]]
+
+# Byte values as defined here run from -129 to 129; since byte is really
+# defined as -127 to 127, a few of those values are illegal, which is OK
+byte-start              ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+byte-non-null-value     ::= [-][{byte-start}]{digit}
+
+# Listing "byte-non-null-value", "integer-non-null-value" or "numeric-non-null-value" more than once makes it more likely
+byte-value              ::= NULL |    {byte-non-null-value} |    {byte-non-null-value} |    {byte-non-null-value}
+integer-value           ::= NULL | {integer-non-null-value} | {integer-non-null-value} | {integer-non-null-value}
+numeric-value           ::= NULL | {numeric-non-null-value} | {numeric-non-null-value} | {numeric-non-null-value}
+
+int-expression          ::= {integer-value} |     {int-column-name} |     {int-function-expr}
+numeric-expression      ::= {numeric-value} | {numeric-column-name} | {numeric-function-expr} | {int-expression}
+
+int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
+                            {int-function-2args}({int-expression}, {int-expression}) | \
+                            {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
+numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expression} | \
+                            {math-function-0args}() | \
+                            {math-function-1arg}({numeric-expression}) | \
+                            {math-function-2args}({numeric-expression}, {numeric-expression}) | \
+                            {num-valued-time-expr}
+math-operator           ::= + | - | * | / | %
+math-function-0args     ::= PI
+math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | SQRT
+math-function-2args     ::= POWER
+int-function-2args      ::= MOD
+
+################################################################################
+# String (VARCHAR) constant values, functions, operators and expressions
+#
+character               ::= A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z | \
+                            a | b | c | d | e | f | g | h | i | j | k | l | m | n | o | p | q | r | s | t | u | v | w | x | y | z | \
+                            {digit}   | . | , | ! | @ | # | $ | % | ^ | & | * | ( | ) | - | _ | + | =
+string-non-null-value   ::= '[{character}][{character}][{character}[{character}[{character}[{character}[{string-non-null-value}]]]]]'
+# Listing "string-non-null-value" more than once makes it more likely
+string-value            ::= NULL | {string-non-null-value} | {string-non-null-value} | {string-non-null-value}
+
+string-expression       ::= {string-value} | {string-column-name} | {string-function-expr} | 
+string-function-expr    ::= {string-expression} {string-operator} {string-expression} | \
+                            {string-function-1arg} ({string-expression}) | \
+                            {string-function-2args}({string-expression}, {string-expression}) | \
+                            {string-function-2args}({string-expression}, {string-expression}, {case-sensitivity}) | \
+                            {string-function-3args}({string-expression}, {string-expression}, {string-expression}) | \
+                            {string-function-4args}({string-expression}, {string-expression}, {string-expression}, {string-expression}) | \
+                            {string-valued-int-expr}  | {string-val-str-int-expr} | \
+                            {string-val-num-int-expr} | {string-special-func-expr}
+string-operator         ::= || | +
+string-function-1arg    ::= CONCAT | LOWER | TRIM | UPPER
+string-function-2args   ::= CONCAT | REGEXP_POSITION
+string-function-3args   ::= CONCAT | REPLACE
+string-function-4args   ::= CONCAT
+# Optional third argument for the REGEXP_POSITION function
+case-sensitivity        ::= 'c' | 'i' | {string-expression}
+
+# Some functions of a string produce an integer value
+int-valued-string-func  ::= CHAR_LENGTH | OCTET_LENGTH
+# POSITION is a special case, due to the use of the IN keyword
+int-valued-string-expr  ::= {int-valued-string-func}({string-expression}) | POSITION({string-expression} IN {string-expression})
+
+# Some functions of an integer produce a string value
+string-valued-int-func  ::= BIN | CHAR | HEX | SPACE
+string-valued-int-expr  ::= {string-valued-int-func}({int-expression})
+
+# Some functions of a string and an integer (or 2) produce a string value
+string-val-str-int-func ::= LEFT | RIGHT | REPEAT | SUBSTRING
+string-val-str-2int-fun ::= SUBSTRING
+string-val-str-int-expr ::= {string-val-str-int-func}({string-expression}, {int-expression}) | \
+                            {string-val-str-2int-fun}({string-expression}, {int-expression}, {int-expression})
+# One function of 2 numbers (1 decimal and 1 integer) produce string values
+string-val-num-int-func ::= FORMAT_CURRENCY
+string-val-num-int-expr ::= {string-val-num-int-func}({numeric-expression}, {int-expression})
+
+# Some string functions use special keywords (e.g. PLACING, FROM, FOR)
+string-special-func-expr::= OVERLAY({string-expression} PLACING {string-expression} FROM {int-expression} [FOR {int-expression}]) | \
+                            SUBSTRING({string-expression} FROM {int-expression} [FOR {int-expression}]) | \
+                            TRIM([[{trim-keyword}] [{character} FROM]{string-expression})
+trim-keyword            ::= LEADING | TRAILING | BOTH
+
+################################################################################
+# Timestamp (date-time) constant values, functions, operators and expressions
+#
+digit-0-to-5            ::= 0 | 1 | 2 | 3 | 4 | 5
+digit-0-to-2            ::= 0 | 1 | 2
+hour-more-than-12       ::= 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23
+day-more-than-23        ::= 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31
+
+century                 ::= 19 | 20
+year                    ::= {digit}{digit}
+month                   ::= 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12
+# Listing "month" and "hour-more-than-12" more than once makes them more likely, which
+# somewhat evens out the likelihood of each day of the month, and hour of the day
+day                     ::= {day-more-than-23} | {month} | {month} | {hour-more-than-12} | {hour-more-than-12}
+hour                    ::= 00 | {month} | {month} | {month} | {hour-more-than-12} | {hour-more-than-12} | {hour-more-than-12}
+minute-or-second        ::= {digit-0-to-5}{digit}
+
+timestamp-non-null-value::= '{century}{year}-{month}-{day} {hour}:{minute-or-second}:{minute-or-second}[.{digit}{digit}{digit}]'
+# Listing "timestamp-non-null-value" more than once makes it more likely
+timestamp-value         ::= NULL | {timestamp-non-null-value} | {timestamp-non-null-value} | {timestamp-non-null-value}
+
+timestamp-expression    ::= {timestamp-value} | {timestamp-column-name} | {timestamp-function-expr}
+timestamp-function-expr ::= CURRENT_TIMESTAMP | NOW | \
+                            FROM_UNIXTIME({int-expression}) | \
+                            TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
+                            TRUNCATE({dateadd-time-unit}, {timestamp-expression}) | \
+                            DATEADD({dateadd-time-unit}, {int-expression}, {timestamp-expression})
+
+# Some functions of a timestamp produce an integer value
+int-valued-time-func    ::= DAY | DAYOFMONTH | DAYOFWEEK | DAYOFYEAR | HOUR | MINUTE | \
+                            MONTH | QUARTER | WEEK | WEEKOFYEAR | WEEKDAY | YEAR
+int-valued-time-expr    ::= {int-valued-time-func}({timestamp-expression})
+
+# One function of a timestamp produces a numeric (float) value
+num-valued-time-func    ::= SECOND | {int-valued-time-func}
+num-valued-time-expr    ::= {num-valued-time-func}({timestamp-expression})
+
+# Some functions of a time-unit (string) and a timestamp produce an integer value
+# (and EXTRACT optionally uses the special keyword FROM)
+# Note: EXTRACT actually produces a decimal (not integer) when the SECOND time-unit is used,
+# which may produce an error in some contexts, if an integer is expected - which is OK
+int-valued-t-unit-expr  ::= SINCE_EPOCH({short-time-unit}, {timestamp-expression}) | \
+                            EXTRACT({extract-time-unit}, {timestamp-expression}) | \
+                            EXTRACT({extract-time-unit} FROM {timestamp-expression})
+
+# Time units used in the definitions above:
+long-time-unit          ::= YEAR | QUARTER | MONTH | DAY | HOUR | MINUTE | SECOND
+short-time-unit         ::= SECOND | MILLISECOND | MILLIS | MICROSECOND | MICROS
+special-time-unit       ::= DAY_OF_MONTH | DAY_OF_WEEK | DAY_OF_YEAR | WEEK | WEEK_OF_YEAR | WEEKDAY
+extract-time-unit       ::= {long-time-unit} | {special-time-unit}
+dateadd-time-unit       ::= {long-time-unit} | {short-time-unit}
+
+################################################################################
+# Varbinary (binary) constant values, functions, operators and expressions
+#
+hex-alphabetic-digit    ::= A | B | C | D | E | F | a | b | c | d | e | f
+hex-digit               ::= {digit} | {hex-alphabetic-digit}
+even-num-of-hex-digits  ::= {hex-digit}{hex-digit}[{even-num-of-hex-digits}]
+varbin-non-null-value   ::= x'{even-num-of-hex-digits}'
+# Listing "varbin-non-null-value" more than once makes it more likely
+varbinary-value         ::= NULL | {varbin-non-null-value} | {varbin-non-null-value} | {varbin-non-null-value}
+
+# TODO: flesh this part out, with varbinary functions, expressions ...
+
+################################################################################
+# Geospatial Point constant values, functions, operators and expressions
+#
+# TODO: flesh this part out ...
+number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
+# Latitude is a number between -100 and 100 (exclusive); longitude is between
+# -200 and 200 (exclusive); these include some illegal values, which is OK
+latitude                ::= [-]{number-less-than-100}
+longitude               ::= [-][1]{number-less-than-100}
+point-non-null-value    ::= pointFromText('POINT({longitude} {latitude})')
+# Listing "point-non-null-value" more than once makes it more likely
+point-value             ::= NULL | {point-non-null-value} | {point-non-null-value} | {point-non-null-value}
+
+# TODO: flesh this part out, with point functions, expressions ...
+
+################################################################################
+# Geospatial Polygon constant values, functions, operators and expressions
+#
+# TODO: flesh this part out ...
+
+# About a quarter of these simple polygons will be defined clockwise, hence invalid
+polygon-non-null-value  ::= polygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0)') | \
+                            polygonFromText('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
+# Listing "polygon-non-null-value" more than once makes it more likely
+polygon-value           ::= NULL | {polygon-non-null-value} | {polygon-non-null-value} | {polygon-non-null-value}
+
+# TODO: flesh this part out, with polygon functions, expressions ...
+
+################################################################################
+# Non-geospatial (ng-) alternative values of some of the above definitions, for
+# use with SQLCoverage, to avoid issues with Geospatial types (point & polygon,
+# i.e. GEOGRAPHY_POINT & GEOGRAPHY); these definitions are largely the same,
+# but with the points and polygons [and varbinary] left out, or NULL
+#
+
+ng-non-int-str-column-name ::= {timestamp-column-name} | {varbinary-column-name} | {int-column-name}
+
+ng-random-type-value       ::= {integer-value} | {numeric-value} | {string-value} | {timestamp-value} | \
+                               {varbinary-value}
+ng-in-or-up-sert-values    ::= {insert-values-id-num}    | {insert-values-id-str}   | {insert-values-id-time} | \
+                               {insert-values-id-varbin} | \
+                               {insert-values-multiple}  | {insert-values-all}      | {insert-values-backward}
+ng-in-or-up-sert-select    ::= {insert-select-id-num}    | {insert-select-id-str}   | {insert-select-id-time} | \
+                               {insert-select-id-varbin} | \
+                               {insert-select-multiple}  | {insert-select-all}      | {insert-select-backward}
+ng-insert-values-multiple  ::= SERT INTO {table-name} (ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
+                               {varbinary-column-name} ) VALUES ({integer-non-null-value}, \
+                               {numeric-value}, {string-value}, {timestamp-value}, {varbinary-value} )
+ng-insert-values-all       ::= SERT INTO {table-name} ( \
+                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN \
+                               ) VALUES ( {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
+                               {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, {timestamp-value}, \
+                               {varbinary-value} )
+ng-insert-values-backward  ::= SERT INTO {table-name} ( \
+                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID \
+                               ) VALUES ( {varbinary-value}, {timestamp-value}, {string-value}, \
+                               {string-value}, {string-value}, {numeric-value}, {numeric-value}, {integer-value}, {integer-value}, \
+                               {integer-value}, {byte-value}, {integer-non-null-value} )
+ng-insert-select-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
+                               {varbinary-column-name} ) SELECT {int-column-name}, \
+                               {numeric-column-name}, {string-column-name}, {timestamp-column-name}, {varbinary-column-name} \
+                               FROM {table-reference}
+ng-insert-select-all       ::= SERT INTO {table-name} ( \
+                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN ) SELECT \
+                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN FROM {table-reference}
+ng-insert-select-backward  ::= SERT INTO {table-name} ( \
+                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID ) SELECT \
+                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-reference}
+ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
+ng-point-value             ::= NULL
+ng-polygon-value           ::= NULL
+
+
+
+# TODO: More expression & function types TBD:
+num-only-aggregate-func ::= SUM | AVG
+non-num-aggregate-func  ::= COUNT | APPROX_COUNT_DISTINCT | MAX | MIN
+aggregate-function      ::= {num-only-aggregate-func} | {non-num-aggregate-func} | {non-num-aggregate-func}

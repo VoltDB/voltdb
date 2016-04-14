@@ -1,0 +1,5 @@
+# This is used to test the SQL grammar generator test program, not for actual
+# testing of VoltDB
+time-column-name        ::= TIME
+num-column-name         ::= ID  | TINY | SMALL  | BIG
+int-column-name         ::= ID 6| TINY | SMALL 2| BIG
