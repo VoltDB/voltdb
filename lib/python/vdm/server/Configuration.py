@@ -39,16 +39,16 @@ def convert_xml_to_json(config_path):
     xml_final = etree_to_dict(config_content)
 
     D2 = {}
-    for (k,v) in zip(xml_final.keys(), xml_final.values()):
+    for (k, v) in zip(xml_final.keys(), xml_final.values()):
         D2[k] = v
-
-    if type(D2[k]['members']['member']) is dict:
-        member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
-        HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
-    else:
-        member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
-        for member in member_json:
-            HTTPListener.Global.SERVERS[member['id']] = member
+    if 'members' in D2[k] and 'member' in D2[k]['members'] and D2[k]['members']['member']:
+        if type(D2[k]['members']['member']) is dict:
+            member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
+            HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+        else:
+            member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
+            for member in member_json:
+                HTTPListener.Global.SERVERS[member['id']] = member
 
     if type(D2[k]['databases']['database']) is dict:
         db_json = get_field_from_xml(D2[k]['databases']['database'],
@@ -441,9 +441,31 @@ def get_fields(content, type_content):
                                                               'dict', 'export')
         elif field == 'enabled' and type_content == 'export':
             new_property[field] = parse_bool_string(content[field])
+        elif field == 'members':
+            members = []
+            if type(content[field]) is dict:
+                members = set_members_field(content[field])
+            elif type(content[field]) is str:
+                members = convert_field_required_format(content, field)
+            new_property[field] = members
         else:
             new_property[field] = convert_field_required_format(content, field)
     return new_property
+
+
+def set_members_field(content):
+    members = []
+    if content and 'member' in content and content['member']:
+        if type(content['member']) is dict:
+            member_json = get_field_from_xml(content['member'], 'dict')
+            HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+        else:
+            member_json = get_field_from_xml(content['member'], 'list')
+            for member in member_json:
+                HTTPListener.Global.SERVERS[member['id']] = member
+        for mem in member_json:
+            members.append(mem['id'])
+    return members
 
 
 def get_users_from_xml(deployment_xml, is_list):
@@ -598,7 +620,6 @@ def make_configuration_file():
     """
     main_header = Element('voltdeploy')
     db_top = SubElement(main_header, 'databases')
-    server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
 
     for key, value in HTTPListener.Global.DATABASES.items():
@@ -609,19 +630,22 @@ def make_configuration_file():
                     db_elem.attrib[k] = "false"
                 else:
                     db_elem.attrib[k] = "true"
+            elif k == 'members':
+                mem_elem = SubElement(db_elem, 'members')
+                for mem_id in val:
+                    server_info = HTTPListener.Global.SERVERS.get(mem_id)
+                    if server_info:
+                        mem_item = SubElement(mem_elem, 'member')
+                        for field in server_info:
+                            if isinstance(server_info[field], bool):
+                                if not value:
+                                    mem_item.attrib[field] = "false"
+                                else:
+                                    mem_item.attrib[field] = "true"
+                            else:
+                                mem_item.attrib[field] = str(server_info[field])
             else:
                 db_elem.attrib[k] = str(val)
-
-    for key, value in HTTPListener.Global.SERVERS.items():
-        server_elem = SubElement(server_top, 'member')
-        for k, v in value.items():
-            if isinstance(v, bool):
-                if not value:
-                    server_elem.attrib[k] = "false"
-                else:
-                    server_elem.attrib[k] = "true"
-            else:
-                server_elem.attrib[k] = str(v)
 
     for key, value in HTTPListener.Global.DEPLOYMENT.items():
 
