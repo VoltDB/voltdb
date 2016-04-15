@@ -394,7 +394,8 @@ public class StatementPartitioning implements Cloneable{
         // reset this flag to forget the last result of the multiple partition access path.
         // AdHoc with parameters will call this function at least two times
         // By default this flag should be true.
-        setJoinValid(true, null);
+        setJoinValid(true);
+        setJoinInvalidReason(null);
         boolean subqueryHasReceiveNode = false;
         boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
@@ -422,9 +423,9 @@ public class StatementPartitioning implements Cloneable{
                     if (subqueryHasReceiveNode) {
                         // Has found another subquery with receive node on the same level
                         // Not going to support this kind of subquery join with 2 fragment plan.
-                        setJoinValid(false,
-                                     "This multipartition query is not plannable.  "
-                                     + "It has a subquery which cannot be single partition.");
+                        setJoinValid(false);
+                        setJoinInvalidReason("This multipartition query is not plannable.  "
+                                             + "It has a subquery which cannot be single partition.");
                         // Still needs to count the independent partition tables
                         break;
                     }
@@ -470,15 +471,16 @@ public class StatementPartitioning implements Cloneable{
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {
-            setJoinValid(false,
-                         "This query is not plannable.  "
-                         + "The planner cannot guarantee that all rows would be in a single partition.");
+            setJoinValid(false);
+            setJoinInvalidReason("This query is not plannable.  "
+                                 + "The planner cannot guarantee that all rows would be in a single partition.");
         }
 
         // This is the case that subquery with receive node join with another partition table
         // on outer level. Not going to support this kind of join.
         if (subqueryHasReceiveNode && hasPartitionedTableJoin) {
-            setJoinValid(false, "This query is not plannable.  It has a subquery which needs cross-partition access.");
+            setJoinValid(false);
+            setJoinInvalidReason("This query is not plannable.  It has a subquery which needs cross-partition access.");
         }
 
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
@@ -505,9 +507,11 @@ public class StatementPartitioning implements Cloneable{
         return m_recentInvalidReason;
     }
 
-    public void setJoinValid(boolean isValid, String why) {
-        assert((isValid && why == null) || (!isValid && why != null));
+    public void setJoinValid(boolean isValid) {
         m_joinValid = isValid;
+    }
+
+    public void setJoinInvalidReason(String why) {
         m_recentInvalidReason = why;
     }
 
@@ -575,7 +579,8 @@ public class StatementPartitioning implements Cloneable{
         m_inferredParameterIndex = -1;
         m_inferredValue = null;
         m_isDML = false;
-        setJoinValid(true, null);
+        setJoinValid(true);
+        setJoinInvalidReason(null);
         m_partitionColForDML = null;
     }
 
