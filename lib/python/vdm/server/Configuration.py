@@ -70,18 +70,27 @@ def convert_xml_to_json(config_path):
         for deployment in deployment_json:
             HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
 
-    if 'users' in D2[k]['deployments']['deployment'] and D2[k]['deployments']['deployment']['users'] is not None\
-            and 'user' in D2[k]['deployments']['deployment']['users']:
+    if D2[k]['deployments'] and 'deployment' in D2[k]['deployments']:
         if type(D2[k]['deployments']['deployment']) is dict:
-            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
+            set_deployment_users(D2[k]['deployments']['deployment'])
+        else:
+            for deployment in D2[k]['deployments']['deployment']:
+                set_deployment_users(deployment)
+
+
+def set_deployment_users(deployment):
+    if 'users' in deployment and deployment['users'] is not None\
+            and 'user' in deployment['users']:
+        if type(deployment) is dict:
+            user_json = get_users_from_xml(deployment,
                                            'dict')
             for user in user_json:
                 HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
         else:
-            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
+            user_json = get_users_from_xml(deployment,
                                            'list')
             for deployment_user in user_json:
-                    HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
+                HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
 
 
 def get_deployment_from_xml(deployment_xml, is_list):
@@ -699,16 +708,25 @@ def set_deployment_for_upload(database_id, request):
                     return {'status': 'failure', 'error': result['error']}
 
                 HTTPListener.map_deployment(req, database_id)
-                HTTPListener.Global.DEPLOYMENT_USERS = {}
+
+                deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
+                if deployment_user is not None:
+                    for user in deployment_user:
+                        if user[0]['databaseid'] == database_id:
+                            del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
                 if 'users' in req.json and 'user' in req.json['users']:
                     for user in req.json['users']['user']:
-                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])]= {
+                        if not HTTPListener.Global.DEPLOYMENT_USERS:
+                            user_id = 1
+                        else:
+                            user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                        HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
                                 'name': user['name'],
                                 'roles': user['roles'],
                                 'password': user['password'],
                                 'plaintext': user['plaintext'],
                                 'databaseid': database_id,
-                                'userid': user['userid']
+                                'userid': user_id
                             }
 
                 HTTPListener.sync_configuration()

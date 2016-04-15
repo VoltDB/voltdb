@@ -1017,7 +1017,7 @@ class DeploymentUserAPI(MethodView):
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
-            user_id = len(Global.DEPLOYMENT_USERS) + 1
+            user_id = Global.DEPLOYMENT_USERS.keys()[-1] + 1
 
         try:
 
