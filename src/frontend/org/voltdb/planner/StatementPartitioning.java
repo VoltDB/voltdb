@@ -141,7 +141,7 @@ public class StatementPartitioning implements Cloneable{
     private String m_fullColumnName;
 
     private boolean m_joinValid = true;
-    
+
     // If m_joinValid is set to false, we also set
     // this string to a hint telling why it is false.
     private String m_recentInvalidReason = null;
