@@ -584,11 +584,11 @@ public class TestCSVLoader {
         String []myData = {
                 "1,\\" + Constants.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
                 "2," + Constants.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11,\"7777-12-25 14:35:26\",\"POINT(1 1)\",\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
-                "3," + Constants.CSV_NULL        + ",1,11111111,  \\" + Constants.CSV_NULL        + "  ,1.10,1.11,\"7777-12-25 14:35:26\"" + Constants.CSV_NULL + "," + Constants.CSV_NULL,
-                "4," + Constants.CSV_NULL        + ",1,11111111,  " + Constants.QUOTED_CSV_NULL + "  ,1.10,1.11,\"7777-12-25 14:35:26\"" + Constants.QUOTED_CSV_NULL + "," + Constants.QUOTED_CSV_NULL,
-                "5,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL   + "  \",1.10,1.11,\"7777-12-25 14:35:26\"" + Constants.CSV_NULL + "," + Constants.CSV_NULL,
-                "6,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL  + " L \",1.10,1.11,\"7777-12-25 14:35:26\"" + Constants.CSV_NULL + "," + Constants.CSV_NULL,
-                "7,\\" + Constants.CSV_NULL        + ",1,11111111,  \"abc\\" + Constants.CSV_NULL + "\"  ,1.10,1.11,\"7777-12-25 14:35:26\"" + Constants.CSV_NULL + "," + Constants.CSV_NULL
+                "3," + Constants.CSV_NULL        + ",1,11111111,  \\" + Constants.CSV_NULL        + "  ,1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "4," + Constants.CSV_NULL        + ",1,11111111,  " + Constants.QUOTED_CSV_NULL + "  ,1.10,1.11,\"7777-12-25 14:35:26\"," + Constants.QUOTED_CSV_NULL + "," + Constants.QUOTED_CSV_NULL,
+                "5,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL   + "  \",1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "6,\\" + Constants.CSV_NULL        + ",1,11111111, \"  \\" + Constants.CSV_NULL  + " L \",1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL,
+                "7,\\" + Constants.CSV_NULL        + ",1,11111111,  \"abc\\" + Constants.CSV_NULL + "\"  ,1.10,1.11,\"7777-12-25 14:35:26\",\\" + Constants.CSV_NULL + ",\\" + Constants.CSV_NULL
         };
         int invalidLineCnt = 0;
         int validLineCnt = myData.length - invalidLineCnt;
@@ -881,10 +881,10 @@ public class TestCSVLoader {
         };
 
         String []myData = {
-                "1,1,1,1,\"openquote,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
-                "2,1,1,1,second,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
-                "3,1,1,1,third,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
-                "4,1,1,1,\"fourthfourthfourth\",1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\""
+                "1,1,1,1,\"openquote,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),",
+                "2,1,1,1,second,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),",
+                "3,1,1,1,third,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),",
+                "4,1,1,1,\"fourthfourthfourth\",1.10,1.11,7777-12-25 14:35:26,POINT(1 1),"
         };
         int invalidLineCnt = 2;
         int validLineCnt = myData.length - invalidLineCnt;
