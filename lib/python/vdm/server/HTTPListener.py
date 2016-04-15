@@ -691,7 +691,7 @@ class ServerAPI(MethodView):
         if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = len(Global.SERVERS) + 1
+            server_id = Global.SERVERS.keys()[-1] + 1
 
         Global.SERVERS[server_id] = {
             'id': server_id,
@@ -885,7 +885,7 @@ class DatabaseAPI(MethodView):
         if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = len(Global.DATABASES) + 1
+            database_id = Global.DATABASES.keys()[-1] + 1
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
