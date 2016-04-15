@@ -39,7 +39,8 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.plannodes;
+ */
+package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -53,17 +54,16 @@ import org.voltdb.types.SortDirectionType;
 import junit.framework.TestCase;
 
 public class TestPartitionByNode extends TestCase {
-    static final String TABLE1 = "TABLE1";
-    static final String[] COLS = { "COL0", "COL1", "COL2", "COL3", "COL4" };
-    static final VoltType[] COLTYPES = { VoltType.INTEGER, VoltType.TINYINT,
+    static private final String TABLE1 = "TABLE1";
+    static private final String[] COLS = { "COL0", "COL1", "COL2", "COL3", "COL4" };
+    static private final VoltType[] COLTYPES = { VoltType.INTEGER, VoltType.TINYINT,
                                          VoltType.TIMESTAMP, VoltType.FLOAT,
                                          VoltType.BIGINT };
 
-    MockVoltDB m_voltdb;
+    private MockVoltDB m_voltdb;
 
     @Override
-    protected void setUp()
-    {
+    protected void setUp() {
         m_voltdb = new MockVoltDB();
         m_voltdb.addTable(TABLE1, false);
         for (int i = 0; i < COLS.length; ++i)
@@ -89,7 +89,7 @@ public class TestPartitionByNode extends TestCase {
             stringer.endObject();
         } catch (Exception ex) {
             ex.printStackTrace();
-            assertTrue(false);
+            fail();
         }
         String json = stringer.toString();
         // Enable this to debug the JSON.

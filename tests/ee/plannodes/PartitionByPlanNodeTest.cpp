@@ -91,8 +91,8 @@ public:
 
 TEST_F(PartitionByPlanNodeTest, TestJSON)
 {
-    for (int idx = 0; jsonStrings[idx]; idx += 1) {
-        const char *jsonString = jsonStrings[idx];
+    for (int jsonIdx = 0; jsonStrings[jsonIdx]; jsonIdx += 1) {
+        const char *jsonString = jsonStrings[jsonIdx];
         PlannerDomRoot root(jsonString);
         PlannerDomValue obj(root.rootObject());
         boost::shared_ptr<voltdb::PartitionByPlanNode> pn(dynamic_cast<PartitionByPlanNode*>(AbstractPlanNode::fromJSONObject(obj)));
@@ -101,14 +101,14 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         const std::vector<AbstractExpression*> &sortExprs = pn->getSortExpressions();
         const std::vector<SortDirectionType> &sortDirs = pn->getSortDirections();
         EXPECT_TRUE(partitionByExprs.size() == 2);
-        for (int idx = 0; idx < partitionByExprs.size(); idx += 1) {
-            TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(partitionByExprs[idx]);
+        for (int exprIdx = 0; exprIdx < partitionByExprs.size(); exprIdx += 1) {
+            TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(partitionByExprs[exprIdx]);
             EXPECT_TRUE(tve != NULL);
-            // This three are all true because of collusion in the
+            // These three are all true because of collusion in the
             // construction of the JSON.
-            EXPECT_TRUE(tve->getColumnId() == idx + 1);
-            EXPECT_TRUE(tve->getValueType() == ((idx == 0) ? 8 : 5));
-            EXPECT_TRUE(tve->getValueSize() == ((idx == 0) ? 8 : 4));
+            EXPECT_TRUE(tve->getColumnId() == exprIdx + 1);
+            EXPECT_TRUE(tve->getValueType() == ((exprIdx == 0) ? 8 : 5));
+            EXPECT_TRUE(tve->getValueSize() == ((exprIdx == 0) ? 8 : 4));
         }
         EXPECT_TRUE(sortExprs.size() == sortDirs.size());
         EXPECT_TRUE(sortDirs[0] == SORT_DIRECTION_TYPE_ASC);
@@ -116,7 +116,7 @@ TEST_F(PartitionByPlanNodeTest, TestJSON)
         for (int idx = 0; idx < partitionByExprs.size(); idx += 1) {
             TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(sortExprs[idx]);
             EXPECT_TRUE(tve != NULL);
-            // This is true, again, because of collusion in the
+            // These are all true, again, because of collusion in the
             // construction of the JSON.
             EXPECT_TRUE(tve->getColumnId() == idx + 1);
             EXPECT_TRUE(tve->getValueType() == ((idx == 0) ? 8 : 5));
