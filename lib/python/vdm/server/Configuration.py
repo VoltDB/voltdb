@@ -41,6 +41,8 @@ def convert_xml_to_json(config_path):
     D2 = {}
     for (k, v) in zip(xml_final.keys(), xml_final.values()):
         D2[k] = v
+
+    # To get the list of servers in case of old members[] (for backward compatible)
     if 'members' in D2[k] and 'member' in D2[k]['members'] and D2[k]['members']['member']:
         if type(D2[k]['members']['member']) is dict:
             member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
@@ -445,6 +447,7 @@ def get_fields(content, type_content):
             members = []
             if type(content[field]) is dict:
                 members = set_members_field(content[field])
+            # To get the database members in case of old members[] (for backward compatible)
             elif type(content[field]) is str:
                 members = convert_field_required_format(content, field)
             new_property[field] = members
