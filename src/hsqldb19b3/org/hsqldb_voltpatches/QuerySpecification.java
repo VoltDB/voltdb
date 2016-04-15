@@ -920,6 +920,12 @@ public class QuerySpecification extends QueryExpression {
                     Expression.subqueryExpressionSet);
 
                 if (!tempSet.isEmpty()) {
+                    // The sql is an aggregate function name, extracted
+                    // from the SQL text of the query.  But the function
+                    // getSQL is intended to call in a context which
+                    // parameters to the string and then adds a trailing
+                    // parenthesis. So, we add the trailing parenthesis
+                    // here if it's necessary.
                     String sql = ((Expression) tempSet.get(0)).getSQL();
                     if (sql.endsWith("(")) {
                         sql += ")";
