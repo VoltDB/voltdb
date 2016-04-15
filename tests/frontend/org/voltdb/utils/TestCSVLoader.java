@@ -52,6 +52,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
 public class TestCSVLoader {
@@ -165,7 +167,7 @@ public class TestCSVLoader {
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();
-        // Polygon (GEOGRAPHY) left null, since it does not work with
+        // Polygon (GEOGRAPHY) left null here, since it does not work with
         // comma separator, without quote char
         String []myData = {
                 "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),",
@@ -179,9 +181,39 @@ public class TestCSVLoader {
     }
 
     @Test
+    public void testNoQuotesNonCommaSeparator() throws Exception
+    {
+        String[] myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=|",
+                "--noquotechar",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 |1|1|11111111|first|1.10|1.11|"+currentTime+"|POINT(1 1)|POLYGON((0 0, 1 0, 0 1, 0 0))",
+                "2|2|2|222222|second|3.30|NULL|"+currentTime+"|POINT(2 2)|POLYGON((0 0, 2 0, 0 2, 0 0))",
+                //unclosed quote below should work
+                "1 |1|1|11111111|fir\"st|1.10|1.11|"+currentTime+"|POINT(1 1)|POLYGON((0 0, 1 0, 0 1, 0 0))",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 2;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
     public void testNoQuotesSpecialSeparator() throws Exception
     {
-        // Separator is Ctrl-A. Don't know how to make it visible in eclipse.
+        // Identical to previous test, except separator is Ctrl-A, not '|'.
+        // Don't know how to make Ctrl-A visible in eclipse.
         String[] myOptions = {
                 "-f" + path_csv,
                 "--reportdir=" + reportDir,
@@ -197,13 +229,11 @@ public class TestCSVLoader {
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();
-        // Polygon (GEOGRAPHY) left null, since it does not work with
-        // comma separator, without quote char
         String []myData = {
-                "1 1111111111first1.101.11"+currentTime+"POINT(1 1)",
-                "222222222second3.30NULL"+currentTime+"POINT(2 2)",
+                "1 1111111111first1.101.11"+currentTime+"POINT(1 1)POLYGON((0 0, 1 0, 0 1, 0 0))",
+                "222222222second3.30NULL"+currentTime+"POINT(2 2)POLYGON((0 0, 2 0, 0 2, 0 0))",
                 //unclosed quote below should work
-                "1 1111111111fir\"st1.101.11"+currentTime+"POINT(1 1)",
+                "1 1111111111fir\"st1.101.11"+currentTime+"POINT(1 1)POLYGON((0 0, 1 0, 0 1, 0 0))",
         };
         int invalidLineCnt = 0;
         int validLineCnt = 2;
@@ -993,6 +1023,70 @@ public class TestCSVLoader {
         long time = 1190542210000000L;
         long diff = tableTimeCol - time;
         assertEquals(TimeUnit.MICROSECONDS.toHours(diff), 7);
+    }
+
+    @Test
+    public void testGeographyPointStringRoundTrip() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,,,,,,,,POINT(1.1 1.1),",
+                "2,,,,,,,,POINT(1.1 1.1),",
+                "3,,,,,,,,POINT(2.2 -2.2),",
+                "4,,,,,,,,POINT(2.2 -2.2),",
+                "5,,,,,,,,POINT(-3.3 3.3),",
+                "6,,,,,,,,POINT(-3.3 3.3),",
+                "7,,,,,,,,POINT(-4.4 -4.4),",
+                "8,,,,,,,,POINT(-4.4 -4.4),",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        while (ts_table.advanceRow()) {
+            GeographyValue poly1 = ts_table.getGeographyValue(9);
+            if (ts_table.advanceRow()) {
+                GeographyValue poly2 = ts_table.getGeographyValue(9);
+                assertEquals(poly1, poly2);
+                continue;
+            }
+        }
+
+    }
+
+    @Test
+    public void testGeographyStringRoundTrip() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,,,,,,,,,\"POLYGON((1.1 1.1, -1.1 1.1, -1.1 -1.1, 1.1 -1.1, 1.1 1.1))\"",
+                "2,,,,,,,,,\"POLYGON((1.1 1.1, -1.1 1.1, -1.1 -1.1, 1.1 -1.1, 1.1 1.1))\"",
+                "3,,,,,,,,,\"POLYGON((2.2 2.2, -2.2 2.2, -2.2 -2.2, 2.2 -2.2, 2.2 2.2),(1.1 1.1, 1.1 -1.1, -1.1 -1.1, -1.1 1.1, 1.1 1.1))\"",
+                "4,,,,,,,,,\"POLYGON((2.2 2.2, -2.2 2.2, -2.2 -2.2, 2.2 -2.2, 2.2 2.2),(1.1 1.1, 1.1 -1.1, -1.1 -1.1, -1.1 1.1, 1.1 1.1))\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        while (ts_table.advanceRow()) {
+            GeographyPointValue pt1 = ts_table.getGeographyPointValue(8);
+            if (ts_table.advanceRow()) {
+                GeographyPointValue pt2 = ts_table.getGeographyPointValue(8);
+                assertEquals(pt1, pt2);
+                continue;
+            }
+        }
+
     }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
