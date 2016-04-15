@@ -94,6 +94,9 @@ public:
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
 
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) = 0;
+
     bool m_enabled;
 protected:
     CatalogId m_partitionId;

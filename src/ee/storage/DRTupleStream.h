@@ -38,7 +38,7 @@ public:
     static const size_t HASH_DELIMITER_SIZE = 1 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 4;
+    static const uint8_t PROTOCOL_VERSION = 5;
 
     DRTupleStream(int partitionId, int defaultBufferSize);
 
@@ -86,6 +86,9 @@ public:
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray catalogCommands);
 
     static int32_t getTestDRBuffer(int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,

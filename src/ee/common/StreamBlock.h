@@ -29,7 +29,7 @@ namespace voltdb
 {
     enum StreamBlockType {
         NORMAL_STREAM_BLOCK = 1,
-        LARGE_STREAM_BLOCK = 2
+        LARGE_STREAM_BLOCK = 2,
     };
     /**
      * A single data block with some buffer semantics.
@@ -50,7 +50,8 @@ namespace voltdb
               m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastSpUniqueId(0),
               m_lastMpUniqueId(0),
-              m_type(voltdb::NORMAL_STREAM_BLOCK)
+              m_type(NORMAL_STREAM_BLOCK),
+              m_drEventType(voltdb::NOT_A_EVENT)
         {
         }
 
@@ -68,7 +69,8 @@ namespace voltdb
               m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
               m_lastSpUniqueId(other->m_lastSpUniqueId),
               m_lastMpUniqueId(other->m_lastMpUniqueId),
-              m_type(other->m_type)
+              m_type(other->m_type),
+              m_drEventType(other->m_drEventType)
         {
         }
 
@@ -159,6 +161,14 @@ namespace voltdb
             m_lastMpUniqueId = lastMpUniqueId;
         }
 
+        void markAsEventBuffer(DREventType type) {
+            m_drEventType = type;
+        }
+
+        DREventType drEventType() {
+            return m_drEventType;
+        }
+
         size_t updateRowCountForDR(size_t rowsToCommit) {
             m_rowCountForDR += rowsToCommit;
             return m_rowCountForDR;
@@ -228,6 +238,7 @@ namespace voltdb
         int64_t m_lastSpUniqueId;
         int64_t m_lastMpUniqueId;
         StreamBlockType m_type;
+        DREventType m_drEventType;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

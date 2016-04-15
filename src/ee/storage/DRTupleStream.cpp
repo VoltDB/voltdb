@@ -490,6 +490,25 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
+void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+        int64_t uniqueId, ByteArray payloads) {
+    switch (type) {
+    case CATALOG_UPDATE: {
+        // Make sure current block is empty
+        extendBufferChain(0);
+        ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
+        io.writeBinaryString(payloads.data(), payloads.length());
+        m_currBlock->consumed(io.position());
+        m_uso += io.position();
+
+        commit(lastCommittedSpHandle, spHandle, uniqueId, false, true, type);
+        break;
+    }
+    default:
+        assert(false);
+    }
+}
+
 int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     std::vector<int32_t> partitionKeyValueList,
     std::vector<int32_t> flagList,

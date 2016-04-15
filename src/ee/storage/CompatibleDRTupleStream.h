@@ -81,6 +81,12 @@ public:
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) {
+        // This method is not supported in compatible stream
+    }
+
     static int32_t getTestDRBuffer(int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
                                    std::vector<int32_t> flagList,
