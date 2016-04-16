@@ -18,16 +18,10 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.InternalConnectionContext;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 
@@ -59,27 +53,27 @@ public abstract class AbstractImporter
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
     private AtomicInteger m_backPressureCount = new AtomicInteger(0);
-    private final AtomicLong m_failures = new AtomicLong(0);
+ //   private final AtomicLong m_failures = new AtomicLong(0);
 
-    public class ImporterCallback implements ProcedureCallback{
-        private final ProcedureCallback m_cb;
-        private final String m_proceddureName;
-
-        public ImporterCallback(String proceddureName, ProcedureCallback cb){
-            this.m_proceddureName = proceddureName;
-            this.m_cb = cb;
-        }
-        @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                String fmt = "AbstractImporter stored procedure failed: %s Error: %s failures: %d";
-                rateLimitedLog(Level.WARN, null, fmt, m_proceddureName, clientResponse.getStatusString(), m_failures.incrementAndGet());
-            }
-            if( m_cb != null){
-                m_cb.clientCallback(clientResponse);
-            }
-        }
-    }
+//    public class ImporterCallback implements ProcedureCallback{
+//        private final ProcedureCallback m_cb;
+//        private final String m_proceddureName;
+//
+//        public ImporterCallback(String proceddureName, ProcedureCallback cb){
+//            this.m_proceddureName = proceddureName;
+//            this.m_cb = cb;
+//        }
+//        @Override
+//        public void clientCallback(ClientResponse clientResponse) throws Exception {
+//            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+//                String fmt = "AbstractImporter stored procedure failed: %s Error: %s failures: %d";
+//                rateLimitedLog(Level.WARN, null, fmt, m_proceddureName, clientResponse.getStatusString(), m_failures.incrementAndGet());
+//            }
+//            if( m_cb != null){
+//                m_cb.clientCallback(clientResponse);
+//            }
+//        }
+//    }
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
@@ -128,8 +122,7 @@ public abstract class AbstractImporter
     protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            ImporterCallback cb = new ImporterCallback(invocation.getProcedure(), callback);
-            boolean result = m_importServerAdapter.callProcedure(this, cb, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
             applyBackPressureAsNeeded();
             return result;

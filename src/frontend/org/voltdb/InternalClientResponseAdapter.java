@@ -65,7 +65,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
-
+    private final AtomicLong m_failures = new AtomicLong(0);
     private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
     // Maintain internal connection ids per caller id. This is useful when collecting statistics
@@ -81,7 +81,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         private final StoredProcedureInvocation m_task;
         private final Procedure m_proc;
         private final AuthSystem.AuthUser m_user;
-
+        private final String m_procName;
         public InternalCallback(
                 final InternalAdapterTaskAttributes kattrs,
                 Procedure proc,
@@ -100,10 +100,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_statsCollector = statsCollector;
             m_partition = partition;
             m_user = user;
+            m_procName = procName;
         }
 
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
+          if (response.getStatus() != ClientResponse.SUCCESS && m_kattrs.isImporter()) {
+          String fmt = "AbstractImporter stored procedure failed: %s Error: %s failures: %d";
+          rateLimitedLog(Level.WARN, null, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
+      }
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
