@@ -105,10 +105,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
-          if (response.getStatus() != ClientResponse.SUCCESS && m_kattrs.isImporter()) {
-          String fmt = "AbstractImporter stored procedure failed: %s Error: %s failures: %d";
-          rateLimitedLog(Level.WARN, null, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
-      }
+            if (response.getStatus() != ClientResponse.SUCCESS && m_kattrs.isImporter()) {
+                String fmt = "Stored procedure failed: %s Error: %s failures: %d";
+                rateLimitedLog(Level.WARN, null, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
+            }
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
