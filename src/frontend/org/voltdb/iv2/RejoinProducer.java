@@ -317,12 +317,14 @@ public class RejoinProducer extends JoinProducerBase {
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
+                long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
+                        clusterCreateTime = event.clusterCreateTime;
                     }
 
                     drSequenceNumbers = event.drSequenceNumbers;
@@ -349,7 +351,8 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection,
                         exportSequenceNumbers,
                         drSequenceNumbers,
-                        true /* requireExistingSequenceNumbers */);
+                        true /* requireExistingSequenceNumbers */,
+                        clusterCreateTime);
             }
         };
         try {
