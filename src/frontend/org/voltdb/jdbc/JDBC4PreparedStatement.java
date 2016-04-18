@@ -441,6 +441,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARBINARY:
             case Types.VARCHAR:
             case Types.NVARCHAR:
+            case Types.OTHER:
             case Types.NULL:
                 this.parameters[parameterIndex-1] = VoltType.NULL_STRING_OR_VARBINARY;
                 break;
@@ -496,6 +497,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARCHAR:
             case Types.NVARCHAR:
                 setString(parameterIndex, (String)x);
+                break;
+            case Types.OTHER:
+                setObject(parameterIndex, x);
                 break;
             default:
                 throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);

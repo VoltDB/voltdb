@@ -14,29 +14,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-import org.openqa.selenium.chrome.ChromeDriver
-import org.openqa.selenium.firefox.FirefoxDriver
-import org.openqa.selenium.phantomjs.PhantomJSDriver
-
-waiting {
-    timeout = 10
-}
-
-environments {
-
-    // run via “./gradlew chromeTest”
-    // See: http://code.google.com/p/selenium/wiki/ChromeDriver
-    chrome {
-        driver = { new ChromeDriver() }
-    }
-
-    // run via “./gradlew firefoxTest”
-    // See: http://code.google.com/p/selenium/wiki/FirefoxDriver
-    firefox {
-        driver = { new FirefoxDriver() }
-    }
-    phantomJs {
-        driver = { new PhantomJSDriver() }
-    }
-}
+/**
+ * This package contains the Java definitions for classes
+ * whose objects are used to represent a VoltDB compiled
+ * and serializable plan graph.
+ *
+ * See the package comment for org.voltdb.planner for more details.
+ */
+package org.voltdb.plannodes;
