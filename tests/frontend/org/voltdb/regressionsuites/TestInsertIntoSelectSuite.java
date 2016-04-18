@@ -795,7 +795,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         verifyStmtFails(client, "insert into target_p " +
                 "select 9, vc, ii, ti " +
                 "from source_p1 as sp1",
-                
+
                 "Partitioning could not be determined");
         // this whole statement should be single-partition!
         verifyStmtFails(client, "insert into target_p " +
