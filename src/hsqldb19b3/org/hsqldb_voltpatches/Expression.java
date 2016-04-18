@@ -1462,7 +1462,7 @@ public class Expression {
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
         prototypes.put(OpTypes.COLUMN,        new VoltXMLElement("columnref")); // reference
-        prototypes.put(OpTypes.COALESCE,      new VoltXMLElement("columnref")); // for now, another reference form?
+        prototypes.put(OpTypes.COALESCE,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when")); // for now, another reference form?
         prototypes.put(OpTypes.DEFAULT,       new VoltXMLElement("columnref")); // uninteresting!? ExpressionColumn
         prototypes.put(OpTypes.SIMPLE_COLUMN, (new VoltXMLElement("simplecolumn")));
 
@@ -1727,9 +1727,41 @@ public class Expression {
             return exp;
 
         case OpTypes.COLUMN:
-        case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;
             return ec.voltAnnotateColumnXML(exp);
+
+        case OpTypes.COALESCE:
+            // @TODO Mike Need a better way to build it
+            // Hsql has check dataType can not be null.
+            assert(dataType != null);
+            exp.attributes.put("valuetype", dataType.getNameString());
+            // Need to build OpTypes.IS_NULL and ALTERNATIVE
+            VoltXMLElement isnull_expr = prototypes.get(OpTypes.IS_NULL);
+            if (isnull_expr == null) {
+                throwForUnsupportedExpression(exprOp);
+            }
+            isnull_expr = isnull_expr.duplicate();
+            isnull_expr.attributes.put("id", this.getUniqueId(session));
+            assert(exp.children.size() == 2);
+            isnull_expr.children.add(exp.children.get(0).duplicate());
+
+            VoltXMLElement alt_expr = prototypes.get(OpTypes.ALTERNATIVE);
+            if (alt_expr == null) {
+                throwForUnsupportedExpression(exprOp);
+            }
+            alt_expr = alt_expr.duplicate();
+            alt_expr.attributes.put("id", this.getUniqueId(session));
+            alt_expr.attributes.put("valuetype", dataType.getNameString());
+            // add children in the reverse order
+            alt_expr.children.add(exp.children.get(1));
+            alt_expr.children.add(exp.children.get(0));
+
+            exp.children.clear();
+            exp.children.add(isnull_expr);
+            exp.children.add(alt_expr);
+            exp.attributes.put("alias", alt_expr.children.get(0).attributes.get("alias"));
+            exp.attributes.put("column", alt_expr.children.get(0).attributes.get("column"));
+            return exp;
 
         case OpTypes.SQL_FUNCTION:
             FunctionSQL fn = (FunctionSQL)this;

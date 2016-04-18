@@ -103,11 +103,9 @@ public class ParsedColInfo implements Cloneable {
         orderCol.expression = adjuster.adjust(orderExpr);
 
         // Cases:
-        // child could be columnref, in which case it's just a normal column or
-        // a COALESCE expression if this is a column from a USING expression for a FULL join.
+        // child could be columnref, in which case it's just a normal column.
         // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        boolean usingColumn = child.hasValue("using", "true") && child.hasValue("jointype", "full");
-        if (child.name.equals("columnref") && !usingColumn) {
+        if (child.name.equals("columnref")) {
             assert(orderExpr instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) orderExpr;
             orderCol.columnName = tve.getColumnName();
@@ -128,8 +126,7 @@ public class ParsedColInfo implements Cloneable {
 
             if ((child.name.equals("operation") == false) &&
                     (child.name.equals("aggregation") == false) &&
-                    (child.name.equals("function") == false) &&
-                    !usingColumn) {
+                    (child.name.equals("function") == false)) {
                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
            }
         }

@@ -32,6 +32,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -870,17 +871,17 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /**
-     * Extract columnref elements from the input element.
+     * Extract operation elements of type operator_case_when from the input element.
      * @param element
      * @param cols - output collection containing the column references
      */
 
-    static protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
-        if ("columnref".equalsIgnoreCase(element.name)) {
+    static protected void extractUsingExpressionReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
+        if ("operation".equalsIgnoreCase(element.name) && element.hasValue("optype", "operator_case_when")) {
             cols.add(element);
         } else {
             for (VoltXMLElement child : element.children) {
-                extractColumnReferences(child, cols);
+                extractUsingExpressionReferences(child, cols);
             }
         }
     }
@@ -1288,8 +1289,8 @@ public abstract class StatementDMQL extends Statement {
         // if join is INNER then the column from USING expression can be from any table
         // participating in join. In case of OUTER join, it must be the outer column
         java.util.List<VoltXMLElement> exprCols = new java.util.ArrayList<VoltXMLElement>();
-        extractColumnReferences(query, exprCols);
-        resolveUsingColumns(exprCols, select.rangeVariables);
+        extractUsingExpressionReferences(query, exprCols);
+        resolveUsingExpressions(exprCols, select.rangeVariables);
 
         return query;
     }
@@ -1303,20 +1304,21 @@ public abstract class StatementDMQL extends Statement {
      * AbstractParsedStmt. Here we only add an additional attribute "jointype" set to "full" to aid
      * the AbstractParsedStmt.
      * 
-     * @param columns list of columns to resolve
-     * @return rvs list of range variables
+     * @param elements list of expression columns to resolve
      */
-    static protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
+    static protected void resolveUsingExpressions(java.util.List<VoltXMLElement> elements, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
 
         // Only one OUTER join for a whole select is supported so far
-        for (VoltXMLElement columnElmt : columns) {
+        int index = 1;
+        for (VoltXMLElement element : elements) {
             String table = null;
             String tableAlias = null;
-            if (columnElmt.attributes.get("table") == null) {
-                columnElmt.attributes.put("using", "true");
+            boolean isFullJoin = false;
+            assert(element.hasValue("optype", "operator_case_when"));
+            String column = element.attributes.get("column");
                 for (RangeVariable rv : rvs) {
-                    if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
+                    if (!rv.getTable().columnList.containsKey(column)) {
                         // The column is not from this table. Skip it
                         continue;
                     }
@@ -1324,8 +1326,9 @@ public abstract class StatementDMQL extends Statement {
                     // If there is an OUTER join we need to pick the outer table
                     if (rv.isRightJoin == true) {
                         if (rv.isLeftJoin == true) {
-                            // this is a full join.  
-                            columnElmt.attributes.put("jointype", "full");
+                            // this is a full join. No need to do anything
+                            isFullJoin = true;
+                            break;
                         } else {
                             // this is the outer table. no need to search
                             // further.
@@ -1348,12 +1351,42 @@ public abstract class StatementDMQL extends Statement {
                         }
                     }
                 }
+                if (isFullJoin) {
+                    break;
+                }
                 if (table != null) {
-                    columnElmt.attributes.put("table", table);
+                    collapseCoalesceExpression(element, table, tableAlias);
+                }
+        }
+    }
+
+    static private void collapseCoalesceExpression(VoltXMLElement element, String table, String tableAlias) {
+        assert(element.children.size() == 2);
+        VoltXMLElement altExpr = element.children.get(1);
+        assert(altExpr.hasValue("optype", "operator_alternative"));
+        for(VoltXMLElement columnref : altExpr.children) {
+            if ((tableAlias != null && columnref.hasValue("tablealias", tableAlias)) ||
+                    (table != null && columnref.hasValue("table", table))) {
+                element.name = "columnref";
+                if (table != null) {
+                    element.withValue("table", table);
                 }
                 if (tableAlias != null) {
-                    columnElmt.attributes.put("tablealias", tableAlias);
+                    element.withValue("tablealias", tableAlias);
                 }
+                String alias = columnref.attributes.get("alias");
+                if (alias != null) {
+                    element.withValue("alias", alias);
+                }
+                String column = columnref.attributes.get("column");
+                if (column != null) {
+                    element.withValue("column", column);
+                }
+                String id = columnref.attributes.get("id");
+                if (id != null) {
+                    element.withValue("id", id);
+                }
+                element.children.clear();
             }
         }
     }

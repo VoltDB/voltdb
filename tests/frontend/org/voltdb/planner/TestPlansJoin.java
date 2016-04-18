@@ -1275,6 +1275,33 @@ public class TestPlansJoin extends PlannerTestCase {
        compile("SELECT C, C FROM R1 GROUP BY C ORDER BY C;");
    }
 
+    public void testUsingColumns() {
+        // Test USING column
+        AbstractPlanNode pn = compile("SELECT MAX(R1.A), C FROM R1 FULL JOIN R2 USING (C) WHERE C > 0 GROUP BY C ORDER BY C");
+
+        // ORDER BY column
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        List<AbstractExpression> s = ((OrderByPlanNode)pn).getSortExpressions();
+        assertEquals(1, s.size());
+        assertEquals(ExpressionType.VALUE_TUPLE, s.get(0).getExpressionType());
+
+        // WHERE
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        AbstractExpression f = ((NestLoopPlanNode)pn).getWherePredicate();
+        assertNotNull(f);
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, f.getLeft().getExpressionType());
+
+        // GROUP BY
+        AbstractPlanNode aggr = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggr);
+        List<AbstractExpression> g = ((AggregatePlanNode) aggr).getGroupByExpressions();
+        assertEquals(1, g.size());
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, g.get(0).getExpressionType());
+
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestJoinOrder.class.getResource("testplans-join-ddl.sql"), "testplansjoin", false);
