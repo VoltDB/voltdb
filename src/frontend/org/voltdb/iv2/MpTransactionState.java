@@ -36,6 +36,8 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -266,7 +268,7 @@ public class MpTransactionState extends TransactionState
         while (true){
             msg = pollForResponses();
             assert(msg.getTableCount() > 0);
-            // Verify that this is not a stale message from
+            // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
             if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
                     msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
                 // Will roll-back and throw if this message has an exception
@@ -328,6 +330,11 @@ public class MpTransactionState extends TransactionState
             // can't leave yet - the transaction is inconsistent.
             // could retry; but this is unexpected. Crash.
             throw new RuntimeException(e);
+        }
+        SerializableException se = msg.getException();
+        if (se != null && se instanceof TransactionRestartException) {
+            // If this is a restart exception, we don't need to match up the DependencyId
+            throw se;
         }
         return msg;
     }
