@@ -1,3 +1,7 @@
+load classes sp.jar;
+
+file -inlinebatch END_OF_BATCH
+
 -- Partitioned Data Table
 CREATE TABLE partitioned_table
 (
@@ -198,3 +202,5 @@ PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
   ON TABLE export_skinny_partitioned_table COLUMN rowid;
 
 CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+END_OF_BATCH

@@ -119,6 +119,7 @@ public enum ExpressionType {
     AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
     AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
     AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
+    AGGREGATE_RANK                (AggregateExpression.class, 49, "RANK"),
 
     // ----------------------------
     // Function

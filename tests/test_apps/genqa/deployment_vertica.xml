@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export>
+        <configuration enabled="true" stream="abc" type="jdbc">
+            <property name="jdbcurl">jdbc:vertica://volt15d:5433/Test1</property>
+            <property name="jdbcuser">dbadmin</property>
+            <property name="skipinternals">true</property>
+            <property name="ignoregenerations">true</property>
+        </configuration>
+    </export>
+
+</deployment>

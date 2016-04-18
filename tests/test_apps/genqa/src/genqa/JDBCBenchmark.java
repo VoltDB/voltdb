@@ -37,6 +37,7 @@ package genqa;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -262,8 +263,11 @@ public class JDBCBenchmark
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(fullStatsContext.getStatsForProcedure(procedure).toString());
-
+            try {
+                System.out.print(fullStatsContext.getStatsForProcedure(procedure).toString());
+            } catch  (Exception e) {
+                e.printStackTrace();
+            }
             // Dump statistics to a CSV file
             Con.unwrap(IVoltDBConnection.class).saveStatistics(fullStatsContext.getStats(), csv);
 
