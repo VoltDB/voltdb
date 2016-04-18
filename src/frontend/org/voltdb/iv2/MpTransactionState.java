@@ -334,6 +334,7 @@ public class MpTransactionState extends TransactionState
         SerializableException se = msg.getException();
         if (se != null && se instanceof TransactionRestartException) {
             // If this is a restart exception, we don't need to match up the DependencyId
+            setNeedsRollback(true);
             throw se;
         }
         return msg;
