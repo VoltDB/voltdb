@@ -178,7 +178,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     setJoinComplete(siteConnection,
                                     event.exportSequenceNumbers,
                                     event.drSequenceNumbers,
-                                    false /* requireExistingSequenceNumbers */);
+                                    false /* requireExistingSequenceNumbers */,
+                                    event.clusterCreateTime);
                 } catch (InterruptedException e) {
                     // isDone() already returned true, this shouldn't happen
                     VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
