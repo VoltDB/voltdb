@@ -492,20 +492,16 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testMPDeterminismOfSelectIndexKeysOnly() {
-        /*
         assertMPPlanDeterminismNeedsOrdering("select a, b from ptree", "order by a, b");
         assertMPPlanDeterminismNeedsOrdering("select a, b, c from ptree", "order by a, b, c");
         // non-prefix keys don't help
         assertMPPlanDeterminismNeedsOrdering("select b, c from ptree", "order by b, c");
-        */
         // if a table has a unique index... it can be used to scan in a r/w transaction
         assertMPPlanNeedsSaferDeterminismCombo("select a from punique");
-        // assertMPPlanNeedsSaferDeterminismCombo("select a from ppk");
-        /*
+        assertMPPlanNeedsSaferDeterminismCombo("select a from ppk");
         // hashes don't help, here
         assertMPPlanDeterminismNeedsOrdering("select a, b from phash", "order by a, b");
         assertMPPlanDeterminismNeedsOrdering("select a, b, c from phash", "order by a, b, c");
-        */
     }
 
     public void testMPDeterminismOfSelectOneKeyValue() {
