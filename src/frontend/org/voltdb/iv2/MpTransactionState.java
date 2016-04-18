@@ -242,7 +242,11 @@ public class MpTransactionState extends TransactionState
             // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 FragmentResponseMessage msg = pollForResponses();
-                handleReceivedFragResponse(msg);
+                boolean expectedMsg = handleReceivedFragResponse(msg);
+                if (expectedMsg) {
+                    // Will roll-back and throw if this message has an exception
+                    checkForException(msg);
+                }
             }
         }
         // satisified. Clear this defensively. Procedure runner is sloppy with
@@ -261,7 +265,12 @@ public class MpTransactionState extends TransactionState
         FragmentResponseMessage msg;
         while (true){
             msg = pollForResponses();
-            if (msg.m_sourceHSId == m_buddyHSId) {
+            assert(msg.getTableCount() > 0);
+            // Verify that this is not a stale message from
+            if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
+                    msg.getTableDependencyIdAtIndex(0) == m_localWork.getOutputDepId(0))) {
+                // Will roll-back and throw if this message has an exception
+                checkForException(msg);
                 break;
             } else {
                 // It's possible to receive stale responses from remote sites on restart,
@@ -320,6 +329,11 @@ public class MpTransactionState extends TransactionState
             // could retry; but this is unexpected. Crash.
             throw new RuntimeException(e);
         }
+        return msg;
+    }
+
+    private void checkForException(FragmentResponseMessage msg)
+    {
         if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
             setNeedsRollback(true);
             if (msg.getException() != null) {
@@ -328,10 +342,9 @@ public class MpTransactionState extends TransactionState
                 throw new FragmentFailureException();
             }
         }
-        return msg;
     }
 
-    private void trackDependency(long hsid, int depId, VoltTable table)
+    private boolean trackDependency(long hsid, int depId, VoltTable table)
     {
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
@@ -340,10 +353,10 @@ public class MpTransactionState extends TransactionState
             // Tolerate weird deps showing up on restart
             // After Ariel separates unique ID from transaction ID, rewrite restart to restart with
             // a new transaction ID and make this and the fake distributed fragment stuff go away.
-            return;
+            return false;
         }
-        Object needed = localRemotes.remove(hsid);
-        if (needed != null) {
+        boolean needed = localRemotes.remove(hsid);
+        if (needed) {
             // add table to storage
             List<VoltTable> tables = m_remoteDepTables.get(depId);
             if (tables == null) {
@@ -358,17 +371,20 @@ public class MpTransactionState extends TransactionState
         else {
             System.out.println("No remote dep for local site: " + hsid);
         }
+        return needed;
     }
 
-    private void handleReceivedFragResponse(FragmentResponseMessage msg)
+    private boolean handleReceivedFragResponse(FragmentResponseMessage msg)
     {
+        boolean expectedMsg = false;
         for (int i = 0; i < msg.getTableCount(); i++)
         {
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
             long src_hsid = msg.getExecutorSiteId();
-            trackDependency(src_hsid, this_depId, this_dep);
+            expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
         }
+        return expectedMsg;
     }
 
     private boolean checkDoneReceivingFragResponses()
