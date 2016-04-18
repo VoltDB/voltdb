@@ -55,10 +55,14 @@ def collect(runner):
         sys.exit(-1)
 
     os.environ["PATH"] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join("voltdb", "bin") in s)
-    checkFD = os.open(os.path.join(runner.opts.voltdbroot, "systemcheck"), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
-    checkOutput = os.fdopen(checkFD, 'w')
-    subprocess.call("voltdb check", stdout=checkOutput, shell=True)
-    checkOutput.close()
+    if os.path.isdir(runner.opts.voltdbroot) and os.access(runner.opts.voltdbroot, os.W_OK):
+        checkFD = os.open(os.path.join(runner.opts.voltdbroot, "systemcheck"), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
+        checkOutput = os.fdopen(checkFD, 'w')
+        subprocess.call("voltdb check", stdout=checkOutput, shell=True)
+        checkOutput.close()
+    else:
+        print >> sys.stderr, "ERROR: Invalid voltdbroot path", runner.opts.voltdbroot
+        sys.exit(-1);
 
     runner.args.extend(['--voltdbroot='+runner.opts.voltdbroot, '--prefix='+runner.opts.prefix, '--host='+runner.opts.host, '--username='+runner.opts.username, '--password='+runner.opts.password,
     '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump), '--days='+str(runner.opts.days)])
