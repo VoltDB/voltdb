@@ -53,27 +53,6 @@ public abstract class AbstractImporter
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
     private AtomicInteger m_backPressureCount = new AtomicInteger(0);
- //   private final AtomicLong m_failures = new AtomicLong(0);
-
-//    public class ImporterCallback implements ProcedureCallback{
-//        private final ProcedureCallback m_cb;
-//        private final String m_proceddureName;
-//
-//        public ImporterCallback(String proceddureName, ProcedureCallback cb){
-//            this.m_proceddureName = proceddureName;
-//            this.m_cb = cb;
-//        }
-//        @Override
-//        public void clientCallback(ClientResponse clientResponse) throws Exception {
-//            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-//                String fmt = "AbstractImporter stored procedure failed: %s Error: %s failures: %d";
-//                rateLimitedLog(Level.WARN, null, fmt, m_proceddureName, clientResponse.getStatusString(), m_failures.incrementAndGet());
-//            }
-//            if( m_cb != null){
-//                m_cb.clientCallback(clientResponse);
-//            }
-//        }
-//    }
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
