@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -66,6 +64,8 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -2814,7 +2814,7 @@ public class TestVoltCompiler extends TestCase {
     public void testGeographyPointValueNegative() throws Exception {
 
         // POINT cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*",
                 "create table pts ("
                 + "  pt geography_point not null"
                 + ");"
@@ -2909,7 +2909,7 @@ public class TestVoltCompiler extends TestCase {
                      "partition table geogs on column geog;\n";
 
         // GEOGRAPHY cannot be a partition column
-        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*", ddl);
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer, varchar or varbinary type.*", ddl);
 
         ddl = "create table geogs ( geog geography(0) not null );";
         badDDLAgainstSimpleSchema(".*precision or scale out of range.*", ddl);
