@@ -45,10 +45,6 @@
 
 #include "executorutil.h"
 
-#include "common/tabletuple.h"
-#include "expressions/abstractexpression.h"
-#include "storage/temptable.h"
-
 namespace voltdb {
 
 CountingPostfilter::CountingPostfilter(const TempTable* table, const AbstractExpression * postPredicate, int limit, int offset,
@@ -71,32 +67,5 @@ CountingPostfilter::CountingPostfilter() :
     m_tuple_skipped(0),
     m_under_limit(false)
 {}
-
-// Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
-    if (m_postPredicate == NULL || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
-        // Check if we have to skip this tuple because of offset
-        if (m_tuple_skipped < m_offset) {
-            m_tuple_skipped++;
-            return false;
-        }
-        // Evaluate LIMIT now
-        if (m_limit >= 0) {
-            assert(m_table != NULL);
-            if (m_table->activeTupleCount() == m_limit) {
-                m_under_limit = false;
-                // Notify a parent that the limit is reached
-                if (m_parentPostfilter) {
-                    m_parentPostfilter->setAboveLimit();
-                }
-                return false;
-            }
-        }
-        // LIMIT/OFFSET are satisfied
-        return true;
-    }
-    // Predicate is not NULL and was evaluated to FALSE
-    return false;
-}
 
 }
