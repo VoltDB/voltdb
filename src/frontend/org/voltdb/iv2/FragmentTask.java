@@ -213,8 +213,7 @@ public class FragmentTask extends TransactionTask
 
         if (m_fragmentMsg.isEmptyForRestart()) {
             int outputDepId = m_fragmentMsg.getOutputDepId(0);
-            currentFragResponse.addDependency(outputDepId,
-                    new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+            currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
             return currentFragResponse;
         }
 
@@ -284,8 +283,7 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(outputDepId,
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
                 }
                 break;
             } catch (final SQLException e) {
@@ -293,8 +291,7 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(outputDepId,
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
                 }
                 break;
             }
@@ -303,8 +300,7 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(outputDepId,
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
                 }
                 break;
             }

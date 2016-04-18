@@ -32,7 +32,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
@@ -201,8 +200,7 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
                 }
                 break;
             } catch (final SQLException e) {
@@ -211,8 +209,7 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
                 }
                 break;
             }
@@ -228,8 +225,7 @@ public class SysprocFragmentTask extends TransactionTask
                         e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
                 }
             }
             catch (final VoltAbortException e) {
@@ -238,8 +234,7 @@ public class SysprocFragmentTask extends TransactionTask
                         new SerializableException(CoreUtils.throwableToString(e)));
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
                 }
                 break;
             }

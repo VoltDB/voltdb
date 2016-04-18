@@ -17,18 +17,24 @@
 
 package org.voltdb.iv2;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.dtxn.TransactionState;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public abstract class TransactionTask extends SiteTasker
 {
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    protected static final VoltTable m_dummyResultTable =
+            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1);
     final protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;
     protected ListenableFuture<Object> m_durabilityBackpressureFuture = CoreUtils.COMPLETED_FUTURE;
