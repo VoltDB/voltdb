@@ -317,6 +317,7 @@ public class RejoinProducer extends JoinProducerBase {
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
+                long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
@@ -326,6 +327,7 @@ public class RejoinProducer extends JoinProducerBase {
 
                         drSequenceNumbers = event.drSequenceNumbers;
                         VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
+                        clusterCreateTime = event.clusterCreateTime;
                     }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
@@ -349,7 +351,8 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection,
                         exportSequenceNumbers,
                         drSequenceNumbers,
-                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */);
+                        m_schemaHasNoTables == false /* requireExistingSequenceNumbers */,
+                        clusterCreateTime);
             }
         };
         try {

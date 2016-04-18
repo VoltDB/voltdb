@@ -36,6 +36,7 @@ public interface SnapshotCompletionInterest {
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds;
+        public final long clusterCreateTime;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -47,7 +48,8 @@ public interface SnapshotCompletionInterest {
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
-                final Map<Integer, Map<Integer, Pair<Long,Long>>> remoteDCLastIds) {
+                final Map<Integer, Map<Integer, Pair<Long,Long>>> remoteDCLastIds,
+                final long clusterCreateTime) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -58,6 +60,7 @@ public interface SnapshotCompletionInterest {
             this.exportSequenceNumbers = exportSequenceNumbers;
             this.drSequenceNumbers = drSequenceNumbers;
             this.remoteDCLastIds = remoteDCLastIds;
+            this.clusterCreateTime = clusterCreateTime;
         }
 
         // Factory method for simplified instances used in testing,
@@ -67,10 +70,11 @@ public interface SnapshotCompletionInterest {
                 String nonce,
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
-                boolean truncationSnapshot) {
+                boolean truncationSnapshot,
+                long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null);
+                    true, "", null, null, null, clusterCreateTime);
         }
     }
 

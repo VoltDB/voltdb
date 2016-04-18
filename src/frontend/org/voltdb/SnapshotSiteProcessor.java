@@ -920,6 +920,12 @@ public class SnapshotSiteProcessor {
     private static void mergeDRTupleStreamInfo(JSONObject jsonObj,
             Map<Integer, Pair<Long, Long>> drTupleStreamInfo) throws JSONException {
         JSONObject stateInfoMap;
+
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
+        // clusterCreateTime should be same across the cluster
+        assert (!jsonObj.has("clusterCreateTime") || (clusterCreateTime == jsonObj.getLong("clusterCreateTime")));
+        jsonObj.put("clusterCreateTime", clusterCreateTime);
+
         if (jsonObj.has("drTupleStreamStateInfo")) {
             stateInfoMap = jsonObj.getJSONObject("drTupleStreamStateInfo");
         } else {
