@@ -121,3 +121,15 @@ create table floataggs (
     beta  float,
     gamma float
 );
+
+
+create table ppkcombo (
+  a bigint not null,
+  b bigint not null,
+  c bigint not null,
+  z bigint not null,
+  PRIMARY KEY (a, b ,c)
+);
+
+partition table ppkcombo on column a;
+

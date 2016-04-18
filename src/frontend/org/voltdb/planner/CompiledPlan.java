@@ -161,7 +161,19 @@ public class CompiledPlan {
         if (m_statementIsOrderDeterministic) {
             return true;
         }
-        return rootPlanGraph.isOrderDeterministic();
+
+        if (rootPlanGraph.isOrderDeterministic()) {
+            return true;
+        }
+
+        // check if plans contains second fragment.
+        if (subPlanGraph != null) {
+            // If so evaluate case where the collector fragment will
+            // return at most one row to the co-ordinator fragment
+            return subPlanGraph.producesOneOutputRowOnly();
+        }
+        return false;
+
     }
 
     public boolean isContentDeterministic() {

@@ -313,6 +313,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Evaluates if the plan generates at most one row.
+     * At present, functionality to evaulate if plan node
+     * produces one row at most if implemented for index scan
+     * plan node. For the rest of the plan nodes, except insert plan
+     * node which can have embed index scan plan node too,
+     * their implementation of returns false indicating
+     * plan node has not be implemented yet.
+     */
+    public boolean producesOneOutputRowOnly() {
+        // iterate through the children nodes to see
+        // if the child nodes will return only one
+        // row at most.
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (!child.producesOneOutputRowOnly()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Does the plan guarantee a result sorted according to the required sort order.
      * The default implementation delegates the question to its child if there is only one child.
      *

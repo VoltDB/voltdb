@@ -97,6 +97,12 @@ public class PlannerTestAideDeCamp {
         return m_currentPlan;
     }
 
+    CompiledPlan compileAdHocPlan(String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode)
+    {
+        compile(sql, 0, null, inferPartitioning, singlePartition, detMode);
+        return m_currentPlan;
+    }
+
     List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
         return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }

@@ -492,16 +492,20 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testMPDeterminismOfSelectIndexKeysOnly() {
+        /*
         assertMPPlanDeterminismNeedsOrdering("select a, b from ptree", "order by a, b");
         assertMPPlanDeterminismNeedsOrdering("select a, b, c from ptree", "order by a, b, c");
         // non-prefix keys don't help
         assertMPPlanDeterminismNeedsOrdering("select b, c from ptree", "order by b, c");
+        */
         // if a table has a unique index... it can be used to scan in a r/w transaction
         assertMPPlanNeedsSaferDeterminismCombo("select a from punique");
-        assertMPPlanNeedsSaferDeterminismCombo("select a from ppk");
+        // assertMPPlanNeedsSaferDeterminismCombo("select a from ppk");
+        /*
         // hashes don't help, here
         assertMPPlanDeterminismNeedsOrdering("select a, b from phash", "order by a, b");
         assertMPPlanDeterminismNeedsOrdering("select a, b, c from phash", "order by a, b, c");
+        */
     }
 
     public void testMPDeterminismOfSelectOneKeyValue() {
@@ -612,10 +616,79 @@ public class TestDeterminism extends PlannerTestCase {
                                       DeterminismMode.FASTER);
     }
 
+    public void testDeterminismOfUniqueConstraintEquivalence() {
+        String sql;
+
+        // equivalence filter in predicate clause using unique key with display list having different column
+        // than in where clause predicate.
+        // test it for safer determinism also as this select statement can be used in insert statement too
+        sql = "select b from punique where a = ?";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        // where clause using equivalence filter on table using all columns forming composite primary
+        // key as this select statement can be in insert clause too, test it for safer determinism also
+        sql = "select z from ppkcombo where a = 1 AND b = 2 AND c =3;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        // using parameters
+        sql = "select z from ppkcombo where a = ? AND b = ? AND c = ?;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        // query does not guarantee determinism as not all columns that form constraints are present
+        // in predicate clause
+        sql = "select c, z from ppkcombo where a = 1 AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+
+        // predicate clause including all columns of composite key with equivalence filter but weakened, OR,
+        // does not guarantee order determinism
+        sql = "select c, z from ppkcombo where a = 1 OR B = ? AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+
+        // predicate clause including all columns of composite keys of composite
+        sql = "select c, z from ppkcombo where a > 1 AND B = ? AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+
+        // non-equivalence filter on unique filter does not guarantee determinism
+        sql = "select a from ppk where a > 1;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+
+        // for non-equivalence filter to generate deterministic results needs to have order by clause
+        sql = "select a from ppk where a > 1 order by a;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+
+        // for non-equivalence filter, with limit/offset clause resuls in non-determinism as well as in-consistent result set
+        sql = "select a from ppk where a > 1 LIMIT 5;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, INCONSISTENT, true, DeterminismMode.FASTER);
+    }
+
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,
             DeterminismMode detMode)
     {
-        CompiledPlan cp = compileAdHocPlan(sql, detMode);
+        assertMPPlanDeterminismCore(sql, order, content, false, detMode);
+    }
+
+    /**
+     * Tests MP compiled plan for the specified determinism properties
+     * @param sql - SQL statement
+     * @param order - Specifies whether the statement should result in order determinism or not
+     * @param content - Specifies whether the statement should result in content determinism or not
+     * @param forcePartitioning - If set to true, applies force MP to generated compiled plan.
+     * @param detMode
+     */
+    private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content, boolean forcePartitioning,
+                                             DeterminismMode detMode) {
+        // Partitioning can be forced or inferred. If inferred, force partitioning is irrelevant
+        // If inferred is set to false, use forced MP by setting forceSP to false
+        boolean inferPartitioning = true;       // by default, use the in
+        boolean forceSP = false;
+
+        if (forcePartitioning) {
+            inferPartitioning = false;
+        }
+        CompiledPlan cp = compileAdHocPlan(sql, inferPartitioning, forceSP, detMode);
         if (order != cp.isOrderDeterministic()) {
             System.out.println((order ? "EXPECTED ORDER: " : "UNEXPECTED ORDER: ") + sql);
             if (m_staticRetryForDebugOnFailure) {
@@ -634,8 +707,8 @@ public class TestDeterminism extends PlannerTestCase {
         }
         assertEquals(content, cp.isOrderDeterministic() || ! cp.hasLimitOrOffset());
         assertTrue(cp.isOrderDeterministic() || (null != cp.nondeterminismDetail()));
-    }
 
+    }
     // Check a number of variants of a core query for expected determinism effects.
     // The variants include the original query, the query with added sorting, the query with a row limit added,
     // the query nested within a trivial "select * " parent query, and various permutations of these changes.

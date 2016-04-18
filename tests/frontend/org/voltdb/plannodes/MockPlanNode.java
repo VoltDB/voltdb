@@ -33,6 +33,7 @@ public class MockPlanNode extends AbstractPlanNode
     String m_tableName;
     String[] m_columnNames;
     boolean m_isOrderDeterministic = false;
+    boolean m_producesOneRowOnly = false;
 
     MockPlanNode(String tableName, String[] columnNames)
     {
@@ -89,6 +90,11 @@ public class MockPlanNode extends AbstractPlanNode
         return m_isOrderDeterministic;
     }
 
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        return false;
+    }
+
     /**
      * Write accessor for order determinism flag and optional description.
      * Also ensures consistency of content determinism flag (true -> true).
@@ -101,6 +107,10 @@ public class MockPlanNode extends AbstractPlanNode
         else {
             m_nondeterminismDetail = explanation;
         }
+    }
+
+    public void setProducesOneOutputRowOnly(boolean value) {
+        m_producesOneRowOnly = value;
     }
 
     @Override

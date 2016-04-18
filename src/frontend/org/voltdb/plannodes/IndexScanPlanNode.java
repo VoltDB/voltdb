@@ -299,6 +299,29 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return false;
     }
 
+    /**
+     * Evaluate if the index plan node will produce at most one output row. This is
+     * true if where clause uses equality equivalence filter on all unique constraints
+     * defined on that table. Logic in here for the evaluation is similar to how logic
+     * today evaluates if estimate output tuple is 1.
+     * @return true if the output if plan will generate at most one row
+     */
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        final double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+        final double keyWidth = getSearchExpressionKeyWidth(colCount);
+        final boolean columnIndex = m_catalogIndex.getExpressionsjson().isEmpty();  //
+
+        if(m_catalogIndex.getUnique() && columnIndex && (colCount == keyWidth) && (m_lookupType == IndexLookupType.EQ)) {
+            // Index scan with equality filter and all the unique index/keys defined on table
+            // included in search key expression will result in zero or one output tuple
+            // Eg Select * from T where A = ? AND B = ?;
+            // Where A and B are unique constraints defined on the table T
+            return true;
+        }
+        return false;
+    }
+
     private void setCatalogIndex(Index index)
     {
         m_catalogIndex = index;
@@ -540,12 +563,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super.resolveColumnIndexes();
     }
 
+    private double getSearchExpressionKeyWidth(final double colCount) {
+        double keyWidth = m_searchkeyExpressions.size();
+        assert(keyWidth <= colCount);
+        // count a range scan as a half covered column
+        if (keyWidth > 0.0 &&
+                m_lookupType != IndexLookupType.EQ &&
+                m_lookupType != IndexLookupType.GEO_CONTAINS) {
+            keyWidth -= 0.5;
+        }
+        else if (keyWidth == 0.0 && m_endExpression != null) {
+            // When there is no start key, count an end-key as a single-column range scan key.
+
+            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
+            // might give a result that is more in line with multi-component start-key-only scans.
+            keyWidth = 0.5;
+        }
+        return keyWidth;
+    }
+
     @Override
     public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-            Cluster unusedCluster,
-            Database unusedDb,
-            DatabaseEstimates estimates,
-            ScalarValueHints[] unusedParamHints) {
+                                     Cluster unusedCluster,
+                                     Database unusedDb,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -558,25 +600,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
-        // get the width of the index and number of columns used
+        // get the width of the index - number of columns or expression included in the index
         // need doubles for math
-        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
-        double keyWidth = m_searchkeyExpressions.size();
-        assert(keyWidth <= colCount);
-
-        // count a range scan as a half covered column
-        if (keyWidth > 0.0 &&
-                m_lookupType != IndexLookupType.EQ &&
-                m_lookupType != IndexLookupType.GEO_CONTAINS) {
-            keyWidth -= 0.5;
-        }
-        // When there is no start key, count an end-key as a single-column range scan key.
-        else if (keyWidth == 0.0 && m_endExpression != null) {
-            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
-            // might give a result that is more in line with multi-component start-key-only scans.
-            keyWidth = 0.5;
-        }
-
+        final double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+        final double keyWidth = getSearchExpressionKeyWidth(colCount);
 
         // Estimate the cost of the scan (AND each projection and sort thereafter).
         // This "tuplesToRead" is not strictly speaking an expected count of tuples.

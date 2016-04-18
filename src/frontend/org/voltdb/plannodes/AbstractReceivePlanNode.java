@@ -64,6 +64,11 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         return false;
     }
 
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        return false;
+    }
+
     /**
      * Accessor
      */

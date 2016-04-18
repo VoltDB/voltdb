@@ -466,4 +466,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return collected;
     }
 
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        return false;
+    }
+
 }
