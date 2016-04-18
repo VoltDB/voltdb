@@ -13,7 +13,7 @@
 # Process name ( For display )
 NAME=voltdeploy
 # Daemon name, where is the actual executable
-DAEMON=/home/sujeshakya/GitHubVoltdb1/voltdb_one/voltdb/bin/voltdeploy
+DAEMON=$VOLT_HOME/voltdeploy
 # pid file for the daemon
 PIDFILE=/var/run/voltdeploy.pid
 
