@@ -1300,6 +1300,48 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(1, g.size());
         assertEquals(ExpressionType.OPERATOR_CASE_WHEN, g.get(0).getExpressionType());
 
+        // Test three table full join
+        pn = compile("SELECT C FROM R1 FULL JOIN R2 USING (C) FULL JOIN R3 USING (C)");
+        pn = pn.getChild(0);
+        NodeSchema ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        SchemaColumn col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        AbstractExpression colExp = col.getExpression();
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, colExp.getExpressionType());
+        List<AbstractExpression> caseWhenExpr = colExp.findAllSubexpressionsOfType(ExpressionType.OPERATOR_CASE_WHEN);
+        assertEquals(2, caseWhenExpr.size());
+
+        // Test three table INNER join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 JOIN R2 USING (C) JOIN R3 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+        // Test two table LEFT join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 LEFT JOIN R2 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+        // Test two table RIGHT join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 RIGHT JOIN R2 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
     }
 
     @Override

@@ -433,4 +433,31 @@ public class VoltXMLElement {
 
         return true;
     }
+
+    /**
+     * Recursively extract sub elements of a given name with matching attribute if it is not null.
+     * @param elementName element name to look for
+     * @param attrName optional attribute name to look for
+     * @param attrValue optional attribute value to look for
+     * @return output collection containing the matching sub elements
+     */
+    public List<VoltXMLElement> extractSubElements(String elementName, String attrName, String attrValue) {
+        assert(elementName != null);
+        assert((elementName != null && attrValue != null) || attrName == null);
+        List<VoltXMLElement> elements = new ArrayList<>();
+        extractSubElements(elementName, attrName, attrValue, elements);
+        return elements;
+    }
+
+    private void extractSubElements(String elementName, String attrName, String attrValue, List<VoltXMLElement> elements) {
+        if (elementName.equalsIgnoreCase(name)) {
+            if (attrName == null || attrValue.equals(attributes.get(attrName))) {
+                elements.add(this);
+            }
+        }
+        for (VoltXMLElement child : children) {
+            child.extractSubElements(elementName, attrName, attrValue, elements);
+        }
+    }
+
 }

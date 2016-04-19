@@ -871,22 +871,6 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /**
-     * Extract operation elements of type operator_case_when from the input element.
-     * @param element
-     * @param cols - output collection containing the column references
-     */
-
-    static protected void extractUsingExpressionReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
-        if ("operation".equalsIgnoreCase(element.name) && element.hasValue("optype", "operator_case_when")) {
-            cols.add(element);
-        } else {
-            for (VoltXMLElement child : element.children) {
-                extractUsingExpressionReferences(child, cols);
-            }
-        }
-    }
-
-    /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
@@ -1288,8 +1272,7 @@ public abstract class StatementDMQL extends Statement {
         // Columns from USING expression in join are not qualified.
         // if join is INNER then the column from USING expression can be from any table
         // participating in join. In case of OUTER join, it must be the outer column
-        java.util.List<VoltXMLElement> exprCols = new java.util.ArrayList<VoltXMLElement>();
-        extractUsingExpressionReferences(query, exprCols);
+        List<VoltXMLElement> exprCols = query.extractSubElements("operation", "optype", "operator_case_when");
         resolveUsingExpressions(exprCols, select.rangeVariables);
 
         return query;
@@ -1306,11 +1289,9 @@ public abstract class StatementDMQL extends Statement {
      * 
      * @param elements list of expression columns to resolve
      */
-    static protected void resolveUsingExpressions(java.util.List<VoltXMLElement> elements, RangeVariable[] rvs)
+    static protected void resolveUsingExpressions(List<VoltXMLElement> elements, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
 
-        // Only one OUTER join for a whole select is supported so far
-        int index = 1;
         for (VoltXMLElement element : elements) {
             String table = null;
             String tableAlias = null;
@@ -1361,12 +1342,16 @@ public abstract class StatementDMQL extends Statement {
     }
 
     static private void collapseCoalesceExpression(VoltXMLElement element, String table, String tableAlias) {
-        assert(element.children.size() == 2);
-        VoltXMLElement altExpr = element.children.get(1);
-        assert(altExpr.hasValue("optype", "operator_alternative"));
-        for(VoltXMLElement columnref : altExpr.children) {
+        List<VoltXMLElement> exprCols = element.extractSubElements("columnref", null, null);
+
+        // Iterate over the columns looking for the first columnref expression that matches input table
+        // Once found, replace the input element 'in-place' with the matching columnref
+        for(VoltXMLElement columnref : exprCols) {
             if ((tableAlias != null && columnref.hasValue("tablealias", tableAlias)) ||
                     (table != null && columnref.hasValue("table", table))) {
+                element.children.clear();
+                element.attributes.clear();
+
                 element.name = "columnref";
                 if (table != null) {
                     element.withValue("table", table);
@@ -1386,7 +1371,6 @@ public abstract class StatementDMQL extends Statement {
                 if (id != null) {
                     element.withValue("id", id);
                 }
-                element.children.clear();
             }
         }
     }

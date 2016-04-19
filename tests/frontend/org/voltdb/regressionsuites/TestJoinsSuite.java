@@ -1445,6 +1445,9 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 8);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 8);");
 
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(6, 8);");
+
         sql = "SELECT MAX(R1.C), A FROM R1 FULL JOIN R2 USING (A) WHERE A > 0 GROUP BY A ORDER BY A";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
@@ -1458,7 +1461,7 @@ public class TestJoinsSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertEquals(1, StringUtils.countMatches(vt.toString(), "FULL"));
 
-        sql = "SELECT A FROM R1 FULL JOIN R2 USING (A) WHERE A > 0 ORDER BY A";
+        sql = "SELECT A FROM R1 FULL JOIN R2 USING (A) FULL JOIN R3 USING(A) WHERE A > 0 ORDER BY A";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
                 {1},
@@ -1466,8 +1469,12 @@ public class TestJoinsSuite extends RegressionSuite {
                 {2},
                 {3},
                 {4},
-                {5}
+                {5},
+                {6}
         });
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(2, StringUtils.countMatches(vt.toString(), "FULL"));
 
     }
 
