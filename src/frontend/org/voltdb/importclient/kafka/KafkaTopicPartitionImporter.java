@@ -53,10 +53,10 @@ import kafka.network.BlockingChannel;
 import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 /**
@@ -441,14 +441,20 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
-                    TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
-                            messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
-                            invocation);
-                    if (!callProcedure(invocation, cb)) {
-                        if (isDebugEnabled()) {
-                            debug(null, "Failed to process Invocation possibly bad data: " + line);
+                    try{
+                        Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
+                        TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
+                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
+                                invocation);
+                        if (!callProcedure(invocation, cb)) {
+                            if (isDebugEnabled()) {
+                                debug(null, "Failed to process Invocation possibly bad data: " + line);
+                            }
+                            m_gapTracker.commit(currentOffset);
                         }
+                    }catch(FormatException e){
+                        rateLimitedLog(Level.ERROR, e, "Failed to tranform data: " + line);
+                        messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);
                     }
                     submitCount++;
@@ -593,26 +599,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
             }
             return c;
-        }
-    }
-
-    public class KafkaStreamImporterException extends ImportBaseException {
-        private static final long serialVersionUID = 7668280657393399984L;
-
-        public KafkaStreamImporterException() {
-        }
-
-        public KafkaStreamImporterException(String format, Object... args) {
-            super(format, args);
-        }
-
-        public KafkaStreamImporterException(Throwable cause) {
-            super(cause);
-        }
-
-        public KafkaStreamImporterException(String format, Throwable cause,
-                Object... args) {
-            super(format, cause, args);
         }
     }
 
