@@ -55,7 +55,7 @@ def collect(runner):
         sys.exit(-1)
 
     os.environ["PATH"] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join("voltdb", "bin") in s)
-    if os.path.isdir(runner.opts.voltdbroot) and os.access(runner.opts.voltdbroot, os.W_OK):
+    if os.path.isdir(runner.opts.voltdbroot) and os.access(runner.opts.voltdbroot, os.R_OK|os.W_OK|os.X_OK):
         checkFD = os.open(os.path.join(runner.opts.voltdbroot, "systemcheck"), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
         checkOutput = os.fdopen(checkFD, 'w')
         subprocess.call("voltdb check", stdout=checkOutput, shell=True)
