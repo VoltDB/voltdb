@@ -1,6 +1,6 @@
 # Configure Logging
 
-VoltDB uses Log4j for logging. The default configuration sends a subset of log messages to the console, while sending a much more detailed set of logging to a file named `voltdb.log` in the `log` the directory where you started VoltDB.
+VoltDB uses Log4j for logging. The default configuration sends a subset of log messages to the console, while sending a much more detailed set of logging to a file named `voltdb.log` in the `log` directory where you started VoltDB.
 
 Relevant Documentation
 -----------------------------------------
