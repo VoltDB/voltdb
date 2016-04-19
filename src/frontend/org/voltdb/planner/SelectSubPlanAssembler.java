@@ -223,8 +223,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // Don't throw a planning error here, in case the problem is just with this
                     // particular join order, but do leave a hint to the PlanAssembler in case
                     // the failure is unanimous -- a common case.
-                    m_recentErrorMsg =
-                        "Join of multiple partitioned tables has insufficient join criteria.";
+                    m_recentErrorMsg = m_partitioning.getJoinInvalidReason();
                     // This join order, at least, is not worth trying to plan.
                     continue;
                 }

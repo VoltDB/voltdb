@@ -256,7 +256,8 @@ public abstract class AdHocQueryTester extends TestCase {
         try {
             runQueryTest(String.format("SELECT * FROM PARTED1 A LEFT JOIN PARTED2 B ON A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
         } catch (Exception pce) {
-            assertTrue(pce.toString().contains("insufficient join criteria"));
+            String msg = pce.toString();
+            assertTrue(msg.contains("This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition."));
         }
 
         // spPartialCount = runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
