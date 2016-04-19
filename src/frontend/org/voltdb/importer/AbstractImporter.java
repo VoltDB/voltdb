@@ -19,7 +19,6 @@ package org.voltdb.importer;
 
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.InternalConnectionContext;
