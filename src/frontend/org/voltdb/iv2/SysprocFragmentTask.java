@@ -198,11 +198,19 @@ public class SysprocFragmentTask extends TransactionTask
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
+                }
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
+                }
                 break;
             }
             catch (final SpecifiedException e) {
@@ -215,11 +223,19 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
+                }
             }
             catch (final VoltAbortException e) {
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         new SerializableException(CoreUtils.throwableToString(e)));
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0), m_dummyResultTable);
+                }
                 break;
             }
         }

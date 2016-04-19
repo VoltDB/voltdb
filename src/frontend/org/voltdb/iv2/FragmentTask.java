@@ -213,8 +213,7 @@ public class FragmentTask extends TransactionTask
 
         if (m_fragmentMsg.isEmptyForRestart()) {
             int outputDepId = m_fragmentMsg.getOutputDepId(0);
-            currentFragResponse.addDependency(outputDepId,
-                    new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+            currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
             return currentFragResponse;
         }
 
@@ -282,15 +281,27 @@ public class FragmentTask extends TransactionTask
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
+                }
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
+                }
                 break;
             }
             catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId, m_dummyResultTable);
+                }
                 break;
             }
             finally {
