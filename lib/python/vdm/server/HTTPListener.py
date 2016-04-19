@@ -75,7 +75,7 @@ def receive_signal(signum, stack):
 
     config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
     Configuration.convert_xml_to_json(config_path)
-    thread.start_new(sync_configuration)
+    thread.start_new(sync_configuration, ())
     # print 'Received:', signum
 
 signal.signal(signal.SIGHUP, receive_signal)
