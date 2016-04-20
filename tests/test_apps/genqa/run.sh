@@ -251,7 +251,8 @@ function async-export() {
         --autotune=false \
         --catalogswap=false \
         --latencytarget=10 \
-        --ratelimit=500
+        --ratelimit=500 \
+        --timeout=300
 }
 
 # Multi-threaded synchronous benchmark sample
