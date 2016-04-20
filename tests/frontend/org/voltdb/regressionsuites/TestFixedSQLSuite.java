@@ -1993,7 +1993,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, "TRANSACTION");
     }
 
-    private void subTestENG7349_InnerJoinWithOverflow() throws IOException, ProcCallException {
+    private void subTestENG7349_InnerJoinWithOverflow() throws Exception {
         // In this bug, ENG-7349, we would fail an erroneous assertion
         // in the EE that we must have more than one active index key when
         // joining with a multi-component index.
@@ -2483,7 +2483,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    private void subTestENG9032() throws IOException, ProcCallException {
+    private void subTestENG9032() throws Exception {
         System.out.println("test subTestENG9032...");
         Client client = getClient();
         String sql;
@@ -2567,7 +2567,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[]{"T1", "T2", "T3", "T3_NO_INDEX"});
     }
 
-    private void subTestENG9533() throws IOException, ProcCallException {
+    private void subTestENG9533() throws Exception {
         System.out.println("test subTestENG9533 outerjoin with OR pred...");
         Client client = getClient();
         String insStmts[] = {
