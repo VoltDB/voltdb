@@ -137,7 +137,7 @@ Then, we delete all rows with timestamps at least as old as the retrieved timest
     WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30)
     AND update_ts <= ?;`
 
-This will always delete oldest tuples first, and it will always delete an identical set of tuples. Note that it might delete more than 1000 tuples if the 1000th oldest timstamp is non-unique. In the worst case, this will delete all rows if all timestamps are identical. The alternative is to use strictly less than when comparing candidates to the 1000th oldest timstamp. That might delete 0 rows in the worst case. In this example we err on the side of making progress and consider millions of duplicate timestamps to be an outlier case.
+This will always delete oldest tuples first, and it will always delete an identical set of tuples. Note that it might delete more than 1000 tuples if the 1000th oldest timestamp is non-unique. In the worst case, this will delete all rows if all timestamps are identical. The alternative is to use strictly less than when comparing candidates to the 1000th oldest timestamp. That might delete 0 rows in the worst case. In this example we err on the side of making progress and consider millions of duplicate timestamps to be an outlier case.
 
 So if you look at the provided *DeleteAfterDate* procedure, you will see essentially this code, though the logic is a bit more complex and there is additional error code.
 
