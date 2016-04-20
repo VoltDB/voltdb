@@ -446,13 +446,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                                 invocation);
-                        if (!callProcedure(invocation, cb)) {
-                            if (isDebugEnabled()) {
-                                debug(null, "Failed to process Invocation possibly bad data: " + line);
-                            }
-                            m_gapTracker.commit(currentOffset);
-                        }
-                    }catch(FormatException e){
+                         if (!callProcedure(invocation, cb)) {
+                              if (isDebugEnabled()) {
+                                 debug(null, "Failed to process Invocation possibly bad data: " + line);
+                               }
+                               m_gapTracker.commit(currentOffset);
+                         }
+                     }catch(FormatException e){
                         rateLimitedLog(Level.ERROR, e, "Failed to tranform data: " + line);
                         messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);

@@ -91,16 +91,16 @@ public class PullSocketImporter extends AbstractImporter {
                 BufferedReader br = reader.get();
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
-                    try{
-                    Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(csv));
-                    if (!callProcedure(invocation)) {
-                        if (isDebugEnabled()) {
-                            debug(null, "Failed to process Invocation possibly bad data: " + csv);
-                        }
-                    }
-                    }catch(FormatException e){
-                        rateLimitedLog(Level.ERROR, e, "Fail to transform data:"+ csv);
-                    }
+                     try{
+                        Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(csv));
+                        if (!callProcedure(invocation)) {
+                            if (isDebugEnabled()) {
+                                 debug(null, "Failed to process Invocation possibly bad data: " + csv);
+                            }
+                         }
+                      }catch(FormatException e){
+                         rateLimitedLog(Level.ERROR, e, "Fail to transform data:"+ csv);
+                      }
                 }
                 if (csv == null) {
                     warn(null, m_config.getResourceID() + " peer terminated stream");
