@@ -58,7 +58,7 @@ This application performs high velocity transaction processing for metro cards. 
 
 NBBO is the National Best Bid and Offer, defined as the lowest available ask price and highest available bid price across the participating markets for a given security.  Brokers should route trade orders to the market with the best price, and by law must guarantee customers the best available price.
 
-The example includes a web dashboard that shows the real-time NBBO for a security and the latest avaialble prices from each exchange. 
+The example includes a web dashboard that shows the real-time NBBO for a security and the latest available prices from each exchange. 
 
 ### positionkeeper ###
 
