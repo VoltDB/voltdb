@@ -20,7 +20,7 @@ To switch between versions, change the source of AsyncBenchmark.java around line
 
 Benefits of ACID Consistency
 ----------
-In the default mode, where the app is using HyperLogLog to estimate counts, the system uses VoltDB's strong consistency to transacitonally store the integer estimate value in the table, along with the blob representing the HLL data structure. This model of transactionally reading, processing and updating is something VoltDB excels at. Because the estimate value is always 100% current and easily accessible via SQL queries, using the data is easier, and the complexity of the HLL algorithm is limited to a single piece of stored logic. In fact, whether the processing is using HLL, exact counts or a hybrid mode can be abstracted away from any clients consuming the data.
+In the default mode, where the app is using HyperLogLog to estimate counts, the system uses VoltDB's strong consistency to transactionally store the integer estimate value in the table, along with the blob representing the HLL data structure. This model of transactionally reading, processing and updating is something VoltDB excels at. Because the estimate value is always 100% current and easily accessible via SQL queries, using the data is easier, and the complexity of the HLL algorithm is limited to a single piece of stored logic. In fact, whether the processing is using HLL, exact counts or a hybrid mode can be abstracted away from any clients consuming the data.
 
 ACID consistency is also key to the simplicity of the hybrid estimate code. Without a transactional handoff between the exact count and the estimated values, it's much harder to claim the exact values are actually exact under the conditions promised.
 
