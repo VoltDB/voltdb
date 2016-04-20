@@ -28,6 +28,7 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 /**
@@ -113,10 +114,14 @@ public class ServerSocketImporter extends AbstractImporter {
                     String line = in.readLine();
                     //You should convert your data to params here.
                     if (line == null) continue;
-                    Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
-                    if (!callProcedure(invocation)) {
-                        rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
-                    }
+                    try{
+                        Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
+                        if (!callProcedure(invocation)) {
+                            rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
+                        }
+                   }catch(FormatException e){
+                       rateLimitedLog(Level.ERROR, e, "Failed to tranform data: " + line);
+                  }
                 }
             } catch (IOException ioe) {
                 error(ioe, "IO exception reading from client socket connection in socket importer");
