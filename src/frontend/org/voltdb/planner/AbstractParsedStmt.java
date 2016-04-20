@@ -1807,4 +1807,81 @@ public abstract class AbstractParsedStmt {
     public boolean isContentDetermistic() {
         return m_contentDeterminismMessage != null;
     }
+
+    // Functional evaluates whether the statement will result in at most
+    // one output tuple. This is implemented for single table by checking
+    // value equivalence of predicates in where clause and using information
+    // if all defined unique indexes are in value equivalence set
+    protected boolean producesOneRowOuputUsingValueEquivalence () {
+        if (m_tableAliasMap.size() != 1) {
+            return false;
+        }
+
+        // Get the table.  There's only one.
+        StmtTableScan scan = m_tableAliasMap.values().iterator().next();
+        Table table = getTableFromDB(scan.getTableName());
+        // May be sub-query? If can't find the table there's no use to continue.
+        if (table == null) {
+            return false;
+        }
+
+        // Get all the indexes defined on the table
+        CatalogMap<Index> indexes = table.getIndexes();
+        if (indexes == null || indexes.size() == 0) {
+            // no indexes defined on the table
+            return false;
+        }
+
+        // Collect value equivalence expression for the SQL statement
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+
+        // If no value equivalence filter defined in SQL statement,
+        // there's no use to continue
+        if (valueEquivalence == null || valueEquivalence.isEmpty()) {
+            return false;
+        }
+
+        // Collect all tve keys from value equivalence exp which have equivalence
+        // defined to parameterized or constant value expression.
+        // Eg: T.A = ? or T.A = 1
+        Set <AbstractExpression> parameterizedConstantKeys = new HashSet<AbstractExpression>();
+        Set<AbstractExpression> valueEquivalenceKeys = valueEquivalence.keySet();   // get all the keys
+        for (AbstractExpression key : valueEquivalenceKeys) {
+            if (key instanceof TupleValueExpression) {
+                Set<AbstractExpression> values = valueEquivalence.get(key);
+                for (AbstractExpression value : values) {
+                    if ((value instanceof ParameterValueExpression) ||
+                        (value instanceof ConstantValueExpression)) {
+                        TupleValueExpression tve = (TupleValueExpression) key;
+                        parameterizedConstantKeys.add(tve);
+                    }
+                }
+            }
+        }
+
+        // Iterate over the unique indexes defined on the table to check in the
+        // unique index defined on table appears in list of equivalence expr above
+        for (Index index : indexes) {
+            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
+            // Fetch pure column indices which are unique
+            if (index != null && index.getUnique() && index.getExpressionsjson().isEmpty()) {
+                CatalogMap<ColumnRef> indexColRefs = index.getColumns();
+                for (ColumnRef indexColRef:indexColRefs) {
+                    Column col = indexColRef.getColumn();
+                    TupleValueExpression tve = new TupleValueExpression(scan.getTableName(),
+                                                                        scan.getTableAlias(),
+                                                                        col.getName(),
+                                                                        col.getName(),
+                                                                        col.getIndex());
+                    indexExpressions.add(tve);
+                }
+            }
+
+            if (!indexExpressions.isEmpty() && parameterizedConstantKeys.containsAll(indexExpressions)) {
+                return true;
+            }
+
+        }
+        return false;
+    }
 }

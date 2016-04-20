@@ -26,8 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.UUID;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -37,8 +35,10 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PopulateTruncateTable;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
+
+import junit.framework.Test;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
     // procedures used by these tests
@@ -836,7 +836,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Fails determinism check
         String stmt = "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
-                + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20";
+                + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE > 20";
         verifyStmtFails(client, stmt,
                         "Since the table being inserted into has a row limit "
                         + "trigger, the SELECT output must be ordered.");
@@ -850,24 +850,24 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // the existing rows.
         String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
         VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 21, 40}});
+        validateTableOfLongs(vt, new long[][] {{1, 31, 60}});
 
         // Now let's try to do an upsert where the outcome relies both
         // on doing an update, doing an insert and also triggering a delete.
 
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 41, 81);
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 61, 121);
-        // Table now contains rows 21, 41, 61.
+        // Table now contains rows 31, 41, 61.
 
         // Upsert with select producing
-        //   0, 21, 42  -- update, and make the row un-purge-able
+        //   0, 31, 62  -- update, and make the row un-purge-able
         //   1, 42, 82  -- insert, will delete all rows except the first
         //   1, 62, 122 -- insert
         validateTableOfScalarLongs(client,
                         "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
                         + "SELECT "
-                        + "  case when wage = 21 then 0 else 1 end, "
-                        + "  case wage when 21 then wage else wage + 1 end, "
+                        + "  case when wage = 31 then 0 else 1 end, "
+                        + "  case wage when 31 then wage else wage + 1 end, "
                         + "  wage * 2 "
                         + "from CAPPED3_LIMIT_ROWS_EXEC "
                         + "ORDER BY 1, 2, 3",
@@ -875,7 +875,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
         validateTableOfLongs(vt, new long[][] {
-                {0, 21, 42},
+                {0, 31, 62},
                 {1, 42, 82},
                 {1, 62, 122}
         });
