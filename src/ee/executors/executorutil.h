@@ -51,6 +51,7 @@
 #include "storage/temptable.h"
 
 #include <cstddef> // for NULL !
+#include <cassert>
 
 namespace voltdb {
 
@@ -59,7 +60,6 @@ namespace voltdb {
 struct CountingPostfilter {
     static const int NO_LIMIT = -1;
     static const int NO_OFFSET = -1;
-    static const int LIMIT = NO_LIMIT + 1;
 
     // A CountingPostfilter is not fully initialized by its default constructor.
     // It should be re-initialized before use via assignment from a properly initialized CountingPostfilter.

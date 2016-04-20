@@ -386,6 +386,19 @@ public abstract class ExpressionUtil {
         } else if (exprType == ExpressionType.OPERATOR_IS_NULL) {
             // IS NOT NULL is NULL rejecting -- IS NULL is not
             return false;
+        } else if (expr.hasAnySubexpressionOfType(ExpressionType.OPERATOR_ALTERNATIVE)) {
+            // COALESCE expression is a sub-expression
+            // For example, COALESCE (C1, C2) > 0
+            List<AbstractExpression> coalesceExprs = expr.findAllSubexpressionsOfType(ExpressionType.OPERATOR_ALTERNATIVE);
+            for (AbstractExpression coalesceExpr : coalesceExprs) {
+                if (containsMatchingTVE(coalesceExpr, tableAlias)) {
+                    // This table is part of the COALESCE expression - not NULL - rejecting
+                    return false;
+                }
+            }
+            // If we get there it means that the tableAlias is not part of any of COALESCE expression
+            // still need to check the catch all case
+            return containsMatchingTVE(expr, tableAlias);
         } else {
             // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
             // it contains a TVE with the matching table name then it is NULL rejection expression?
