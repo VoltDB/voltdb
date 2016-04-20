@@ -532,11 +532,11 @@ public class AsyncExportClient
     public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
         waitForStreamedAllocatedMemoryZero(client,300);
     }
-    
+
     public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
         boolean passed = false;
         Instant maxTime = Instant.now().plusSeconds(timeout);
-        
+
         VoltTable stats = null;
         try {
             System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
@@ -544,7 +544,8 @@ public class AsyncExportClient
         }
         while (true) {
             if ( Instant.now().isAfter(maxTime) ) {
-                throw new Exception("Test Timeout waiting for non-null Statistics" );
+                throw new Exception("Test Timeout waiting for non-null @Statistics call, "
+                + "increase --timeout arg for slower tests" );
             }
             try {
                 stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
@@ -557,7 +558,8 @@ public class AsyncExportClient
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 if ( Instant.now().isAfter(maxTime) ) {
-                    throw new Exception("Test Timeout expecting non-zero TUPLE_ALLOCATED_MEMORY" );
+                    throw new Exception("Test Timeout expecting non-zero TUPLE_ALLOCATED_MEMORY Statistic, "
+                    + "increase --timeout arg for slower clients" );
                 }
                 String ttype = stats.getString("TABLE_TYPE");
                 if (ttype.equals("StreamedTable")) {
