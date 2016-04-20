@@ -152,4 +152,19 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
 
         return true;
     }
+
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        assert(m_children != null);
+        assert(m_children.size() == 1);
+
+        // This implementation is very close to AbstractPlanNode's implementation of this
+        // method, except that we assert just one child.
+        AbstractPlanNode child = m_children.get(0);
+        if (! child.isOrderDeterministic()) {
+            m_nondeterminismDetail = child.m_nondeterminismDetail;
+            return false;
+        }
+        return true;
+    }
 }

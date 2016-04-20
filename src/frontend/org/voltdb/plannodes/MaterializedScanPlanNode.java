@@ -95,6 +95,11 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
+    public boolean producesOneOutputRowOnly() {
+        return false;
+    }
+
+    @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // assume constant cost. Most of the cost of the SQL-IN will be measured by the NLIJ that is always paired with this element
         m_estimatedProcessedTupleCount = 1;

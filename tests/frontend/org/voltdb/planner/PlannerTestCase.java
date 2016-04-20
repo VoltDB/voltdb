@@ -95,7 +95,42 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
-    final int paramCount = 0;
+    /**
+     *  Fetch compiled planned based on provided partitioning information.
+     * @param sql: SQL statement
+     * @param inferPartitioning: Flag to indicate whether to use infer or forced partitioning when
+     *                           generating plan.
+     *                           True for infer partitioning info, false for forced partitioning
+     * @param forcedSP: Flag to indicate whether to generate plan for forced Single or Multi-partition
+     *                  If inferPartitioing flag is set to true, this flag is ignored
+     * @param detMode: Specifies determinism mode - Faster or Safer
+     * @return: Compiled plan based on specified input parameters
+     */
+
+    protected CompiledPlan compileAdHocPlan(String sql,
+                                            boolean inferPartitioning,
+                                            boolean forcedSP,
+                                            DeterminismMode detMode) {
+        CompiledPlan cp = null;
+        try {
+            cp = m_aide.compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
+            assertTrue(cp != null);
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+            fail();
+        }
+        return cp;
+    }
+
+    protected CompiledPlan compileAdHocPlan(String sql,
+                                            boolean inferPartitioning,
+                                            boolean forcedSP) {
+        return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
+    }
+
+
+    final int m_defaultParamCount = 0;
     String noJoinOrder = null;
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
@@ -157,7 +192,7 @@ public class PlannerTestCase extends TestCase {
 
     protected void compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
     {
-        compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
+        compileWithJoinOrderToFragments(sql, m_defaultParamCount, m_byDefaultPlanForSinglePartition, joinOrder);
     }
 
 

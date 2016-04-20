@@ -66,6 +66,16 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     @Override
     public abstract boolean isOrderDeterministic();
 
+    @Override
+    public boolean producesOneOutputRowOnly() {
+        // This function is not fully implemented for functional operation
+        // for update and delete at present, so it returns false for them.
+        // Insert operation can have a select statement, which can have result in
+        // index scan plan node. So for insert plan implementation is similar
+        // to AbstractPlanNode.
+        return false;
+    }
+
     /**
      * @return the target_table_name
      */

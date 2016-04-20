@@ -211,6 +211,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
+    public boolean producesOneOutputRowOnly() {
+        return false;
+    }
+
+    @Override
     public boolean hasInlinedIndexScanOfTable(String tableName) {
         IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(index_scan != null);
