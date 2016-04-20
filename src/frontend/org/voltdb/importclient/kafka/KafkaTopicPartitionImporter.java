@@ -452,8 +452,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                                }
                                m_gapTracker.commit(currentOffset);
                          }
-                     }catch(FormatException e){
-                        rateLimitedLog(Level.ERROR, e, "Failed to tranform data: " + line);
+                     } catch (FormatException e){
+                        rateLimitedLog(Level.ERROR, e, "Failed to tranform data: %s" ,line);
                         messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);
                     }

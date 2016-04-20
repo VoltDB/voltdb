@@ -119,8 +119,8 @@ public class ServerSocketImporter extends AbstractImporter {
                         if (!callProcedure(invocation)) {
                             rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                         }
-                   }catch(FormatException e){
-                       rateLimitedLog(Level.ERROR, e, "Failed to tranform data: " + line);
+                   } catch (FormatException e){
+                       rateLimitedLog(Level.ERROR, e, "Failed to tranform data: %s" ,line);
                   }
                 }
             } catch (IOException ioe) {

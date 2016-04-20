@@ -98,8 +98,8 @@ public class PullSocketImporter extends AbstractImporter {
                                  debug(null, "Failed to process Invocation possibly bad data: " + csv);
                             }
                          }
-                      }catch(FormatException e){
-                         rateLimitedLog(Level.ERROR, e, "Fail to transform data:"+ csv);
+                      } catch (FormatException e){
+                          rateLimitedLog(Level.ERROR, e, "Failed to tranform data: %s" ,csv);;
                       }
                 }
                 if (csv == null) {
