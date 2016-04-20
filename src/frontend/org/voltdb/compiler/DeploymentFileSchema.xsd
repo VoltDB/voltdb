@@ -379,7 +379,6 @@
       <xs:enumeration value="http"/>
       <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="elasticsearch"/>
-      <xs:enumeration value="kinesisfirehose"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

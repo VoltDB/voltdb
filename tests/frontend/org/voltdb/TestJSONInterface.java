@@ -2006,7 +2006,6 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jobj.getString("types").contains("KAFKA"));
             assertTrue(jobj.getString("types").contains("HTTP"));
             assertTrue(jobj.getString("types").contains("RABBITMQ"));
-            assertTrue(jobj.getString("types").contains("KINESISFIREHOSE"));
             assertTrue(jobj.getString("types").contains("CUSTOM"));
         } finally {
             if (server != null) {
