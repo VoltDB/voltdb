@@ -132,22 +132,19 @@ public class PlannerTestCase extends TestCase {
     }
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileToFragments(String sql)
-    {
+    protected List<AbstractPlanNode> compileToFragments(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
     }
 
-    protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql)
-    {
+    protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
     }
 
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, String joinOrder)
-    {
+    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, String joinOrder) {
         boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, joinOrder);
     }
@@ -155,8 +152,7 @@ public class PlannerTestCase extends TestCase {
     /** A helper here where the junit test can assert success */
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
                                                                    boolean planForSinglePartition,
-                                                                   String joinOrder)
-    {
+                                                                   String joinOrder) {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
@@ -165,8 +161,7 @@ public class PlannerTestCase extends TestCase {
     /** A helper here where the junit test can assert success */
     private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
                                                                    boolean planForSinglePartition,
-                                                                   String joinOrder)
-    {
+                                                                   String joinOrder) {
         List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
@@ -177,8 +172,7 @@ public class PlannerTestCase extends TestCase {
         return pn;
     }
 
-    protected AbstractPlanNode compileSPWithJoinOrder(String sql, String joinOrder)
-    {
+    protected AbstractPlanNode compileSPWithJoinOrder(String sql, String joinOrder) {
         try {
             return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
         }
@@ -189,30 +183,27 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
-    protected void compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
-    {
+    protected void compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception {
         compileWithJoinOrderToFragments(sql, m_defaultParamCount, m_byDefaultPlanForSinglePartition, joinOrder);
     }
 
 
-    private AbstractPlanNode compileWithCountedParamsAndJoinOrder(String sql, String joinOrder) throws Exception
-    {
+    private AbstractPlanNode compileWithCountedParamsAndJoinOrder(String sql,
+                                                                  String joinOrder) throws Exception {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         return compileSPWithJoinOrder(sql, paramCount, joinOrder);
     }
 
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compile(String sql)
-    {
+    protected AbstractPlanNode compile(String sql) {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         return compileSPWithJoinOrder(sql, paramCount, null);
     }
 
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compileForSinglePartition(String sql)
-    {
+    protected AbstractPlanNode compileForSinglePartition(String sql) {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
         int paramCount = StringUtils.countMatches(sql, "?");
         boolean m_infer = m_byDefaultInferPartitioning;
@@ -227,8 +218,9 @@ public class PlannerTestCase extends TestCase {
     }
 
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compileSPWithJoinOrder(String sql, int paramCount, String joinOrder)
-    {
+    protected AbstractPlanNode compileSPWithJoinOrder(String sql,
+                                                      int paramCount,
+                                                      String joinOrder) {
         List<AbstractPlanNode> pns = null;
         try {
             pns = compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
@@ -258,14 +250,13 @@ public class PlannerTestCase extends TestCase {
 
 
     protected void setupSchema(URL ddlURL, String basename,
-                               boolean planForSinglePartition) throws Exception
-    {
+                               boolean planForSinglePartition) throws Exception {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
         m_byDefaultPlanForSinglePartition = planForSinglePartition;
     }
 
-    protected void setupSchema(boolean inferPartitioning, URL ddlURL, String basename) throws Exception
-    {
+    protected void setupSchema(boolean inferPartitioning, URL ddlURL,
+                               String basename) throws Exception {
         m_byDefaultInferPartitioning = inferPartitioning;
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
     }
