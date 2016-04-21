@@ -96,12 +96,12 @@ public class PlannerTestCase extends TestCase {
     }
 
     /**
-     *  Fetch compiled planned based on provided partitioning information.
+     * Fetch compiled planned based on provided partitioning information.
      * @param sql: SQL statement
-     * @param inferPartitioning: Flag to indicate whether to use infer or forced partitioning when
-     *                           generating plan.
-     *                           True for infer partitioning info, false for forced partitioning
-     * @param forcedSP: Flag to indicate whether to generate plan for forced Single or Multi-partition
+     * @param inferPartitioning: Flag to indicate whether to use infer or forced partitioning
+     *                           when generating plan. True to use infer partitioning info,
+     *                           false for forced partitioning
+     * @param forcedSP: Flag to indicate whether to generate plan for forced SP or MP.
      *                  If inferPartitioing flag is set to true, this flag is ignored
      * @param detMode: Specifies determinism mode - Faster or Safer
      * @return: Compiled plan based on specified input parameters

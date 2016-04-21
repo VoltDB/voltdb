@@ -1818,7 +1818,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return true;
         }
 
-        return producesOneRowOuputUsingValueEquivalence();
+        return producesOneRowOutput();
     }
 
     private boolean hasTopLevelScans() {

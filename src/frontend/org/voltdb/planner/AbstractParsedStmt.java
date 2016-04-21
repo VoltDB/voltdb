@@ -1808,11 +1808,13 @@ public abstract class AbstractParsedStmt {
         return m_contentDeterminismMessage != null;
     }
 
-    // Functional evaluates whether the statement will result in at most
-    // one output tuple. This is implemented for single table by checking
-    // value equivalence of predicates in where clause and using information
-    // if all defined unique indexes are in value equivalence set
-    protected boolean producesOneRowOuputUsingValueEquivalence () {
+    // Function evaluates whether the statement results in at most
+    // one output row. This is implemented for single table by checking
+    // value equivalence of predicates in where clause and checking
+    // if all defined unique indexes are in value equivalence set.
+    // Returns true if the statement results is at most one output
+    // row else false
+    protected boolean producesOneRowOutput () {
         if (m_tableAliasMap.size() != 1) {
             return false;
         }
@@ -1835,13 +1837,12 @@ public abstract class AbstractParsedStmt {
         // Collect value equivalence expression for the SQL statement
         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
 
-        // If no value equivalence filter defined in SQL statement,
-        // there's no use to continue
+        // If no value equivalence filter defined in SQL statement, there's no use to continue
         if (valueEquivalence == null || valueEquivalence.isEmpty()) {
             return false;
         }
 
-        // Collect all tve keys from value equivalence exp which have equivalence
+        // Collect all tve expressions from value equivalence set which have equivalence
         // defined to parameterized or constant value expression.
         // Eg: T.A = ? or T.A = 1
         Set <AbstractExpression> parameterizedConstantKeys = new HashSet<AbstractExpression>();
@@ -1859,8 +1860,8 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        // Iterate over the unique indexes defined on the table to check in the
-        // unique index defined on table appears in list of equivalence expr above
+        // Iterate over the unique indexes defined on the table to check if the unique
+        // index defined on table appears in tve equivalence expression gathered above.
         for (Index index : indexes) {
             Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
             // Fetch pure column indices which are unique
@@ -1876,11 +1877,9 @@ public abstract class AbstractParsedStmt {
                     indexExpressions.add(tve);
                 }
             }
-
             if (!indexExpressions.isEmpty() && parameterizedConstantKeys.containsAll(indexExpressions)) {
                 return true;
             }
-
         }
         return false;
     }

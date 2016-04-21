@@ -130,8 +130,6 @@ create table ppkcombo (
   z bigint not null,
   PRIMARY KEY (a, b ,c)
 );
-
-create unique index pcover3_ppkCombo on ppkcombo (a, c, z);
---create unique index pcover2_ppkCombo on ppkcombo (a, c);
+create unique index pcover2_ppkCombo on ppkcombo (a, z);
 partition table ppkcombo on column a;
 

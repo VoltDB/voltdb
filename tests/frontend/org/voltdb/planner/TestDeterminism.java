@@ -612,7 +612,7 @@ public class TestDeterminism extends PlannerTestCase {
                                       DeterminismMode.FASTER);
     }
 
-    public void testDeterminismOfUniqueConstraintEquivalence() {
+    public void testDeterminismForUniqueConstraintEquivalence() {
         String sql;
 
         // equivalence filter in predicate clause using unique key with display list with
@@ -636,12 +636,16 @@ public class TestDeterminism extends PlannerTestCase {
 
         // predicate containing value-equivalence through transitive behavior that form unique
         // index on table
-        sql = "select c, z from ppkcombo where a = ? AND A = B AND c = B;";
+        sql = "select c, z from ppkcombo where a = ? AND a = b AND c = B;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        sql = "select * from ppkcombo where a = ? AND z = a;";
         assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.FASTER);
         assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, true, DeterminismMode.SAFER);
 
         // predicate clause has equivalence filter but not value-equivalence
-        sql = "select c, z from ppkcombo where A = B AND C = B;";
+        sql = "select c, z from ppkcombo where a = b AND c = b;";
         assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
 
         // query does not guarantee determinism if not all columns that form
@@ -651,12 +655,12 @@ public class TestDeterminism extends PlannerTestCase {
 
         // predicate clause including all columns of compound key with
         // OR operator, does not guarantee single row output
-        sql = "select c, z from ppkcombo where a = 1 OR B = ? AND c = 3;";
+        sql = "select c, z from ppkcombo where a = 1 OR b = ? AND c = 3;";
         assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
 
         // predicate clause including all columns of composite keys of composite but not
         // value equivalence
-        sql = "select c, z from ppkcombo where a > 1 AND B = ? AND c = 3;";
+        sql = "select c, z from ppkcombo where a > 1 AND b = ? AND c = 3;";
         assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.FASTER);
 
         // non-equivalence filter on unique filter does not guarantee
@@ -682,10 +686,7 @@ public class TestDeterminism extends PlannerTestCase {
      */
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,
             boolean forcePartitioning, DeterminismMode detMode) {
-        // Partitioning can be forced or inferred. If inferred, force
-        // partitioning is irrelevant
-        // If inferred is set to false, use forced MP by setting forceSP to
-        // false
+
         boolean inferPartitioning = true; // by default, use the in
         boolean forceSP = false;
         if (forcePartitioning) {

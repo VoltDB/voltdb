@@ -545,8 +545,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(keyWidth <= colCount);
         // count a range scan as a half covered column
         if (keyWidth > 0.0 &&
-                m_lookupType != IndexLookupType.EQ &&
-                m_lookupType != IndexLookupType.GEO_CONTAINS) {
+            m_lookupType != IndexLookupType.EQ &&
+            m_lookupType != IndexLookupType.GEO_CONTAINS) {
             keyWidth -= 0.5;
         }
         else if (keyWidth == 0.0 && m_endExpression != null) {
