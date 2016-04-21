@@ -8,7 +8,7 @@ We believe that no other system on the planet performs as well under contention 
 
 Note that the update is a read, increment, write operation, where the increment is between 0 and 4 (inclusive). This is slightly more difficult than a increment-by-one operation common to many counters.
 
-It's also the smallest example we have, for what it's worth.
+It's also the smallest example we have, for what it's worth!
 
 
 Variations to Try
@@ -24,7 +24,7 @@ A more complex version of this app might populate the base table with billions o
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It is very readable and when executed, shows what is precisely being run to accomplish a given task..
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
 2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
@@ -49,7 +49,7 @@ If you change the client or procedure Java code, you must recompile the jars by 
 
 Client Behavior Options
 ---------------------------
-You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
+You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
 
 **Speed & Duration:**
 
