@@ -57,7 +57,7 @@ If you change the client or procedure Java code, you must recompile the jars by 
 
 Client Behavior Options
 ---------------------------
-You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
+You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
 
 **Speed & Duration:**
 
