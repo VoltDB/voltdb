@@ -11,7 +11,7 @@ Optionally, the project can export data using the HTTP connector. There's a simp
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to build and run the Java clients. The script is readable and when run, shows what commands are being executed to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
 2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
