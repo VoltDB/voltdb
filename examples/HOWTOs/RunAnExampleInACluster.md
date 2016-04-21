@@ -28,7 +28,7 @@ voltdb create --force -d deployment.xml -H myhostname
 
 Make a list of the hostnames of the servers on which you're going to run VoltDB.
 
-For the purposes of this example, let's say they are `voltserver1`, `voltserver12`, and `voltserver3`.
+For the purposes of this example, let's say they are `voltserver1`, `voltserver2`, and `voltserver3`.
 
 On any machines where you're going to run the client, you're going to need to edit the `run.sh` file.
 
@@ -41,13 +41,13 @@ SERVERS="localhost"
 And change it to say:
 
 ```
-SERVERS="voltserver1,voltserver1,voltserver1"
+SERVERS="voltserver1,voltserver2,voltserver3"
 ```
 
 Note that this is equivalent to:
 
 ```
-SERVERS="voltserver1:21212,voltserver1:21212,voltserver1:21212"
+SERVERS="voltserver1:21212,voltserver2:21212,voltserver3:21212"
 ```
 
 If your servers are configured with different ports, you would need to change this, but the defaults should be fine for almost all cases.
@@ -56,7 +56,7 @@ Now save the `run.sh` file.
 
 ### Step Two: Choose a Leader
 
-Consider our host list again: `voltserver1`, `voltserver12`, and `voltserver3`.
+Consider our host list again: `voltserver1`, `voltserver2`, and `voltserver3`.
 
 We need to pick a startup leader. This is the node the other nodes will connect to at startup. It can be any node in the list. After startup, the leader has no special role at all. After startup, there are no special nodes in a VoltDB cluster.
 
