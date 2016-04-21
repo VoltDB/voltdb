@@ -2,11 +2,11 @@
 
 Use Case
 --------
-This application simulates a simple position keeper application that maintains the positions of portfolios that are updated frequently as trades and price changes occur.
+This application simulates a simple position keeper application that maintains the portfolion positions. Portfolios are updated frequently as trades and price changes occur.
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to build and run the Java clients. The script is readable and when run, shows what commands are being executed to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
 2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
@@ -15,7 +15,7 @@ VoltDB Examples come with a run.sh script that sets up some environment and save
 
 You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.
 
-Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
+Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before steps above. Note that this step requires a full Java JDK.
 
 Other run.sh Actions
 ---------------------------
