@@ -94,10 +94,10 @@ public class OfferBenchmark {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(desc = "Volt user name")
+        @Option(desc = "User name for connection.")
         public String user = "";
 
-        @Option(desc = "Volt password")
+        @Option(desc = "Password for connection.")
         public String password = "";
 
         @Option(desc = "Benchmark duration, in seconds.")
