@@ -7,6 +7,8 @@
     change the user data listed here in order to use
     this file.
 
+    At least on user must have the role "administrator".
+
     Also note that all roles that aren't predefined
     must be defined in DDL.
 -->
@@ -14,7 +16,7 @@
     <cluster hostcount="1"/>
     <security enabled="true"/>
     <users>
-        <user name="operator" password="mech" roles="ops" />
+        <user name="operator" password="mech" roles="ops,administrator" />
         <user name="developer" password="tech" roles="ops,dbuser" />
         <user name="clientapp" password="xyzzy" roles="dbuser" />
     </users>
