@@ -1,16 +1,16 @@
 # Examples Guide
 
-VoltDB provides a number of examples here to help people learn what is possible with VoltDB and how to use certain features. Some of these examples are specifically constructed to show specific patterns and features, while others are based on real world applications. These examples may be simplified in the interest of making them better learning tools.
+VoltDB provides a number of examples to help people learn what is possible with VoltDB as well as how to use certain features. Some of these examples show specific patterns and individual features, while others are based on real-world applications. Many examples are simplified in the interest of making them better learning tools.
 
-All of the examples in the download kit for VoltDB are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.
+All of the examples in the download kit are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.
 
-Clearly these examples do not cover the complete set of VoltDB features or use cases; we do expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, send email to askanengineer@voltdb.com.
+These examples do not cover the complete set of VoltDB features or use cases; they are just a sample of what is possible with VoltDB. We do, however, expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, send email to askanengineer@voltdb.com, we welcome your input.
 
 
 HOWTOs
 --------------------------
 
-The HOWTOs directory provides short guides on how to use the examples to test out different features and configurations. For example, there are short guides to run an example in a three-node cluster, or with different durability settings. There is also a subdirectory of example deployment files.
+The HOWTOs directory provides short guides on how to use the examples to try different VoltDB features and configurations. For example, there are short guides to run an example in a three-node cluster and also with different durability settings. There is also a subdirectory of sample deployment files.
 
 
 Example Projects
@@ -20,7 +20,7 @@ The following projects are included in the examples directory:
 
 ### adperformance ###
 
-This application simulates a high velocity stream of simulated events (impressions, clickthroughs, conversions) that are enriched and ingested. Several views maintain real-time aggregations on this table to provide a minutely summary for each advertiser, plus drill-down reports grouped by campaign and creative to show detail-level metrics, costs and rates with real-time accuracy.
+This application simulates a high velocity stream of impression, click-through, and conversions events that are enriched and ingested by VoltDB. Several materialized views maintain real-time aggregations on this data to provide a minutely summary for each advertiser as well as drill-down reports grouped by campaign to show detail-level metrics, costs and rates with real-time accuracy.
 
 ### bank-fraud ###
 
@@ -28,7 +28,7 @@ Ingest generated consumer purchase transaction data and use summary data from ma
 
 ### bank-offers ###
 
-Ingest simulated consumer purchase transaction data and find the best matching offer to present to the consumer at the point of sale.
+Ingest simulated consumer purchase transaction data and find the best matching offer to present to the consumer at the point-of-sale.
 
 Matching offers are found using a query that joins a summary view of the account activity with this vendor (merchant) against the available offers from that vendor.  The best match is determined by the priority for the offers that was set by the vendor.
 
@@ -36,17 +36,17 @@ Matching offers are found using a query that joins a summary view of the account
 
 Process begin and end call events from a call center. Pair/join events in VoltDB to create a definitive record of completed calls.
 
-Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. The provided HTML dashboard shows a top-N list of agents by standard deviation.
+Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency.  Thankfully VoltDB provides strong consistency, making solving this problem much easier. The provided HTML dashboard shows a top-N list of agents by standard deviation.
 
 ### contentionmark ###
   
 ContentionMark is a small VoltDB application that measures VoltDB throughput under extreme contention. By default, ContentionMark creates one row, then updates it as fast as VoltDB will let it, one transaction per update.
 
-It's also the smallest example we have, for what it's worth.
+It's also the smallest example we have, for what it's worth!
 
 ### geospatial ###
 
-This example demonstrates geospatial functionality that was added to VoltDB in version 6.0.  The problem space for this demo is serving ads to many mobile device users based on their location in real time.
+This example demonstrates geospatial functionality that was added to VoltDB in version 6.0.  The problem space for this demo is serving ads to many mobile device users based on their location, in real time.
 
 ### json-sessions ####
 
@@ -87,7 +87,7 @@ This example shows an application that takes in time-series data, runs analytic 
   
 ### windowing-with-ddl ###
 
-A modified version of the windowing example that demonstrates the V5 feature that lets users define how to age out old tuples using a special constraint on the table definition.  This example has no Java stored procedures.
+A modified version of the windowing example that demonstrates the V5 feature that lets users define how to age out old tuples using a special row-count constraint on the table definition.  This example has no Java stored procedures.
 
 
 Getting Started
@@ -107,6 +107,6 @@ The following steps will run an example:
 
 Typing "./run.sh help" will also show the available targets for each example.
 
-When finished, hit Ctrl C in the server terminal window to stop the VoltDB database.
+When finished, hit Ctrl-C in the server terminal window to stop the VoltDB database.
 
 
