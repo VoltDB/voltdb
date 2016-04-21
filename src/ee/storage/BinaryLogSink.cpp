@@ -365,6 +365,9 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (newTuple) {
+        assert(ExecutorContext::getDRTimestampFromHiddenNValue(newTuple->getHiddenNValue(drTable->getDRTimestampColumnIndex()))
+               == UniqueId::timestampSinceUnixEpoch(uniqueId));
+
         newMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
         newTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, drTable, NULL));
         createConflictExportTuple(newMetaTableForInsert.get(), newTupleTableForInsert.get(),
@@ -373,7 +376,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
+                                                                                      UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
