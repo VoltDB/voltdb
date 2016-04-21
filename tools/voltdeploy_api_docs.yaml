@@ -937,15 +937,240 @@ definitions:
   deployment:
     type: object
     properties:
-      commandlog: 
+      admin-mode:
         type: object
         properties:
+          adminstartup:
+            type: boolean
+          port:
+            type: integer
+      cluster:
+        type: object
+        properties:
+          elastic:
+            type: string
+          hostcount:
+            type: integer
+          kfactor:
+            type: integer
+          schema:
+            type: string
+          sitesperhost:
+            type: integer
+      commandlog:
+        type: object
+        properties:
+          enabled:
+            type: boolean
           frequency:
             type: object
             properties:
-              time: 
+              time:
                 type: integer
-  
+              transactions:
+                type: integer
+          logsize:
+            type: integer
+          synchronous:
+            type: boolean
+      # dr:
+      #   type: object
+      #   properties:
+      #     connection:
+      #       type: object
+      #       properties:
+      #         source:
+      #           type: string
+      #     id:
+      #       type: integer
+      #     listen:
+      #       type: boolean
+      #     port:
+      #       type: integer
+      export:
+        type: object
+        properties:
+          configuration:
+            type: array
+            items:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                exportconnectorclass:
+                  type: string
+                property:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                stream:
+                  type: string
+                type:
+                  type: string
+      heartbeat:
+        type: object
+        properties:
+          timeout:
+            type: integer
+
+      httpd:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          jsonapi:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+          port:
+            type: integer
+
+      import:
+        type: object
+        properties:
+          configuration:
+            type: array
+            items:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                format:
+                  type: string
+                module:
+                  type: string
+                property:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                type:
+                    type: string
+
+      partition-detection:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          snapshot:
+            type: object
+            properties:
+              prefix:
+                type: string
+
+      paths:
+        type: object
+        properties:
+          commandlog:
+            type: object
+            properties:
+              path:
+                type: string
+          commandlogsnapshot:
+            type: object
+            properties:
+              path:
+                type: string
+          droverflow:
+            type: object
+            properties:
+              path:
+                type: string
+          exportoverflow:
+            type: object
+            properties:
+              path:
+                type: string
+          snapshots:
+            type: object
+            properties:
+              path:
+                type: string
+          voltdbroot:
+            type: object
+            properties:
+              path:
+                type: string
+
+      security:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          provider:
+            type: string
+
+      snapshot:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          frequency:
+            type: string
+          prefix:
+            type: string
+          retain:
+            type: integer
+
+      systemsettings:
+        type: object
+        properties:
+          elastic:
+            type: object
+            properties:
+              duration:
+                type: integer
+              throughput:
+                type: integer
+          query:
+            type: object
+            properties:
+              timeout:
+                type: integer
+
+          resourcemonitor:
+            type: object
+            properties:
+              disklimit:
+                type: object
+                properties:
+                  feature:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        size:
+                          type: string
+              memorylimit:
+                type: object
+                properties:
+                  size:
+                    type: string
+
+          snapshot:
+            type: object
+            properties:
+              priority:
+                type: integer
+
+          temptables:
+            type: object
+            properties:
+              maxsize:
+                type: integer
+
   deploymentResponse:
     type: object
     properties:
@@ -975,7 +1200,7 @@ definitions:
           commandlog:
             type: object
             properties:
-              enabled: 
+              enabled:
                 type: boolean
               frequency:
                 type: object
@@ -1021,22 +1246,22 @@ definitions:
                         properties:
                           name:
                             type: string
-                          value: 
+                          value:
                             type: string
-                    stream: 
+                    stream:
                       type: string
-                    type: 
+                    type:
                       type: string
           heartbeat:
             type: object
             properties:
               timeout:
                 type: integer
-          
+
           httpd:
             type: object
             properties:
-              enabled: 
+              enabled:
                 type: boolean
               jsonapi:
                 type: object
@@ -1045,7 +1270,7 @@ definitions:
                     type: boolean
               port:
                 type: integer
-                
+
           import:
             type: object
             properties:
@@ -1067,11 +1292,11 @@ definitions:
                         properties:
                           name:
                             type: string
-                          value: 
+                          value:
                             type: string
-                    type: 
+                    type:
                       type: string
-          
+
           partition-detection:
             type: object
             properties:
@@ -1082,7 +1307,7 @@ definitions:
                 properties:
                   prefix:
                     type: string
-          
+
           paths:
             type: object
             properties:
@@ -1116,7 +1341,7 @@ definitions:
                 properties:
                   path:
                     type: string
-          
+
           security:
             type: object
             properties:
@@ -1124,7 +1349,7 @@ definitions:
                 type: boolean
               provider:
                 type: string
-          
+
           snapshot:
             type: object
             properties:
@@ -1136,7 +1361,7 @@ definitions:
                 type: string
               retain:
                 type: integer
-          
+
           systemsettings:
             type: object
             properties:
@@ -1150,9 +1375,9 @@ definitions:
               query:
                 type: object
                 properties:
-                  tiemout:
+                  timeout:
                     type: integer
-          
+
               resourcemonitor:
                 type: object
                 properties:
@@ -1161,56 +1386,56 @@ definitions:
                     properties:
                       feature:
                         type: array
-                        items: 
+                        items:
                           type: object
                           properties:
                             name:
                               type: string
                             size:
-                              type: integer
+                              type: string
                   memorylimit:
                     type: object
                     properties:
-                      size: 
+                      size:
                         type: string
-                        
+
               snapshot:
                 type: object
                 properties:
                   priority:
                     type: integer
-              
+
               temptables:
                 type: object
                 properties:
                   maxsize:
                     type: integer
-                    
+
           users:
             type: object
             properties:
               user:
                 type: array
-                items: 
+                items:
                   type: object
                   properties:
-                    name: 
+                    name:
                       type: string
                     plaintext:
                       type: string
-                    roles: 
-                      type: string  
-                    
+                    roles:
+                      type: string
+
   user:
     type: object
     properties:
-      name: 
+      name:
         type: string
       password:
         type: string
       roles:
         type: string
-  
+
   voltdeployConfig:
     type: object
     properties:
@@ -1234,7 +1459,7 @@ definitions:
           properties:
             databaseid:
               type: integer
-            name: 
+            name:
               type: string
             password:
               type: string
@@ -1242,7 +1467,7 @@ definitions:
               type: boolean
             roles:
               type: string
-            userid: 
+            userid:
               type: integer
       deployments:
         type: array
@@ -1275,7 +1500,7 @@ definitions:
                 commandlog:
                   type: object
                   properties:
-                    enabled: 
+                    enabled:
                       type: boolean
                     frequency:
                       type: object
@@ -1323,22 +1548,22 @@ definitions:
                               properties:
                                 name:
                                   type: string
-                                value: 
-                                  type: string
-                          stream: 
+                                value:
+                                  type: integer
+                          stream:
                             type: string
-                          type: 
+                          type:
                             type: string
                 heartbeat:
                   type: object
                   properties:
                     timeout:
                       type: integer
-                
+
                 httpd:
                   type: object
                   properties:
-                    enabled: 
+                    enabled:
                       type: boolean
                     jsonapi:
                       type: object
@@ -1347,7 +1572,7 @@ definitions:
                           type: boolean
                     port:
                       type: integer
-                      
+
                 import:
                   type: object
                   properties:
@@ -1369,11 +1594,11 @@ definitions:
                               properties:
                                 name:
                                   type: string
-                                value: 
+                                value:
                                   type: string
-                          type: 
+                          type:
                             type: string
-                
+
                 partition-detection:
                   type: object
                   properties:
@@ -1384,7 +1609,7 @@ definitions:
                       properties:
                         prefix:
                           type: string
-                
+
                 paths:
                   type: object
                   properties:
@@ -1418,7 +1643,7 @@ definitions:
                       properties:
                         path:
                           type: string
-                
+
                 security:
                   type: object
                   properties:
@@ -1426,7 +1651,7 @@ definitions:
                       type: boolean
                     provider:
                       type: string
-                
+
                 snapshot:
                   type: object
                   properties:
@@ -1438,7 +1663,7 @@ definitions:
                       type: string
                     retain:
                       type: integer
-                
+
                 systemsettings:
                   type: object
                   properties:
@@ -1452,7 +1677,7 @@ definitions:
                     query:
                       type: object
                       properties:
-                        tiemout:
+                        timeout:
                           type: integer
                 
                     resourcemonitor:
