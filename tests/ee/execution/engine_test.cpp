@@ -409,12 +409,12 @@ public:
          */
         m_topend = new EngineTestTopend();
         m_engine = new VoltDBEngine(m_topend);
-        m_parameterBuffer = new char[4 * 1024];
-        m_resultBuffer = new char[1024 * 1024 * 2];
-        m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers(m_parameterBuffer, 4 * 1024,
-                             m_resultBuffer, 1024 * 1024 * 2,
-                             m_exceptionBuffer, 4096);
+        m_parameterBuffer.reset(new char [4 * 1024]);
+        m_resultBuffer.reset(new char [1024 * 1024 * 2]);
+        m_exceptionBuffer.reset(new char [4 * 1024]);
+        m_engine->setBuffers(m_parameterBuffer.get(), 4 * 1024,
+                             m_resultBuffer.get(), 1024 * 1024 * 2,
+                             m_exceptionBuffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
         int partitionCount = 3;
         ASSERT_TRUE(m_engine->initialize(this->cluster_id, this->site_id, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false));
@@ -458,9 +458,6 @@ public:
             //
             delete(m_engine);
             delete(m_topend);
-            delete(m_resultBuffer);
-            delete(m_exceptionBuffer);
-            delete(m_parameterBuffer);
         }
 
     protected:
@@ -480,9 +477,9 @@ public:
         Table* replicated_customer_table;
         int replicated_customer_table_id;
         void compareTables(Table *first, Table* second);
-        char *m_resultBuffer;
-        char *m_exceptionBuffer;
-        char *m_parameterBuffer;
+        boost::shared_array<char>m_resultBuffer;
+        boost::shared_array<char>m_exceptionBuffer;
+        boost::shared_array<char>m_parameterBuffer;
 };
 
 /* Check the order of index vector
@@ -627,8 +624,8 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Make sure the parameter buffer is filled
     // with healthful zeros, and then create an input
     // deserializer.
-    memset(m_parameterBuffer, 0, 4 * 1024);
-    ReferenceSerializeInputBE emptyParams(m_parameterBuffer, 4 * 1024);
+    memset(m_parameterBuffer.get(), 0, 4 * 1024);
+    ReferenceSerializeInputBE emptyParams(m_parameterBuffer.get(), 4 * 1024);
 
     //
     // Execute the plan.  You'd think this would be more
@@ -642,7 +639,7 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // need to query the engine.
     size_t result_size = m_engine->getResultsSize();
     if (debug_dump) {
-        dumpResultTable(m_resultBuffer, result_size);
+        dumpResultTable(m_resultBuffer.get(), result_size);
     }
 
     //
@@ -651,12 +648,12 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // values in the second column should be twice the values
     // in the first column.
     //
-    // The validation functino should all be a separate function.
+    // The validation function should all be a separate function.
     // But then it could not call the ASSERT_TRUE macro.  This macro
     // calls fail(), which is a member function of the framework.
     // Bitten by OO again.
     //
-    ReferenceSerializeInputBE result(m_resultBuffer, result_size);
+    ReferenceSerializeInputBE result(m_resultBuffer.get(), result_size);
     if (debug_print) {
         printf("Result Table:\n");
     }
@@ -667,7 +664,7 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     }
     size_t intercostal_clavicle = result.readInt();
     if (debug_print) {
-        printf("  intercolstal_clavicle = %lu\n", intercostal_clavicle);
+        printf("  intercosttal_clavicle = %lu\n", intercostal_clavicle);
     }
     size_t serialized_exception = result.readInt();
     if (debug_print) {
