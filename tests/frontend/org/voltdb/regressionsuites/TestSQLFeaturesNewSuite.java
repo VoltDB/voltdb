@@ -26,6 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.UUID;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -37,8 +39,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PopulateTruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
-
-import junit.framework.Test;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
     // procedures used by these tests
