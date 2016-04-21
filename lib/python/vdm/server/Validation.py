@@ -753,9 +753,11 @@ schema = {
                             "id": "source",
                             "type": "string",
                         }
-                    }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False

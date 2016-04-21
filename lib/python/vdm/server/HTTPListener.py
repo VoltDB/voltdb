@@ -281,7 +281,7 @@ def map_deployment(request, database_id):
             'resourcemonitor'] is None:
             deployment['systemsettings']['resourcemonitor'] = {}
 
-        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and request.json['systemsettings']['resourcemonitor']['memorylimit']:
             deployment['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                     and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
@@ -298,8 +298,8 @@ def map_deployment(request, database_id):
             deployment['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
-            deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
             if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
                 deployment['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
                 if request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
                     for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
@@ -351,7 +351,7 @@ def map_deployment(request, database_id):
                     )
                 i += 1
     if 'export' in request.json:
-        if 'export' not in deployment or deployment['export'] is None or deployment['import'] == "None":
+        if 'export' not in deployment or deployment['export'] is None or deployment['export'] == "None":
             deployment['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
