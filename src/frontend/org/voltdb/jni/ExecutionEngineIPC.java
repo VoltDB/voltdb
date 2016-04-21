@@ -1368,7 +1368,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             retval[1] = results.getLong();
 
         } catch (final IOException e) {
-            e.printStackTrace();
             throw new RuntimeException(e);
         }
 
