@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file has auth by user enabled.
+    See the HOWTO on enabling authentication for more.
+
+    Note that unlike other examples, you will need to
+    change the user data listed here in order to use
+    this file.
+
+    Also note that all roles that aren't predefined
+    must be defined in DDL.
+-->
+<deployment>
+    <cluster hostcount="1"/>
+    <security enabled="true"/>
+    <users>
+        <user name="operator" password="mech" roles="ops" />
+        <user name="developer" password="tech" roles="ops,dbuser" />
+        <user name="clientapp" password="xyzzy" roles="dbuser" />
+    </users>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>

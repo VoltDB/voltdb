@@ -25,7 +25,7 @@ SERVERS="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class
+    rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class *.log
 }
 
 # remove everything from "clean" as well as the jarfiles
@@ -55,7 +55,9 @@ function jars-ifneeded() {
 
 # run the voltdb server locally
 function server() {
-    voltdb create -H $STARTUPLEADERHOST --force
+    # note: "create --force" will delete any existing data
+    # use "recover" to start from an existing voltdbroot folder with data
+    voltdb create --force -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures
@@ -87,9 +89,7 @@ function async-benchmark() {
         --duration=120 \
         --servers=$SERVERS \
         --contestants=6 \
-        --maxvotes=2 \
-        --ratelimit=2000000
-#        --latencyreport=true \
+        --maxvotes=2
 }
 
 # trivial client code for illustration purposes
@@ -132,8 +132,8 @@ function jdbc-benchmark() {
         voter.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
-        --maxvotes=2 \
         --servers=$SERVERS \
+        --maxvotes=2 \
         --contestants=6 \
         --threads=40
 }

@@ -818,15 +818,21 @@ DISTRIBUTION
 <target name="dist_internal" depends="dist_internal_core">
 
     <!-- build the jars for the clients -->
-    <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/bank-fraud' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/metrocard' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/nbbo' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/positionkeeper' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+    <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- build the jars for the tutorials -->
     <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
@@ -913,16 +919,21 @@ DISTRIBUTION
         <fileset dir="${dist.dir}-client-java/" defaultexcludes="yes">
             <include name="doc/tutorials/auction/run.sh"/>
             <include name="doc/tutorials/helloworld/run.sh"/>
+            <include name="examples/adperformance/run.sh"/>
+            <include name="examples/bank-fraud/run.sh"/>
+            <include name="examples/bank-offers/run.sh"/>
+            <include name="examples/callcenter/run.sh"/>
             <include name="examples/contentionmark/run.sh"/>
             <include name="examples/geospatial/run.sh"/>
-            <include name="examples/voltcache/run.sh"/>
+            <include name="examples/json-sessions/run.sh"/>
+            <include name="examples/metrocard/run.sh"/>
+            <include name="examples/nbbo/run.sh"/>
+            <include name="examples/positionkeeper/run.sh"/>
+            <include name="examples/uniquedevices/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
-            <include name="examples/callcenter/run.sh"/>
-            <include name="examples/json-sessions/run.sh"/>
             <include name="examples/windowing/run.sh"/>
             <include name="examples/windowing-with-ddl/run.sh"/>
-            <include name="examples/uniquedevices/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -1067,18 +1078,27 @@ CLEANING
     description="Remove all compiled and generated files."
     depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
              clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
-  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+
+  <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/bank-fraud' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/geospatial' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
-  <exec dir='examples/contentionmark' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
-  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
-  <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/metrocard' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/nbbo' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/positionkeeper' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
@@ -2254,24 +2274,37 @@ TEST CASES
 
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
+
+    <echo>checking adperformance</echo>
+    <samplecheck app="adperformance" />
+    <echo>checking bank-fraud</echo>
+    <samplecheck app="bank-fraud" />
+    <echo>checking bank-offers</echo>
+    <samplecheck app="bank-offers" />
     <echo>checking callcenter</echo>
     <samplecheck app="callcenter" />
+    <echo>checking contentionmark</echo>
+    <samplecheck app="contentionmark" />
+    <echo>checking geospatial</echo>
+    <samplecheck app="geospatial" />
+    <echo>checking json-sessions</echo>
+    <samplecheck app="json-sessions" />
+    <echo>checking metrocard</echo>
+    <samplecheck app="metrocard" />
+    <echo>checking nbbo</echo>
+    <samplecheck app="nbbo" />
+    <echo>checking positionkeeper</echo>
+    <samplecheck app="positionkeeper" />
+    <echo>checking uniquedevices</echo>
+    <samplecheck app="uniquedevices" />
     <echo>checking voltkv</echo>
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
-    <echo>checking geospatial</echo>
-    <samplecheck app="geospatial" />
-    <echo>checking contentionmark</echo>
-    <samplecheck app="contentionmark" />
-    <echo>checking json-sessions</echo>
-    <samplecheck app="json-sessions" />
     <echo>checking windowing</echo>
     <samplecheck app="windowing" />
     <echo>checking windowing-with-ddl</echo>
     <samplecheck app="windowing-with-ddl" />
-    <echo>checking uniquedevices</echo>
-    <samplecheck app="uniquedevices" />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
