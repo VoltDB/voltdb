@@ -293,12 +293,6 @@ public:
     }
 
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
-        ASSERT_FALSE(indexPair.first == NULL);
-        ASSERT_FALSE(indexPairReplica.first == NULL);
-        EXPECT_EQ(indexPair.second, indexPairReplica.second);
-
         beginTxn(99, 99, 98, 70);
         TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
@@ -620,11 +614,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
 
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getSmallestUniqueIndex();
-    ASSERT_FALSE(indexPair1.first == NULL);
-    ASSERT_TRUE(indexPair2.first == NULL);
-
     beginTxn(99, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
     TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
@@ -666,9 +655,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNullColumn) {
     createIndexes();
-
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
-    ASSERT_FALSE(indexPair1.first == NULL);
 
     beginTxn(99, 99, 98, 70);
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();

@@ -26,7 +26,6 @@
 #include "common/executorcontext.hpp"
 #include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
-#include "indexes/tableindex.h"
 
 #include <vector>
 #include <cstdio>
@@ -130,9 +129,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t spHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
-                                  DRRecordType type,
-                                  const TableIndex *uniqueIndex /*= NULL*/,
-                                  uint32_t uniqueIndexCrc /*= 0*/)
+                                  DRRecordType type)
 {
     size_t startingUso = m_uso;
 
@@ -161,12 +158,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    const std::vector<int>* interestingColumns = NULL;
-    if (DR_RECORD_DELETE == type && uniqueIndex) {
-        type = DR_RECORD_DELETE_BY_INDEX;
-        interestingColumns = &(uniqueIndex->getColumnIndices());
-    }
-    tupleMaxLength = computeOffsets(tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
+    tupleMaxLength = computeOffsets(tuple, rowHeaderSz, rowMetadataSz) + TXN_RECORD_HEADER_SIZE;
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -195,7 +187,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
 
     // write the tuple's data
-    tuple.serializeToDR(io, 0, nullArray, interestingColumns);
+    tuple.serializeToDR(io, 0, nullArray);
 
     // write the row size in to the row header
     // rowlength does not include the 4 byte length prefix or record header
@@ -203,13 +195,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
     // No need to subtract out the length of this size prefix itself, since it's
     // balanced out by the checksum at the end
-    if (DR_RECORD_DELETE_BY_INDEX == type) {
-        // Do need to subtract out the length of the index checksum
-        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE - sizeof(int32_t)));
-        hdr.writeInt(uniqueIndexCrc);
-    } else {
-        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
-    }
+    hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
@@ -227,18 +213,18 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 }
 
 size_t
-DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns)
+DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz)
 {
     // round-up columncount to next multiple of 8 and divide by 8
-    const int columnCount = interestingColumns ? (int)interestingColumns->size() : tuple.sizeInValues();
+    const int columnCount = tuple.sizeInValues();
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
 
     // row header is 32-bit length of row plus null mask
-    rowMetadataSz = sizeof(int32_t) + (/*index crc*/ interestingColumns ? sizeof(int32_t) : 0);
+    rowMetadataSz = sizeof(int32_t);
     rowHeaderSz = rowMetadataSz + nullMaskLength;
 
     //Can return 0 for a single column varchar with null
-    size_t dataSz = tuple.maxDRSerializationSize(interestingColumns);
+    size_t dataSz = tuple.maxDRSerializationSize();
 
     return rowHeaderSz + dataSz;
 }

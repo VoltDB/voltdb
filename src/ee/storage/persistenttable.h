@@ -277,13 +277,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual void addIndex(TableIndex *index) {
         Table::addIndex(index);
         m_noAvailableUniqueIndex = false;
-        m_smallestUniqueIndex = NULL;
-        m_smallestUniqueIndexCrc = 0;
     }
     virtual void removeIndex(TableIndex *index) {
         Table::removeIndex(index);
-        m_smallestUniqueIndex = NULL;
-        m_smallestUniqueIndexCrc = 0;
     }
 
     // ------------------------------------------------------------------
@@ -494,13 +490,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_purgeExecutorVector;
     }
 
-    inline std::pair<const TableIndex*, uint32_t> getSmallestUniqueIndex() {
-        if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
-            computeSmallestUniqueIndex();
-        }
-        return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
-    }
-
   private:
 
     // Zero allocation size uses defaults.
@@ -614,8 +603,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple);
 
-    void computeSmallestUniqueIndex();
-
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
@@ -678,8 +665,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     char m_signature[20];
 
     bool m_noAvailableUniqueIndex;
-    TableIndex* m_smallestUniqueIndex;
-    uint32_t m_smallestUniqueIndexCrc;
     int m_drTimestampColumnIndex;
 };
 

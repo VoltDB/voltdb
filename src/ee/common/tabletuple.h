@@ -152,16 +152,8 @@ public:
         return bytes;
     }
 
-    size_t maxDRSerializationSize(const std::vector<int>* interestingColumns) const {
-        if (!interestingColumns) {
-            return maxExportSerializationSize();
-        }
-        size_t bytes = 0;
-        std::vector<int> cols = *interestingColumns;
-        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
-            bytes += maxExportSerializedColumnSize(*cit);
-        }
-        return bytes;
+    size_t maxDRSerializationSize() const {
+        return maxExportSerializationSize();
     }
 
     // Return the amount of memory allocated for non-inlined objects
@@ -315,8 +307,7 @@ public:
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
-                       int colOffset, uint8_t *nullArray,
-                       const std::vector<int>* interestingColumns);
+                       int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
@@ -834,18 +825,8 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
 }
 
 inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray,
-                              const std::vector<int>* interestingColumns) {
-    if (!interestingColumns) {
-        serializeToExport(io, colOffset, nullArray);
-    } else {
-        // relative index in the interesting column vector, used to find the correct bit in the null array
-        int colIndex = 0;
-        std::vector<int> cols = *interestingColumns;
-        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit, ++colIndex) {
-            serializeColumnToExport(io, colOffset + colIndex, getNValue(*cit), nullArray);
-        }
-    }
+                              int colOffset, uint8_t *nullArray) {
+    serializeToExport(io, colOffset, nullArray);
 }
 
 inline bool TableTuple::equals(const TableTuple &other) const {

@@ -63,7 +63,7 @@ const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTI
 // 4 index checksum bytes
 // 1 * sizeof(int32_t) = 4 data bytes
 // new total: 27
-const int MAGIC_OPTIMIZED_TUPLE_SIZE = 27;
+const int MAGIC_OPTIMIZED_TUPLE_SIZE = MAGIC_TUPLE_SIZE;
 const int MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_OPTIMIZED_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 const int BUFFER_SIZE = 950;
 // roughly 22.5k
@@ -114,7 +114,7 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, TableIndex* index = NULL, uint32_t indexCrc = 0)
+    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
     {
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
@@ -125,7 +125,7 @@ public:
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, currentSpHandle, *m_tuple, type, index, indexCrc);
+                               currentSpHandle, currentSpHandle, *m_tuple, type);
     }
 
     virtual ~DRTupleStreamTest() {
@@ -251,24 +251,17 @@ TEST_F(DRTupleStreamTest, BasicOps)
 
 
 TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
-    vector<int> columnIndices(1, 0);
-    TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
-                                               columnIndices, TableIndex::simplyIndexColumns(),
-                                               true, true, m_schema);
-    TableIndex *index = TableIndexFactory::getInstance(scheme);
-    uint32_t indexCrc = 42;
     for (int i = 1; i < 10; i++)
     {
-        // first, send some delete records with an index
-        appendTuple(i-1, i, DR_RECORD_DELETE, index, indexCrc);
+        // first, send some delete records
+        appendTuple(i-1, i, DR_RECORD_DELETE);
         m_wrapper.endTransaction();
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
-    delete index;
 
     for (int i = 10; i < 20; i++)
     {
-        // then send some delete records without an index
+        // then send some delete records
         appendTuple(i-1, i, DR_RECORD_DELETE);
         m_wrapper.endTransaction();
     }
