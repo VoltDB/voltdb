@@ -12,7 +12,7 @@ The web dashboard shows recent offers as well as a moving chart of offers/sec an
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It is very readable and when executed, shows what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
 2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
@@ -41,7 +41,7 @@ If you change the client or procedure Java code, you must recompile the jars by 
 
 Client Behavior Options
 ---------------------------
-You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
+You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
 
 **Speed & Duration:**
 
