@@ -39,6 +39,8 @@ public class PlannerTestCase extends TestCase {
     private PlannerTestAideDeCamp m_aide;
     private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
+    final private int m_defaultParamCount = 0;
+    private String m_noJoinOrder = null;
 
     /**
      * @param sql
@@ -129,20 +131,17 @@ public class PlannerTestCase extends TestCase {
         return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
     }
 
-
-    final int m_defaultParamCount = 0;
-    String noJoinOrder = null;
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
     {
         boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
     }
 
     protected List<AbstractPlanNode> compileToFragmentsForSinglePartition(String sql)
     {
         boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, m_noJoinOrder);
     }
 
 
