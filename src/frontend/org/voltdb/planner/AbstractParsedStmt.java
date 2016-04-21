@@ -1838,7 +1838,7 @@ public abstract class AbstractParsedStmt {
         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
 
         // If no value equivalence filter defined in SQL statement, there's no use to continue
-        if (valueEquivalence == null || valueEquivalence.isEmpty()) {
+        if (valueEquivalence.isEmpty()) {
             return false;
         }
 
@@ -1863,21 +1863,24 @@ public abstract class AbstractParsedStmt {
         // Iterate over the unique indexes defined on the table to check if the unique
         // index defined on table appears in tve equivalence expression gathered above.
         for (Index index : indexes) {
-            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
-            // Fetch pure column indices which are unique
-            if (index != null && index.getUnique() && index.getExpressionsjson().isEmpty()) {
-                CatalogMap<ColumnRef> indexColRefs = index.getColumns();
-                for (ColumnRef indexColRef:indexColRefs) {
-                    Column col = indexColRef.getColumn();
-                    TupleValueExpression tve = new TupleValueExpression(scan.getTableName(),
-                                                                        scan.getTableAlias(),
-                                                                        col.getName(),
-                                                                        col.getName(),
-                                                                        col.getIndex());
-                    indexExpressions.add(tve);
-                }
+            // Perform lookup only on pure column indices which are unique
+            if (!index.getUnique() || !index.getExpressionsjson().isEmpty()) {
+                continue;
             }
-            if (!indexExpressions.isEmpty() && parameterizedConstantKeys.containsAll(indexExpressions)) {
+
+            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
+            CatalogMap<ColumnRef> indexColRefs = index.getColumns();
+            for (ColumnRef indexColRef:indexColRefs) {
+                Column col = indexColRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(scan.getTableName(),
+                                                                    scan.getTableAlias(),
+                                                                    col.getName(),
+                                                                    col.getName(),
+                                                                    col.getIndex());
+                indexExpressions.add(tve);
+            }
+
+            if (parameterizedConstantKeys.containsAll(indexExpressions)) {
                 return true;
             }
         }
