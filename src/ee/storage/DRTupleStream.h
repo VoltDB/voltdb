@@ -27,7 +27,6 @@
 
 namespace voltdb {
 class StreamBlock;
-class TableIndex;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 69;
@@ -66,9 +65,7 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type,
-                       const TableIndex *uniqueIndex = NULL,
-                       uint32_t uniqueIndexCrc = 0);
+                       DRRecordType type);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -77,7 +74,7 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns);
+    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz);
 
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
@@ -107,9 +104,7 @@ public:
                            int64_t spHandle,
                            int64_t uniqueId,
                            TableTuple &tuple,
-                           DRRecordType type,
-                           const TableIndex *uniqueIndex = NULL,
-                           uint32_t uniqueIndexCrc = 0) {
+                           DRRecordType type) {
         return 0;
     }
 
