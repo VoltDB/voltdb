@@ -74,7 +74,7 @@ ALLOWED_EXTENSIONS = ['xml']
 def receive_signal(signum, stack):
 
     config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
-    Configuration.convert_xml_to_json(config_path)
+    Configuration.validate_and_convert_xml_to_json(config_path)
     thread.start_new(sync_configuration, ())
     # print 'Received:', signum
 
@@ -861,7 +861,6 @@ class ServerAPI(MethodView):
         else:
             return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
             server_id, database_id)})
-
 
 
 class DatabaseAPI(MethodView):
