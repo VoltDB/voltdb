@@ -289,12 +289,10 @@ public class VoltZK {
     public static void createRejoinNodeIndicator(ZooKeeper zk, String node)
     {
         try {
-            System.out.println("start create znode" + node);
             zk.create(node,
                       null,
                       Ids.OPEN_ACL_UNSAFE,
                       CreateMode.EPHEMERAL);
-            System.out.println("finshed create znode" + node);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
                 VoltDB.crashLocalVoltDB("Unable to create rejoin node Indicator", true, e);
@@ -307,7 +305,7 @@ public class VoltZK {
     public static boolean removeRejoinNodeIndicator(ZooKeeper zk, String node)
     {
         try {
-            ZKUtil.deleteRecursively(zk, node);
+            zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 return false;
