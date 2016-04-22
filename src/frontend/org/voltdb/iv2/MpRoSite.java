@@ -485,7 +485,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            boolean requireExistingSequenceNumbers)
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

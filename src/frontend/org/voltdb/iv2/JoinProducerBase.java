@@ -173,9 +173,11 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      Map<Integer, Long> drSequenceNumbers,
-                                     boolean requireExistingSequenceNumbers)
+                                     boolean requireExistingSequenceNumbers,
+                                     long clusterCreateTime)
     {
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers, requireExistingSequenceNumbers);
+        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers,
+                drSequenceNumbers, requireExistingSequenceNumbers, clusterCreateTime);
     }
 
     protected void registerSnapshotMonitor(String nonce) {

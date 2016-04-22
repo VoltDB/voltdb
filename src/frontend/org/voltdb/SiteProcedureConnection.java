@@ -171,7 +171,8 @@ public interface SiteProcedureConnection {
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            boolean requireExistingSequenceNumbers);
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime);
 
     public long[] getUSOForExportTable(String signature);
 
