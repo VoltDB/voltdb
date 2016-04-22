@@ -215,7 +215,7 @@ label.ccErrorMsg {
     background-position: -6px -95px;
     cursor: pointer;
 	position:relative;
-	top:10px;
+/*	top:10px;*/
 }
 .deleteDisableDS{
     height: 26px;
@@ -766,7 +766,7 @@ ul.addServerList li:nth-child(1) {
 	margin-left: 5px;
 	overflow-x:hidden;
 }
-.rightSide .chooseFile { padding:6px 0 6px 10px;}
+.rightSide .chooseFile { padding:4px 0 3px 10px;}
 .main {
 	background-color: #FFFFFF;
 	margin-top: 20px;
@@ -1492,12 +1492,13 @@ ul.drList {
 	float: none;
 }
 .upDownBtn {
-	margin: 10px 0 0 0;
+	margin: 5px 0 0 0;
 }
 .modal.custom .modifiedModalCreateDB {
 	width: 95%;
 	margin: 35% auto;
-	right: -7px;
+	right:0;
+	/*right: -7px;*/
 }
 
 }
@@ -1511,6 +1512,8 @@ ul.drList {
 	 
 }
 @media (width: 320px) {
+	.overlayText { width:84%}
+	.overlayWrapper{ width:89.9%;}
 	
 	
 .navbar-header img {
@@ -1529,9 +1532,22 @@ ul.drList {
     right: 108px;
     width: 67%;
 }
+.overlayWrapper{ width:95.9%;}
 }
 
 /*jquery UI override*/
 .ui-menu { z-index:9999; width:213px!important;}
+
+@media (width: 360px) { 
+.overlayWrapper { width:91.5%;}
+.overlayText { width:86%;}
+}
+@media (width: 480px) { 
+.overlayText { width:89.5%;}
+}
+
+@media (width: 640px) { 
+.overlayText { width:92%;}
+}
 
 
