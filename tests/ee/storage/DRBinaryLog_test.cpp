@@ -526,12 +526,6 @@ public:
     }
 
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-        ASSERT_FALSE(indexPair.first == NULL);
-        ASSERT_FALSE(indexPairReplica.first == NULL);
-        EXPECT_EQ(indexPair.second, indexPairReplica.second);
-
         beginTxn(m_engine, 99, 99, 98, 70);
         TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
@@ -994,12 +988,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     m_engine->setIsActiveActiveDREnabled(true);
     m_engineReplica->setIsActiveActiveDREnabled(true);
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_TRUE(indexPair.first == NULL);
-    ASSERT_TRUE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, 0);
-    EXPECT_EQ(indexPairReplica.second, 0);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
@@ -1025,11 +1013,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
-
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair1.first == NULL);
-    ASSERT_TRUE(indexPair2.first == NULL);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
@@ -1072,9 +1055,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNullColumn) {
     createIndexes();
-
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair1.first == NULL);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();
@@ -1121,11 +1101,6 @@ TEST_F(DRBinaryLogTest, BasicUpdate) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair.first == NULL);
-    ASSERT_FALSE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, indexPairReplica.second);
     simpleUpdateTest();
 }
 
@@ -1134,12 +1109,6 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
     m_engine->setIsActiveActiveDREnabled(true);
     m_engineReplica->setIsActiveActiveDREnabled(true);
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_TRUE(indexPair.first == NULL);
-    ASSERT_TRUE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, 0);
-    EXPECT_EQ(indexPairReplica.second, 0);
     simpleUpdateTest();
 }
 
@@ -1178,11 +1147,6 @@ TEST_F(DRBinaryLogTest, UpdateWithNulls) {
 
 TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair.first == NULL);
-    ASSERT_FALSE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, indexPairReplica.second);
     updateWithNullsTest();
 }
 
