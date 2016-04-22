@@ -154,6 +154,7 @@ def main():
 
             #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
             sb = plt.subplot(1,numrows,subplotlocations[ratio]);
+            sb.invert_xaxis()
             # these need to be applied AFTER the subplot is created.
             plt.xlabel("Zipfian",fontsize=20);
             plt.ylabel("TPS",fontsize=20);
@@ -169,6 +170,7 @@ def main():
                 statsraw = buckets[build][ratio][workload];
                 # sort them
                 stats = np.array(statsraw);
+                #statslist= stats[stats[:,0].argsort()[::-1]]
                 statslist =  stats[stats[:,0].argsort()]
 
                 x = statslist[:,0]
@@ -177,7 +179,6 @@ def main():
                 #ysmooth = spline(x,300,xnew
 
                 sb.plot(x,y, "-", linewidth=10,label=workload,solid_capstyle='round',solid_joinstyle='round',aa=True)
-
 
             plt.legend(legendlist, loc='best')
         fig.savefig(build+".png");
