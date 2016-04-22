@@ -45,6 +45,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 import org.voltdb.utils.FixedDBBPool;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
 
@@ -86,6 +87,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // Node-wise stream snapshot receiver buffer pool
     private final FixedDBBPool m_snapshotBufPool;
 
+    private String m_hostId;
+
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                 Collection<Long> sites,
                                 String voltroot,
@@ -117,6 +120,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
             // Create a buffer pool for compressed stream snapshot data
             m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
+
+            m_hostId = String.valueOf(m_messenger.getHostId());
+            Preconditions.checkArgument(
+                    m_hostId != null && !m_hostId.trim().isEmpty(),
+                    "m_hostId is null or empty"
+                    );
         }
     }
 
@@ -178,6 +187,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
         boolean schemaHasNoTables = catalog.getTables().isEmpty();
+        final String node = VoltZK.rejoinNodesBlockerNode+m_hostId;
+        VoltZK.createRejoinNodeIndicator(m_messenger.getZK(),node);
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;

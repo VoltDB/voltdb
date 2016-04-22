@@ -650,11 +650,14 @@ public final class InvocationDispatcher {
         if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
             hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
                     + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                    + "And all rejoin nodes should be completed."
                     + " Use shutdown to stop the cluster.");
             return gracefulFailureResponse(
                     "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                  + "And all rejoin nodes should be completed."
                   + " Use shutdown to stop the cluster.", task.clientHandle);
         }
+
 
         int hid = hostMessenger.getHostId();
         if (hid == ihid) {
