@@ -30,7 +30,6 @@
 #include "storage/tablefactory.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "indexes/tableindex.h"
 
 #include "catalog/database.h"
 
@@ -59,37 +58,6 @@ const static int DR_TUPLE_COLUMN_INDEX = 9;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
-
-class CachedIndexKeyTuple {
-public:
-    CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
-
-    TableTuple &tuple(PersistentTable *table, uint32_t indexCrc) {
-        if (m_storageSize > 0 && indexCrc == m_cachedIndexCrc) {
-            return m_tuple;
-        }
-        std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
-        if (!index.first || indexCrc != index.second) {
-            throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
-                                         indexCrc);
-        }
-        const TupleSchema* schema = index.first->getKeySchema();
-        size_t tupleLength = schema->tupleLength() + TUPLE_HEADER_SIZE;
-        if (tupleLength > m_storageSize) {
-            m_tupleStorage.reset(new char[tupleLength]);
-            m_storageSize = tupleLength;
-        }
-        m_tuple.setSchema(schema);
-        m_tuple.move(m_tupleStorage.get());
-        m_cachedIndexCrc = index.second;
-        return m_tuple;
-    }
-private:
-    TableTuple m_tuple;
-    uint32_t m_cachedIndexCrc;
-    size_t m_storageSize;
-    boost::scoped_array<char> m_tupleStorage;
-};
 
 // a c++ style way to limit access from outside this file
 namespace {
@@ -521,8 +489,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
                              boost::unordered_map<int64_t, PersistentTable*> &tables,
                              Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                              const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
-    CachedIndexKeyTuple indexKeyTuple;
-
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
@@ -682,76 +648,10 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecord
         break;
     }
     case DR_RECORD_DELETE_BY_INDEX: {
-        int64_t tableHandle = taskInfo->readLong();
-        int32_t rowKeyLength = taskInfo->readInt();
-        uint32_t indexCrc = taskInfo->readInt();
-        const char *rowKeyData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowKeyLength));
-        if (skipRow) {
-            break;
-        }
-
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
-        if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
-                                         (intmax_t)tableHandle);
-        }
-        PersistentTable *table = tableIter->second;
-
-        TableTuple tempTuple = indexKeyTuple.tuple(table, indexCrc);
-
-        ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
-
-        const TableIndex* index = table->getUniqueIndexForDR().first;
-        IndexCursor indexCursor(index->getTupleSchema());
-        index->moveToKey(&tempTuple, indexCursor);
-        TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
-        if (deleteTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                         type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
-        }
-
-        table->deleteTuple(deleteTuple, true);
-        break;
+        throwSerializableEEException("Delete by index is not supported for DR");
     }
     case DR_RECORD_UPDATE_BY_INDEX: {
-        int64_t tableHandle = taskInfo->readLong();
-        int32_t oldRowKeyLength = taskInfo->readInt();
-        uint32_t oldKeyIndexCrc = taskInfo->readInt();
-        const char *oldRowKeyData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowKeyLength));
-        int32_t newRowLength = taskInfo->readInt();
-        const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        if (skipRow) {
-            break;
-        }
-
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
-        if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
-                                         (intmax_t)tableHandle);
-        }
-        PersistentTable *table = tableIter->second;
-
-        TableTuple tempTuple = indexKeyTuple.tuple(table, oldKeyIndexCrc);
-
-        ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
-
-        const TableIndex* index = table->getUniqueIndexForDR().first;
-        IndexCursor indexCursor(index->getTupleSchema());
-        index->moveToKey(&tempTuple, indexCursor);
-        TableTuple oldTuple = index->nextValueAtKey(indexCursor);
-        if (oldTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                        type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
-        }
-
-        tempTuple = table->tempTuple();
-        ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
-
-        table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
-        break;
+        throwSerializableEEException("Update by index is not supported for DR");
     }
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
