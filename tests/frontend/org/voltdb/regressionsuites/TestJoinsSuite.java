@@ -797,7 +797,7 @@ public class TestJoinsSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testOuterJoin() throws NoConnectionsException, IOException, ProcCallException
+    public void testOuterJoin() throws Exception
     {
         Client client = this.getClient();
         subtestOuterJoinMultiTable(client);
@@ -834,7 +834,7 @@ public class TestJoinsSuite extends RegressionSuite {
     }
 
     private void subtestOuterJoinENG8692(Client client)
-            throws NoConnectionsException, IOException, ProcCallException
+            throws Exception
     {
         client.callProcedure("@AdHoc", "INSERT INTO t1 VALUES(1);");
         client.callProcedure("@AdHoc", "INSERT INTO t2 VALUES(1);");

@@ -157,7 +157,9 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                     break;
                 }
             }
-            if (indexKeyUpdated) break;
+            if (indexKeyUpdated) {
+                break;
+            }
         }
         if (indexKeyUpdated) {
             indexesToUpdate.push_back(index);
@@ -168,24 +170,19 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(targetTuple.sizeInValues() == targetTable->columnCount());
     TableIterator input_iterator = m_inputTable->iterator();
     while (input_iterator.next(m_inputTuple)) {
-        //
-        // OPTIMIZATION: Single-Sited Query Plans
-        // If our beloved UpdatePlanNode is apart of a single-site query plan,
-        // then the first column in the input table will be the address of a
-        // tuple on the target table that we will want to update. This saves us
-        // the trouble of having to do an index lookup
-        //
+        // The first column in the input table will be the address of a
+        // tuple to update in the target table.
         void *target_address = m_inputTuple.getNValue(0).castAsAddress();
         targetTuple.move(target_address);
 
         // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
         // the values that we need to. The key thing to note here is that we
         // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-        // we want to update). This insures that if the input tuple is somehow
+        // we want to update). This ensures that if the input tuple is somehow
         // bringing garbage with it, we're only going to copy what we really
         // need to into the target tuple.
         //
-        TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
+        TableTuple &tempTuple = targetTable->copyIntoTempTuple(targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
             tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
                                 m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
@@ -208,24 +205,14 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (!targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                           indexesToUpdate)) {
-            VOLT_INFO("Failed to update tuple from table '%s'",
-                      targetTable->name().c_str());
-            return false;
-        }
+        targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
+                                                    indexesToUpdate);
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));
     // try to put the tuple into the output table
-    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(m_inputTable->activeTupleCount()),
-                   m_node->getOutputTable()->name().c_str());
-        return false;
-    }
+    m_node->getOutputTable()->insertTuple(count_tuple);
 
     VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug().c_str());
     // TODO lets output result table here, not in result executor. same thing in

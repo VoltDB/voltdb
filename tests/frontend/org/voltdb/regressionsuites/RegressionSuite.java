@@ -387,8 +387,14 @@ public class RegressionSuite extends TestCase {
         return isLocalCluster() ? ((LocalCluster)m_config).internalPort(hostId) : VoltDB.DEFAULT_INTERNAL_PORT+hostId;
     }
 
-    static protected void validateTableOfLongs(Client c, String sql, long[][] expected)
-            throws NoConnectionsException, IOException, ProcCallException {
+    static protected void validateDMLTupleCount(Client c, String sql, long modifiedTupleCount)
+            throws Exception {
+        validateTableOfLongs(c, sql, new long[][] {{modifiedTupleCount}});
+    }
+
+    static public void validateTableOfLongs(Client c, String sql, long[][] expected)
+            throws Exception, IOException, ProcCallException {
+        assertNotNull(expected);
         VoltTable vt = c.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(sql, vt, expected);
     }
