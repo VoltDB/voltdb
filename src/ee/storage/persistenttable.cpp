@@ -598,7 +598,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const &indexesToUpdate,
                                                      bool fallible,
@@ -761,7 +761,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
     }
-    return true;
 }
 
 /*
