@@ -34,9 +34,9 @@ Matching offers are found using a query that joins a summary view of the account
 
 ### callcenter ###
 
-Process begin and end call events from a call center. Pair/join events in VoltDB to create a definitive record of completed calls.
+The Callcenter VoltDB application processes begin and end call events from a call center. Pair/join events in VoltDB create a definitive record of completed calls.
 
-Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency.  Thankfully VoltDB provides strong consistency, making solving this problem much easier. The provided HTML dashboard shows a top-N list of agents by standard deviation.
+This app uses VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. The provided HTML dashboard shows a top-N list of agents by standard deviation.
 
 ### contentionmark ###
   

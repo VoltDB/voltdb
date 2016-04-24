@@ -1817,7 +1817,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
         }
-        return false;
+        return producesOneRowOutput();
     }
 
     private boolean hasTopLevelScans() {

@@ -416,7 +416,7 @@ class ServerBundle(JavaBundle):
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
-    verb.add_options(
+        verb.add_options(
             cli.StringListOption(None, '--ignore', 'skip_requirements',
                              '''requirements to skip when start voltdb:
                  thp - Checking for Transparent Huge Pages (THP) has been disabled.  Use of THP can cause VoltDB to run out of memory. Do not disable this check on production systems.''',

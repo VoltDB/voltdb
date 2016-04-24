@@ -5,7 +5,7 @@ Use Case
 ---------------------------
 Process begin and end call events from a call center. Pair/join events in VoltDB to create a definitive record of completed calls.
 
-Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. The provided HTML dashboard shows a top-N list of agents by standard deviation. It can be found in the "web" folder.
+This app uses VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. The provided HTML dashboard shows a top-N list of agents by standard deviation. It can be found in the "web" folder.
 
 Note that in order for the simulation to be interesting, this app uses unrealistic call data. The average call time is 5s by default to make the stats interesting in a two-minute example run.
 

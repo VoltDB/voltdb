@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+PHOME=`dirname $0`
+export PYTHONPATH=${PHOME}/python-jenkins-0.4.12
+#echo $PYTHONPATH
+python ${PHOME}/resv.py $*

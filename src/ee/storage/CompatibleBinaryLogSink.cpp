@@ -484,7 +484,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log insert on table " + table->name());
+            throw;
+        }
         try {
             table->insertPersistentTuple(tempTuple, true, true);
         } catch (ConstraintFailureException &e) {
@@ -514,7 +519,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log delete on table " + table->name());
+            throw;
+        }
 
         TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
         if (deleteTuple.isNullTuple()) {
@@ -563,7 +573,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (old tuple) on table " + table->name());
+            throw;
+        }
 
         // create the expected tuple
         TableTuple expectedTuple(table->schema());
@@ -572,7 +587,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         expectedTuple.copyForPersistentInsert(tempTuple, pool);
 
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(newRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (new tuple) on table " + table->name());
+            throw;
+        }
 
         TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
         if (oldTuple.isNullTuple()) {
@@ -636,7 +656,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = indexKeyTuple.tuple(table, indexCrc);
 
         ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log delete by index on table " + table->name());
+            throw;
+        }
 
         const TableIndex* index = table->getUniqueIndexForDR().first;
         IndexCursor indexCursor(index->getTupleSchema());
@@ -670,7 +695,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
         TableTuple tempTuple = indexKeyTuple.tuple(table, oldKeyIndexCrc);
 
         ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update by index (old tuple) on table " + table->name());
+            throw;
+        }
 
         const TableIndex* index = table->getUniqueIndexForDR().first;
         IndexCursor indexCursor(index->getTupleSchema());
@@ -683,7 +713,12 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
 
         tempTuple = table->tempTuple();
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(newRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update by index (new tuple) on table " + table->name());
+            throw;
+        }
 
         table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
         break;
