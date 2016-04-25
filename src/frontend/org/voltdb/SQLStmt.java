@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 
+import com.google_voltpatches.common.base.Objects;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.ActivePlanRepository;
@@ -206,5 +207,30 @@ public class SQLStmt {
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(sqlText, joinOrder);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final SQLStmt other = (SQLStmt) obj;
+        return Objects.equal(this.sqlText, other.sqlText) && Objects.equal(this.joinOrder, other.joinOrder);
+    }
+
+    @Override
+    public String toString() {
+        return Objects.toStringHelper(this)
+                .add("sqlTextStr", getText())
+                .add("joinOrder", joinOrder)
+                .toString();
     }
 }
