@@ -609,9 +609,9 @@ def allowed_file(filename):
 
 def get_servers_from_database_id(database_id):
     servers = []
-    database = Global.DATABASES.get(database_id)
+    database = Global.DATABASES.get(int(database_id))
     if database is None:
-        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % int(database_id)}), 404)
     else:
         members = database['members']
 
@@ -754,7 +754,6 @@ class ServerAPI(MethodView):
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def delete(database_id, server_id):
@@ -932,7 +931,6 @@ class DatabaseAPI(MethodView):
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def put(database_id):

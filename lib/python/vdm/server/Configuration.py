@@ -40,6 +40,7 @@ import DeploymentConfig
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 from logging.handlers import RotatingFileHandler
 import logging
+import ast
 
 
 def convert_xml_to_json(config_path):
@@ -112,8 +113,6 @@ def validate_and_convert_xml_to_json(config_path):
     for (k, v) in zip(xml_final.keys(), xml_final.values()):
         D2[k] = v
     log_file = os.path.join(HTTPListener.Global.DATA_PATH, 'voltdeploy.log')
-    # file = open(log_file, 'w')
-    # file.close()
 
     handler = RotatingFileHandler(log_file)
     handler.setFormatter(logging.Formatter(
@@ -132,7 +131,11 @@ def validate_and_convert_xml_to_json(config_path):
             sys.stdout.write(str(inputs.errors))
             log.error("Error while reloading configuration: %s", str(inputs.errors))
         else:
-            HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+            result = validate_server_ports(member_json[0], D2[k]['databases']['database'])
+            if result is None:
+                HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+            else:
+                log.error("Error while reloading configuration: %s", result)
     else:
         member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
         for member in member_json:
@@ -144,7 +147,11 @@ def validate_and_convert_xml_to_json(config_path):
                 sys.stdout.write(str(inputs.errors))
                 log.error("Error while reloading configuration: %s", str(inputs.errors))
             else:
-                HTTPListener.Global.SERVERS[member['id']] = member
+                result = validate_server_ports(member_json[0], D2[k]['databases']['database'])
+                if result is None:
+                    HTTPListener.Global.SERVERS[member['id']] = member
+                else:
+                    log.error("Error while reloading configuration: %s", result)
 
     if type(D2[k]['databases']['database']) is dict:
         db_json = get_field_from_xml(D2[k]['databases']['database'],
@@ -226,6 +233,91 @@ def validate_and_convert_xml_to_json(config_path):
                     log.error("Error while reloading configuration: %s", str(inputs.errors))
                 else:
                     HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
+
+
+def validate_server_ports(member, databases):
+    arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
+           "client-listener"]
+
+    specified_port_values = {
+        "http-listener": HTTPListener.get_port(member['http-listener']),
+        "admin-listener": HTTPListener.get_port(member['admin-listener']),
+        "replication-listener": HTTPListener.get_port(member['replication-listener']),
+        "client-listener": HTTPListener.get_port(member['client-listener']),
+        "zookeeper-listener": HTTPListener.get_port(member['zookeeper-listener']),
+        "internal-listener": HTTPListener.get_port(member['internal-listener'])
+    }
+
+    for option in arr:
+        value = specified_port_values[option]
+        for port_key in specified_port_values.keys():
+            if option != port_key and value is not None and specified_port_values[port_key] == value:
+                return "Duplicate port"
+
+    if type(databases) is dict:
+        if member['id'] in ast.literal_eval(databases['members']):
+                database_servers = get_servers_from_database_id(databases['id'])
+                servers = [servers for servers in database_servers if servers['hostname'] == member['hostname']]
+                for option in arr:
+                    result = check_port_valid(option, servers)
+                    if result is not None:
+                        return result
+    elif type(databases) is list:
+        for database in databases:
+            if member['id'] in ast.literal_eval(database['members']):
+                database_servers = get_servers_from_database_id(database['id'])
+                servers = [servers for servers in database_servers if servers['hostname'] == member['hostname']]
+                for option in arr:
+                    result = check_port_valid(option, servers)
+                    if result is not None:
+                        return result
+
+
+def check_port_valid(port_option, servers):
+    for i in range(len(servers)):
+        for j in range(i + 1, len(servers)):
+            return compare(port_option, servers[i], servers[j])
+
+
+def get_servers_from_database_id(database_id):
+    servers = []
+    database = HTTPListener.Global.DATABASES.get(int(database_id))
+    if database is None:
+        return 'No database found for id: %u' % int(database_id)
+    else:
+        members = database['members']
+
+    for server_id in members:
+        server = HTTPListener.Global.SERVERS.get(server_id)
+        servers.append(server)
+    return servers
+
+
+def compare(port_option, first, second):
+    if port_option == "http-listener":
+        default_port = "8080"
+    if port_option == "admin-listener":
+        default_port = "21211"
+    if port_option == "zookeeper-listener":
+        default_port = "7181"
+    if port_option == "replication-listener":
+        default_port = "5555"
+    if port_option == "client-listener":
+        default_port = "21212"
+    if port_option == "internal-listener":
+        default_port = "3021"
+
+    first_port = HTTPListener.get_port(first[port_option])
+    if first_port is None or first_port == "":
+        first_port = default_port
+
+    second_port = HTTPListener.get_port(second[port_option])
+    if second_port is None or second_port == "":
+        second_port = default_port
+
+    if first_port == second_port:
+        return "Port %s for the same host is already used by server %s for %s" % \
+                              (first_port, first['hostname'], port_option)
 
 
 def get_deployment_from_xml(deployment_xml, is_list):
