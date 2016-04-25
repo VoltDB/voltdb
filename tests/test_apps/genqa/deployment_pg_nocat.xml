@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="1" kfactor="0" />
+    <!--
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    -->
+    <export>
+        <configuration enabled="true" stream="abc" type="jdbc">
+            <property name="jdbcurl">jdbc:postgresql://localhost/vexport</property>
+            <property name="jdbcuser">vexport</property>
+            <property name="ignoregenerations">true</property>
+        </configuration>
+    </export>
+</deployment>

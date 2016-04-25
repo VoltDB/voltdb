@@ -757,7 +757,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                         "select sp1.bi, sp2.vc, sp1.ii, sp2.ti " +
                         "from source_p1 as sp1 inner join source_p2 as sp2 " +
                         "on sp1.ii = sp2.ii",
-                        "Join of multiple partitioned tables has insufficient join criteria");
+                        "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
 
         verifyStmtFails(client, "insert into target_r " +
                         "select sr1.bi, sr1.vc, sr1.ii, sr1.ti  " +
@@ -795,8 +795,8 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         verifyStmtFails(client, "insert into target_p " +
                 "select 9, vc, ii, ti " +
                 "from source_p1 as sp1",
-                "Partitioning could not be determined");
 
+                "Partitioning could not be determined");
         // this whole statement should be single-partition!
         verifyStmtFails(client, "insert into target_p " +
                 "select 9, vc, ii, ti " +
@@ -811,9 +811,8 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "inner join " +
                 "(select 9 as bi, vc, ii, ti from source_p1) as ins_sq " +
                 "on target_p.bi = ins_sq.bi",
-                "Join of multiple partitioned tables " +
-                "has insufficient join criteria"
-                );
+                "This query is not plannable.  "
+                + "The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testInsertIntoSelectGeneratedProcs() throws Exception

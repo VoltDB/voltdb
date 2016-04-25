@@ -625,6 +625,7 @@ public class Inits {
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
+                        (m_config.m_startAction==StartAction.CREATE && m_config.m_forceVoltdbCreate),
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );

@@ -941,6 +941,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    public void testGroupByAliasENG9872() {
+        // If we have an alias in a group by clause, and
+        // the alias is to an aggregate, we need to reject
+        // this.
+        failToCompile("SELECT 2*count(P1.PKEY) AS AAA FROM P1 GROUP BY AAA",
+                      "invalid GROUP BY expression:  COUNT()");
+        // Ambiguity.
+        failToCompile("SELECT P1.PKEY AS AAA, P1.PKEY AS AAA FROM P1 GROUP BY AAA",
+                      "Group by expression \"AAA\" is ambiguous");
+        // More ambiguity.  Also, the count aggregate is used
+        // in the group by, but we see the ambiguity first.
+        failToCompile("SELECT 2*count(P1.PKEY) AS AAA, P1.PKEY AS AAA FROM P1 GROUP BY AAA",
+                      "Group by expression \"AAA\" is ambiguous");
+        // This used to fail because we ignored select lists
+        // which had no aggregates.  Now we look at all of them.
+        compile("SELECT P1.PKEY AS AAA FROM P1 GROUP BY AAA");
+    }
+
     public void testGroupbyAliasNegativeCases() {
         // Group by aggregate expression
         try {
@@ -948,7 +966,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("invalid GROUP BY expression"));
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
@@ -956,7 +974,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
             fail();
         } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+            assertEquals("invalid GROUP BY expression:  COUNT()", ex.getMessage());
         }
 
         try {
@@ -964,7 +982,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
             fail();
         } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+            assertEquals("invalid GROUP BY expression:  COUNT()", ex.getMessage());
         }
 
         // Group by alias and expression
