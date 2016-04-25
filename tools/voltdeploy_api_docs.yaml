@@ -835,18 +835,6 @@ paths:
           schema:
             $ref: "#/definitions/voltdeployConfig"
     
-    post:
-      description:
-        Updates VDM configuration
-      responses:
-        200:
-          description: Success message
-          schema:
-            type: object
-            properties:
-              deployment:
-                type: integer
-                
   /databases/{database_id}/servers/start?id={server_id}:
     put:
       description:
