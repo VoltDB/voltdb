@@ -388,16 +388,31 @@
                        "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
+# This Insert, with WHERE clause and ORDER BY, works fine (Select from Replicated, Upsert into Partitioned table):
 {"testName":"InsertIntoSelectRepl2Part",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              INSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM partitioned_table",
  "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
-# Same Insert, without Order By, works fine (unlike UPSERT, but correct):
+# Same Insert, with WHERE clause but no ORDER BY, works fine:
 {"testName":"InsertIntoSelectNoOrderBy",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              INSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;\n
+             SELECT * FROM partitioned_table",
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+# Same Insert, with ORDER BY but no WHERE clause, works fine:
+{"testName":"InsertIntoSelectNoWhere",
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
+             INSERT INTO partitioned_table SELECT * FROM replicated_table ORDER BY rowid;\n
+             SELECT * FROM partitioned_table",
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+# Same Insert, without WHERE clause or ORDER BY, also works fine (unlike UPSERT, but correct):
+{"testName":"InsertIntoSelectNoWhereOrOrderBy",
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
+             INSERT INTO partitioned_table SELECT * FROM replicated_table;\n
              SELECT * FROM partitioned_table",
  "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
@@ -437,16 +452,31 @@
                        "type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
+# This Upsert, with WHERE clause and ORDER BY, works fine (Select from Replicated, Upsert into Partitioned table):
 {"testName":"UpsertIntoSelectRepl2Part",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
              UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1 ORDER BY rowid;\n
              SELECT * FROM partitioned_table",
  "response":{"result":"__standard_result",
              "status":"SUCCESS"}}
-# Same Upsert, without Order By, fails (DML error; unlike INSERT, but correct):
+# Same Upsert, with WHERE clause but no ORDER BY, now works fine (since ENG-10073 fixed, because WHERE clause specifies one row):
 {"testName":"UpsertIntoSelectNoOrderBy",
    "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
-             UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;               ",
+             UPSERT INTO partitioned_table SELECT * FROM replicated_table WHERE rowid=1;\n
+             SELECT * FROM partitioned_table",
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+# Same Upsert, with ORDER BY but no WHERE clause, works fine:
+{"testName":"UpsertIntoSelectNoWhere",
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
+             UPSERT INTO partitioned_table SELECT * FROM replicated_table ORDER BY rowid;\n
+             SELECT * FROM partitioned_table",
+ "response":{"result":"__standard_result",
+             "status":"SUCCESS"}}
+# Same Upsert, without WHERE clause or ORDER BY, fails (non-deterministic error; unlike INSERT, but correct):
+{"testName":"UpsertIntoSelectNoWhereOrOrderBy",
+   "sqlCmd":"INSERT INTO replicated_table VALUES(__standard_insert_values);\n
+             UPSERT INTO partitioned_table SELECT * FROM replicated_table;",
  "response":{"result":"ERROR","status":"FAILURE","error":"non-deterministic"}}
 # Select from Partitioned, Upsert into Replicated should fail:
 {"testName":"UpsertIntoSelectPart2Repl",
