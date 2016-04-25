@@ -35,6 +35,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
@@ -414,9 +415,10 @@ public abstract class StatementCompiler {
         // We will need to update the system catalogs with this new information
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-            catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
             catalogParam.setIndex(i);
+            ParameterValueExpression pve = plan.parameters[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
         }
 
         PlanFragment frag = stmt.getFragments().add("0");

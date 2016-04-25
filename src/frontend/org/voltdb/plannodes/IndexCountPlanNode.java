@@ -259,7 +259,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             if (canPadding && missingKeyType.isMaxValuePaddable()) {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
-                missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
+                missingKey.setValue(String.valueOf(missingKeyType.getMaxValueForKeyPadding()));
                 missingKey.setValueSize(missingKeyType.getLengthInBytesForFixedTypes());
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);

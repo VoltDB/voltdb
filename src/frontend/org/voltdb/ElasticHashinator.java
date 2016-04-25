@@ -96,7 +96,7 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public int pHashToPartition(VoltType type, Object obj) {
-        return hashinateBytes(valueToBytes(obj));
+        return hashinateBytes(VoltType.valueToBytes(obj));
     }
 
     /**
