@@ -30,17 +30,35 @@ MARKERS = ['+', '*', '<', '>', '^', '_',
 
 mc = {}
 
-def get_stats(hostname, port) :
+def getLatestKitBuildTag(conn,kit_pattern,appname_pattern) :
+    if (kit_pattern == "latest" or kit_pattern == None) :
+        sql="select kit_build_tag from app_stats where appname like '"+appname_pattern+"' order by date desc,appname limit 1"
+    else :
+        sql="select kit_build_tag from app_stats where kit_build_tag like '"+kit_pattern+"' and appname like '"+appname_pattern+"' order by date desc,appname limit 1";
+
+    proc = VoltProcedure(conn, "@AdHoc",[FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([sql])
+    res=resp.tables[0].tuples[0][0]
+
+    return res;
+
+
+def get_stats(conn,build_tag) :
     """Get most recent run statistics of all apps within the last 'days'
     """
 
-    conn = FastSerializer(hostname, port)
     proc = VoltProcedure(conn, "@AdHoc",[FastSerializer.VOLTTYPE_STRING])
 
+    if ( build_tag == None ) :
+        print("No build tag provided");
+        return;
+        #sql = "select appname,nodes,duration,date,branch,throughput as tps,kit_build_tag as build,lat95,lat99 from app_stats where appname like 'YCSB-Anticache%' order by date desc,appname limit 1000"
+    else :
+        sql="select appname,nodes,duration,date,branch,throughput as tps,kit_build_tag as build,lat95,lat99 from app_stats where kit_build_tag = '"+build_tag+"' order by date desc,appname"
 
-    resp = proc.call(["select appname,nodes,duration,date,branch,throughput as tps,kit_build_tag as build,lat95,lat99 from app_stats where appname like 'YCSB-Anticache%' order by date desc,appname limit 1000"])
+    #print("sql:"+sql);
+    resp = proc.call([sql])
 
-    conn.close()
 
     # keyed on app name, value is a list of runs sorted chronologically
     maxdate = datetime.datetime(1970,1,1,0,0,0)
@@ -59,87 +77,82 @@ def get_stats(hostname, port) :
     return (app_stats, mindate, maxdate)
 
 
-def usage():
-    print "Usage:"
-    print "\t", sys.argv[0], "output_dir [build-tag]" \
-        " [width] [height]"
-    print
-    print "\t", "width in pixels"
-    print "\t", "height in pixels"
+def plotByWorkload(buckets,path,combograph=False) :
+   # build the graphs
+    for build in buckets :
+        location = 0;
+        subplotlocations = {}
+        sblocation = 0;
+        # create a subplot for each ratio
+        numcols = 1
+        if ( combograph ):
+            fig = plt.figure(figsize=(70,20))
+            fig.suptitle('Zipfian Distribution',fontsize=28,fontweight='bold');
+            numcols = len(buckets[build]);
 
-def main():
-    build_tag = None;
-    width = None;
-    height = None;
-
-    if len(sys.argv) < 1:
-        usage()
-        exit(-1)
-
-    path = sys.argv[1];
-    if not os.path.exists(path):
-        print path, "does not exist"
-        exit(-1)
-
-    if len(sys.argv) >= 3:
-        build_tag = str(sys.argv[2])
-    print(sys.argv);
-
-    if len(sys.argv) >= 4:
-        width = int(sys.argv[3])
-
-    if len(sys.argv) >= 5:
-        height = int(sys.argv[4])
-
-    # show all the history
-    (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212)
-
-    root_path = path
-    filenames = []              # (appname, latency, throughput)
-    iorder = 0
-    buckets = {};
-    for data in stats:
-        app = data["app"];
-        app = app.replace('/','')
-        # parse the appname so we can group them together: YCSB-Anticache-A-Z0.7-1:1
-        workload_group= re.search(r"YCSB-Anticache-([A-Z]+)-Z(\d+\.\d+)-(\d:\d)",app);
-        workload = workload_group.group(1);
-        zipfian = workload_group.group(2);
-        ratio = workload_group.group(3);
-        tps = data["tps"];
-        branch = data["branch"];
-        date = data["date"];
-        build = data["build"];
-
-        # put it in buckets
-        stats = [zipfian,tps];
-        statslist = [];
-        if build in buckets :
-            if ratio in buckets[build] :
-                if workload in buckets[build][ratio] :
-                    statslist = buckets[build][ratio][workload]
-                else :
-                    buckets[build][ratio][workload] = {}
+        for workload in sorted(buckets[build]) :
+            if ( not combograph) :
+                fig = plt.figure(figsize=(9,7))
+                #fig.suptitle('Zipfian Distribution',fontsize=20,fontweight='bold');
+                subplotlocations[workload] = 1;
             else :
-                buckets[build][ratio] = {};
-                buckets[build][ratio][workload] = {}
-        else :
-            buckets[build] = {};
-            buckets[build][ratio] = {};
-            buckets[build][ratio][workload] = {};
+                if workload in subplotlocations :
+                    sblocation = subplotlocations[workload]
+                else :
+                    location = location + 1;
+                    subplotlocations[workload] = location
 
-        statslist.append(stats);
+            #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
+            sb = plt.subplot(1,numcols,subplotlocations[workload]);
+            sb.invert_xaxis()
+            #sb.set_color_cycle(COLORS);
+            # these need to be applied AFTER the subplot is created.
+            plt.xlabel("Zipfian Value",fontsize=20,fontweight='bold');
+            plt.ylabel("Txns/Sec",fontsize=20,fontweight='bold');
 
-        buckets[build][ratio][workload] = statslist;
+            sb.set_title("Workload "+workload+": Throughput",fontsize=20,fontweight='bold');
+            sb.grid(True);
+
+            # stack a plot for each workload
+            legendlist = []
+            # sort the workloads:
+            for ratio in sorted(buckets[build][workload]) :
+                legendlist.append(ratio);
+                statsraw = buckets[build][workload][ratio];
+                stats = np.array(statsraw);
+                statslist =  stats[stats[:,0].argsort()]
+
+                x = statslist[:,0]
+                y = statslist[:,1]
+
+                sb.plot(x,y, "-", linewidth=3,label=ratio,solid_capstyle='round',solid_joinstyle='round',aa=True)
+
+            plt.legend(legendlist, loc='best')
+            if ( not combograph) :
+                savepath=path+"/"+build+"-workload-"+workload+".png"
+                print("writing:"+savepath);
+                fig.savefig(savepath);
+                fig.clear();
+
+        if ( combograph ) :
+            savepath=path+"/"+build+"-workload.png"
+            print("writing:"+savepath);
+            fig.savefig(savepath);
+            fig.clear();
+
+        plt.close(fig);
+
+    plt.close("all");
 
 
+def plotByRatio(buckets) :
     # build the graphs
     for build in buckets :
         location = 0;
         subplotlocations = {}
         sblocation = 0;
         # create a subplot for each ratio
-        numrows = len(buckets[build]);
+        numcols = len(buckets[build]);
         fig = plt.figure(figsize=(70,20))
         fig.suptitle('Zipfian Distribution',fontsize=28,fontweight='bold');
         # sort the ratio's first before we use them,
@@ -153,13 +166,13 @@ def main():
                 subplotlocations[ratio] = location
 
             #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
-            sb = plt.subplot(1,numrows,subplotlocations[ratio]);
+            sb = plt.subplot(1,numcols,subplotlocations[ratio]);
             sb.invert_xaxis()
             # these need to be applied AFTER the subplot is created.
-            plt.xlabel("Zipfian",fontsize=20);
-            plt.ylabel("TPS",fontsize=20);
+            plt.xlabel("Zipfian Value",fontsize=20);
+            plt.ylabel("Txns/Sec",fontsize=20);
 
-            sb.set_title("workload distribution: "+ratio);
+            sb.set_title("Ratio "+ratio+": Throughput",fontsize=30);
             sb.grid(True);
 
             # stack a plot for each workload
@@ -181,11 +194,115 @@ def main():
                 sb.plot(x,y, "-", linewidth=10,label=workload,solid_capstyle='round',solid_joinstyle='round',aa=True)
 
             plt.legend(legendlist, loc='best')
-        fig.savefig(build+".png");
+        fig.savefig(build+"-ratio.png");
         fig.clear();
         plt.close(fig);
 
     plt.close("all");
+
+def usage():
+    print "Usage:"
+    print "\t", sys.argv[0], "output_dir [build-tag] [master-tag] "
+    print "\t example: ./ycsb-graphs.py /tmp/test jenkins-kit-performance-rambranch-build-73 latest"
+    print "\t example: ./ycsb-graphs.py /tmp/test latest latest"
+    print "\t example: ./ycsb-graphs.py /tmp/test latest jenkins-kit-performance-ycsb-zipfian-build-4"
+    print ""
+
+def main():
+    build_tag = None;
+    master_tag = None;
+
+    if len(sys.argv) < 2:
+        usage()
+        exit(-1)
+
+    path = sys.argv[1];
+    if not os.path.exists(path):
+        print path, "does not exist"
+        exit(-1)
+
+    if len(sys.argv) >= 3:
+        build_tag = str(sys.argv[2])
+
+    if len(sys.argv) >= 4:
+        master_tag = str(sys.argv[3])
+
+    conn = FastSerializer(STATS_SERVER,21212)
+
+    latestMaster=getLatestKitBuildTag(conn,master_tag,'YCSB-%-master')
+    latestAnticache=getLatestKitBuildTag(conn,build_tag,'YCSB-Anticache-%')
+
+    print("master kit:"+latestMaster);
+    print("workload kit:"+latestAnticache);
+
+    # show all the history
+    (stats, mindate, maxdate) = get_stats(conn,latestAnticache)
+    (masterstats,mastermindate,mastermaxdate) = get_stats(conn,latestMaster)
+    conn.close();
+
+    workBuckets = getBucketsByWorkload(stats,mindate,maxdate);
+    masterWorkBuckets = getBucketsByWorkload(masterstats,mindate,maxdate);
+
+    # we need to merge the workload bucket and master buckets, add the master values to the workload bucket
+    for build in workBuckets :
+        for workload in workBuckets[build] :
+            for mbuild in masterWorkBuckets :
+                if ( workload in masterWorkBuckets[mbuild] ) :
+                   workBuckets[build][workload]["master"] = masterWorkBuckets[mbuild][workload]["master"]
+
+
+    plotByWorkload(workBuckets,path)
+
+def getBucketsByWorkload(stats,mindate,maxdate) :
+    #root_path = path
+    filenames = []              # (appname, latency, throughput)
+    iorder = 0
+    buckets = {};
+    for data in stats:
+        app = data["app"];
+        app = app.replace('/','')
+        # parse the appname so we can group them together: YCSB-Anticache-A-Z0.7-1:1
+        workload_group= re.search(r"YCSB-Anticache-([A-Z]+)-Z(\d+\.\d+)-(\d:\d)",app);
+        if ( workload_group == None) :
+            #YCSB-A-Z0.7-master
+            workload_group = re.search(r"YCSB-([A-Z]+)-Z(\d+\.\d+)",app);
+
+        workload = workload_group.group(1);
+        zipfian = workload_group.group(2);
+        if ( len(workload_group.groups()) >= 3  ) :
+            ratio = workload_group.group(3);
+        else :
+            ratio = "master"
+
+        tps = data["tps"];
+        branch = data["branch"];
+        date = data["date"];
+        build = data["build"];
+
+        # put it in buckets
+        stats = [zipfian,tps];
+        statslist = [];
+        # structure will be buckets[build][workload][ratio]
+        if build in buckets :
+
+            if workload in buckets[build] :
+                if ratio in buckets[build][workload] :
+                    statslist = buckets[build][workload][ratio]
+                else :
+                    buckets[build][workload][ratio] = {}
+            else :
+                buckets[build][workload] = {};
+                buckets[build][workload][ratio] = {}
+        else :
+            buckets[build] = {};
+            buckets[build][workload] = {};
+            buckets[build][workload][ratio] = {};
+
+        statslist.append(stats);
+
+        buckets[build][workload][ratio] = statslist;
+
+    return buckets;
 
 if __name__ == "__main__":
     main()
