@@ -215,7 +215,7 @@ label.ccErrorMsg {
     background-position: -6px -95px;
     cursor: pointer;
 	position:relative;
-	top:10px;
+	top:1px;
 }
 .deleteDisableDS{
     height: 26px;
