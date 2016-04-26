@@ -24,6 +24,11 @@
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
 ---------------------------------------------------------------------------------
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES bankoffers-procs.jar;
+
+file -inlinebatch END_OF_BATCH
+
 ----- REPLICATED TABLES -----------------
 
 CREATE TABLE customer(
@@ -112,9 +117,6 @@ GROUP BY TRUNCATE(SECOND,offer_ts);
 
 --------- PROCEDURES ----------------------
 
--- Update classes from jar to that server will know about classes but not procedures yet.
-LOAD CLASSES bankoffers-procs.jar;
-
 CREATE PROCEDURE recent_offer_totals AS
 SELECT * FROM total_offers ORDER BY offer_ts DESC LIMIT 60;
 
@@ -129,3 +131,5 @@ INNER JOIN account a on avt.acc_no = a.acc_no
 INNER JOIN customer c on a.cust_id = c.cust_id
 ORDER BY og.offer_ts desc
 LIMIT 10;
+
+END_OF_BATCH

@@ -24,6 +24,11 @@
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
 ---------------------------------------------------------------------------------
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES bankfraud-procs.jar;
+
+file -inlinebatch END_OF_BATCH
+
 ----- REPLICATED TABLES -----------------
 
 CREATE TABLE customer (
@@ -107,9 +112,6 @@ GROUP BY acc_no,TRUNCATE(DAY,txn_ts);
 
 --------- PROCEDURES ----------------------
 
--- Update classes from jar to that server will know about classes but not procedures yet.
-LOAD CLASSES bankfraud-procs.jar;
-
 CREATE PROCEDURE FROM CLASS bankfraud.DetectFraud;
 PARTITION PROCEDURE DetectFraud ON TABLE transaction COLUMN acc_no PARAMETER 1;
 
@@ -132,3 +134,4 @@ WHERE acc_no = ?
 ORDER BY txn_ts;
 PARTITION PROCEDURE GetTransactions ON TABLE transaction COLUMN acc_no PARAMETER 0;
 
+END_OF_BATCH
