@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET exportStream
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -104,7 +104,7 @@ CREATE TABLE  export_mirror_partitioned_table
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET exportStream
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -154,7 +154,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
+CREATE STREAM  export_replicated_table EXPORT TO TARGET exportStream
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -181,7 +181,7 @@ CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET exportStream
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
