@@ -418,7 +418,7 @@ def output_messages(msgs, f=sys.stdout, tag=None, level=0):
     else:
         stag = ''
     # msgs can be a single string or an iterable object.
-    if is_string(msgs):
+    if isinstance(msgs, basestring):
         msgs = [msgs]
     sindent = level * '  '
     # Recursively process message list and sub-lists.
@@ -429,7 +429,7 @@ def output_messages(msgs, f=sys.stdout, tag=None, level=0):
                 write('%s%s%s Exception: %s\n' % (stag, sindent, msg.__class__.__name__, str(msg)))
             else:
                 # Handle multi-line strings
-                if is_string(msg):
+                if isinstance(msg, basestring):
                     # If it is a string slice and dice it by linefeeds.
                     for msg2 in msg.split('\n'):
                         write('%s%s%s\n' % (stag, sindent, msg2))
@@ -460,16 +460,4 @@ def stop_logging():
         G.log_file = None
 
 
-def is_string(item):
-    """
-    Return True if the item behaves like a string.
-    :type item: str
-    :param item:
-    """
-    try:
-        # noinspection PyUnusedLocal
-        v = item + ''
-        return True
-    except TypeError:
-        return False
 

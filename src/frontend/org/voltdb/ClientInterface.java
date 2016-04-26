@@ -1263,6 +1263,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_cihm.get(adapter.connectionId());
     }
 
+    public void unbindAdapter(final Connection adapter) {
+        ClientInterfaceHandleManager cihm = m_cihm.remove(adapter.connectionId());
+        if (cihm != null) {
+            m_numConnections.decrementAndGet();
+            /*
+             * It's necessary to free all the resources held
+             * Outstanding requests may actually still be at large
+             */
+            m_allACGs.remove(cihm.m_acg);
+            m_notifier.removeConnection(adapter);
+            cihm.freeOutstandingTxns();
+        }
+    }
+
     // if this ClientInterface's site ID is the lowest non-execution site ID
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
