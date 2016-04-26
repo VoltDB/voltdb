@@ -39,6 +39,11 @@
 -- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
 ---------------------------------------------------------------------------------
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES metrocard-procs.jar;
+
+file -inlinebatch END_OF_BATCH
+
 -------------- REPLICATED TABLES ------------------------------------------------
 CREATE TABLE stations (
   station_id            SMALLINT          NOT NULL,
@@ -117,9 +122,6 @@ GROUP BY
 
 -------------- PROCEDURES -------------------------------------------------------
 
--- Update classes from jar to that server will know about classes but not procedures yet.
-LOAD CLASSES metrocard-procs.jar;
-
 CREATE PROCEDURE PARTITION ON TABLE cards COLUMN card_id PARAMETER 0 FROM CLASS metrocard.CardSwipe;
 CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
 CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
@@ -131,3 +133,5 @@ WHERE card_id = ? AND card_type = 0;
 PARTITION PROCEDURE ReplenishCard ON TABLE cards COLUMN card_id PARAMETER 1;
 
 EXPORT TABLE card_alert_export to STREAM alertstream;
+
+END_OF_BATCH
