@@ -971,8 +971,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setupExecutor() {
-        if (m_executor==null) {
-            synchronized(m_executorLock) {
+        if (m_executor!=null) {
+            return;
+        }
+
+        synchronized(m_executorLock) {
+            if (m_executor==null) {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation
                             + " table " + m_tableName + " partition " + m_partitionId, 1);
