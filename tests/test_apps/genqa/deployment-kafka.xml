@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="4" kfactor="0" elastic="enabled" schema="catalog" />
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" elastic="enabled"/>
     <partition-detection enabled="false">
         <snapshot prefix="voltdb_partition_detection"/>
     </partition-detection>
@@ -9,12 +9,13 @@
     <httpd port="8080">
         <jsonapi enabled="true"/>
     </httpd>
-    <export enabled="true" target="kafka">
-        <configuration>
-            <property name="metadata.broker.list">kafka1:9092</property>
+    <export>
+        <configuration enabled="true" stream="exportStream" type="kafka">
+            <property name="metadata.broker.list">kafka2:9092</property>
             <property name="producer.type">async</property>
-            <property name="request.required.acks">1</property>
-            <property name="skipinternals">false</property>
+            <property name="acks">1</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix"></property>
         </configuration>
     </export>
     <commandlog synchronous="false" enabled="false" logsize="1024">
