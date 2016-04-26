@@ -105,8 +105,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile boolean m_mastershipAccepted = false;
-    private volatile boolean m_isActive;
-    private AtomicReference<ListeningExecutorService> m_executor = new AtomicReference<>();
+    private volatile ListeningExecutorService m_executor;
     private Integer m_executorLock = new Integer(0);
     private LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
 
@@ -302,7 +301,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void activate() {
-        m_isActive = true;
         setupExecutor();
     }
 
@@ -502,7 +500,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    final ByteBuffer buf = checkDoubleFree();
+                                    checkDoubleFree();
                                     cont.discard();
                                     deleted.set(true);
                                 }
@@ -544,10 +542,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             Throwables.propagate(e);
         }
         ListeningExecutorService es = getExecutorService();
+        assert(es!=null); // tests will fail because we run with assertion enabled
         if (es==null) {
-            //TODO: Is this the right thing to do?
-            throw new RuntimeException("This generation must be active by the time pushExportBuffer is called");
+            exportLog.error(
+                "Push export buffer called before the generation is active. This push will be ignored");
+            return;
         }
+
         if (es.isShutdown()) {
            m_bufferPushPermits.release();
            return;
@@ -946,35 +947,35 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, boolean callExecute) {
-        if (!m_isActive) {
+        if (m_executor==null) {
             synchronized (m_executorLock) {
-                if (!m_isActive) {
+                if (m_executor==null) {
                     m_queuedActions.add(runnable);
                     return Futures.immediateFuture(null);
                 }
             }
         }
 
-        setupExecutor();
-        runnable.setExecutorService(m_executor.get());
+        // If we got here executor is not null and this generation is active
+        runnable.setExecutorService(m_executor);
 
-        if (m_executor.get().isShutdown()) {
+        if (m_executor.isShutdown()) {
             return Futures.immediateFuture(null);
         }
         if (callExecute) {
-            m_executor.get().execute(runnable);
+            m_executor.execute(runnable);
             return Futures.immediateFuture(null);
         } else {
-            return m_executor.get().submit(runnable);
+            return m_executor.submit(runnable);
         }
     }
 
     public void setupExecutor() {
-        if (m_executor.get()==null) {
-            ListeningExecutorService es = CoreUtils.getListeningExecutorService(
+        if (m_executor==null) {
+            synchronized(m_executorLock) {
+                ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation
                             + " table " + m_tableName + " partition " + m_partitionId, 1);
-            synchronized(m_executorLock) {
                 if (m_queuedActions.size()>0) {
                     for (RunnableWithES queuedR : m_queuedActions) {
                         queuedR.setExecutorService(es);
@@ -982,15 +983,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     m_queuedActions.clear();
                 }
-            }
-            if (!m_executor.compareAndSet(null, es)) {
-                es.shutdown();
+                m_executor = es;
             }
         }
     }
 
     public ListeningExecutorService getExecutorService() {
-        return m_executor.get();
+        return m_executor;
     }
 
     private abstract class RunnableWithES implements Runnable {
