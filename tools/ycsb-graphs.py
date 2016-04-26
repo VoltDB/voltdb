@@ -52,7 +52,6 @@ def get_stats(conn,build_tag) :
     if ( build_tag == None ) :
         print("No build tag provided");
         return;
-        #sql = "select appname,nodes,duration,date,branch,throughput as tps,kit_build_tag as build,lat95,lat99 from app_stats where appname like 'YCSB-Anticache%' order by date desc,appname limit 1000"
     else :
         sql="select appname,nodes,duration,date,branch,throughput as tps,kit_build_tag as build,lat95,lat99 from app_stats where kit_build_tag = '"+build_tag+"' order by date desc,appname"
 
@@ -77,7 +76,7 @@ def get_stats(conn,build_tag) :
     return (app_stats, mindate, maxdate)
 
 
-def plotByWorkload(buckets,path,combograph=False) :
+def plotByWorkload(buckets,path,combograph=False,title='') :
    # build the graphs
     for build in buckets :
         location = 0;
@@ -87,13 +86,13 @@ def plotByWorkload(buckets,path,combograph=False) :
         numcols = 1
         if ( combograph ):
             fig = plt.figure(figsize=(70,20))
-            fig.suptitle('Zipfian Distribution',fontsize=28,fontweight='bold');
+            fig.suptitle(title,fontsize=10,fontweight='bold');
             numcols = len(buckets[build]);
 
         for workload in sorted(buckets[build]) :
             if ( not combograph) :
                 fig = plt.figure(figsize=(9,7))
-                #fig.suptitle('Zipfian Distribution',fontsize=20,fontweight='bold');
+                fig.suptitle(title,fontsize=10);
                 subplotlocations[workload] = 1;
             else :
                 if workload in subplotlocations :
@@ -104,7 +103,7 @@ def plotByWorkload(buckets,path,combograph=False) :
 
             #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
             sb = plt.subplot(1,numcols,subplotlocations[workload]);
-            sb.invert_xaxis()
+            #sb.invert_xaxis()
             #sb.set_color_cycle(COLORS);
             # these need to be applied AFTER the subplot is created.
             plt.xlabel("Zipfian Value",fontsize=20,fontweight='bold');
@@ -124,8 +123,17 @@ def plotByWorkload(buckets,path,combograph=False) :
 
                 x = statslist[:,0]
                 y = statslist[:,1]
+                #i = 0;
+                #z= [len(x)];
+                #for v in x :
+                #    z[i] = "z"+str(x);
+                #print("x:"+str(x));
 
-                sb.plot(x,y, "-", linewidth=3,label=ratio,solid_capstyle='round',solid_joinstyle='round',aa=True)
+
+                sb.plot(x,y, "-^", linewidth=3,label=ratio,solid_capstyle='round',solid_joinstyle='round',aa=True)
+
+                # this will force it to use the specific x values, and not autoscale.
+                sb.set_xticks([float(i) for i in x]);
 
             plt.legend(legendlist, loc='best')
             if ( not combograph) :
@@ -140,62 +148,6 @@ def plotByWorkload(buckets,path,combograph=False) :
             fig.savefig(savepath);
             fig.clear();
 
-        plt.close(fig);
-
-    plt.close("all");
-
-
-def plotByRatio(buckets) :
-    # build the graphs
-    for build in buckets :
-        location = 0;
-        subplotlocations = {}
-        sblocation = 0;
-        # create a subplot for each ratio
-        numcols = len(buckets[build]);
-        fig = plt.figure(figsize=(70,20))
-        fig.suptitle('Zipfian Distribution',fontsize=28,fontweight='bold');
-        # sort the ratio's first before we use them,
-
-        for ratio in sorted(buckets[build]) :
-
-            if ratio in subplotlocations :
-                sblocation = subplotlocations[ratio]
-            else :
-                location = location + 1;
-                subplotlocations[ratio] = location
-
-            #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
-            sb = plt.subplot(1,numcols,subplotlocations[ratio]);
-            sb.invert_xaxis()
-            # these need to be applied AFTER the subplot is created.
-            plt.xlabel("Zipfian Value",fontsize=20);
-            plt.ylabel("Txns/Sec",fontsize=20);
-
-            sb.set_title("Ratio "+ratio+": Throughput",fontsize=30);
-            sb.grid(True);
-
-            # stack a plot for each workload
-            legendlist = []
-            # sort the workloads:
-            for workload in sorted(buckets[build][ratio]) :
-                legendlist.append(workload);
-                statsraw = buckets[build][ratio][workload];
-                # sort them
-                stats = np.array(statsraw);
-                #statslist= stats[stats[:,0].argsort()[::-1]]
-                statslist =  stats[stats[:,0].argsort()]
-
-                x = statslist[:,0]
-                #xsmooth = np.linspace(x.min(),x.max(),300)
-                y = statslist[:,1]
-                #ysmooth = spline(x,300,xnew
-
-                sb.plot(x,y, "-", linewidth=10,label=workload,solid_capstyle='round',solid_joinstyle='round',aa=True)
-
-            plt.legend(legendlist, loc='best')
-        fig.savefig(build+"-ratio.png");
-        fig.clear();
         plt.close(fig);
 
     plt.close("all");
@@ -218,7 +170,7 @@ def main():
 
     path = sys.argv[1];
     if not os.path.exists(path):
-        print path, "does not exist"
+        print path, " save path does not exist"
         exit(-1)
 
     if len(sys.argv) >= 3:
@@ -243,7 +195,7 @@ def main():
     workBuckets = getBucketsByWorkload(stats,mindate,maxdate);
     masterWorkBuckets = getBucketsByWorkload(masterstats,mindate,maxdate);
 
-    # we need to merge the workload bucket and master buckets, add the master values to the workload bucket
+    # we need to merge the workload and master buckets, add the master values to the workload bucket
     for build in workBuckets :
         for workload in workBuckets[build] :
             for mbuild in masterWorkBuckets :
@@ -251,7 +203,7 @@ def main():
                    workBuckets[build][workload]["master"] = masterWorkBuckets[mbuild][workload]["master"]
 
 
-    plotByWorkload(workBuckets,path)
+    plotByWorkload(workBuckets,path,title=latestMaster+" vs "+ latestAnticache )
 
 def getBucketsByWorkload(stats,mindate,maxdate) :
     #root_path = path
