@@ -72,6 +72,7 @@
 #include "catalog/database.h"
 #include "catalog/constraint.h"
 
+#include "test_utils/LoadTableFrom.hpp"
 
 using namespace std;
 using namespace voltdb;
@@ -123,9 +124,9 @@ public:
      * just for this test.  But that is not easily done.
      */
     ExecutionEngineTest(uint32_t random_seed = (unsigned int)time(NULL))
-            : cluster_id(1),
-              site_id(1),
-              constraint(NULL)
+            : m_cluster_id(1),
+              m_site_id(1),
+              m_constraint(NULL)
     {
         srand(random_seed);
         /*
@@ -139,7 +140,7 @@ public:
          * and surround each line with unescaped double quotes.  But you
          * knew that already.
          */
-        catalog_string =
+        m_catalog_string =
             "add / clusters cluster\n"
             "set /clusters#cluster localepoch 1199145600\n"
             "set $PREV securityEnabled false\n"
@@ -407,33 +408,33 @@ public:
          * resetReusedResultOutputBuffer causes the engine to
          * use them.
          */
-        m_topend = new EngineTestTopend();
-        m_engine = new VoltDBEngine(m_topend);
-        m_parameterBuffer.reset(new char [4 * 1024]);
-        m_resultBuffer.reset(new char [1024 * 1024 * 2]);
-        m_exceptionBuffer.reset(new char [4 * 1024]);
-        m_engine->setBuffers(m_parameterBuffer.get(), 4 * 1024,
-                             m_resultBuffer.get(), 1024 * 1024 * 2,
-                             m_exceptionBuffer.get(), 4096);
+        m_topend.reset(new EngineTestTopend());
+        m_engine.reset(new VoltDBEngine(m_topend.get()));
+        m_parameter_buffer.reset(new char [4 * 1024]);
+        m_result_buffer.reset(new char [1024 * 1024 * 2]);
+        m_exception_buffer.reset(new char [4 * 1024]);
+        m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
+                             m_result_buffer.get(), 1024 * 1024 * 2,
+                             m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->cluster_id, this->site_id, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false));
+        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false));
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-        ASSERT_TRUE(m_engine->loadCatalog( -2, catalog_string));
+        ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
         /*
          * Get a link to the catalog and pull out information about it
          */
-        catalog = m_engine->getCatalog();
-        cluster = catalog->clusters().get("cluster");
-        database = cluster->databases().get("database");
-        database_id = database->relativeIndex();
-        catalog::Table *partitioned_catalog_table_customer = database->tables().get("D_CUSTOMER");
-        partitioned_customer_table_id = partitioned_catalog_table_customer->relativeIndex();
-        partitioned_customer_table = m_engine->getTable(partitioned_customer_table_id);
-        catalog::Table *replicated_catalog_table_customer = database->tables().get("R_CUSTOMER");
-        replicated_customer_table_id = replicated_catalog_table_customer->relativeIndex();
-        replicated_customer_table = m_engine->getTable(replicated_customer_table_id);
+        m_catalog = m_engine->getCatalog();
+        m_cluster = m_catalog->clusters().get("cluster");
+        m_database = m_cluster->databases().get("database");
+        m_database_id = m_database->relativeIndex();
+        catalog::Table *partitioned_catalog_table_customer = m_database->tables().get("D_CUSTOMER");
+        m_partitioned_customer_table_id = partitioned_catalog_table_customer->relativeIndex();
+        m_partitioned_customer_table = m_engine->getTable(m_partitioned_customer_table_id);
+        catalog::Table *replicated_catalog_table_customer = m_database->tables().get("R_CUSTOMER");
+        m_replicated_customer_table_id = replicated_catalog_table_customer->relativeIndex();
+        m_replicated_customer_table = m_engine->getTable(m_replicated_customer_table_id);
 
         //
         // Fill in tuples.  The IndexOrder test does not use
@@ -444,52 +445,48 @@ public:
         // especially if the random see is the time the test
         // started.
         //
-        ASSERT_TRUE(partitioned_customer_table);
-        ASSERT_TRUE(tableutil::addRandomTuples(partitioned_customer_table, NUM_OF_TUPLES));
-        ASSERT_TRUE(replicated_customer_table);
-        ASSERT_TRUE(tableutil::addRandomTuples(replicated_customer_table, NUM_OF_TUPLES));
+        ASSERT_TRUE(m_partitioned_customer_table);
+        ASSERT_TRUE(tableutil::addRandomTuples(m_partitioned_customer_table, NUM_OF_TUPLES));
+        ASSERT_TRUE(m_replicated_customer_table);
+        ASSERT_TRUE(tableutil::addRandomTuples(m_replicated_customer_table, NUM_OF_TUPLES));
     }
-        ~ExecutionEngineTest() {
+    ~ExecutionEngineTest() {
             //
             // When we delete the VoltDBEngine
             // it will cleanup all the tables for us.
-            // We need to delete some other stuff we
-            // have allocated, though.
             //
-            delete(m_engine);
-            delete(m_topend);
         }
 
     protected:
-        CatalogId cluster_id;
-        CatalogId database_id;
-        CatalogId site_id;
-        VoltDBEngine *m_engine;
-        string catalog_string;
-        catalog::Catalog *catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
-        catalog::Cluster *cluster;
-        catalog::Database *database;
-        catalog::Constraint *constraint;
-        EngineTestTopend *m_topend;
-        Table* partitioned_customer_table;
-        int partitioned_customer_table_id;
+        CatalogId m_cluster_id;
+        CatalogId m_database_id;
+        CatalogId m_site_id;
+        string m_catalog_string;
+        catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
+        catalog::Cluster *m_cluster;
+        catalog::Database *m_database;
+        catalog::Constraint *m_constraint;
+        boost::scoped_ptr<VoltDBEngine>     m_engine;
+        boost::scoped_ptr<EngineTestTopend> m_topend;
+        Table* m_partitioned_customer_table;
+        int m_partitioned_customer_table_id;
 
-        Table* replicated_customer_table;
-        int replicated_customer_table_id;
+        Table* m_replicated_customer_table;
+        int m_replicated_customer_table_id;
         void compareTables(Table *first, Table* second);
-        boost::shared_array<char>m_resultBuffer;
-        boost::shared_array<char>m_exceptionBuffer;
-        boost::shared_array<char>m_parameterBuffer;
+        boost::shared_array<char>m_result_buffer;
+        boost::shared_array<char>m_exception_buffer;
+        boost::shared_array<char>m_parameter_buffer;
 };
 
 /* Check the order of index vector
  * Index vector should follow the order of primary key first, all unique indices afterwards, and all the non-unique indices at the end.
  */
 TEST_F(ExecutionEngineTest, IndexOrder) {
-    ASSERT_TRUE(partitioned_customer_table->primaryKeyIndex() == partitioned_customer_table->allIndexes()[0]);
-    ASSERT_TRUE(partitioned_customer_table->allIndexes()[1]->isUniqueIndex());
-    ASSERT_FALSE(partitioned_customer_table->allIndexes()[2]->isUniqueIndex());
-    ASSERT_FALSE(partitioned_customer_table->allIndexes()[3]->isUniqueIndex());
+    ASSERT_TRUE(m_partitioned_customer_table->primaryKeyIndex() == m_partitioned_customer_table->allIndexes()[0]);
+    ASSERT_TRUE(m_partitioned_customer_table->allIndexes()[1]->isUniqueIndex());
+    ASSERT_FALSE(m_partitioned_customer_table->allIndexes()[2]->isUniqueIndex());
+    ASSERT_FALSE(m_partitioned_customer_table->allIndexes()[3]->isUniqueIndex());
 }
 
 // ------------------------------------------------------------------
@@ -610,11 +607,6 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Given a PlanFragmentInfo data object, make the m_engine execute it,
     // and validate the results.
     //
-    // Set this to true to print the result table while validating.
-    //
-    bool debug_print = false;
-
-    //
     // Load the plan in the top end.  We'll use fragmentId as
     // a length one array below.
     //
@@ -624,8 +616,8 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Make sure the parameter buffer is filled
     // with healthful zeros, and then create an input
     // deserializer.
-    memset(m_parameterBuffer.get(), 0, 4 * 1024);
-    ReferenceSerializeInputBE emptyParams(m_parameterBuffer.get(), 4 * 1024);
+    memset(m_parameter_buffer.get(), 0, 4 * 1024);
+    ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), 4 * 1024);
 
     //
     // Execute the plan.  You'd think this would be more
@@ -639,222 +631,38 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // need to query the engine.
     size_t result_size = m_engine->getResultsSize();
     if (debug_dump) {
-        dumpResultTable(m_resultBuffer.get(), result_size);
+        dumpResultTable(m_result_buffer.get(), result_size);
     }
 
-    //
-    // Create deserializer for the results, and validate it.
-    // It should have two columns, all with numeric data.  The
-    // values in the second column should be twice the values
-    // in the first column.
-    //
-    // The validation function should all be a separate function.
-    // But then it could not call the ASSERT_TRUE macro.  This macro
-    // calls fail(), which is a member function of the framework.
-    // Bitten by OO again.
-    //
-    ReferenceSerializeInputBE result(m_resultBuffer.get(), result_size);
-    if (debug_print) {
-        printf("Result Table:\n");
+    boost::scoped_ptr<TempTable> result(loadTableFrom(m_result_buffer.get(), result_size));
+    assert(result.get() != NULL);
+    if (debug_dump) {
+        printf("Result has %d columns\n", result->columnCount());
+        printf("Result has %ld rows\n", result->activeTupleCount());
     }
-    size_t msg_len = result.readInt();
-    uint8_t status = result.readByte();
-    if (debug_print) {
-        printf("  message length = %lu, status = %hu\n", msg_len, status);
+    ASSERT_TRUE(result != NULL);
+
+    const TupleSchema* res_schema = result->schema();
+    TableTuple tuple(res_schema);
+    boost::scoped_ptr<TableIterator> iter(result->makeIterator());
+    if (!iter->hasNext()) {
+        printf("No results!!\n");
     }
-    size_t intercostal_clavicle = result.readInt();
-    if (debug_print) {
-        printf("  intercosttal_clavicle = %lu\n", intercostal_clavicle);
-    }
-    size_t serialized_exception = result.readInt();
-    if (debug_print) {
-        printf("  serialized exception = %lu\n", serialized_exception);
-    }
-    size_t table_length = result.readInt();
-    size_t table_metadata_length = result.readInt();
-    if (debug_print) {
-        printf("  %lu table length, %lu table_metadata_length\n",
-               table_length,
-               table_metadata_length);
-    }
-    uint8_t table_status = result.readByte();
-    uint16_t column_count = result.readShort();
-    if (debug_print) {
-        printf("  %hhu table status, %hu column_count\n",
-               table_status,
-               column_count);
-    }
-    voltdb::ValueType  column_base_types[100];
-    bool     column_is_array[100];
-    std::string column_names[100];
-    if (debug_print) {
-        printf("  %hu columns\n", column_count);
-    }
-    for (int idx = 0; idx < column_count; idx += 1) {
-        column_base_types[idx] = static_cast<voltdb::ValueType>(result.readByte());
-        column_is_array[idx] = (column_base_types[idx] == voltdb::VALUE_TYPE_ARRAY);
-        if (column_is_array[idx]) {
-            column_base_types[idx] = static_cast<voltdb::ValueType>(result.readByte());
-        }
-    }
-    for (int idx = 0; idx < column_count; idx += 1) {
-        column_names[idx] = result.readTextString();
-    }
-    if (debug_print) {
-        for (int idx = 0; idx < column_count; idx += 1) {
-            printf("    %3d.) name %s, type: %d, %s\n",
-                   idx + 1,
-                   column_names[idx].c_str(),
-                   column_base_types[idx],
-                   (column_is_array[idx] ? "is array" : "is not array"));
-        }
-    }
-    size_t row_count = result.readInt();
-    int64_t long_value;
-    int32_t int_value;
-    int16_t short_value;
-    int8_t  byte_value;
-    double   double_value;
-    std::string string_value;
-    ByteArray varbinary_value;
-    uint64_t column_values[100];
-    for (int ridx = 0; ridx < row_count; ridx += 1) {
-        size_t row_length = result.readInt();
-        if (debug_print) {
-            printf("    Row %3d: length %lu\n", ridx, row_length);
-        }
-        for (int cidx = 0; cidx < column_count; cidx += 1) {
-            if (debug_print) {
-                printf("        Column %3d: ", cidx);
-            }
-            switch (column_base_types[cidx]) {
-            case voltdb::VALUE_TYPE_BIGINT:
-                long_value = result.readLong();
-                if (debug_print) {
-                    printf("%ld\n", long_value);
-                }
-                column_values[cidx] = long_value;
-                break;
-            case voltdb::VALUE_TYPE_INTEGER:
-                int_value = result.readInt();
-                if (debug_print) {
-                    printf("%d\n", int_value);
-                }
-                column_values[cidx] = int_value;
-                break;
-            case voltdb::VALUE_TYPE_SMALLINT:
-                short_value = result.readShort();
-                if (debug_print) {
-                    printf("%hd\n", short_value);
-                }
-                column_values[cidx] = short_value;
-                break;
-            case voltdb::VALUE_TYPE_TINYINT:
-                byte_value = result.readByte();
-                if (debug_print) {
-                    printf("%hhd\n", byte_value);
-                }
-                column_values[cidx] = byte_value;
-                break;
-            case voltdb::VALUE_TYPE_DOUBLE:
-                double_value = result.readDouble();
-                if (debug_print) {
-                    printf("%g\n", double_value);
-                }
-                column_values[cidx] = static_cast<long>(byte_value);
-                break;
-            case voltdb::VALUE_TYPE_DECIMAL:
-                long_value = result.readLong();
-                if (debug_print) {
-                    printf("%ld\n", long_value);
-                }
-                column_values[cidx] = long_value;
-                break;
-            case voltdb::VALUE_TYPE_VARCHAR:
-                string_value = result.readTextString();
-                if (debug_print) {
-                    printf("%s\n", string_value.c_str());
-                }
-                break;
-            case voltdb::VALUE_TYPE_VARBINARY:
-                varbinary_value = result.readBinaryString();
-                if (debug_print) {
-                    printf("VARBINARY\n");
-                }
-                break;
-            default:
-                break;
-            }
-        }
+    int32_t count;
+    for (count = 0; iter->next(tuple); count += 1) {
         /*
          * This is true because of collusion between the query
          * and the test.  The query selects two values, both
          * integral, and the second is twice the first.
          */
-        ASSERT_TRUE(2*column_values[0] == column_values[1]);
+        int64_t v0 = ValuePeeker::peekAsBigInt(tuple.getNValue(0));
+        int64_t v1 = ValuePeeker::peekAsBigInt(tuple.getNValue(1));
+        ASSERT_TRUE(2*v0 == v1);
+    }
+    if (debug_dump) {
+        printf("Success after inspecting %d rows\n", count);
     }
 }
-
-#if       0
-None of these are defined.  Maybe there were in some plan, but there
-is nothing here now.
-
-// ------------------------------------------------------------------
-// Execute_PlanFragmentId
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Execute_PlanFragmentId) {
-    //
-    // Given a PlanFragmentInfo data object, make sure that the m_engine converts it to
-    // PlanFragmentInfo object and executes it properly
-    //
-}
-
-// ------------------------------------------------------------------
-// Execute_PlanFragmentPayload
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Execute_PlanFragmentPayload) {
-    //
-    // Given a PlanFragmentInfo payload object, make sure that the engine deserializes
-    // it into a PlanFragmentInfo object and executes it properly
-    //
-}
-
-// ------------------------------------------------------------------
-// Send
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Send) {
-    //
-    // Not sure what this will do just yet...
-    //
-}
-
-// ------------------------------------------------------------------
-// Receive_Table
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Receive_Table) {
-    //
-    // Not sure what this will do just yet...
-    //
-}
-
-// ------------------------------------------------------------------
-// Receive_TablePointer
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Receive_TablePointer) {
-    //
-    // Not sure what this will do just yet...
-    //
-}
-
-// ------------------------------------------------------------------
-// Receive_TablePayload
-// ------------------------------------------------------------------
-TEST_F(ExecutionEngineTest, Receive_TablePayload) {
-    //
-    // Not sure what this will do just yet...
-    //
-}
-#endif
 
 int main() {
      return TestSuite::globalInstance()->runAll();
