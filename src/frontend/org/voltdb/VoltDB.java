@@ -217,6 +217,8 @@ public class VoltDB {
         /** Placement group */
         public String m_placementGroup = null;
 
+        public boolean m_adminMode = false;
+
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
@@ -482,9 +484,12 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
-                else if (arg.equalsIgnoreCase("force"))
+                else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
-                else {
+                } else if (arg.equalsIgnoreCase("paused")) {
+                    //Start paused.
+                    m_adminMode = true;
+                } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();

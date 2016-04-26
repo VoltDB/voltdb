@@ -390,6 +390,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
+     * @param config configuration that gets passed in from commandline.
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
@@ -1694,6 +1695,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    //Indicating Result of meshing.
+    class MeshResult {
+        OperationMode m_mode = OperationMode.RUNNING;
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -1701,7 +1707,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    void buildClusterMesh(boolean isRejoin) {
+    MeshResult buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
         HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
         String hostname = hostAndPort.getHostText();
@@ -1749,6 +1755,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     "Please check your command line and start action and try again.", false, null);
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
+        return new MeshResult();
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -2695,7 +2702,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        Object args[] = { m_mode.toString() };
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), args, null);
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);

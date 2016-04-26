@@ -399,7 +399,8 @@ class ServerBundle(JavaBundle):
                  daemon_output=None,
                  supports_multiple_daemons=False,
                  check_environment_config=False,
-                 force_voltdb_create=False):
+                 force_voltdb_create=False,
+                 supports_paused=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -413,6 +414,7 @@ class ServerBundle(JavaBundle):
         self.supports_multiple_daemons = supports_multiple_daemons
         self.check_environment_config = check_environment_config
         self.force_voltdb_create = force_voltdb_create
+        self.supports_paused = supports_paused
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -455,6 +457,11 @@ class ServerBundle(JavaBundle):
                     cli.IntegerOption('-I', '--instance', 'instance',
                                   #'specify an instance number for multiple servers on the same host'))
                                   None))
+        if self.supports_paused:
+            verb.add_options(
+                cli.BooleanOption('-p', '--paused', 'paused',
+                                  'Start Database in paused mode.'))
+
         if self.force_voltdb_create:
             verb.add_options(
                 cli.BooleanOption('-f', '--force', 'force',
@@ -529,6 +536,11 @@ class ServerBundle(JavaBundle):
         if self.subcommand in ('create'):
             if runner.opts.force:
                 final_args.extend(['force'])
+            if runner.opts.paused:
+                final_args.extend(['paused'])
+        if self.subcommand in ('recover'):
+            if runner.opts.paused:
+                final_args.extend(['paused'])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}
