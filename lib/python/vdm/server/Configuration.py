@@ -218,29 +218,64 @@ def validate_and_convert_xml_to_json(config_path):
         if type(D2[k]['deployments']['deployment']) is dict:
             user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'dict')
-            for user in user_json:
+            if type(user_json) is dict:
                 req = HTTPListener.DictClass()
                 req.json = {}
-                req.json = user
+                user_json['plaintext'] = bool(user_json['plaintext'])
+                req.json = user_json
                 inputs = UserInputs(req)
                 if not inputs.validate():
                     sys.stdout.write(str(inputs.errors))
                     log.error("Error while reloading configuration: %s", str(inputs.errors))
                 else:
-                    HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
+                    HTTPListener.Global.DEPLOYMENT_USERS[int(user_json['userid'])] = user_json
+
+            elif type(user_json) is list:
+                result = check_duplicate_user(user_json)
+                if result != "":
+                    log.error("Error while reloading configuration: %s", result)
+                else:
+                    for user in user_json:
+                        req = HTTPListener.DictClass()
+                        req.json = {}
+                        user['plaintext'] = bool(user['plaintext'])
+                        req.json = user
+                        inputs = UserInputs(req)
+                        if not inputs.validate():
+                            sys.stdout.write(str(inputs.errors))
+                            log.error("Error while reloading configuration: %s", str(inputs.errors))
+                        else:
+                            HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
         else:
             user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
                                            'list')
-            for deployment_user in user_json:
+            if type(user_json) is dict:
                 req = HTTPListener.DictClass()
                 req.json = {}
-                req.json = deployment_user
+                user_json['plaintext'] = bool(user_json['plaintext'])
+                req.json = user_json
                 inputs = UserInputs(req)
                 if not inputs.validate():
                     sys.stdout.write(str(inputs.errors))
                     log.error("Error while reloading configuration: %s", str(inputs.errors))
                 else:
-                    HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
+                    HTTPListener.Global.DEPLOYMENT_USERS[int(user_json['userid'])] = user_json
+            elif type(user_json) is list:
+                result = check_duplicate_user(user_json)
+                if result != "":
+                    log.error("Error while reloading configuration: %s", result)
+                else:
+                    for user in user_json:
+                        req = HTTPListener.DictClass()
+                        req.json = {}
+                        user['plaintext'] = bool(user['plaintext'])
+                        req.json = user
+                        inputs = UserInputs(req)
+                        if not inputs.validate():
+                            sys.stdout.write(str(inputs.errors))
+                            log.error("Error while reloading configuration: %s", str(inputs.errors))
+                        else:
+                            HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
 
 
 def validate_server_ports_dict(member, databases, isDict):
@@ -320,6 +355,12 @@ def check_duplicate_database(databases):
             return compare_database(databases[i], databases[j])
 
 
+def check_duplicate_user(users):
+    for i in range(len(users)):
+        for j in range(i + 1, len(users)):
+            return compare_user(users[i], users[j])
+
+
 def get_servers_from_database_id(database_id):
     servers = []
     database = HTTPListener.Global.DATABASES.get(int(database_id))
@@ -364,6 +405,13 @@ def compare(port_option, first, second):
 def compare_database(first, second):
     if first['name'] == second['name']:
         return 'Duplicate database name: %s' % first['name']
+    else:
+        return ""
+
+
+def compare_user(first, second):
+    if first['name'] == second['name']:
+        return 'Duplicate user name: %s' % first['name']
     else:
         return ""
 
