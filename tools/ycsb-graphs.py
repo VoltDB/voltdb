@@ -123,12 +123,8 @@ def plotByWorkload(buckets,path,combograph=False,title='') :
 
                 x = statslist[:,0]
                 y = statslist[:,1]
-                #i = 0;
-                #z= [len(x)];
-                #for v in x :
-                #    z[i] = "z"+str(x);
-                #print("x:"+str(x));
-
+                if  len(y) <= 2 :
+                    print("WARNING ratio %s: only has %s datapoints x/y: %s/%s" % (ratio,len(y),x,y));
 
                 sb.plot(x,y, "-^", linewidth=3,label=ratio,solid_capstyle='round',solid_joinstyle='round',aa=True)
 
