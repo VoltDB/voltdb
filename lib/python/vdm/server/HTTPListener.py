@@ -395,37 +395,37 @@ def map_deployment(request, database_id):
             )
 
     if 'dr' in request.json:
-        if 'dr' not in deployment or deployment['dr'] is None:
+        if not request.json['dr']:
             deployment['dr'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr']:
-        if not hasattr(deployment['dr'], 'connection'):
-            deployment['dr']['connection'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr'] and 'source' not in request.json['dr']['connection']:
-        deployment['dr']['connection'] = None
-
-    if 'dr' in request.json and 'id' in request.json['dr']:
-        deployment['dr']['id'] = request.json['dr']['id']
-
-    if 'dr' in request.json and 'listen' in request.json['dr']:
-        deployment['dr']['listen'] = request.json['dr']['listen']
-
-    if 'dr' in request.json and request.json['dr']:
-        if 'port' in request.json['dr']:
-            deployment['dr']['port'] = request.json['dr']['port']
         else:
-            deployment['dr']['port'] = None
+            if 'dr' not in deployment or deployment['dr'] is None:
+                deployment['dr'] = {}
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] \
-            and 'source' in request.json['dr']['connection']:
-        deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            if 'connection' in request.json['dr'] and request.json['dr']['connection']:
+                if not hasattr(deployment['dr'], 'connection'):
+                    deployment['dr']['connection'] = {}
 
-    if 'dr' in request.json and not request.json['dr']:
-        deployment['dr'] = {}
+                if 'source' not in request.json['dr']['connection'] or \
+                        ('source' in request.json['dr']['connection'] and
+                         request.json['dr']['connection']['source'].strip() == ''):
+                    deployment['dr']['connection'] = None
+                else:
+                    deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            else:
+                deployment['dr']['connection'] = None
+            if 'id' in request.json['dr']:
+                deployment['dr']['id'] = request.json['dr']['id']
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] and not request.json['dr']['connection']:
-        deployment['dr']['connection'] = {}
+            if 'listen' in request.json['dr']:
+                deployment['dr']['listen'] = request.json['dr']['listen']
+            else:
+                deployment['dr']['listen'] = True
+
+            if request.json['dr']:
+                if 'port' in request.json['dr']:
+                    deployment['dr']['port'] = request.json['dr']['port']
+                else:
+                    deployment['dr']['port'] = None
 
     return deployment
 
@@ -1444,6 +1444,8 @@ class DatabaseDeploymentAPI(MethodView):
             result = Configuration.check_validation_deployment(request)
             if 'status' in result and result['status'] == 'error':
                 return jsonify(result)
+            if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
+                return jsonify({'status': 'error', 'error': 'DR id is required.'})
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()
