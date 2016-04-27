@@ -41,6 +41,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -600,14 +601,6 @@ class DictClass(dict):
     pass
 
 
-def check_user_duplication(roles):
-    non_dup_roles = []
-    user_roles = roles.split(',')
-    for role in user_roles:
-        if role not in non_dup_roles:
-            non_dup_roles.append(role)
-    return ','.join(non_dup_roles)
-
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = {"databaseid": True, "users": True}
@@ -1021,7 +1014,7 @@ class DeploymentUserAPI(MethodView):
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-        user_roles = check_user_duplication(request.json['roles'])
+        user_roles = ','.join(Set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
@@ -1060,12 +1053,14 @@ class DeploymentUserAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if current_user is None:
+            return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-        user_roles = check_user_duplication(request.json.get('roles', current_user['roles']))
+        user_roles = ','.join(Set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
