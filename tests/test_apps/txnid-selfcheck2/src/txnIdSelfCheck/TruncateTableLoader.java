@@ -161,14 +161,14 @@ public class TruncateTableLoader extends BenchmarkThread {
                 hardStop("getrowcount exception", e);
             }
 
+            log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
+            shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
+            String tp = this.truncateProcedure;
+            if (tableName == "trup")
+                tp += r.nextInt(100) < mpRatio * 100. ? tableName.toUpperCase() + "MP" : tableName.toUpperCase() + "SP";
             try {
-                log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
-                shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
-                String tp = this.truncateProcedure;
-                if (tableName == "trup")
-                    tp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
-                ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
+                ClientResponse clientResponse = client.callProcedure(tp, p, shouldRollback);
                 byte status = clientResponse.getStatus();
                 if (status == ClientResponse.GRACEFUL_FAILURE ||
                         (shouldRollback == 0 && status == ClientResponse.USER_ABORT)) {
@@ -192,7 +192,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        hardStop("TruncateTableLoader failed a TruncateTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
+                        hardStop("TruncateTableLoader failed a TruncateTable ProcCallException call for table '" + tableName + "' procedure " + tp +
+                                 " (" + shouldRollback + ") " + e.getMessage());
                     }
                 }
             }
