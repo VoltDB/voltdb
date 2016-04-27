@@ -93,7 +93,6 @@ public class KinesisStreamImporter extends AbstractImporter {
 
                     kclConfig.withRegionName(m_config.getRegion()).withMaxRecords(m_config.getMaxReadBatchSize())
                             .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
-                            .withMaxLeasesToStealAtOneTime(0)
                             .withIdleTimeBetweenReadsInMillis(m_config.getIdleTimeBetweenReads())
                             .withTaskBackoffTimeMillis(m_config.getTaskBackoffTimeMillis()).withKinesisClientConfig(
                                     KinesisStreamImporterConfig.getClientConfigWithUserAgent(m_config.getAppName()));
