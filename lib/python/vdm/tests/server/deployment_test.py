@@ -662,6 +662,20 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['success'],False)
             self.assertEqual(response.status_code, 200)
 
+    def test_validate_dr_no_additional_property(self):
+        """ensure no additional properties are inserted"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'id': '2', "extraproperty":"extra"}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "Additional properties are not allowed (u'extraproperty' was unexpected)")
+            self.assertEqual(response.status_code, 200)
+
     def test_validate_dr_id_empty(self):
         """ensure dr id  is not empty"""
         response = requests.get(__db_url__)
@@ -674,6 +688,20 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'dr': {'id': ''}}, headers=headers)
             value = response.json()
             self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_no_id(self):
+        """ensure id is required field"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'port': 22}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['error'], "DR id is required.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_id_negative(self):
