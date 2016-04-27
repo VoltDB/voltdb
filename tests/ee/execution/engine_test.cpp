@@ -638,7 +638,7 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     assert(result.get() != NULL);
     if (debug_dump) {
         printf("Result has %d columns\n", result->columnCount());
-        printf("Result has %ld rows\n", result->activeTupleCount());
+        printf("Result has %lld rows\n", result->activeTupleCount());
     }
     ASSERT_TRUE(result != NULL);
 
