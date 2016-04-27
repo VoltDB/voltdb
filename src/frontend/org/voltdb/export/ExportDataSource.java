@@ -950,6 +950,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_executor==null) {
             synchronized (m_executorLock) {
                 if (m_executor==null) {
+                    // Bound the queue. It shouldn't get to this high value.
+                    // Log an error so that we know if it does get to the high value.
+                    if (m_queuedActions.size() > 50) {
+                        exportLog.error("Queue for export source for generation " + m_generation +
+                                " is going beyond 50. Not queueing anymore events");
+                        return Futures.immediateFuture(null);
+                    }
                     m_queuedActions.add(runnable);
                     return Futures.immediateFuture(null);
                 }
