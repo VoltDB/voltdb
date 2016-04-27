@@ -61,8 +61,7 @@ const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTI
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
 // 4 index checksum bytes
 // 1 * sizeof(int32_t) = 4 data bytes
-// new total: 22
-const int MAGIC_OPTIMIZED_TUPLE_SIZE = 22;
+const int MAGIC_OPTIMIZED_TUPLE_SIZE = MAGIC_TUPLE_SIZE;
 const int MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_OPTIMIZED_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 const int BUFFER_SIZE = 950;
 // roughly 22.5k
@@ -111,7 +110,7 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, const std::pair<TableIndex*, int32_t>& index = defaultIndexPair)
+    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
     {
         // fill a tuple
         m_tuple->setNValue(0, ValueFactory::getIntegerValue(0));
@@ -123,7 +122,7 @@ public:
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
-                               currentSpHandle, currentSpHandle, *m_tuple, type, index);
+                               currentSpHandle, currentSpHandle, *m_tuple, type);
     }
 
     virtual ~DRTupleStreamTest() {
@@ -140,10 +139,7 @@ protected:
     DummyTopend m_topend;
     boost::scoped_ptr<ExecutorContext> m_context;
     char tableHandle[20];
-
-    const static std::pair<TableIndex*, int32_t> defaultIndexPair;
 };
-const std::pair<TableIndex*, int32_t> DRTupleStreamTest::defaultIndexPair = std::make_pair((TableIndex*)NULL, -1);
 
 // Several of these cases were move to TestExportDataSource in Java
 // where some ExportTupleStream functionality now lives
@@ -253,19 +249,13 @@ TEST_F(DRTupleStreamTest, BasicOps)
 
 TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
     vector<int> columnIndices(1, 0);
-    TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
-                                               columnIndices, TableIndex::simplyIndexColumns(),
-                                               true, true, m_schema);
-    TableIndex *index = TableIndexFactory::getInstance(scheme);
-    uint32_t indexCrc = 42;
     for (int i = 1; i < 10; i++)
     {
         // first, send some delete records with an index
-        appendTuple(i-1, i, DR_RECORD_DELETE, std::make_pair(index, indexCrc));
+        appendTuple(i-1, i, DR_RECORD_DELETE);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
-    delete index;
 
     for (int i = 10; i < 20; i++)
     {
