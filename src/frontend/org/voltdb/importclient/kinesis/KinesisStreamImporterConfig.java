@@ -55,7 +55,6 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 	private final long m_idleTimeBetweenReadsInMillis;
 	private final int m_maxReadBatchSize;
 	private final long m_taskBackoffTimeMillis;
-	private final String m_shardId;
 	private final AbstractFormatterFactory m_formatterFactory;
 
 	/**
@@ -70,13 +69,11 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 	 * @param maxReadBatchSize Max records to read per Kinesis get request
 	 * @param resourceId The URI per stream, per shard, per app
 	 * @param taskBackoffTimeMillis  Backoff period when tasks encounter an exception
-	 * @param maxLeasesToStealAtOneTime  Max leases to steal from another worker at one time for load balancing.
-	 * @param shardId   Shard identifier
 	 * @param formatterFactory AbstractFormatterFactory
 	 */
 	private KinesisStreamImporterConfig(String appName, String region, String streamName, String procedure,
 			String secretKey, String accessKey, long idleTimeBetweenReadsInMillis, int maxReadBatchSize, URI resourceId,
-			long taskBackoffTimeMillis, String shardId, AbstractFormatterFactory formatterFactory) {
+			long taskBackoffTimeMillis, AbstractFormatterFactory formatterFactory) {
 
 		m_appName = appName;
 		m_region = region;
@@ -88,7 +85,6 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 		m_maxReadBatchSize = maxReadBatchSize;
 		m_resourceID = resourceId;
 		m_taskBackoffTimeMillis = taskBackoffTimeMillis;
-		m_shardId = shardId;
 		m_formatterFactory = formatterFactory;
 	}
 
@@ -157,17 +153,18 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 
 		// build UI per stream, per shard and per application
 		Map<URI, ImporterConfig> configs = new HashMap<>();
+		int shardCnt = 0;
 		for (Shard shard : shards) {
 
 			StringBuilder builder = new StringBuilder(128);
 			builder.append("kinesis://").append(region).append("/").append(streamName).append("/").append("shard-")
-					.append(shard.getShardId()).append("/").append(appName);
+					.append(shardCnt++).append("/").append(appName);
 
 			URI uri = URI.create(builder.toString());
 
 			ImporterConfig config = new KinesisStreamImporterConfig(appName, region, streamName, procedure, secretKey,
 					accessKey, Long.parseLong(readInterval), Integer.parseInt(maxReadBatchSize), uri,
-					Long.parseLong(taskBackoffTimeMillis), shard.getShardId(), formatterFactory);
+					Long.parseLong(taskBackoffTimeMillis), formatterFactory);
 
 			configs.put(uri, config);
 		}
@@ -204,8 +201,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 			}
 			return result.getStreamDescription().getShards();
 		} catch (ResourceNotFoundException e) {
-			throw new IllegalArgumentException(
-					"Kinesis stream " + streamName + " does not exist. Please create it Kinesis.");
+			throw new IllegalArgumentException("Kinesis stream " + streamName + " does not exist.");
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Error found while describing the kinesis stream " + streamName);
 		}
@@ -227,9 +223,5 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 		userAgent.append(" ").append(appName).append("/").append(APP_VERSION);
 		config.setUserAgent(userAgent.toString());
 		return config;
-	}
-
-	public String getShardId() {
-		return m_shardId;
 	}
 }
