@@ -382,9 +382,11 @@ def validate_server_ports_list(members, databases, isDict):
 
 
 def check_port_valid(port_option, servers):
+    result = None
     for i in range(len(servers)):
         for j in range(i + 1, len(servers)):
-            result = compare(port_option, servers[i], servers[j])
+            if servers[i]['hostname'] == servers[j]['hostname']:
+                result = compare(port_option, servers[i], servers[j])
     if result is not None:
         return result
 
@@ -392,7 +394,7 @@ def check_port_valid(port_option, servers):
 def check_duplicate_database(databases):
     for i in range(len(databases)):
         for j in range(i + 1, len(databases)):
-            result =  compare_database(databases[i], databases[j])
+            result = compare_database(databases[i], databases[j])
     if result is not None:
         return result
 
