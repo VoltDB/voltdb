@@ -481,8 +481,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // write dirty-ness of the batch and number of dependencies output to the FRONT of
     // the result buffer
     if (last) {
-        m_resultOutput.writeIntAt(m_startOfResultBuffer,
-            static_cast<int32_t>((m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)));
+        m_resultOutput.writeIntAt(m_startOfResultBuffer, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 
