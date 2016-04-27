@@ -636,10 +636,6 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
 
     boost::scoped_ptr<TempTable> result(loadTableFrom(m_result_buffer.get(), result_size));
     assert(result.get() != NULL);
-    if (debug_dump) {
-        printf("Result has %d columns\n", result->columnCount());
-        printf("Result has %lld rows\n", result->activeTupleCount());
-    }
     ASSERT_TRUE(result != NULL);
 
     const TupleSchema* res_schema = result->schema();
