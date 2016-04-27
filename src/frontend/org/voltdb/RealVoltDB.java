@@ -1729,6 +1729,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+        hmconfig.isPaused = m_config.m_isPaused;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -2563,10 +2564,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         {
             if (mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(true);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(false);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -2700,6 +2703,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = m_startMode;
         } else {
             // Shouldn't be here, but to be safe
+            m_config.m_isPaused.set(false);
             m_mode = OperationMode.RUNNING;
         }
         Object args[] = { m_mode.toString() };

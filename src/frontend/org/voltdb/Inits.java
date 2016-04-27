@@ -558,7 +558,7 @@ public class Inits {
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
             //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
-            if (m_config.m_adminMode) {
+            if (m_config.m_isPaused.get()) {
                 m_rvdb.setStartMode(OperationMode.PAUSED);
             }
         }

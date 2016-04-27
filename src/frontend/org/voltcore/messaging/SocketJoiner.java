@@ -38,6 +38,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -205,7 +206,7 @@ public class SocketJoiner {
 
     /** Set to true when the thread exits correctly. */
     private final boolean success = false;
-
+    private final AtomicBoolean m_paused;
     public boolean getSuccess() {
         return success;
     }
@@ -213,7 +214,7 @@ public class SocketJoiner {
     public SocketJoiner(
             InetSocketAddress coordIp,
             String internalInterface,
-            int internalPort,
+            int internalPort, AtomicBoolean isPaused,
             JoinHandler jh) {
         if (internalInterface == null || coordIp == null || jh == null) {
             throw new IllegalArgumentException();
@@ -222,6 +223,7 @@ public class SocketJoiner {
         m_joinHandler = jh;
         m_internalInterface = internalInterface;
         m_internalPort = internalPort;
+        m_paused = isPaused;
     }
 
     /*
@@ -344,6 +346,7 @@ public class SocketJoiner {
             returnJs.put("versionString", VoltDB.instance().getVersionString());
             returnJs.put("buildString", VoltDB.instance().getBuildString());
             returnJs.put("versionCompatible", VoltDB.instance().isCompatibleVersionString(remoteBuildString));
+            returnJs.put("paused", m_paused.get());
             byte jsBytes[] = returnJs.toString(4).getBytes(Constants.UTF8ENCODING);
 
             ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
@@ -450,7 +453,15 @@ public class SocketJoiner {
         String remoteVersionString = jsonVersionInfo.getString("versionString");
         String remoteBuildString = jsonVersionInfo.getString("buildString");
         boolean remoteAcceptsLocalVersion = jsonVersionInfo.getBoolean("versionCompatible");
-
+        boolean paused;
+        if (jsonVersionInfo.has("paused")) {
+            paused = jsonVersionInfo.getBoolean("paused");
+        } else {
+            paused = false;
+        }
+        if (paused != m_paused.get()) {
+            VoltDB.crashLocalVoltDB("Incompatible start mode all nodes must start with same paused state" , false, null);
+        }
         if (remoteVersionString.equals(localVersionString)) {
             if (localBuildString.equals(remoteBuildString) == false) {
                 // ignore test/eclipse build string so tests still work
@@ -514,6 +525,7 @@ public class SocketJoiner {
             }
             currentTimeBuf.flip();
             long skew = System.currentTimeMillis() - currentTimeBuf.getLong();
+            skew = 0;
             skews.add(skew);
 
             String localVersionString = VoltDB.instance().getVersionString();
@@ -539,6 +551,7 @@ public class SocketJoiner {
             if (!m_internalInterface.isEmpty()) {
                 jsObj.put("address", m_internalInterface);
             }
+            jsObj.put("paused", m_paused.get());
 
             byte jsBytes[] = jsObj.toString(4).getBytes(Constants.UTF8ENCODING);
             ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
@@ -622,6 +635,8 @@ public class SocketJoiner {
                         "address",
                         m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
                 jsObj.put("versionString", VoltDB.instance().getVersionString());
+                jsObj.put("paused", m_paused.get());
+
                 jsBytes = jsObj.toString(4).getBytes("UTF-8");
                 ByteBuffer pushHostId = ByteBuffer.allocate(4 + jsBytes.length);
                 pushHostId.putInt(jsBytes.length);

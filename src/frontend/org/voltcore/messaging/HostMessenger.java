@@ -67,6 +67,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -101,6 +102,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
+        public AtomicBoolean isPaused;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -261,7 +263,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
-                m_config.internalPort,
+                m_config.internalPort, m_config.isPaused,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
