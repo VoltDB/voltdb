@@ -267,10 +267,11 @@ def validate_and_convert_xml_to_json(config_path):
                             sys.stdout.write(str(inputs.errors))
                             log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-                    result = check_duplicate_user(user_json)
-                    if result != "":
-                        success = False
-                        log.error("Error while reloading configuration: %s", result)
+                    if len(user_json)> 1:
+                        result = check_duplicate_user(user_json)
+                        if result != "":
+                            success = False
+                            log.error("Error while reloading configuration: %s", result)
 
                     if success is True:
                         HTTPListener.Global.DEPLOYMENT_USERS = {}
