@@ -51,7 +51,6 @@ import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
 import org.voltcore.logging.Level;
-import org.voltcore.utils.EstTime;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
@@ -555,6 +554,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     final class Gap {
         long c = 0;
         long s = -1L;
+        long check = 0;
+        long offer = 0;
         final long [] lag;
 
         Gap(int leeway) {
@@ -568,17 +569,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
-            long startTime = EstTime.currentTimeMillis();
-            while (EstTime.currentTimeMillis() - startTime < gapTrackerCheckMaxTimeMs){
-                long check =  Math.max(offset, s) - c;
-                if (check >= lag.length) {
-                    try {
-                        wait();
-                    } catch (InterruptedException e) {
-                        rateLimitedLog(Level.WARN,
-                                e, "Gap tracker observe large lag %d for"
-                                + m_topicAndPartition + " but failed to wait", check);
-                    }
+            check = Math.max(offset, s) - c - lag.length;
+            if (check >= 0) {
+                try {
+                    wait(gapTrackerCheckMaxTimeMs);
+                } catch (InterruptedException e) {
+                    rateLimitedLog(Level.WARN, e, "Gap tracker observe large lag %d for" + m_topicAndPartition
+                            + " but failed to wait", check);
                 }
             }
             if (offset > s) {
@@ -609,11 +606,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     lag[idx(c)] = c;
                 }
                 lag[idx(offset)] = offset;
-                long oldc = c;
                 while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
                     ++c;
+                    ++offer;
                 }
-                if (c > oldc) {
+                if (check >= 0 & offer >= check + 1) {
+                    offer = 0;
                     this.notify();
                 }
             }
