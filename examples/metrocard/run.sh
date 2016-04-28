@@ -91,7 +91,7 @@ function client() {
     java -classpath metrocard-client.jar:$CLIENTCLASSPATH metrocard.MetroBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=300 \
+        --duration=120 \
         --servers=$SERVERS \
         --ratelimit=250000 \
         --cardcount=50000

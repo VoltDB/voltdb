@@ -82,7 +82,7 @@ function client() {
          adperformance.AdTrackingBenchmark \
          --displayinterval=5 \
          --warmup=5 \
-         --duration=1800 \
+         --duration=120 \
          --servers=$SERVERS \
          --ratelimit=20000 \
          --sites=100 \

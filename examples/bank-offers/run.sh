@@ -84,7 +84,7 @@ function client() {
     java -classpath bankoffers-client.jar:$APPCLASSPATH bankoffers.OfferBenchmark \
          --displayinterval=5 \
          --warmup=3 \
-         --duration=600 \
+         --duration=120 \
          --servers=$SERVERS \
          --custcount=100000
 }
