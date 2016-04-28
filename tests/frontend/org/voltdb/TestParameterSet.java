@@ -56,13 +56,13 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Date;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-
-import junit.framework.TestCase;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
