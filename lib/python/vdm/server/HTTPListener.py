@@ -41,6 +41,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -691,7 +692,7 @@ class ServerAPI(MethodView):
         if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = len(Global.SERVERS) + 1
+            server_id = Global.SERVERS.keys()[-1] + 1
 
         Global.SERVERS[server_id] = {
             'id': server_id,
@@ -885,7 +886,7 @@ class DatabaseAPI(MethodView):
         if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = len(Global.DATABASES) + 1
+            database_id = Global.DATABASES.keys()[-1] + 1
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
@@ -1013,11 +1014,11 @@ class DeploymentUserAPI(MethodView):
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(Set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
-            user_id = len(Global.DEPLOYMENT_USERS) + 1
+            user_id = Global.DEPLOYMENT_USERS.keys()[-1] + 1
 
         try:
 
@@ -1026,7 +1027,7 @@ class DeploymentUserAPI(MethodView):
                 'databaseid': database_id,
                 'name': request.json['name'],
                 'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
-                'roles': request.json['roles'],
+                'roles': user_roles,
                 'plaintext': True
             }
         except Exception, err:
@@ -1052,18 +1053,20 @@ class DeploymentUserAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if current_user is None:
+            return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(Set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
         current_user['password'] = urllib.unquote(
             str(request.json.get('password', current_user['password'])).encode('ascii')).decode('utf-8')
-        current_user['roles'] = request.json.get('roles', current_user['roles'])
+        current_user['roles'] = user_roles
         current_user['plaintext'] = request.json.get('plaintext', current_user['plaintext'])
         sync_configuration()
         Configuration.write_configuration_file()
