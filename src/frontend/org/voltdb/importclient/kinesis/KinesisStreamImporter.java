@@ -22,11 +22,8 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
 import org.voltdb.importer.formatter.Formatter;
@@ -108,9 +105,10 @@ public class KinesisStreamImporter extends AbstractImporter {
                     rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer %s", m_config.getResourceID());
                     if (null != m_worker)
                         m_worker.shutdown();
+
                     // The worker fails, backoff and restart
                     if (shouldRun()) {
-                        backoffSleep(2);
+                        backoffSleep(5);
                         workerStatus.compareAndSet(false, true);
                     }
                 }
@@ -137,8 +135,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     /**
      * Create AWSCredentialsProvider with access key id and secret key for the
-     * user. Make sure that the suer has permission to have access to Kinesis
-     * Stream and DynamoDB
+     * user. The user should have read/write permission to Kinesis Stream and DynamoDB
      * @return AWSCredentialsProvider Provides credentials used to sign AWS requests
      * @throws AmazonClientException
      */
@@ -183,25 +180,21 @@ public class KinesisStreamImporter extends AbstractImporter {
         @Override
         public void processRecords(ProcessRecordsInput records) {
 
-            AtomicLong cbcnt = new AtomicLong(records.getRecords().size());
-            if (cbcnt.get() < 1) {
-                return;
-            }
-
-            info(null, "Processing %d records on shard %s", cbcnt.get(), m_shardId);
+            info(null, "Processing %d records on shard %s", records.getRecords().size(), m_shardId);
 
             BigInteger seq = BigInteger.ZERO;
             for (Record record : records.getRecords()) {
 
-                //if (isDebugEnabled()) {
-                BigInteger curr = new BigInteger(record.getSequenceNumber());
-                if (curr.compareTo(seq) < 0) {
-                    info(null, "Record is out of sequence on shard %s. Current sequence num: %s", m_shardId,
-                            record.getSequenceNumber());
-                } else {
-                    seq = curr;
+                if (isDebugEnabled()) {
+                    BigInteger curr = new BigInteger(record.getSequenceNumber());
+                    if (curr.compareTo(seq) < 0) {
+                        //should never happen
+                        debug(null, "Record is out of sequence on shard %s. Sequence num: %s", m_shardId,
+                                record.getSequenceNumber());
+                    } else {
+                        seq = curr;
+                    }
                 }
-                //}
 
                 ExtendedSequenceNumber extendedSequenceNumber = new ExtendedSequenceNumber(record.getSequenceNumber(),
                         record instanceof UserRecord ? ((UserRecord) record).getSubSequenceNumber() : null);
@@ -214,24 +207,24 @@ public class KinesisStreamImporter extends AbstractImporter {
                 String data = null;
                 try {
                     data = new String(record.getData().array(), "UTF-8");
-                    info(null, "%s", record.getSequenceNumber());
+                    debug(null, "%s", record.getSequenceNumber());
                 } catch (UnsupportedEncodingException e) {
-                    rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer on shard %s, data:", m_shardId,
-                            data);
+                    rateLimitedLog(Level.ERROR, e,
+                            "Data encoding error in Kinesis stream importer on shard %s, data: %s", m_shardId, data);
 
                     // data issue. Keep going
                     continue;
                 }
                 try {
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
-                    StreamInvocationCallback callBack = new StreamInvocationCallback(cbcnt);
-                    if (!callProcedure(invocation, callBack)) {
-                        rateLimitedLog(Level.ERROR, null, "Error in Kinesis stream importer in shard %s", m_shardId);
+                    if (!callProcedure(invocation)) {
+                        rateLimitedLog(Level.ERROR, null, "Call procedure error in Kinesis stream importer on shard %s",
+                                m_shardId);
                     }
                 } catch (Exception e) {
 
                     // data formatting or procedure issue, keep going
-                    rateLimitedLog(Level.ERROR, e, "Procedure error with data %s on shard %s", data, m_shardId);
+                    rateLimitedLog(Level.ERROR, e, "Call procedure error with data %s on shard %s", data, m_shardId);
                 }
                 if (!shouldRun()) {
                     break;
@@ -247,23 +240,23 @@ public class KinesisStreamImporter extends AbstractImporter {
             if (shutDownInput.getShutdownReason().equals(ShutdownReason.TERMINATE)) {
 
                 // this processor will be shutdown. The load will be moved to
-                // other worker. make sure that the last record is checked.
+                // other processor. checkpoint he last record.
                 checkpoint(shutDownInput.getCheckpointer());
             }
         }
 
         /**
-         * Mark the records as processed.
-         */
+        * set a checkpoint to dynamoDB so we know the records prior to the point are read by this app
+        * @param checkpointer  The checkpoint processor
+        */
         private void checkpoint(IRecordProcessorCheckpointer checkpointer) {
 
             if (null == m_largestExtendedSequenceNumber) {
                 return;
             }
-            if (isDebugEnabled()) {
-                info(null, "Checking point Kninesis record on on shard %s. Current sequence num: %s", m_shardId,
-                        m_largestExtendedSequenceNumber.getSequenceNumber());
-            }
+
+            debug(null, "Checking point on shard %s. Sequence num: %s", m_shardId,
+                    m_largestExtendedSequenceNumber.getSequenceNumber());
 
             int failCount = 1;
             for (int i = 0; i < NUM_RETRIES; i++) {
@@ -274,24 +267,25 @@ public class KinesisStreamImporter extends AbstractImporter {
                     checkpointer.checkpoint(m_largestExtendedSequenceNumber.getSequenceNumber());
                     break;
                 } catch (ShutdownException se) {
-                    rateLimitedLog(Level.ERROR, se,
-                            "Caught shutdown exception, skipping checkpoint. shard id: %s, sequence number: %s.",
-                            m_shardId, m_largestExtendedSequenceNumber.getSequenceNumber());
+                    rateLimitedLog(Level.WARN, null,
+                            "Skipping checkpoint on shard id: %s, sequence number: %s. Reason: %s", m_shardId,
+                            m_largestExtendedSequenceNumber.getSequenceNumber(), se.getMessage());
                     break;
                 } catch (ThrottlingException e) {
                     if (i >= (NUM_RETRIES - 1)) {
-                        rateLimitedLog(Level.ERROR, e,
-                                "Checkpoint failed after %s attempts: shard id: %s, sequence number: %s.", (i + 1),
-                                m_shardId, m_largestExtendedSequenceNumber.getSequenceNumber());
+                        rateLimitedLog(Level.WARN, null,
+                                "Checkpoint failed after %s attempts on hard id: %s, sequence number: %s. Reason: %s",
+                                (i + 1), m_shardId, m_largestExtendedSequenceNumber.getSequenceNumber(),
+                                e.getMessage());
                         break;
                     } else {
-                        rateLimitedLog(Level.INFO, null, "Transient issue when checkpointing - attempt %s of %s",
-                                (i + 1), NUM_RETRIES);
+                        rateLimitedLog(Level.INFO, null, "Checkpointing - attempt %s of %s on shard %s", (i + 1),
+                                NUM_RETRIES, m_shardId);
                     }
                 } catch (InvalidStateException | KinesisClientLibDependencyException e) {
-                    rateLimitedLog(Level.ERROR, e,
-                            "Cannot save checkpoint to the DynamoDB table used by the Amazon Kinesis Client Library. shard id: %s, sequence number: %s.",
-                            m_shardId, m_largestExtendedSequenceNumber.getSequenceNumber());
+                    rateLimitedLog(Level.WARN, null,
+                            "Cannot save checkpoint on shard id: %s, sequence number: %s. Reason: %s", m_shardId,
+                            m_largestExtendedSequenceNumber.getSequenceNumber(), e.getMessage());
                     break;
                 }
                 failCount = backoffSleep(failCount);
@@ -308,20 +302,5 @@ public class KinesisStreamImporter extends AbstractImporter {
             rateLimitedLog(Level.ERROR, e, "Interrupted sleep when checkpointing.");
         }
         return failedCount;
-    }
-
-    private final class StreamInvocationCallback implements ProcedureCallback {
-
-        private final AtomicLong m_cbcnt;
-
-        public StreamInvocationCallback(final AtomicLong cbcnt) {
-            m_cbcnt = cbcnt;
-        }
-
-        @Override
-        public void clientCallback(ClientResponse response) throws Exception {
-            m_cbcnt.decrementAndGet();
-
-        }
     }
 }
