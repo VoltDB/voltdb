@@ -188,13 +188,15 @@ public class KinesisStreamImporter extends AbstractImporter {
                 return;
             }
 
+            info(null, "Processing %d records on shard ", cbcnt.get(), m_shardId);
+
             BigInteger seq = BigInteger.ZERO;
             for (Record record : records.getRecords()) {
 
                 if (isDebugEnabled()) {
                     BigInteger curr = new BigInteger(record.getSequenceNumber());
                     if (curr.compareTo(seq) < 0) {
-                        info(null, "Record is out of sequence on shard %s. Current sequence num: %s", m_shardId,
+                        debug(null, "Record is out of sequence on shard %s. Current sequence num: %s", m_shardId,
                                 record.getSequenceNumber());
                     } else {
                         seq = curr;
@@ -212,10 +214,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 String data = null;
                 try {
                     data = new String(record.getData().array(), "UTF-8");
-                    if (isDebugEnabled()) {
-                        info(null, "Processing Kninesis record on shard %s. Current sequence num: %s", m_shardId,
-                                record.getSequenceNumber());
-                    }
+                    debug(null, "%s", record.getSequenceNumber());
                 } catch (UnsupportedEncodingException e) {
                     rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer on shard %s, data:", m_shardId,
                             data);
