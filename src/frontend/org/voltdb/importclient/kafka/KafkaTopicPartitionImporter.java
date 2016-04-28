@@ -51,6 +51,7 @@ import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
 import org.voltcore.logging.Level;
+import org.voltcore.utils.EstTime;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
@@ -78,6 +79,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+    private final long gapTrackerCheckMaxTimeMs = 2_000;
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
 
@@ -566,6 +568,19 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
+            long startTime = EstTime.currentTimeMillis();
+            while (EstTime.currentTimeMillis() - startTime < gapTrackerCheckMaxTimeMs){
+                long check =  Math.max(offset, s) - c;
+                if (check >= lag.length) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        rateLimitedLog(Level.WARN,
+                                e, "Gap tracker observe large lag %d for"
+                                + m_topicAndPartition + " but failed to wait", check);
+                    }
+                }
+            }
             if (offset > s) {
                 s = offset;
             }
@@ -586,7 +601,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (offset <= s && offset > c) {
                 int ggap = (int)Math.min(lag.length, offset-c);
                 if (ggap == lag.length) {
-                    warn(
+                    rateLimitedLog(Level.WARN,
                               null, "Gap tracker moving topic commit point from %d to %d for "
                               + m_topicAndPartition, c, (offset - lag.length + 1)
                             );
@@ -594,8 +609,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     lag[idx(c)] = c;
                 }
                 lag[idx(offset)] = offset;
+                long oldc = c;
                 while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
                     ++c;
+                }
+                if (c > oldc) {
+                    this.notify();
                 }
             }
             return c;
