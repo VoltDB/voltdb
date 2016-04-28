@@ -32,7 +32,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
-import org.voltdb.types.TimestampType;
 
 @ProcInfo (
     partitionInfo = "NO_NULLS.PKEY: 1",

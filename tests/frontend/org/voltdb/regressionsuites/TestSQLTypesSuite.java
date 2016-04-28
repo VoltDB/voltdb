@@ -515,8 +515,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
             caught = false;
             // system-defined CRUD inputs
             cr = client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
-                    null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null);
         } catch (RuntimeException e) {
+            assertEquals("Can't serialize TIMESTAMP value with fractional microseconds", e.getMessage());
             caught = true;
         }
         assert(caught);
@@ -525,8 +526,9 @@ public class TestSQLTypesSuite extends RegressionSuite {
             caught = false;
             // user-defined statement inputs
             cr = client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
-                    null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null);
         } catch (RuntimeException e) {
+            assertEquals("Can't serialize TIMESTAMP value with fractional microseconds", e.getMessage());
             caught = true;
         }
         assert(caught);

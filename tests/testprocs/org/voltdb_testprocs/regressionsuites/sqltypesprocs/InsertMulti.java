@@ -58,7 +58,7 @@ public class InsertMulti extends VoltProcedure {
       ("INSERT INTO EXPRESSIONS_NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_no_nulls_repl = new SQLStmt
-      ("INSERT INTO NO_NULLS_REPL VALUES        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      ("INSERT INTO NO_NULLS_REPL VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public VoltTable[] run(
             String tablename,
