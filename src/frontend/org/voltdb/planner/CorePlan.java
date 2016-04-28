@@ -57,7 +57,7 @@ public class CorePlan {
     /** What SHA-1 hash of the catalog is this plan good for? */
     private final byte[] catalogHash;
 
-    /** What are the types of the paramters this plan accepts? */
+    /** What are the types of the parameters this plan accepts? */
     public final VoltType[] parameterTypes;
 
     /**
