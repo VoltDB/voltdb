@@ -2,7 +2,7 @@
 
 Use Case
 --------
-This application simulates a simple position keeper application that maintains the portfolion positions. Portfolios are updated frequently as trades and price changes occur.
+This application simulates a simple position keeper application that maintains portfolio positions. Portfolios are updated frequently as trades and price changes occur.
 
 Quickstart
 ---------------------------
@@ -56,4 +56,4 @@ You can control various characteristics of the demo by modifying the parameters 
 
 Customizing this Example
 ---------------------------
-See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
+See the "deployment-examples" directory within the "examples/HOWTOs" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
