@@ -104,8 +104,7 @@ def validate_and_convert_xml_to_json(config_path):
     Method to get the json content from xml file
     :param config_path (string): path of xml file
     """
-
-    log_file = os.path.join(HTTPListener.Global.DATA_PATH, 'voltdeploy.log')
+    log_file = os.path.join(os.environ["JAVA_HOME"], HTTPListener.Global.DATA_PATH, 'voltdeploy.log')
 
     handler = RotatingFileHandler(log_file)
     handler.setFormatter(logging.Formatter(
@@ -123,199 +122,211 @@ def validate_and_convert_xml_to_json(config_path):
         D2 = {}
         for (k, v) in zip(xml_final.keys(), xml_final.values()):
             D2[k] = v
-        # HTTPListener.Global.DATABASES = {}
-        success = True
-        if type(D2[k]['databases']['database']) is dict:
-            db_json = get_field_from_xml(D2[k]['databases']['database'],
-                                         'dict', 'database')
-            req = HTTPListener.DictClass()
-            req.json = {}
-            req.json = db_json[0]
-            inputs = DatabaseInputs(req)
-            if not inputs.validate():
-                success = False
-                sys.stdout.write(str(inputs.errors))
-                log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-            if success is True:
-                HTTPListener.Global.DATABASES = {db_json[0]['id']: db_json[0]}
+        populate_database(D2[k]['databases']['database'], log)
+
+        populate_server(D2[k]['members']['member'], D2[k]['databases']['database'], log)
+
+        populate_deployment(D2[k]['deployments']['deployment'], log)
+
+    except Exception as err:
+        log.error("Error while reloading configuration: %s", "Invalid file content.")
+
+
+def populate_database(databases, log):
+    success = True
+    if type(databases) is dict:
+        db_json = get_field_from_xml(databases,
+                                     'dict', 'database')
+        req = HTTPListener.DictClass()
+        req.json = {}
+        req.json = db_json[0]
+        inputs = DatabaseInputs(req)
+        if not inputs.validate():
+            success = False
+            sys.stdout.write(str(inputs.errors))
+            log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+        if success is True:
+            HTTPListener.Global.DATABASES = {db_json[0]['id']: db_json[0]}
+    else:
+        db_json = get_field_from_xml(databases,
+                                     'list', 'database')
+        success = True
+        result = check_duplicate_database(db_json)
+        if result != "":
+            success = False
+            log.error("Error while reloading configuration: %s", result)
         else:
-            db_json = get_field_from_xml(D2[k]['databases']['database'],
-                                         'list', 'database')
-            success = True
-            result = check_duplicate_database(db_json)
-            if result != "":
+            for database in db_json:
+                req = HTTPListener.DictClass()
+                req.json = {}
+                req.json = database
+                inputs = DatabaseInputs(req)
+                if not inputs.validate():
+                    success = False
+                    sys.stdout.write(str(inputs.errors))
+                    log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+        if success is True:
+            HTTPListener.Global.DATABASES = {}
+            for database in db_json:
+                HTTPListener.Global.DATABASES[database['id']] = database
+
+
+def populate_server(servers, databases, log):
+    success = True
+    if type(servers) is dict:
+        member_json = get_field_from_xml(servers, 'dict')
+        req = HTTPListener.DictClass()
+        req.json = {}
+        req.json = member_json[0]
+        inputs = ServerInputs(req)
+        if not inputs.validate():
+            success = False
+            sys.stdout.write(str(inputs.errors))
+            log.error("Error while reloading configuration: %s", str(inputs.errors))
+        else:
+            result = validate_server_ports_dict(member_json[0], databases, True)
+            if result is not None:
                 success = False
                 log.error("Error while reloading configuration: %s", result)
-            else:
-                for database in db_json:
-                    req = HTTPListener.DictClass()
-                    req.json = {}
-                    req.json = database
-                    inputs = DatabaseInputs(req)
-                    if not inputs.validate():
-                        success = False
-                        sys.stdout.write(str(inputs.errors))
-                        log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-            if success is True:
-                HTTPListener.Global.DATABASES = {}
-                for database in db_json:
-                    HTTPListener.Global.DATABASES[database['id']] = database
-
-        success = True
-        if type(D2[k]['members']['member']) is dict:
-            member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
+        if success is True:
+            HTTPListener.Global.SERVERS = {member_json[0]['id']: member_json[0]}
+    else:
+        member_json = get_field_from_xml(servers, 'list')
+        for member in member_json:
             req = HTTPListener.DictClass()
             req.json = {}
-            req.json = member_json[0]
+            req.json = member
             inputs = ServerInputs(req)
             if not inputs.validate():
                 success = False
                 sys.stdout.write(str(inputs.errors))
                 log.error("Error while reloading configuration: %s", str(inputs.errors))
-            else:
-                result = validate_server_ports_dict(member_json[0], D2[k]['databases']['database'], True)
-                if result is not None:
-                    success = False
-                    log.error("Error while reloading configuration: %s", result)
+            result = validate_server_ports_list(member_json, databases, False)
+            if result is not None:
+                success = False
+                log.error("Error while reloading configuration: %s", result)
 
-            if success is True:
-                HTTPListener.Global.SERVERS = {member_json[0]['id']: member_json[0]}
-        else:
-            member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
+        if success is True:
+            HTTPListener.Global.SERVERS = {}
             for member in member_json:
-                req = HTTPListener.DictClass()
-                req.json = {}
-                req.json = member
-                inputs = ServerInputs(req)
-                if not inputs.validate():
-                    success = False
-                    sys.stdout.write(str(inputs.errors))
-                    log.error("Error while reloading configuration: %s", str(inputs.errors))
-                result = validate_server_ports_list(member_json, D2[k]['databases']['database'], False)
-                if result is not None:
-                    success = False
-                    log.error("Error while reloading configuration: %s", result)
+                HTTPListener.Global.SERVERS[member['id']] = member
 
-            if success is True:
-                HTTPListener.Global.SERVERS = {}
-                for member in member_json:
-                    HTTPListener.Global.SERVERS[member['id']] = member
 
-        success = True
-        if type(D2[k]['deployments']['deployment']) is dict:
-            deployment_json = get_deployment_from_xml(D2[k]['deployments']
-                                                      ['deployment'], 'dict')
+def populate_deployment(deployments, log):
+    success = True
+    if type(deployments) is dict:
+        deployment_json = get_deployment_from_xml(deployments, 'dict')
+        req = HTTPListener.DictClass()
+        req.json = {}
+        req.json = deployment_json[0]
+        inputs = JsonInputs(req)
+        if not inputs.validate():
+            success = False
+            sys.stdout.write(str(inputs.errors))
+            log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+        if success is True:
+            HTTPListener.Global.DEPLOYMENT = {deployment_json[0]['databaseid']: deployment_json[0]}
+    else:
+        deployment_json = get_deployment_from_xml(deployments, 'list')
+        for deployment in deployment_json:
             req = HTTPListener.DictClass()
             req.json = {}
-            req.json = deployment_json[0]
+            req.json = deployment
             inputs = JsonInputs(req)
             if not inputs.validate():
                 success = False
                 sys.stdout.write(str(inputs.errors))
                 log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-            if success is True:
-                HTTPListener.Global.DEPLOYMENT = {deployment_json[0]['databaseid']: deployment_json[0]}
-        else:
-            deployment_json = get_deployment_from_xml(D2[k]['deployments']
-                                                      ['deployment'], 'list')
+        if success is True:
+            HTTPListener.Global.DEPLOYMENT = {}
             for deployment in deployment_json:
+                HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
+    success = True
+    if 'users' in deployments and deployments['users'] is not None \
+            and 'user' in deployments['users']:
+        if type(deployments) is dict:
+            user_json = get_users_from_xml(deployments,
+                                           'dict')
+            if type(user_json) is dict:
                 req = HTTPListener.DictClass()
                 req.json = {}
-                req.json = deployment
-                inputs = JsonInputs(req)
+                user_json['plaintext'] = bool(user_json['plaintext'])
+                req.json = user_json
+                inputs = UserInputs(req)
                 if not inputs.validate():
                     success = False
                     sys.stdout.write(str(inputs.errors))
                     log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-            if success is True:
-                HTTPListener.Global.DEPLOYMENT = {}
-                for deployment in deployment_json:
-                    HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
-        success = True
-        if 'users' in D2[k]['deployments']['deployment'] and D2[k]['deployments']['deployment']['users'] is not None \
-                and 'user' in D2[k]['deployments']['deployment']['users']:
-            if type(D2[k]['deployments']['deployment']) is dict:
-                user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
-                                               'dict')
-                if type(user_json) is dict:
+                if success is True:
+                    HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
+
+            elif type(user_json) is list:
+                for user in user_json:
                     req = HTTPListener.DictClass()
                     req.json = {}
-                    user_json['plaintext'] = bool(user_json['plaintext'])
-                    req.json = user_json
+                    user['plaintext'] = bool(user['plaintext'])
+                    req.json = user
                     inputs = UserInputs(req)
                     if not inputs.validate():
                         success = False
                         sys.stdout.write(str(inputs.errors))
                         log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-                    if success is True:
-                        HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
-
-                elif type(user_json) is list:
-                    for user in user_json:
-                        req = HTTPListener.DictClass()
-                        req.json = {}
-                        user['plaintext'] = bool(user['plaintext'])
-                        req.json = user
-                        inputs = UserInputs(req)
-                        if not inputs.validate():
-                            success = False
-                            sys.stdout.write(str(inputs.errors))
-                            log.error("Error while reloading configuration: %s", str(inputs.errors))
-
-                    if len(user_json)> 1:
-                        result = check_duplicate_user(user_json)
-                        if result != "":
-                            success = False
-                            log.error("Error while reloading configuration: %s", result)
-
-                    if success is True:
-                        HTTPListener.Global.DEPLOYMENT_USERS = {}
-                        for user in user_json:
-                            HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
-            else:
-                user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
-                                               'list')
-                if type(user_json) is dict:
-                    req = HTTPListener.DictClass()
-                    req.json = {}
-                    user_json['plaintext'] = bool(user_json['plaintext'])
-                    req.json = user_json
-                    inputs = UserInputs(req)
-                    if not inputs.validate():
-                        success = False
-                        sys.stdout.write(str(inputs.errors))
-                        log.error("Error while reloading configuration: %s", str(inputs.errors))
-
-                    if success is True:
-                        HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
-                elif type(user_json) is list:
-                    for user in user_json:
-                        req = HTTPListener.DictClass()
-                        req.json = {}
-                        user['plaintext'] = bool(user['plaintext'])
-                        req.json = user
-                        inputs = UserInputs(req)
-                        if not inputs.validate():
-                            success = False
-                            sys.stdout.write(str(inputs.errors))
-                            log.error("Error while reloading configuration: %s", str(inputs.errors))
-
+                if len(user_json)> 1:
                     result = check_duplicate_user(user_json)
                     if result != "":
                         success = False
                         log.error("Error while reloading configuration: %s", result)
 
-                    if success is True:
-                        HTTPListener.Global.DEPLOYMENT_USERS = {}
-                        for user in user_json:
-                            HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])]  =user
-    except Exception as err:
-        log.error("Error while reloading configuration: %s", "Invalid file content.")
+                if success is True:
+                    HTTPListener.Global.DEPLOYMENT_USERS = {}
+                    for user in user_json:
+                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
+        else:
+            user_json = get_users_from_xml(deployments,
+                                           'list')
+            if type(user_json) is dict:
+                req = HTTPListener.DictClass()
+                req.json = {}
+                user_json['plaintext'] = bool(user_json['plaintext'])
+                req.json = user_json
+                inputs = UserInputs(req)
+                if not inputs.validate():
+                    success = False
+                    sys.stdout.write(str(inputs.errors))
+                    log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+                if success is True:
+                    HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
+            elif type(user_json) is list:
+                for user in user_json:
+                    req = HTTPListener.DictClass()
+                    req.json = {}
+                    user['plaintext'] = bool(user['plaintext'])
+                    req.json = user
+                    inputs = UserInputs(req)
+                    if not inputs.validate():
+                        success = False
+                        sys.stdout.write(str(inputs.errors))
+                        log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+                result = check_duplicate_user(user_json)
+                if result != "":
+                    success = False
+                    log.error("Error while reloading configuration: %s", result)
+
+                if success is True:
+                    HTTPListener.Global.DEPLOYMENT_USERS = {}
+                    for user in user_json:
+                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
+
 
 def validate_server_ports_dict(member, databases, isDict):
     arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
@@ -371,6 +382,7 @@ def validate_server_ports_list(members, databases, isDict):
 
     elif type(databases) is list:
         for database in databases:
+            database_members = []
             memberIds = ast.literal_eval(database['members'])
             if len(members) > 1:
                 for id in memberIds:
@@ -406,6 +418,7 @@ def check_duplicate_user(users):
             result = compare_user(users[i], users[j])
     if result is not None:
         return result
+
 
 def get_servers_from_database_id(database_id):
     servers = []
