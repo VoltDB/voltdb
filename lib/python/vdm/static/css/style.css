@@ -1147,7 +1147,7 @@ table.tblPopup {
 .configurTbl tr td {
 	border: none;
 	padding: 5px 0;
-	vertical-align: middle;
+
 }
 .propertiesAlign {
 	margin: 10px 0 0 0;
@@ -1608,10 +1608,10 @@ ul.nav li:nth-child(1) {
 	margin-bottom: 0;
 }
 .modal-dialog-center {
-	margin-top: 45%;
+	margin-top:15%;
 }
 .clusterStartStop {
-	width: 100%
+	width: 100%;
 }
 .resetpb {
 	width: 100%;
@@ -1671,7 +1671,7 @@ ul.drList {
 	margin: 0;
 }
 }
- @media (min-width: 320px) and (max-width: 620px) {
+ @media (min-width: 320px) and (max-width: 640px) {
 .rightSide {
 	float: none;
 }
@@ -1742,4 +1742,11 @@ ul.drList {
 .overlayText {
 	width: 92%;
 }
+.overlayWrapper { width:95.1%;} 
 }
+ @media (width: 800px){
+	 .overlayWrapper { width:96.1%;}
+ }
+  @media (width: 980px){
+	 .overlayWrapper { width:96.9%;}
+ }
