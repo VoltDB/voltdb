@@ -72,7 +72,7 @@ public class OperatorExpression extends AbstractExpression {
         }
         ExpressionType type = getExpressionType();
         if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
-            m_valueType = VoltType.BIGINT;
+            m_valueType = VoltType.BOOLEAN;
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             return;
         }
@@ -133,7 +133,7 @@ public class OperatorExpression extends AbstractExpression {
         if (m_right == null) {
             if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT ||
                     type == ExpressionType.OPERATOR_EXISTS) {
-                m_valueType = VoltType.BIGINT;
+                m_valueType = VoltType.BOOLEAN;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
             return;
