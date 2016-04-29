@@ -103,7 +103,6 @@ def plotByWorkload(buckets,path,combograph=False,title='') :
 
             #print("Adding new subplot: ratio: %s build: %s at subplotlocations[ratio]" % (ratio,build));
             sb = plt.subplot(1,numcols,subplotlocations[workload]);
-            #sb.invert_xaxis()
             #sb.set_color_cycle(COLORS);
             # these need to be applied AFTER the subplot is created.
             plt.xlabel("Zipfian Value",fontsize=20,fontweight='bold');
@@ -127,11 +126,12 @@ def plotByWorkload(buckets,path,combograph=False,title='') :
                     print("WARNING ratio %s: only has %s datapoints x/y: %s/%s" % (ratio,len(y),x,y));
 
                 sb.plot(x,y, "-^", linewidth=3,label=ratio,solid_capstyle='round',solid_joinstyle='round',aa=True)
-
                 # this will force it to use the specific x values, and not autoscale.
                 sb.set_xticks([float(i) for i in x]);
 
             plt.legend(legendlist, loc='best')
+            # Highest zipfian number should go first.
+            sb.invert_xaxis();
             if ( not combograph) :
                 savepath=path+"/"+build+"-workload-"+workload+".png"
                 print("writing:"+savepath);
@@ -150,11 +150,12 @@ def plotByWorkload(buckets,path,combograph=False,title='') :
 
 def usage():
     print "Usage:"
-    print "\t", sys.argv[0], "output_dir [build-tag] [master-tag] "
+    print "\t", sys.argv[0], "output_dir [build-tag|latest] [master-tag|latest]"
     print "\t example: ./ycsb-graphs.py /tmp/test jenkins-kit-performance-rambranch-build-73 latest"
     print "\t example: ./ycsb-graphs.py /tmp/test latest latest"
     print "\t example: ./ycsb-graphs.py /tmp/test latest jenkins-kit-performance-ycsb-zipfian-build-4"
-    print ""
+    print "if no master-tag is given, master stat's will not be included"
+    print "if latest is used, it will grab the latest version from the stats database"
 
 def main():
     build_tag = None;
@@ -177,29 +178,32 @@ def main():
 
     conn = FastSerializer(STATS_SERVER,21212)
 
-    latestMaster=getLatestKitBuildTag(conn,master_tag,'YCSB-%-master')
     latestAnticache=getLatestKitBuildTag(conn,build_tag,'YCSB-Anticache-%')
-
-    print("master kit:"+latestMaster);
     print("workload kit:"+latestAnticache);
-
-    # show all the history
     (stats, mindate, maxdate) = get_stats(conn,latestAnticache)
-    (masterstats,mastermindate,mastermaxdate) = get_stats(conn,latestMaster)
+    workBuckets = getBucketsByWorkload(stats,mindate,maxdate);
+
+    if master_tag != None :
+        latestMaster=getLatestKitBuildTag(conn,master_tag,'YCSB-%-master')
+        print("master kit:"+latestMaster);
+        (masterstats,mastermindate,mastermaxdate) = get_stats(conn,latestMaster)
+        masterWorkBuckets = getBucketsByWorkload(masterstats,mindate,maxdate)
+
+
     conn.close();
 
-    workBuckets = getBucketsByWorkload(stats,mindate,maxdate);
-    masterWorkBuckets = getBucketsByWorkload(masterstats,mindate,maxdate);
-
     # we need to merge the workload and master buckets, add the master values to the workload bucket
-    for build in workBuckets :
-        for workload in workBuckets[build] :
-            for mbuild in masterWorkBuckets :
-                if ( workload in masterWorkBuckets[mbuild] ) :
-                   workBuckets[build][workload]["master"] = masterWorkBuckets[mbuild][workload]["master"]
+    if master_tag != None :
+        for build in workBuckets :
+            for workload in workBuckets[build] :
+                for mbuild in masterWorkBuckets :
+                    if ( workload in masterWorkBuckets[mbuild] ) :
+                        workBuckets[build][workload]["master"] = masterWorkBuckets[mbuild][workload]["master"]
 
 
-    plotByWorkload(workBuckets,path,title=latestMaster+" vs "+ latestAnticache )
+        plotByWorkload(workBuckets,path,title=latestMaster+" vs "+ latestAnticache )
+    else :
+        plotByWorkload(workBuckets,path,title=latestAnticache )
 
 def getBucketsByWorkload(stats,mindate,maxdate) :
     #root_path = path
