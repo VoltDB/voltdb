@@ -177,7 +177,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // Insert a null by passing an instance of the null sigil
             validateTableOfScalarLongs(client, "delete from " + tbl, new long[] {1});
-            vt = client.callProcedure(tbl + ".Insert", 0, "null geog", VoltType.GEOGRAPHY.getNullValue()).getResults()[0];
+            vt = client.callProcedure(tbl + ".Insert", 0, "null geog", VoltType.NULL_GEOGRAPHY).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {1});
 
             vt = client.callProcedure("@AdHoc", "select poly from " + tbl).getResults()[0];
@@ -741,7 +741,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 client.callProcedure("select_in_" + tbl,
                     (Object)(new Object[] {
                             BERMUDA_TRIANGLE_POLY,
-                            VoltType.GEOGRAPHY.getNullValue(),
+                            VoltType.NULL_GEOGRAPHY,
                             LOWELL_SQUARE_POLY}));
                 fail("Expected an exception to be thrown");
             }

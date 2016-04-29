@@ -67,6 +67,8 @@ public class Promote extends VoltSystemProcedure {
                     -1);
             VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }
+        // clear out trackers on all sites when DR consumer be promoted
+        ctx.resetDrAppliedTracker();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

@@ -25,10 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -36,6 +33,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestLoadingSuite extends RegressionSuite {
 
@@ -73,7 +72,7 @@ public class TestLoadingSuite extends RegressionSuite {
         table = m_template.clone(100);
         table.addRow(1, 1, 1, "1", 1.0);
         table.addRow(2, 1, 2, "2", 2.0);
-        r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
+        r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
                 "PARTITIONED", upsertMode, table);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
         assertEquals(1, r.getResults().length);
@@ -82,7 +81,7 @@ public class TestLoadingSuite extends RegressionSuite {
 
         // test failure to load replicated table from SP proc
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(1),
+            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
                     "REPLICATED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
@@ -95,7 +94,7 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(3, 2, 3, "3", 3.0);
         table.addRow(3, 2, 3, "3", 3.0);
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", TheHashinator.valueToBytes(2),
+            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(2),
                     "PARTITIONED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {

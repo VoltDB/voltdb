@@ -56,13 +56,13 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+
+import junit.framework.TestCase;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
@@ -413,7 +413,7 @@ public class TestParameterSet extends TestCase {
         ByteBuffer buf;
 
         Object[] psetObjs = new Object[] {
-                null, VoltType.INTEGER.getNullValue(), VoltType.DECIMAL.getNullValue(), // null values
+                null, VoltType.NULL_INTEGER, VoltType.NULL_DECIMAL, // null values
                 (byte)1, (short)2, (int)3, (long)4, 1.2f, 3.6d, // numbers
                 "This is spinal tap", "", // strings
                 "ABCDF012", new byte[] { 1, 3, 5 }, new byte[0], // binary

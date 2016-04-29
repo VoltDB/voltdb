@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import ast
 from collections import defaultdict
@@ -56,6 +43,7 @@ from flask_logging import Filter
 import Configuration
 import signal
 import thread
+from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -518,11 +506,11 @@ def check_port_valid(port_option, server):
 
     if port == server_port:
         return jsonify(success=False,
-                       errors="Port %s for the same host is already used by server %s for %s" % \
+                       errors="Port %s for the same host is already used by server %s for %s." % \
                               (port, server['hostname'], port_option))
 
 
-def validate_server_ports(database_id):
+def validate_server_ports(database_id, server_id=-1):
     arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
            "client-listener"]
 
@@ -541,7 +529,11 @@ def validate_server_ports(database_id):
             if option != port_key and value is not None and specified_port_values[port_key] == value:
                 return jsonify(success=False, errors="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    if server_id == -1:
+        servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    else:
+        servers = [servers for servers in database_servers if servers['hostname'] ==
+                   request.json['hostname'] and servers['id'] != server_id]
     for server in servers:
         for option in arr:
             result = check_port_valid(option, server)
@@ -703,7 +695,7 @@ class ServerAPI(MethodView):
             Information and the status of server if it is saved otherwise the error message.
         """
         if 'id' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' while creating server.'}), 404)
+            return make_response(jsonify({'errors': 'You cannot specify \'Id\' while creating server.'}), 404)
 
         inputs = ServerInputs(request)
         if not inputs.validate():
@@ -716,7 +708,7 @@ class ServerAPI(MethodView):
         if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = len(Global.SERVERS) + 1
+            server_id = Global.SERVERS.keys()[-1] + 1
 
         Global.SERVERS[server_id] = {
             'id': server_id,
@@ -807,7 +799,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'error': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'errors': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -822,7 +814,7 @@ class ServerAPI(MethodView):
             if current_server is None:
                 abort(404)
 
-            result = validate_server_ports(database_id)
+            result = validate_server_ports(database_id, server_id)
             if result is not None:
                 return result
 
@@ -908,7 +900,7 @@ class DatabaseAPI(MethodView):
         if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = len(Global.DATABASES) + 1
+            database_id = Global.DATABASES.keys()[-1] + 1
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
@@ -1035,11 +1027,11 @@ class DeploymentUserAPI(MethodView):
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(Set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
-            user_id = len(Global.DEPLOYMENT_USERS) + 1
+            user_id = Global.DEPLOYMENT_USERS.keys()[-1] + 1
 
         try:
 
@@ -1048,7 +1040,7 @@ class DeploymentUserAPI(MethodView):
                 'databaseid': database_id,
                 'name': request.json['name'],
                 'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
-                'roles': request.json['roles'],
+                'roles': user_roles,
                 'plaintext': True
             }
         except Exception, err:
@@ -1074,18 +1066,20 @@ class DeploymentUserAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if current_user is None:
+            return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(Set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
         current_user['password'] = urllib.unquote(
             str(request.json.get('password', current_user['password'])).encode('ascii')).decode('utf-8')
-        current_user['roles'] = request.json.get('roles', current_user['roles'])
+        current_user['roles'] = user_roles
         current_user['plaintext'] = request.json.get('plaintext', current_user['plaintext'])
         sync_configuration()
         Configuration.write_configuration_file()

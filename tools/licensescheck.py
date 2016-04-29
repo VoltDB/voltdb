@@ -57,6 +57,11 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
             return 0
         print "ERROR: \"%s\" does not start with an approved license." % f
     else:
+        # skip hashbang, Groovy case
+        if content.startswith("#!") and f.endswith('.groovy'):
+            (ignore, content) = content.split("\n", 1)
+            content = content.lstrip()
+
         if not content.startswith("/*"):
             if content.lstrip().startswith("/*"):
                 print "ERROR: \"%s\" contains whitespace before initial comment." % f
@@ -281,7 +286,7 @@ def fixTrailingNewline(f, content):
 FIX_LICENSES_LEVEL = 2
 
 def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
-    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
+    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy'):
         if f.endswith(suffix):
             break
     else:
@@ -352,6 +357,7 @@ def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython):
     (fixcount, errcount) = (0, 0)
     for f in [f for f in files if not f.startswith('.') and f not in prunelist]:
         fullpath = os.path.join(d,f)
+        # print fullpath
         if os.path.isdir(fullpath):
             (fixinc, errinc) = processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
         else:
@@ -393,6 +399,11 @@ srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
 (fixcount, errcount) = (0, 0)
 (fixinc, errinc) = processAllFiles(basepath + "src", fix,
+    tuple([readFile(f) for f in srcLicenses]),
+    tuple([readFile(f) for f in srcLicensesPy]))
+fixcount += fixinc
+errcount += errinc
+(fixinc, errinc) = processAllFiles(basepath + "lib/python", fix,
     tuple([readFile(f) for f in srcLicenses]),
     tuple([readFile(f) for f in srcLicensesPy]))
 fixcount += fixinc

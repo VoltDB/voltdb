@@ -1262,7 +1262,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testRemoveDRTableColumn() throws IOException {
@@ -1278,23 +1278,37 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiff(catOriginal, catUpdated);
     }
 
     public void testModifyDRTableColumn() throws IOException {
+        String originalSchema = "\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 INTEGER NOT NULL);" +
+                                "\nPARTITION TABLE A ON COLUMN C1;" +
+                                "\nDR TABLE A;";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
-                                 "\nPARTITION TABLE A ON COLUMN C1;" +
-                                 "\nDR TABLE A;");
+        builder.addLiteralSchema(originalSchema);
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
-        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 INTEGER;");
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 BIGINT;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        // Does not require empty table as C2 is made wider
+        verifyDiff(catOriginal, catUpdated);
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(originalSchema);
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr3.jar"));
+        catOriginal = catalogForJar(testDir +  File.separator + "dr3.jar");
+
+        builder.addLiteralSchema("\nALTER TABLE A ALTER COLUMN C2 TINYINT;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr4.jar"));
+        catUpdated = catalogForJar(testDir + File.separator + "dr4.jar");
+
+        // Requires empty table as C2 is made narrower
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testExportConfigStreamTargetAttribute() throws Exception {

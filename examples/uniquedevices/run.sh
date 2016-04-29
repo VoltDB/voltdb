@@ -61,9 +61,9 @@ function cleanall() {
 function jars() {
     # compile java source
     javac \
-        hyperloglogsrc/org/voltdb/hll/HyperLogLog.java \
-        hyperloglogsrc/org/voltdb/hll/MurmurHash.java \
-        hyperloglogsrc/org/voltdb/hll/RegisterSet.java
+        hyperloglogsrc/org/voltdb_hll/HyperLogLog.java \
+        hyperloglogsrc/org/voltdb_hll/MurmurHash.java \
+        hyperloglogsrc/org/voltdb_hll/RegisterSet.java
     javac -classpath hyperloglogsrc:$APPCLASSPATH \
         procedures/uniquedevices/*.java
     javac -classpath hyperloglogsrc:$CLIENTCLASSPATH \
@@ -76,7 +76,7 @@ function jars() {
     # remove compiled .class files
     rm -rf \
         procedures/uniquedevices/*.class \
-        hyperloglogsrc/org/org/voltdb/hll/*.class \
+        hyperloglogsrc/org/org/voltdb_hll/*.class \
         client/uniquedevices/*.class
 }
 

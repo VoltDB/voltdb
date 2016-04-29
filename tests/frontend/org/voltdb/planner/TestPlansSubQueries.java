@@ -205,9 +205,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1", "A1", "C");
 
-        pn = compile("select C1 FROM (SELECT A+3, C C1 FROM R1) T1 WHERE T1.C1 < 0");
+        pn = compile("select COL1 FROM (SELECT A+3, C COL1 FROM R1) T1 WHERE T1.COL1 < 0");
         pn = pn.getChild(0);
-        checkSeqScan(pn, tbName,  "C1");
+        checkSeqScan(pn, tbName,  "COL1");
         assertEquals(((SeqScanPlanNode) pn).getInlinePlanNodes().size(), 1);
         assertNotNull(((SeqScanPlanNode) pn).getInlinePlanNode(PlanNodeType.PROJECTION));
         checkPredicateComparisonExpression(pn, tbName);
@@ -1492,7 +1492,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     }
 
-    private final String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
+    private final String joinErrorMsg = ".";
     public void testUnsupportedCases() {
         // (1)
         // sub-selected table must have an alias
@@ -1679,7 +1679,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Distinct with GROUP BY
         // TODO: group by partition column cases can be supported
-        String errorMessage = "Join of multiple partitioned tables has insufficient join criteria";
+        String errorMessage = "This query is not plannable.  It has a subquery which needs cross-partition access.";
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A", errorMessage);
@@ -2099,7 +2099,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = upn.getChild(2);
         checkSeqScan(pn, "R3", "A", "C");
 
-        String message = "Join of multiple partitioned tables has insufficient join criteria";
+        String message = "This query is not plannable.  It has a subquery which needs cross-partition access.";
         failToCompile("select * FROM " +
                 "(SELECT A, COUNT(*) FROM P1 GROUP BY A " +
                 "UNION " +

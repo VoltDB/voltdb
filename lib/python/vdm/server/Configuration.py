@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 from collections import defaultdict
@@ -57,13 +44,15 @@ def convert_xml_to_json(config_path):
     for (k, v) in zip(xml_final.keys(), xml_final.values()):
         D2[k] = v
 
-    if type(D2[k]['members']['member']) is dict:
-        member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
-        HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
-    else:
-        member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
-        for member in member_json:
-            HTTPListener.Global.SERVERS[member['id']] = member
+    # To get the list of servers in case of old members[] (for backward compatible)
+    if 'members' in D2[k] and 'member' in D2[k]['members'] and D2[k]['members']['member']:
+        if type(D2[k]['members']['member']) is dict:
+            member_json = get_field_from_xml(D2[k]['members']['member'], 'dict')
+            HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+        else:
+            member_json = get_field_from_xml(D2[k]['members']['member'], 'list')
+            for member in member_json:
+                HTTPListener.Global.SERVERS[member['id']] = member
 
     if type(D2[k]['databases']['database']) is dict:
         db_json = get_field_from_xml(D2[k]['databases']['database'],
@@ -85,15 +74,25 @@ def convert_xml_to_json(config_path):
         for deployment in deployment_json:
             HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
 
-    if 'users' in D2[k]['deployments']['deployment'] and D2[k]['deployments']['deployment']['users'] is not None \
-            and 'user' in D2[k]['deployments']['deployment']['users']:
+
+    if D2[k]['deployments'] and 'deployment' in D2[k]['deployments']:
         if type(D2[k]['deployments']['deployment']) is dict:
-            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
+            set_deployment_users(D2[k]['deployments']['deployment'])
+        else:
+            for deployment in D2[k]['deployments']['deployment']:
+                set_deployment_users(deployment)
+
+
+def set_deployment_users(deployment):
+    if 'users' in deployment and deployment['users'] is not None\
+            and 'user' in deployment['users']:
+        if type(deployment) is dict:
+            user_json = get_users_from_xml(deployment,
                                            'dict')
             for user in user_json:
                 HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
         else:
-            user_json = get_users_from_xml(D2[k]['deployments']['deployment'],
+            user_json = get_users_from_xml(deployment,
                                            'list')
             for deployment_user in user_json:
                 HTTPListener.Global.DEPLOYMENT_USERS[int(deployment_user['userid'])] = deployment_user
@@ -832,9 +831,32 @@ def get_fields(content, type_content):
                                                               'dict', 'export')
         elif field == 'enabled' and type_content == 'export':
             new_property[field] = parse_bool_string(content[field])
+        elif field == 'members':
+            members = []
+            if type(content[field]) is dict:
+                members = set_members_field(content[field])
+            # To get the database members in case of old members[] (for backward compatible)
+            elif type(content[field]) is str:
+                members = convert_field_required_format(content, field)
+            new_property[field] = members
         else:
             new_property[field] = convert_field_required_format(content, field)
     return new_property
+
+
+def set_members_field(content):
+    members = []
+    if content and 'member' in content and content['member']:
+        if type(content['member']) is dict:
+            member_json = get_field_from_xml(content['member'], 'dict')
+            HTTPListener.Global.SERVERS[member_json[0]['id']] = member_json[0]
+        else:
+            member_json = get_field_from_xml(content['member'], 'list')
+            for member in member_json:
+                HTTPListener.Global.SERVERS[member['id']] = member
+        for mem in member_json:
+            members.append(mem['id'])
+    return members
 
 
 def get_users_from_xml(deployment_xml, is_list):
@@ -989,7 +1011,6 @@ def make_configuration_file():
     """
     main_header = Element('voltdeploy')
     db_top = SubElement(main_header, 'databases')
-    server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
 
     for key, value in HTTPListener.Global.DATABASES.items():
@@ -1000,19 +1021,22 @@ def make_configuration_file():
                     db_elem.attrib[k] = "false"
                 else:
                     db_elem.attrib[k] = "true"
+            elif k == 'members':
+                mem_elem = SubElement(db_elem, 'members')
+                for mem_id in val:
+                    server_info = HTTPListener.Global.SERVERS.get(mem_id)
+                    if server_info:
+                        mem_item = SubElement(mem_elem, 'member')
+                        for field in server_info:
+                            if isinstance(server_info[field], bool):
+                                if not value:
+                                    mem_item.attrib[field] = "false"
+                                else:
+                                    mem_item.attrib[field] = "true"
+                            else:
+                                mem_item.attrib[field] = str(server_info[field])
             else:
                 db_elem.attrib[k] = str(val)
-
-    for key, value in HTTPListener.Global.SERVERS.items():
-        server_elem = SubElement(server_top, 'member')
-        for k, v in value.items():
-            if isinstance(v, bool):
-                if not value:
-                    server_elem.attrib[k] = "false"
-                else:
-                    server_elem.attrib[k] = "true"
-            else:
-                server_elem.attrib[k] = str(v)
 
     for key, value in HTTPListener.Global.DEPLOYMENT.items():
 
@@ -1090,17 +1114,26 @@ def set_deployment_for_upload(database_id, request):
                     return {'status': 'failure', 'error': result['error']}
 
                 HTTPListener.map_deployment(req, database_id)
-                HTTPListener.Global.DEPLOYMENT_USERS = {}
+
+                deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
+                if deployment_user is not None:
+                    for user in deployment_user:
+                        if user[0]['databaseid'] == database_id:
+                            del HTTPListener.Global.DEPLOYMENT_USERS[int(user[0]['userid'])]
                 if 'users' in req.json and 'user' in req.json['users']:
                     for user in req.json['users']['user']:
-                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = {
-                            'name': user['name'],
-                            'roles': user['roles'],
-                            'password': user['password'],
-                            'plaintext': user['plaintext'],
-                            'databaseid': database_id,
-                            'userid': user['userid']
-                        }
+                        if not HTTPListener.Global.DEPLOYMENT_USERS:
+                            user_id = 1
+                        else:
+                            user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                        HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
+                                'name': user['name'],
+                                'roles': user['roles'],
+                                'password': user['password'],
+                                'plaintext': user['plaintext'],
+                                'databaseid': database_id,
+                                'userid': user_id
+                            }
 
                 HTTPListener.sync_configuration()
                 write_configuration_file()

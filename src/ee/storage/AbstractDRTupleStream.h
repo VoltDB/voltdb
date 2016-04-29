@@ -25,7 +25,6 @@
 #include <deque>
 
 namespace voltdb {
-class TableIndex;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
@@ -43,7 +42,7 @@ struct DRCommittedInfo{
 
 class AbstractDRTupleStream : public TupleStreamBase {
 public:
-    AbstractDRTupleStream(int defaultBufferSize);
+    AbstractDRTupleStream(int partitionId, int defaultBufferSize);
 
     virtual ~AbstractDRTupleStream() {}
 
@@ -54,7 +53,6 @@ public:
     virtual void setSecondaryCapacity(size_t capacity);
 
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
-    void configure(CatalogId partitionId) { m_partitionId = partitionId; }
 
     /**
      * write an insert or delete record to the stream
@@ -62,12 +60,12 @@ public:
      * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       DRRecordType type) = 0;
 
     /**
      * write an update record to the stream
@@ -75,16 +73,17 @@ public:
      * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
-                       TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       TableTuple &newTuple) = 0;
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
+                       int partitionColumn,
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) = 0;

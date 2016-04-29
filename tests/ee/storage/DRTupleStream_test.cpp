@@ -46,24 +46,22 @@ const int COLUMN_COUNT = 5;
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
 // columns, which includes:
-// 1 version byte
 // 1 type byte
 // 8 table signature bytes
 // 4 row length bytes
 // 1 (5 columns rounds to 8, /8 = 1) null mask byte
 // 5 * sizeof(int32_t) = 20 data bytes
-// 4 checksum bytes
-// total: 39
-const int MAGIC_TUPLE_SIZE = 39;
-const int MAGIC_BEGIN_TRANSACTION_SIZE = 22;
-const int MAGIC_TRANSACTION_SIZE = 36;
+// total: 34
+const int MAGIC_TUPLE_SIZE = 34;
+const int MAGIC_BEGIN_TRANSACTION_SIZE = 27;
+const int MAGIC_END_TRANSACTION_SIZE = 13;
+const int MAGIC_TRANSACTION_SIZE = MAGIC_BEGIN_TRANSACTION_SIZE + MAGIC_END_TRANSACTION_SIZE;
 const int MAGIC_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 // More magic: assume we've indexed on precisely one of those integer
 // columns. Then our magic size should reduce the 5 * sizeof(int32_t) to:
 // 4 index checksum bytes
 // 1 * sizeof(int32_t) = 4 data bytes
-// new total: 27
-const int MAGIC_OPTIMIZED_TUPLE_SIZE = 27;
+const int MAGIC_OPTIMIZED_TUPLE_SIZE = MAGIC_TUPLE_SIZE;
 const int MAGIC_OPTIMIZED_TUPLE_PLUS_TRANSACTION_SIZE = MAGIC_OPTIMIZED_TUPLE_SIZE + MAGIC_TRANSACTION_SIZE;
 const int BUFFER_SIZE = 950;
 // roughly 22.5k
@@ -76,10 +74,10 @@ static int64_t addPartitionId(int64_t value) {
 class DRTupleStreamTest : public Test {
 public:
     DRTupleStreamTest()
-        : m_wrapper(64*1024),
+        : m_wrapper(42, 64*1024),
           m_context(new ExecutorContext(1, 1, NULL, &m_topend, NULL,
-                                      (NValueArray*)NULL, (VoltDBEngine*)NULL,
-                                      "localhost", 2, &m_wrapper, NULL, 0))
+                                        (NValueArray*)NULL, (VoltDBEngine*)NULL,
+                                        "localhost", 2, &m_wrapper, NULL, 0))
     {
         m_wrapper.m_enabled = true;
         srand(0);
@@ -97,9 +95,6 @@ public:
                                          columnLengths,
                                          columnAllowNull);
 
-        // allocate a new buffer and wrap it
-        m_wrapper.configure(42);
-
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
         m_wrapper.setSecondaryCapacity(LARGE_BUFFER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING);
@@ -115,18 +110,19 @@ public:
         m_tuple->move(m_tupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT, const std::pair<TableIndex*, int32_t>& index = defaultIndexPair)
+    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
     {
         // fill a tuple
-        for (int col = 0; col < COLUMN_COUNT; col++) {
+        m_tuple->setNValue(0, ValueFactory::getIntegerValue(0));
+        for (int col = 1; col < COLUMN_COUNT; col++) {
             int value = rand();
             m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
         }
         lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
-        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, currentSpHandle,
-                               currentSpHandle, currentSpHandle, *m_tuple, type, index);
+        return m_wrapper.appendTuple(lastCommittedSpHandle, tableHandle, 0, currentSpHandle,
+                               currentSpHandle, currentSpHandle, *m_tuple, type);
     }
 
     virtual ~DRTupleStreamTest() {
@@ -143,10 +139,7 @@ protected:
     DummyTopend m_topend;
     boost::scoped_ptr<ExecutorContext> m_context;
     char tableHandle[20];
-
-    const static std::pair<TableIndex*, int32_t> defaultIndexPair;
 };
-const std::pair<TableIndex*, int32_t> DRTupleStreamTest::defaultIndexPair = std::make_pair((TableIndex*)NULL, -1);
 
 // Several of these cases were move to TestExportDataSource in Java
 // where some ExportTupleStream functionality now lives
@@ -256,19 +249,13 @@ TEST_F(DRTupleStreamTest, BasicOps)
 
 TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
     vector<int> columnIndices(1, 0);
-    TableIndexScheme scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
-                                               columnIndices, TableIndex::simplyIndexColumns(),
-                                               true, true, m_schema);
-    TableIndex *index = TableIndexFactory::getInstance(scheme);
-    uint32_t indexCrc = 42;
     for (int i = 1; i < 10; i++)
     {
         // first, send some delete records with an index
-        appendTuple(i-1, i, DR_RECORD_DELETE, std::make_pair(index, indexCrc));
+        appendTuple(i-1, i, DR_RECORD_DELETE);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
-    delete index;
 
     for (int i = 10; i < 20; i++)
     {
@@ -733,7 +720,7 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     for (int i = 1; i < tuples_to_fill; i++) {
         appendTuple(2, 3);
     }
-    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() < MAGIC_TUPLE_SIZE);
+    ASSERT_TRUE(m_wrapper.m_currBlock->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
 
     appendTuple(2, 3);
     m_wrapper.endTransaction(addPartitionId(3));

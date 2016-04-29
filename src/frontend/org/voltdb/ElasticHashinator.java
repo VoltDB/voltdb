@@ -20,24 +20,27 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.Thread.State;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.SortedMapDifference;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
+import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.SortedMapDifference;
 import com.google_voltpatches.common.collect.UnmodifiableIterator;
-
-import org.voltdb.utils.CompressionService;
 
 import sun.misc.Cleaner;
 
@@ -93,7 +96,7 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public int pHashToPartition(VoltType type, Object obj) {
-        return hashinateBytes(valueToBytes(obj));
+        return hashinateBytes(VoltType.valueToBytes(obj));
     }
 
     /**
@@ -678,5 +681,10 @@ public class ElasticHashinator extends TheHashinator {
             address = 0;
             m_allocatedHashinatorBytes.addAndGet(-size);
         }
+    }
+
+    @Override
+    public int getPartitionFromHashedToken(int hashedToken) {
+        return partitionForToken(hashedToken);
     }
 }

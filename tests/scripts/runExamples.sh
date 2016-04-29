@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TESTS=${1:-"geospatial json-sessions uniquedevices voltkv voter windowing windowing-with-ddl"}
+TESTS=${1:-"callcenter contentionmark geospatial json-sessions uniquedevices voltkv voter windowing windowing-with-ddl"}
 
 function echodo() {
   local opt_n=0 opt_s=0 opt_x=0 retval=0 opt=0 OPTIND
@@ -34,6 +34,7 @@ function echodo() {
   then
     $@
     retval=$?
+    echo "+++ Return value: " $retval
     if [ \( $opt_x -eq 1 \) -a \( $retval -ne 0 \) ]
     then
       echo "exiting: '$@' returned: $retval"

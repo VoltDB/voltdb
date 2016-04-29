@@ -236,16 +236,16 @@ public class TestDeterminism extends PlannerTestCase {
 
     public void testDeterminismOfJoin() {
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.a, X.c, X.b, Y.a");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.b, X.a, Y.a, X.c");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y",
                 "order by X.z, X.a, X.c, X.b, Y.a");
         assertPlanDeterminism(
-                "select X.a, X.z, Y.z, X.z + Y.z from tuniqcombo X, tunique Y",
+                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from tuniqcombo X, tunique Y",
                 "order by 4, X.z, X.a, X.c, X.b, Y.a");
         assertPlanDeterminismNeedsOrdering(
                 "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.a, X.c, X.b, Y.a",
@@ -257,14 +257,14 @@ public class TestDeterminism extends PlannerTestCase {
                 "select X.a l, X.z m, Y.z n from ttree X, tunique Y order by X.z, X.a, X.c, X.b, Y.a",
                 ", X.z, Y.z", "order by l, m, n");
         assertPlanDeterminismNeedsOrdering(
-                "select X.a, X.z, Y.z, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a",
+                "select X.a, X.z as xz, Y.z as yz, X.z + Y.z from ttree X, tunique Y order by 4, X.z, X.a, X.c, X.b, Y.a",
                 ", Y.z", "order by 1, 2, 3, 4");
         assertPlanNeedsSaferDeterminismCombo(
-                "select X.a, X.z, Y.z from tuniqcombo X, tunique Y where X.a = Y.a");
+                "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y where X.a = Y.a");
         assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from tuniqcombo X, tunique Y order by X.a, X.b, Y.a");
+            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.b, Y.a");
         assertPlanNeedsSaferDeterminismCombo(
-            "select X.a, X.z, Y.z from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a");
+            "select X.a, X.z as xz, Y.z as yz from tuniqcombo X, tunique Y order by X.a, X.c + X.b, X.b, Y.a");
     }
 
     public void testDeterminismOfSelectOrderGroupKeys() {
@@ -318,11 +318,11 @@ public class TestDeterminism extends PlannerTestCase {
     }
 
     public void testDeterminismOfJoinOrderAll() {
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a",
+        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
                 "order by 1, 2, 3");
         assertPlanDeterminismNeedsOrdering("select X.a l, X.z m, Y.z n from ttree X, tunique Y where X.a = Y.a",
                 "order by Y.z, X.a, X.z", "order by l, m, n");
-        assertPlanDeterminismNeedsOrdering("select X.a, X.z, Y.z from ttree X, tunique Y where X.a = Y.a",
+        assertPlanDeterminismNeedsOrdering("select X.a, X.z as xz, Y.z as yz from ttree X, tunique Y where X.a = Y.a",
                 "order by 3, 2, 1");
     }
 
@@ -612,10 +612,103 @@ public class TestDeterminism extends PlannerTestCase {
                                       DeterminismMode.FASTER);
     }
 
+    public void testDeterminismForUniqueConstraintEquivalence() {
+        String sql;
+
+        // equivalence filter in predicate clause using unique key with display list with
+        // different column than in where clause predicate.
+        sql = "select b from punique where a = ?";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.SAFER);
+
+        // where clause using equivalence filter on table using all columns
+        // forming composite primary
+        // key as this select statement can be in insert clause too, test it for
+        // safer determinism also
+        sql = "select z from ppkcombo where a = 1 AND b = 2 AND c = 3;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.SAFER);
+
+        // using parameters
+        sql = "select z from ppkcombo where a = ? AND b = ? AND c = ?;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.SAFER);
+
+        // predicate containing value-equivalence through transitive behavior that form unique
+        // index on table
+        sql = "select c, z from ppkcombo where a = ? AND a = b AND c = b;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.SAFER);
+
+        sql = "select * from ppkcombo where a = ? AND z = a;";
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        assertMPPlanDeterminismCore(sql, ORDERED, CONSISTENT, false, DeterminismMode.SAFER);
+
+        // predicate clause has equivalence filter but not value-equivalence
+        sql = "select c, z from ppkcombo where a = b AND c = b;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+
+        // query does not guarantee determinism if not all columns that form
+        // compound index, are present in part of value equivalence
+        sql = "select c, z from ppkcombo where a = 1 AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+
+        // predicate clause including all columns of compound key with
+        // OR operator, does not guarantee single row output
+        sql = "select c, z from ppkcombo where a = 1 OR b = ? AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+
+        // predicate clause including all columns of composite keys of composite but not
+        // value equivalence
+        sql = "select c, z from ppkcombo where a > 1 AND b = ? AND c = 3;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+
+        // non-equivalence filter on unique filter does not guarantee determinism
+        sql = "select a from ppk where a > 1;";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+
+        // Two-table scan query with predicate containing value equivalence filters, such that it covers
+        // unique indexes defined on both table, output will contain at most one row and is deterministic.
+        // Though the logic for unique index equivalence is defined for single table currently, so multi-
+        // table statement gets flagged incorrectly as non-deterministic. ENG-10299 is to address this issue.
+
+        // Change the test to expect determinism when ENG-10299 is fixed and execute test with safer
+        // determinism mode.
+        sql = "select * from punique, ppk where punique.a = ppk.a and ppk.a = ?";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        //assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        // Change the test to expect determinism when ENG-10299 is fixed and execute test with safer
+        // determinism mode.
+        sql = "select * from ppkcombo, ppk where ppkcombo.a = ppk.a and ppk.a = ? and ppkcombo.z = ?";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+        //assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, true, DeterminismMode.SAFER);
+
+        // query on multi-table with predicate only has equivalence but not value equivalence on unique
+        // indexes defined on both the tables. At most one row output is not guaranteed.
+        sql = "select * from punique, ppk where punique.a = ppk.a";
+        assertMPPlanDeterminismCore(sql, UNORDERED, CONSISTENT, false, DeterminismMode.FASTER);
+    }
+
+    private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content, DeterminismMode detMode) {
+        assertMPPlanDeterminismCore(sql, order, content, true, detMode);
+        }
+
+    /**
+     * Tests MP compiled plan for the specified determinism properties
+     *
+     * @param sql - SQL statement
+     * @param order - Specifies whether the statement should result in order determinism or not
+     * @param content - Specifies whether the statement should result in content determinism or not
+     * @param inferPartitioning - If set to true uses inferred partitioning to generate the compiled plan;
+     *                            if set to false applies force MP to generate the compiled plan.
+     * @param detMode - Determinism mode - faster or slower.
+     */
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,
-            DeterminismMode detMode)
-    {
-        CompiledPlan cp = compileAdHocPlan(sql, detMode);
+            boolean inferPartitioning, DeterminismMode detMode) {
+
+        final boolean forceSP = false;
+        CompiledPlan cp = compileAdHocPlan(sql, inferPartitioning, forceSP, detMode);
         if (order != cp.isOrderDeterministic()) {
             System.out.println((order ? "EXPECTED ORDER: " : "UNEXPECTED ORDER: ") + sql);
             if (m_staticRetryForDebugOnFailure) {

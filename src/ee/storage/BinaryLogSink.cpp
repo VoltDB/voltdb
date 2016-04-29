@@ -30,7 +30,6 @@
 #include "storage/tablefactory.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "indexes/tableindex.h"
 
 #include "catalog/database.h"
 
@@ -59,37 +58,6 @@ const static int DR_TUPLE_COLUMN_INDEX = 9;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
-
-class CachedIndexKeyTuple {
-public:
-    CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
-
-    TableTuple &tuple(PersistentTable *table, uint32_t indexCrc) {
-        if (m_storageSize > 0 && indexCrc == m_cachedIndexCrc) {
-            return m_tuple;
-        }
-        std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
-        if (!index.first || indexCrc != index.second) {
-            throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
-                                         indexCrc);
-        }
-        const TupleSchema* schema = index.first->getKeySchema();
-        size_t tupleLength = schema->tupleLength() + TUPLE_HEADER_SIZE;
-        if (tupleLength > m_storageSize) {
-            m_tupleStorage.reset(new char[tupleLength]);
-            m_storageSize = tupleLength;
-        }
-        m_tuple.setSchema(schema);
-        m_tuple.move(m_tupleStorage.get());
-        m_cachedIndexCrc = index.second;
-        return m_tuple;
-    }
-private:
-    TableTuple m_tuple;
-    uint32_t m_cachedIndexCrc;
-    size_t m_storageSize;
-    boost::scoped_array<char> m_tupleStorage;
-};
 
 // a c++ style way to limit access from outside this file
 namespace {
@@ -419,7 +387,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             }
         }
         if (newTuple) {
-            drTable->insertPersistentTuple(*newTuple, true);
+            drTable->insertPersistentTuple(*newTuple, true, true);
         }
     }
 
@@ -464,22 +432,71 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
 BinaryLogSink::BinaryLogSink() {}
 
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unordered_map<int64_t,
-                             PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-                             int32_t remoteClusterId, const char *recordStart, int64_t *uniqueId,
-                             int64_t *sequenceNumber) {
-    CachedIndexKeyTuple indexKeyTuple;
+int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
+                                boost::unordered_map<int64_t, PersistentTable*> &tables,
+                                Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                                const char *txnStart) {
+    int64_t      rowCount = 0;
+    DRRecordType type;
+    int64_t      uniqueId;
+    int64_t      sequenceNumber;
+    bool         isMultiHash;
+    int32_t      partitionHash;
+    bool         skipWrongHashRows;
 
-    const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
-    size_t rowCount = rowCostForDRRecord(type);
+    type = static_cast<DRRecordType>(taskInfo->readByte());
+    assert(type == DR_RECORD_BEGIN_TXN);
+    uniqueId = taskInfo->readLong();
+    sequenceNumber = taskInfo->readLong();
 
+    DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(taskInfo->readByte());
+    isMultiHash = (hashFlag == TXN_PAR_HASH_MULTI);
+    taskInfo->readInt();  // txnLength
+    partitionHash = taskInfo->readInt();
+    if (isMultiHash) {
+        skipWrongHashRows = !engine->isLocalSite(partitionHash);
+    }
+    else {
+        // check if the sp txn is for local site.
+        assert(hashFlag != TXN_PAR_HASH_SINGLE || engine->isLocalSite(partitionHash));
+        skipWrongHashRows = false;
+    }
+    // Read the whole txn since there is only one version number at the beginning
+    type = static_cast<DRRecordType>(taskInfo->readByte());
+    do {
+        rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
+                          txnStart, sequenceNumber, uniqueId, skipWrongHashRows);
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+        if (type == DR_RECORD_HASH_DELIMITER) {
+            assert(isMultiHash);
+            partitionHash = taskInfo->readInt();
+            skipWrongHashRows = !engine->isLocalSite(partitionHash);
+            type = static_cast<DRRecordType>(taskInfo->readByte());
+        }
+    } while (type != DR_RECORD_END_TXN);
+    int64_t tempSequenceNumber = taskInfo->readLong();
+    if (tempSequenceNumber != sequenceNumber) {
+        throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
+                            (intmax_t)sequenceNumber, (intmax_t)tempSequenceNumber);
+    }
+    uint32_t checksum = taskInfo->readInt();
+    validateChecksum(checksum, txnStart, taskInfo->getRawPointer());
+
+    return rowCount;
+}
+
+int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
+                             boost::unordered_map<int64_t, PersistentTable*> &tables,
+                             Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                             const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow) {
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+        if (skipRow) {
+            break;
+        }
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -491,13 +508,18 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
         try {
-            table->insertPersistentTuple(tempTuple, true);
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log insert on table " + table->name());
+            throw;
+        }
+        try {
+            table->insertPersistentTuple(tempTuple, true, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()),
-                                   *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT,
+                                   uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT,
                                    CONFLICT_CONSTRAINT_VIOLATION)) {
                     break;
                 }
@@ -510,8 +532,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         int64_t tableHandle = taskInfo->readLong();
         int32_t rowLength = taskInfo->readInt();
         const char *rowData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+        if (skipRow) {
+            break;
+        }
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -523,17 +546,22 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE rowInput(rowData, rowLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(rowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log delete on table " + table->name());
+            throw;
+        }
 
         TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
         if (deleteTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, *uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                     break;
                 }
             }
             throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                             type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
         }
 
         // we still run in risk of having timestamp mismatch, need to check.
@@ -544,7 +572,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
             if (localTimestamp != remoteTimestamp) {
                 // timestamp mismatch conflict
-                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, *uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                     break;
                 }
             }
@@ -559,8 +587,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         const char *oldRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowLength));
         int32_t newRowLength = taskInfo->readInt();
         const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+        if (skipRow) {
+            break;
+        }
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -572,7 +601,12 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple tempTuple = table->tempTuple();
 
         ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (old tuple) on table " + table->name());
+            throw;
+        }
 
         // create the expected tuple
         TableTuple expectedTuple(table->schema());
@@ -581,20 +615,25 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         expectedTuple.copyForPersistentInsert(tempTuple, pool);
 
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
+        try {
+            tempTuple.deserializeFromDR(newRowInput, pool);
+        } catch (SerializableEEException &e) {
+            e.appendContextToMessage(" DR binary log update (new tuple) on table " + table->name());
+            throw;
+        }
 
         TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
         if (oldTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, &expectedTuple,
-                                   &tempTuple, *uniqueId, remoteClusterId,
+                                   &tempTuple, uniqueId, remoteClusterId,
                                    DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING,
                                    NO_CONFLICT)) {
                     break;
                 }
             }
             throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                     type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+                                     type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
         }
 
         // Timestamp mismatch conflict
@@ -605,7 +644,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
             if (localTimestamp != remoteTimestamp) {
                 if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple,
-                                   &tempTuple, *uniqueId, remoteClusterId,
+                                   &tempTuple, uniqueId, remoteClusterId,
                                    DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH,
                                    NO_CONFLICT)) {
                     break;
@@ -619,7 +658,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(),
                                    const_cast<TableTuple *>(e.getConflictTuple()),
-                                   *uniqueId, remoteClusterId, DR_RECORD_UPDATE,
+                                   uniqueId, remoteClusterId, DR_RECORD_UPDATE,
                                    NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                     break;
                 }
@@ -629,111 +668,17 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         break;
     }
     case DR_RECORD_DELETE_BY_INDEX: {
-        int64_t tableHandle = taskInfo->readLong();
-        int32_t rowKeyLength = taskInfo->readInt();
-        uint32_t indexCrc = taskInfo->readInt();
-        const char *rowKeyData = reinterpret_cast<const char *>(taskInfo->getRawPointer(rowKeyLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
-
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
-        if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
-                                         (intmax_t)tableHandle);
-        }
-        PersistentTable *table = tableIter->second;
-
-        TableTuple tempTuple = indexKeyTuple.tuple(table, indexCrc);
-
-        ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
-        tempTuple.deserializeFromDR(rowInput, pool);
-
-        const TableIndex* index = table->getUniqueIndexForDR().first;
-        IndexCursor indexCursor(index->getTupleSchema());
-        index->moveToKey(&tempTuple, indexCursor);
-        TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
-        if (deleteTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                         type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
-        }
-
-        table->deleteTuple(deleteTuple, true);
-        break;
+        throwSerializableEEException("Delete by index is not supported for DR");
     }
     case DR_RECORD_UPDATE_BY_INDEX: {
-        int64_t tableHandle = taskInfo->readLong();
-        int32_t oldRowKeyLength = taskInfo->readInt();
-        uint32_t oldKeyIndexCrc = taskInfo->readInt();
-        const char *oldRowKeyData = reinterpret_cast<const char*>(taskInfo->getRawPointer(oldRowKeyLength));
-        int32_t newRowLength = taskInfo->readInt();
-        const char *newRowData = reinterpret_cast<const char*>(taskInfo->getRawPointer(newRowLength));
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
-
-        boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
-        if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
-                                         (intmax_t)tableHandle);
-        }
-        PersistentTable *table = tableIter->second;
-
-        TableTuple tempTuple = indexKeyTuple.tuple(table, oldKeyIndexCrc);
-
-        ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
-        tempTuple.deserializeFromDR(oldRowInput, pool);
-
-        const TableIndex* index = table->getUniqueIndexForDR().first;
-        IndexCursor indexCursor(index->getTupleSchema());
-        index->moveToKey(&tempTuple, indexCursor);
-        TableTuple oldTuple = index->nextValueAtKey(indexCursor);
-        if (oldTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                        type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
-        }
-
-        tempTuple = table->tempTuple();
-        ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-        tempTuple.deserializeFromDR(newRowInput, pool);
-
-        table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
-        break;
-    }
-    case DR_RECORD_BEGIN_TXN: {
-        *uniqueId = taskInfo->readLong();
-        int64_t tempSequenceNumber = taskInfo->readLong();
-        if (*sequenceNumber >= 0) {
-            if (tempSequenceNumber < *sequenceNumber) {
-                throwFatalException("Found out of order sequencing inside a binary log segment. Expected %jd but found %jd",
-                                    (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber == *sequenceNumber) {
-                throwFatalException("Found duplicate transaction %jd in a binary log segment",
-                                    (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber > *sequenceNumber + 1) {
-                throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
-                                    (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-            }
-        }
-        *sequenceNumber = tempSequenceNumber;
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
-        break;
-    }
-    case DR_RECORD_END_TXN: {
-        int64_t tempSequenceNumber = taskInfo->readLong();
-        if (tempSequenceNumber != *sequenceNumber) {
-            throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
-                                (intmax_t)*sequenceNumber, (intmax_t)tempSequenceNumber);
-        }
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
-        break;
+        throwSerializableEEException("Update by index is not supported for DR");
     }
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
         std::string tableName = taskInfo->readTextString();
-
-        uint32_t checksum = taskInfo->readInt();
-        validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
+        if (skipRow) {
+            break;
+        }
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
@@ -747,11 +692,15 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         break;
     }
+    case DR_RECORD_BEGIN_TXN: {
+        throwFatalException("Unexpected BEGIN_TXN before END_TXN");
+        break;
+    }
     default:
         throwFatalException("Unrecognized DR record type %d", type);
         break;
     }
-    return static_cast<int64_t>(rowCount);
+    return static_cast<int64_t>(rowCostForDRRecord(type));
 }
 
 }

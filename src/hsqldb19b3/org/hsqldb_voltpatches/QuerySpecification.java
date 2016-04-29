@@ -263,10 +263,6 @@ public class QuerySpecification extends QueryExpression {
 
     /************************* Volt DB Extensions *************************/
     void resolveColumnReferencesInGroupBy() {
-        if (! isAggregated) {
-            return;
-        }
-
         if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
             return;
         }
@@ -327,25 +323,30 @@ public class QuerySpecification extends QueryExpression {
                 continue;
             }
 
-            // find it in the SELECT list
+            // Find it in the SELECT list.  We need to look at all
+            // the select list elements to see if there are more
+            // than one.
+            int matchcount = 0;
             for (int j = 0; j < indexLimitVisible; j++) {
                 Expression selectCol = exprColumns[j];
-                if (selectCol.isAggregate) {
-                    // Group by can not support aggregate expression
-                    continue;
-                }
                 if (selectCol.alias == null) {
                     // columns referenced by their alias must have an alias
                     continue;
                 }
                 if (alias.equals(selectCol.alias.name)) {
+                    matchcount += 1;
+                    // This may be an alias to an aggregate
+                    // column.  But we'll find that later, so
+                    // don't check for it here.
                     exprColumns[k] = selectCol;
                     exprColumnList.set(k, selectCol);
-                    // found it and get the next one
-
-                    newUnresolvedExpressions.remove(element);
-                    break;
+                    if (matchcount == 1) {
+                        newUnresolvedExpressions.remove(element);
+                    }
                 }
+            }
+            if (matchcount > 1) {
+                throw new HsqlException(String.format("Group by expression \"%s\" is ambiguous", alias), "", 0);
             }
         }
         unresolvedExpressions = newUnresolvedExpressions;
@@ -919,8 +920,17 @@ public class QuerySpecification extends QueryExpression {
                     Expression.subqueryExpressionSet);
 
                 if (!tempSet.isEmpty()) {
-                    throw Error.error(ErrorCode.X_42572,
-                                      ((Expression) tempSet.get(0)).getSQL());
+                    // The sql is an aggregate function name, extracted
+                    // from the SQL text of the query.  But the function
+                    // getSQL is intended to call in a context which
+                    // parameters to the string and then adds a trailing
+                    // parenthesis. So, we add the trailing parenthesis
+                    // here if it's necessary.
+                    String sql = ((Expression) tempSet.get(0)).getSQL();
+                    if (sql.endsWith("(")) {
+                        sql += ")";
+                    }
+                    throw Error.error(ErrorCode.X_42572, sql);
                 }
             }
 
