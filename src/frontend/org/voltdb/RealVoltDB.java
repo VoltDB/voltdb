@@ -2786,6 +2786,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (!m_config.m_isEnterprise
                 || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
