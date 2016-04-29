@@ -405,7 +405,8 @@ schema = {
                                     "name": {
                                         "id": "name",
                                         "type": "string",
-                                        "minLength": 1
+                                        "minLength": 1,
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "password": {
                                         "id": "password",
@@ -415,6 +416,7 @@ schema = {
                                     "roles": {
                                         "id": "roles",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.,-]+$"
                                     },
                                     "plaintext": {
                                         "id": "plaintext",
