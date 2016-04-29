@@ -41,6 +41,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+import signal
+import thread
 from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
@@ -55,6 +57,16 @@ __IP__ = "localhost"
 __PORT__ = 8000
 
 ALLOWED_EXTENSIONS = ['xml']
+
+
+def receive_signal(signum, stack):
+
+    config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
+    Configuration.validate_and_convert_xml_to_json(config_path)
+    thread.start_new(sync_configuration, ())
+    # print 'Received:', signum
+
+signal.signal(signal.SIGHUP, receive_signal)
 
 
 @APP.errorhandler(400)
@@ -589,9 +601,9 @@ def allowed_file(filename):
 
 def get_servers_from_database_id(database_id):
     servers = []
-    database = Global.DATABASES.get(database_id)
+    database = Global.DATABASES.get(int(database_id))
     if database is None:
-        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % int(database_id)}), 404)
     else:
         members = database['members']
 
@@ -735,7 +747,6 @@ class ServerAPI(MethodView):
 
         return resp
 
-
     @staticmethod
     def delete(database_id, server_id):
         """
@@ -843,7 +854,6 @@ class ServerAPI(MethodView):
             server_id, database_id)})
 
 
-
 class DatabaseAPI(MethodView):
     """
     Class to handle requests related to database
@@ -913,7 +923,6 @@ class DatabaseAPI(MethodView):
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def put(database_id):
