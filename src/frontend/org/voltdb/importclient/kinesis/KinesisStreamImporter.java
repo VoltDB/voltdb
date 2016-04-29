@@ -22,19 +22,21 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang.math.NumberUtils;
 import org.voltcore.logging.Level;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.internal.StaticCredentialsProvider;
-import com.amazonaws.services.kinesis.clientlibrary.exceptions.InvalidStateException;
-import com.amazonaws.services.kinesis.clientlibrary.exceptions.KinesisClientLibDependencyException;
-import com.amazonaws.services.kinesis.clientlibrary.exceptions.ShutdownException;
 import com.amazonaws.services.kinesis.clientlibrary.exceptions.ThrottlingException;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcessor;
@@ -42,12 +44,10 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.v2.IRecordProcess
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
-import com.amazonaws.services.kinesis.clientlibrary.types.ExtendedSequenceNumber;
 import com.amazonaws.services.kinesis.clientlibrary.types.InitializationInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ProcessRecordsInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
-import com.amazonaws.services.kinesis.clientlibrary.types.UserRecord;
 import com.amazonaws.services.kinesis.model.Record;
 
 /**
@@ -59,6 +59,9 @@ public class KinesisStreamImporter extends AbstractImporter {
     private final AtomicBoolean m_eos = new AtomicBoolean(false);
 
     private Worker m_worker;
+
+    private AtomicLong m_recordCnt = new AtomicLong(0L);
+    private AtomicLong m_skipCommitCnt = new AtomicLong(0L);
 
     public KinesisStreamImporter(KinesisStreamImporterConfig config) {
         m_config = config;
@@ -108,7 +111,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
                     // The worker fails, backoff and restart
                     if (shouldRun()) {
-                        backoffSleep(5);
+                        backoffSleep(3);
                         workerStatus.compareAndSet(false, true);
                     }
                 }
@@ -117,7 +120,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         m_eos.compareAndSet(false, true);
 
-        info(null, "Stop kinesis stream importer for %s", m_config.getResourceID().toString());
+        info(null, "The importer stops %s", m_config.getResourceID().toString());
     }
 
     @Override
@@ -153,14 +156,10 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private class StreamConsumer implements IRecordProcessor {
 
-        /**
-         * Number of times of checkpoint retry
-         */
-        private static final int NUM_RETRIES = 10;
-
         private String m_shardId;
         private Formatter<String> m_formatter;
-        private ExtendedSequenceNumber m_largestExtendedSequenceNumber;
+        Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32_768));
+        private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
 
         public StreamConsumer() {
         }
@@ -170,10 +169,14 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void initialize(InitializationInput initInput) {
 
             m_shardId = initInput.getShardId();
-            m_largestExtendedSequenceNumber = null;
             m_formatter = ((Formatter<String>) m_config.getFormatterFactory().create());
-            info(null, "Initializing record processor for shard: %s, starting seqeunce number: %s", m_shardId,
-                    initInput.getExtendedSequenceNumber().getSequenceNumber());
+
+            String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
+            if (NumberUtils.isDigits(seq)) {
+                m_lastFetchCommittedSequenceNumber = new BigInteger(seq);
+            }
+
+            info(null, "Initializing record processor for shard: %s, last committed on: %s", m_shardId, seq);
 
         }
 
@@ -183,52 +186,50 @@ public class KinesisStreamImporter extends AbstractImporter {
             info(null, "Processing %d records on shard %s", records.getRecords().size(), m_shardId);
 
             BigInteger seq = BigInteger.ZERO;
+            AtomicLong cbcnt = new AtomicLong(0);
+            m_gapTracker.allocateTrackObj(records.getRecords().size());
+            int offset = 0;
             for (Record record : records.getRecords()) {
 
-                if (isDebugEnabled()) {
-                    BigInteger curr = new BigInteger(record.getSequenceNumber());
-                    if (curr.compareTo(seq) < 0) {
-                        //should never happen
-                        debug(null, "Record is out of sequence on shard %s. Sequence num: %s", m_shardId,
-                                record.getSequenceNumber());
-                    } else {
-                        seq = curr;
-                    }
+                BigInteger seqNum = new BigInteger(record.getSequenceNumber());
+                if (seqNum.compareTo(m_lastFetchCommittedSequenceNumber) < 0) {
+                    continue;
                 }
 
-                ExtendedSequenceNumber extendedSequenceNumber = new ExtendedSequenceNumber(record.getSequenceNumber(),
-                        record instanceof UserRecord ? ((UserRecord) record).getSubSequenceNumber() : null);
-
-                if (null == m_largestExtendedSequenceNumber
-                        || m_largestExtendedSequenceNumber.compareTo(extendedSequenceNumber) < 0) {
-                    m_largestExtendedSequenceNumber = extendedSequenceNumber;
+                if (isDebugEnabled()) {
+                    debug(null, "last committed seq: %s  shard %s", m_lastFetchCommittedSequenceNumber.toString(),
+                            record.getSequenceNumber());
+                    if (seqNum.compareTo(seq) < 0) {
+                        debug(null, "Record %d is out of sequence on shard %s", seqNum, m_shardId);
+                    } else {
+                        seq = seqNum;
+                    }
                 }
 
                 String data = null;
                 try {
                     data = new String(record.getData().array(), "UTF-8");
-                    debug(null, "%s", record.getSequenceNumber());
-                } catch (UnsupportedEncodingException e) {
-                    rateLimitedLog(Level.ERROR, e,
-                            "Data encoding error in Kinesis stream importer on shard %s, data: %s", m_shardId, data);
 
-                    // data issue. Keep going
-                    continue;
-                }
-                try {
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
-                    if (!callProcedure(invocation)) {
-                        rateLimitedLog(Level.ERROR, null, "Call procedure error in Kinesis stream importer on shard %s",
-                                m_shardId);
-                    }
-                } catch (Exception e) {
 
-                    // data formatting or procedure issue, keep going
+                    StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, cbcnt,
+                            m_eos);
+                    if (!callProcedure(invocation, cb)) {
+                        rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);
+                        m_gapTracker.commit(offset);
+                    }
+                } catch (UnsupportedEncodingException | FormatException e) {
+                    rateLimitedLog(Level.ERROR, e, "Data encoding or call procedure error on shard %s, data: %s",
+                            m_shardId, data);
+                    m_gapTracker.commit(offset);
+                } catch (Exception e) {
                     rateLimitedLog(Level.ERROR, e, "Call procedure error with data %s on shard %s", data, m_shardId);
+                    break;
                 }
                 if (!shouldRun()) {
                     break;
                 }
+                offset++;
             }
 
             checkpoint(records.getCheckpointer());
@@ -238,57 +239,46 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void shutdown(ShutdownInput shutDownInput) {
 
             if (shutDownInput.getShutdownReason().equals(ShutdownReason.TERMINATE)) {
-
-                // this processor will be shutdown. The load will be moved to
-                // other processor. checkpoint he last record.
+                //shard may be split or merged. let us checkpoint one last time
                 checkpoint(shutDownInput.getCheckpointer());
             }
         }
 
         /**
-        * set a checkpoint to dynamoDB so we know the records prior to the point are read by this app
+        * set a checkpoint to dynamoDB so we know the records prior to the point are processed by this app
         * @param checkpointer  The checkpoint processor
         */
         private void checkpoint(IRecordProcessorCheckpointer checkpointer) {
 
-            if (null == m_largestExtendedSequenceNumber) {
-                return;
-            }
+            int retries = 1;
+            while (retries < 4 && shouldRun()) {
+                final BigInteger safe = m_gapTracker.getSafePoint();
 
-            debug(null, "Checking point on shard %s. Sequence num: %s", m_shardId,
-                    m_largestExtendedSequenceNumber.getSequenceNumber());
-
-            int failCount = 1;
-            for (int i = 0; i < NUM_RETRIES; i++) {
-                if (!shouldRun()) {
-                    break;
+                if (isDebugEnabled()) {
+                    debug(null, "New commit checkpoint %s, last checkpoint %s on shard %s", safe.toString(),
+                            m_lastFetchCommittedSequenceNumber.toString(), m_shardId);
                 }
-                try {
-                    checkpointer.checkpoint(m_largestExtendedSequenceNumber.getSequenceNumber());
-                    break;
-                } catch (ShutdownException se) {
-                    rateLimitedLog(Level.WARN, null,
-                            "Skipping checkpoint on shard id: %s, sequence number: %s. Reason: %s", m_shardId,
-                            m_largestExtendedSequenceNumber.getSequenceNumber(), se.getMessage());
-                    break;
-                } catch (ThrottlingException e) {
-                    if (i >= (NUM_RETRIES - 1)) {
-                        rateLimitedLog(Level.WARN, null,
-                                "Checkpoint failed after %s attempts on hard id: %s, sequence number: %s. Reason: %s",
-                                (i + 1), m_shardId, m_largestExtendedSequenceNumber.getSequenceNumber(),
-                                e.getMessage());
-                        break;
-                    } else {
-                        rateLimitedLog(Level.INFO, null, "Checkpointing - attempt %s of %s on shard %s", (i + 1),
-                                NUM_RETRIES, m_shardId);
+                if (safe.compareTo(m_lastFetchCommittedSequenceNumber) > 0) {
+
+                    if (isDebugEnabled()) {
+                        debug(null, "Trying to checkpoint %s on shard %s", safe.toString(), m_shardId);
                     }
-                } catch (InvalidStateException | KinesisClientLibDependencyException e) {
-                    rateLimitedLog(Level.WARN, null,
-                            "Cannot save checkpoint on shard id: %s, sequence number: %s. Reason: %s", m_shardId,
-                            m_largestExtendedSequenceNumber.getSequenceNumber(), e.getMessage());
-                    break;
+
+                    try {
+                        checkpointer.checkpoint(safe.toString());
+                        m_lastFetchCommittedSequenceNumber = new BigInteger(safe.toByteArray());
+                        break;
+                    } catch (ThrottlingException e) {
+                        rateLimitedLog(Level.INFO, null, "Checkpoint attempt  %s on shard %s", retries, m_shardId);
+                    } catch (Exception e) {
+                        //committed on other nodes
+                        rateLimitedLog(Level.WARN, e, "Skipping checkpoint %s on shard %s. Reason: %s", safe.toString(),
+                                m_shardId, e.getMessage());
+                        break;
+                    }
+
+                    backoffSleep(retries++);
                 }
-                failCount = backoffSleep(failCount);
             }
         }
     }
@@ -302,5 +292,94 @@ public class KinesisStreamImporter extends AbstractImporter {
             rateLimitedLog(Level.ERROR, e, "Interrupted sleep when checkpointing.");
         }
         return failedCount;
+    }
+
+    private final static class StreamProcedureCallback implements ProcedureCallback {
+
+        private final AtomicLong m_cbcnt;
+        private final Gap m_tracker;
+        private final AtomicBoolean m_dontCommit;
+        private final int m_offset;
+
+        public StreamProcedureCallback(final Gap tracker, final int offset, BigInteger seq, final AtomicLong cbcnt,
+                final AtomicBoolean dontCommit) {
+            m_cbcnt = cbcnt;
+            m_tracker = tracker;
+            m_dontCommit = dontCommit;
+            m_offset = offset;
+            m_tracker.submit(m_offset, seq);
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+
+            m_cbcnt.incrementAndGet();
+            if (!m_dontCommit.get()) {
+                m_tracker.commit(m_offset);
+            }
+        }
+    }
+
+    final class Gap {
+        long c = 0;
+        long s = -1L;
+        final long[] lag;
+        BigInteger[] trackedObj;
+
+        Gap(int leeway) {
+            if (leeway <= 0) {
+                throw new IllegalArgumentException("leeways is zero or negative");
+            }
+            lag = new long[leeway];
+        }
+
+        synchronized void allocateTrackObj(int size) {
+            trackedObj = new BigInteger[size];
+            c = 0;
+            s = -1L;
+            for (int i = 0; i < lag.length; i++)
+                lag[i] = -1L;
+        }
+
+        synchronized void submit(long offset, BigInteger obj) {
+            if (s == -1L && offset >= 0) {
+                lag[idx(offset)] = c = s = offset;
+            }
+            if (offset > s) {
+                s = offset;
+            }
+
+            trackedObj[(int) offset] = obj;
+        }
+
+        private final int idx(long offset) {
+            return (int) (offset % lag.length);
+        }
+
+        synchronized void resetTo(long offset) {
+            if (offset < 0) {
+                throw new IllegalArgumentException("offset is negative");
+            }
+            lag[idx(offset)] = s = c = offset;
+        }
+
+        synchronized long commit(long offset) {
+            if (offset <= s && offset > c) {
+                int ggap = (int) Math.min(lag.length, offset - c);
+                if (ggap == lag.length) {
+                    c = offset - lag.length + 1;
+                    lag[idx(c)] = c;
+                }
+                lag[idx(offset)] = offset;
+                while (ggap > 0 && lag[idx(c)] + 1 == lag[idx(c + 1)]) {
+                    ++c;
+                }
+            }
+            return c;
+        }
+
+        synchronized BigInteger getSafePoint() {
+            return trackedObj[(int) commit(-1L)];
+        }
     }
 }
