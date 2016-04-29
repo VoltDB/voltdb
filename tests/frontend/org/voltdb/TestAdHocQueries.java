@@ -492,9 +492,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assert(i < Short.MAX_VALUE);
             VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
             assertEquals(i, result.getRowCount());
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail("Adhoc SQL exceeding length limit, throw expected exception");
         }
          finally {
             env.tearDown();
