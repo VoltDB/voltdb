@@ -78,7 +78,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
-    private final long gapTrackerCheckMaxTimeMs = 2_000;
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
 
@@ -554,9 +553,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     final class Gap {
         long c = 0;
         long s = -1L;
-        long check = 0;
-        long offer = 0;
+        long offer = -1L;
         final long [] lag;
+        private final long gapTrackerCheckMaxTimeMs = 2_000;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -569,13 +568,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
-            check = Math.max(offset, s) - c - lag.length;
-            if (check >= 0) {
+            if ((offset - c) >= lag.length) {
+                offer = offset;
                 try {
                     wait(gapTrackerCheckMaxTimeMs);
                 } catch (InterruptedException e) {
-                    rateLimitedLog(Level.WARN, e, "Gap tracker observe large lag %d for" + m_topicAndPartition
-                            + " but failed to wait", check);
+                    rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
                 }
             }
             if (offset > s) {
@@ -592,6 +590,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 throw new IllegalArgumentException("offset is negative");
             }
             lag[idx(offset)] = s = c = offset;
+            offer = -1L;
         }
 
         synchronized long commit(long offset) {
@@ -608,11 +607,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 lag[idx(offset)] = offset;
                 while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
                     ++c;
-                    ++offer;
                 }
-                if (check >= 0 & offer >= check + 1) {
-                    offer = 0;
-                    this.notify();
+                if (offer >=0 && (offer-c) < lag.length) {
+                    offer = -1L;
+                    notify();
                 }
             }
             return c;
