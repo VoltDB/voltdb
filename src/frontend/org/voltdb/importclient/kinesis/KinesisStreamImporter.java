@@ -60,9 +60,6 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private Worker m_worker;
 
-    private AtomicLong m_recordCnt = new AtomicLong(0L);
-    private AtomicLong m_skipCommitCnt = new AtomicLong(0L);
-
     public KinesisStreamImporter(KinesisStreamImporterConfig config) {
         m_config = config;
     }
@@ -197,8 +194,8 @@ public class KinesisStreamImporter extends AbstractImporter {
                 }
 
                 if (isDebugEnabled()) {
-                    debug(null, "last committed seq: %s  shard %s", m_lastFetchCommittedSequenceNumber.toString(),
-                            record.getSequenceNumber());
+                    debug(null, "last committed seq: %s, current seq:%s shard %s",
+                            m_lastFetchCommittedSequenceNumber.toString(), record.getSequenceNumber(), m_shardId);
                     if (seqNum.compareTo(seq) < 0) {
                         debug(null, "Record %d is out of sequence on shard %s", seqNum, m_shardId);
                     } else {
@@ -276,9 +273,8 @@ public class KinesisStreamImporter extends AbstractImporter {
                                 m_shardId, e.getMessage());
                         break;
                     }
-
-                    backoffSleep(retries++);
                 }
+                backoffSleep(retries++);
             }
         }
     }
