@@ -22,7 +22,6 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.math.NumberUtils;
 import org.voltcore.logging.Level;
@@ -155,7 +154,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         private String m_shardId;
         private Formatter<String> m_formatter;
-        Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32_768));
+        Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
 
         public StreamConsumer() {
@@ -183,7 +182,6 @@ public class KinesisStreamImporter extends AbstractImporter {
             info(null, "Processing %d records on shard %s", records.getRecords().size(), m_shardId);
 
             BigInteger seq = BigInteger.ZERO;
-            AtomicLong cbcnt = new AtomicLong(0);
             m_gapTracker.allocateTrackObj(records.getRecords().size());
             int offset = 0;
             for (Record record : records.getRecords()) {
@@ -209,16 +207,15 @@ public class KinesisStreamImporter extends AbstractImporter {
 
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
 
-                    StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, cbcnt,
-                            m_eos);
+                    StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_eos);
                     if (!callProcedure(invocation, cb)) {
                         rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);
-                        m_gapTracker.commit(offset);
+                        m_gapTracker.commit(offset, seqNum);
                     }
                 } catch (UnsupportedEncodingException | FormatException e) {
                     rateLimitedLog(Level.ERROR, e, "Data encoding or call procedure error on shard %s, data: %s",
                             m_shardId, data);
-                    m_gapTracker.commit(offset);
+                    m_gapTracker.commit(offset, seqNum);
                 } catch (Exception e) {
                     rateLimitedLog(Level.ERROR, e, "Call procedure error with data %s on shard %s", data, m_shardId);
                     break;
@@ -249,7 +246,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
             int retries = 1;
             while (retries < 4 && shouldRun()) {
-                final BigInteger safe = m_gapTracker.getSafePoint();
+                final BigInteger safe = m_gapTracker.getSafeCommitPoint();
 
                 if (isDebugEnabled()) {
                     debug(null, "New commit checkpoint %s, last checkpoint %s on shard %s", safe.toString(),
@@ -292,35 +289,40 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private final static class StreamProcedureCallback implements ProcedureCallback {
 
-        private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
         private final int m_offset;
+        private final BigInteger m_seq;
 
-        public StreamProcedureCallback(final Gap tracker, final int offset, BigInteger seq, final AtomicLong cbcnt,
+        public StreamProcedureCallback(final Gap tracker, final int offset, BigInteger seq,
                 final AtomicBoolean dontCommit) {
-            m_cbcnt = cbcnt;
+
             m_tracker = tracker;
             m_dontCommit = dontCommit;
             m_offset = offset;
-            m_tracker.submit(m_offset, seq);
+            m_seq = seq;
+            m_tracker.submit(m_offset, m_seq);
         }
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
 
-            m_cbcnt.incrementAndGet();
             if (!m_dontCommit.get()) {
-                m_tracker.commit(m_offset);
+                m_tracker.commit(m_offset, m_seq);
             }
         }
     }
 
+    /**
+     * The class take an array of sequence objects and use their indices within the array to keep track of the safe commit point
+     * and use the safe commit point to look up the sequence number used in Kinesis stream.
+     *
+     */
     final class Gap {
         long c = 0;
         long s = -1L;
         final long[] lag;
-        BigInteger[] trackedObj;
+        BigInteger[] trackedObjs;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -330,7 +332,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized void allocateTrackObj(int size) {
-            trackedObj = new BigInteger[size];
+            trackedObjs = new BigInteger[size];
             c = 0;
             s = -1L;
             for (int i = 0; i < lag.length; i++)
@@ -338,6 +340,11 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized void submit(long offset, BigInteger obj) {
+
+            //keep duplicated away
+            if (offset >= trackedObjs.length || trackedObjs[(int) offset] != null) {
+                return;
+            }
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
@@ -345,37 +352,44 @@ public class KinesisStreamImporter extends AbstractImporter {
                 s = offset;
             }
 
-            trackedObj[(int) offset] = obj;
+            trackedObjs[(int) offset] = obj;
         }
 
         private final int idx(long offset) {
             return (int) (offset % lag.length);
         }
 
-        synchronized void resetTo(long offset) {
-            if (offset < 0) {
-                throw new IllegalArgumentException("offset is negative");
-            }
-            lag[idx(offset)] = s = c = offset;
-        }
+        synchronized long commit(long offset, BigInteger obj) {
 
-        synchronized long commit(long offset) {
-            if (offset <= s && offset > c) {
-                int ggap = (int) Math.min(lag.length, offset - c);
-                if (ggap == lag.length) {
-                    c = offset - lag.length + 1;
-                    lag[idx(c)] = c;
+            if (obj != null && offset > 0) {
+
+                //commit what has been submitted
+                if (offset >= trackedObjs.length || trackedObjs[(int) offset] == null) {
+                    return -1L;
                 }
-                lag[idx(offset)] = offset;
-                while (ggap > 0 && lag[idx(c)] + 1 == lag[idx(c + 1)]) {
-                    ++c;
+
+                if (offset <= s && offset > c && obj.compareTo(trackedObjs[(int) offset]) == 0) {
+                    int ggap = (int) Math.min(lag.length, offset - c);
+                    if (ggap == lag.length) {
+                        c = offset - lag.length + 1;
+                        lag[idx(c)] = c;
+                    }
+                    lag[idx(offset)] = offset;
+                    while (ggap > 0 && lag[idx(c)] + 1 == lag[idx(c + 1)]) {
+                        ++c;
+                    }
                 }
             }
             return c;
         }
 
-        synchronized BigInteger getSafePoint() {
-            return trackedObj[(int) commit(-1L)];
+        synchronized BigInteger getSafeCommitPoint() {
+
+            int idx = (int) commit(-1L, null);
+            if (idx >= 0 && idx < trackedObjs.length)
+                return trackedObjs[idx];
+
+            return BigInteger.valueOf(-1L);
         }
     }
 }
