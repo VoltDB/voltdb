@@ -881,6 +881,9 @@ public class TestJoinsSuite extends RegressionSuite {
         subtestMultipleFullJoins(client);
         clearSeqTables(client);
         subtestUsingFullJoin(client);
+        clearSeqTables(client);
+        clearIndexTables(client);
+        subtestFullJoinOrderBy(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -1478,6 +1481,51 @@ public class TestJoinsSuite extends RegressionSuite {
 
     }
 
+    private void subtestFullJoinOrderBy(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1,NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(3, 1);");
+
+        sql = "SELECT L.A FROM R3 L FULL JOIN R3 R ON L.C = R.C ORDER BY A";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL},
+                {1},
+                {1},
+                {1},
+                {2},
+                {2},
+                {3},
+                {3}
+        });
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "FULL"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "SORT"));
+
+        sql = "SELECT L.A, SUM(L.C) FROM R3 L FULL JOIN R3 R ON L.C = R.C GROUP BY L.A ORDER BY 1";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL},
+                {1, 2},
+                {2, 5},
+                {3, 2}
+        });
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "FULL"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "SORT"));
+        assertEquals(1, StringUtils.countMatches(vt.toString(), "Serial AGGREGATION"));
+
+    }
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
