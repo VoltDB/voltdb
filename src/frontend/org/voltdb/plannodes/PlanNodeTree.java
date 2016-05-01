@@ -28,8 +28,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
@@ -39,20 +37,12 @@ import org.voltdb.types.PlanNodeType;
  *
  */
 public class PlanNodeTree implements JSONString {
+    private static final String PLAN_NODES_MEMBER_NAME = "PLAN_NODES";
+    private static final String PLAN_NODES_LISTS_MEMBER_NAME = "PLAN_NODES_LISTS";
+    private static final String STATEMENT_ID_MEMBER_NAME = "STATEMENT_ID";
 
-    public enum Members {
-        PLAN_NODES,
-        PLAN_NODES_LISTS,
-        PARAMETERS,
-        PARAMETER_IDX,
-        STATEMENT_ID;
-    }
-
-    protected final List< Pair< Integer, VoltType > > m_parameters = new ArrayList< Pair< Integer, VoltType > >();
     // Subquery ID / subquery plan node list map. The top level statement always has id = 0
     protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<Integer, List<AbstractPlanNode>>();
-    // Subquery ID / subquery root node plan
-    protected final Map<Integer, AbstractPlanNode> m_subqueryMap = new HashMap<Integer, AbstractPlanNode>();
 
     public PlanNodeTree() {
     }
@@ -62,14 +52,10 @@ public class PlanNodeTree implements JSONString {
             List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
             m_planNodesListMap.put(0, nodeList);
             constructTree(nodeList, root_node);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public Integer getRootPlanNodeId() {
-        assert(!m_planNodesListMap.isEmpty() && !m_planNodesListMap.get(0).isEmpty());
-        return m_planNodesListMap.get(0).get(0).getPlanNodeId();
     }
 
     public AbstractPlanNode getRootPlanNode() {
@@ -77,7 +63,7 @@ public class PlanNodeTree implements JSONString {
         return m_planNodesListMap.get(0).get(0);
     }
 
-    public Boolean constructTree(List<AbstractPlanNode> planNodes, AbstractPlanNode node) throws Exception {
+    private boolean constructTree(List<AbstractPlanNode> planNodes, AbstractPlanNode node) throws Exception {
         planNodes.add(node);
         extractSubqueries(node);
         for (int i = 0; i < node.getChildCount(); i++) {
@@ -89,15 +75,6 @@ public class PlanNodeTree implements JSONString {
         return true;
     }
 
-    public List< Pair< Integer, VoltType > > getParameters() {
-        return m_parameters;
-    }
-
-    public void setParameters(List< Pair< Integer, VoltType > > parameters) {
-        m_parameters.clear();
-        m_parameters.addAll(parameters);
-    }
-
     @Override
     public String toJSONString() {
         JSONStringer stringer = new JSONStringer();
@@ -105,7 +82,8 @@ public class PlanNodeTree implements JSONString {
             stringer.object();
             toJSONString(stringer);
             stringer.endObject();
-        } catch (JSONException e) {
+        }
+        catch (JSONException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
@@ -114,18 +92,18 @@ public class PlanNodeTree implements JSONString {
 
     public void toJSONString(JSONStringer stringer) throws JSONException {
         if (m_planNodesListMap.size() == 1) {
-            stringer.key(Members.PLAN_NODES.name()).array();
+            stringer.key(PLAN_NODES_MEMBER_NAME).array();
             for (AbstractPlanNode node : m_planNodesListMap.get(0)) {
                 assert (node instanceof JSONString);
                 stringer.value(node);
             }
             stringer.endArray(); //end entries
         } else {
-            stringer.key(Members.PLAN_NODES_LISTS.name()).array();
+            stringer.key(PLAN_NODES_LISTS_MEMBER_NAME).array();
             for (Map.Entry<Integer, List<AbstractPlanNode>> planNodes : m_planNodesListMap.entrySet()) {
-                stringer.object().key(Members.STATEMENT_ID.name()).
+                stringer.object().key(STATEMENT_ID_MEMBER_NAME).
                     value(planNodes.getKey());
-                stringer.key(Members.PLAN_NODES.name()).array();
+                stringer.key(PLAN_NODES_MEMBER_NAME).array();
                 for (AbstractPlanNode node : planNodes.getValue()) {
                     assert (node instanceof JSONString);
                     stringer.value(node);
@@ -134,23 +112,10 @@ public class PlanNodeTree implements JSONString {
             }
             stringer.endArray(); //end entries
         }
-
-        if (m_parameters.size() > 0) {
-            stringer.key(Members.PARAMETERS.name()).array();
-            for (Pair< Integer, VoltType > parameter : m_parameters) {
-                stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
-            }
-            stringer.endArray();
-        }
     }
 
     public List<AbstractPlanNode> getNodeList() {
         return m_planNodesListMap.get(0);
-    }
-
-    public List<AbstractPlanNode> getNodeList(int idx) {
-        assert(idx < m_planNodesListMap.size());
-        return m_planNodesListMap.get(idx);
     }
 
     /**
@@ -160,25 +125,26 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadFromJSONPlan( JSONObject jobj, Database db )  throws JSONException {
-        if (jobj.has(Members.PLAN_NODES_LISTS.name())) {
-            JSONArray jplanNodesArray = jobj.getJSONArray(Members.PLAN_NODES_LISTS.name());
+    public void loadFromJSONPlan(JSONObject jobj, Database db)  throws JSONException {
+        if (jobj.has(PLAN_NODES_LISTS_MEMBER_NAME)) {
+            JSONArray jplanNodesArray = jobj.getJSONArray(PLAN_NODES_LISTS_MEMBER_NAME);
             for (int i = 0; i < jplanNodesArray.length(); ++i) {
                 JSONObject jplanNodesObj = jplanNodesArray.getJSONObject(i);
-                JSONArray jplanNodes = jplanNodesObj.getJSONArray(Members.PLAN_NODES.name());
-                int stmtId = jplanNodesObj.getInt(Members.STATEMENT_ID.name());
+                JSONArray jplanNodes = jplanNodesObj.getJSONArray(PLAN_NODES_MEMBER_NAME);
+                int stmtId = jplanNodesObj.getInt(STATEMENT_ID_MEMBER_NAME);
                 loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
             }
-        } else {
-            // There is only one statement in the plan. Its id  is set to 0 by default
+        }
+        else {
+            // There is only one statement in the plan. Its id is set to 0 by default
             int stmtId = 0;
-            JSONArray jplanNodes = jobj.getJSONArray(Members.PLAN_NODES.name());
+            JSONArray jplanNodes = jobj.getJSONArray(PLAN_NODES_MEMBER_NAME);
             loadPlanNodesFromJSONArrays(stmtId, jplanNodes, db);
         }
 
         // Connect the parent and child statements
         for (List<AbstractPlanNode> nextPlanNodes : m_planNodesListMap.values()) {
-            for(AbstractPlanNode node : nextPlanNodes) {
+            for (AbstractPlanNode node : nextPlanNodes) {
                 findPlanNodeWithPredicate(node);
             }
         }
@@ -190,7 +156,7 @@ public class PlanNodeTree implements JSONString {
     private void findPlanNodeWithPredicate(AbstractPlanNode node) {
         NodeSchema outputSchema = node.getOutputSchema();
         if (outputSchema != null) {
-            for(SchemaColumn col : outputSchema.getColumns()) {
+            for (SchemaColumn col : outputSchema.getColumns()) {
                 connectPredicateStmt(col.getExpression());
             }
         }
@@ -255,52 +221,41 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
+    private void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
         List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
         int size = jArray.length();
 
         try {
-            for( int i = 0; i < size; i++ ) {
-                JSONObject jobj;
-                jobj = jArray.getJSONObject(i);
+            for (int i = 0; i < size; i++) {
+                JSONObject jobj = jArray.getJSONObject(i);
                 String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
-                PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
-                AbstractPlanNode apn = null;
-                try {
-                    apn = nodeType.getPlanNodeClass().newInstance();
-                } catch (InstantiationException e) {
-                    System.err.println( e.getMessage() );
-                    e.printStackTrace();
-                    return;
-                } catch (IllegalAccessException e) {
-                    System.err.println( e.getMessage() );
-                    e.printStackTrace();
-                    return;
-                }
+                PlanNodeType nodeType = PlanNodeType.get(nodeTypeStr);
+                AbstractPlanNode apn = nodeType.getPlanNodeClass().newInstance();
                 apn.loadFromJSONObject(jobj, db);
                 planNodes.add(apn);
             }
 
             //link children and parents
-            for( int i = 0; i < size; i++ ) {
-                JSONObject jobj;
-                jobj = jArray.getJSONObject(i);
+            for (int i = 0; i < size; i++) {
+                JSONObject jobj = jArray.getJSONObject(i);
                 if (jobj.has("CHILDREN_IDS")) {
+                    AbstractPlanNode parent = planNodes.get(i);
                     JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
-                    for( int j = 0; j < children.length(); j++ ) {
-                        planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j), planNodes ) );
+                    for (int j = 0; j < children.length(); j++) {
+                        AbstractPlanNode child = getNodeofId(children.getInt(j), planNodes);
+                        parent.addAndLinkChild(child);
                     }
                 }
             }
+            m_planNodesListMap.put(stmtId,  planNodes);
         }
-        catch (JSONException e) {
+        catch (JSONException | InstantiationException | IllegalAccessException e) {
+            System.err.println(e);
             e.printStackTrace();
         }
-        m_planNodesListMap.put(stmtId,  planNodes);
-        return;
     }
 
-    public AbstractPlanNode getNodeofId (int id, List<AbstractPlanNode> planNodes) {
+    private AbstractPlanNode getNodeofId (int id, List<AbstractPlanNode> planNodes) {
         int size = planNodes.size();
         for (int i = 0; i < size; i++) {
             if (planNodes.get(i).getPlanNodeId() == id) {
@@ -312,7 +267,7 @@ public class PlanNodeTree implements JSONString {
 
     /**
      * Traverse down the plan extracting all the subquery plans. The potential places where
-     * the suqueries could be found are:
+     * the subqueries could be found are:
      *  - NestLoopInPlan
      *  - AbstractScanPlanNode predicate
      *  - AbstractJoinPlanNode predicates
@@ -325,13 +280,12 @@ public class PlanNodeTree implements JSONString {
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
         assert(node != null);
-        Collection<AbstractExpression> subexprs = node.findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-
-        for(AbstractExpression nextexpr : subexprs) {
+        Collection<AbstractExpression> subexprs =
+                node.findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof AbstractSubqueryExpression);
             AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();
-            m_subqueryMap.put(stmtId, subqueryExpr.getSubqueryNode());
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
             assert(!m_planNodesListMap.containsKey(stmtId));
             m_planNodesListMap.put(stmtId, planNodes);
