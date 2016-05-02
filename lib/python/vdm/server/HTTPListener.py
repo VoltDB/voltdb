@@ -1657,47 +1657,49 @@ def main(runner, amodule, config_dir, data_dir, server):
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
-                     methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, defaults={'database_id': None},
                      view_func=DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>', strict_slashes=False, view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, view_func=DATABASE_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
 
     # Internal API
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', strict_slashes=False,
+                     view_func=STATUS_DATABASE_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', strict_slashes=False,
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/voltdeploy/status/', strict_slashes=False,
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/', strict_slashes=False,
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/', strict_slashes=False,
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False, view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
