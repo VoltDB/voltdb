@@ -46,20 +46,20 @@
 #ifndef HSTOREEXECUTORUTIL_H
 #define HSTOREEXECUTORUTIL_H
 
+#include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
+#include "storage/temptable.h"
+
 #include <cstddef> // for NULL !
+#include <cassert>
 
 namespace voltdb {
-
-class AbstractExpression;
-class TableTuple;
-class TempTable;
 
 // Helper struct to evaluate a postfilter and count the number of tuples that
 // successfully passed the evaluation
 struct CountingPostfilter {
     static const int NO_LIMIT = -1;
     static const int NO_OFFSET = -1;
-    static const int LIMIT = NO_LIMIT + 1;
 
     // A CountingPostfilter is not fully initialized by its default constructor.
     // It should be re-initialized before use via assignment from a properly initialized CountingPostfilter.
@@ -95,6 +95,33 @@ struct CountingPostfilter {
     int m_tuple_skipped;
     bool m_under_limit;
 };
+
+inline
+bool CountingPostfilter::eval(const TableTuple* outer_tuple, const TableTuple* inner_tuple) {
+    if (m_postPredicate == NULL || m_postPredicate->eval(outer_tuple, inner_tuple).isTrue()) {
+        // Check if we have to skip this tuple because of offset
+        if (m_tuple_skipped < m_offset) {
+            m_tuple_skipped++;
+            return false;
+        }
+        // Evaluate LIMIT now
+        if (m_limit >= 0) {
+            assert(m_table != NULL);
+            if (m_table->activeTupleCount() == m_limit) {
+                m_under_limit = false;
+                // Notify a parent that the limit is reached
+                if (m_parentPostfilter) {
+                    m_parentPostfilter->setAboveLimit();
+                }
+                return false;
+            }
+        }
+        // LIMIT/OFFSET are satisfied
+        return true;
+    }
+    // Predicate is not NULL and was evaluated to FALSE
+    return false;
+}
 
 }
 
