@@ -472,6 +472,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         try {
             env.setUp();
+            // by pass valgrind due to ENG-7843
+            if (env.isValgrind()) {
+                return;
+            }
             StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
             int i = 0;
             while (adHocQueryTemp.length() <= Short.MAX_VALUE*10) {
@@ -488,9 +492,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assert(i < Short.MAX_VALUE);
             VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
             assertEquals(i, result.getRowCount());
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail("Adhoc SQL exceeding length limit, throw expected exception");
         }
          finally {
             env.tearDown();
@@ -1109,6 +1110,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             // no clue how helpful this is
             System.gc();
+        }
+
+        boolean isValgrind() {
+            if (m_cluster != null)
+                return m_cluster.isValgrind();
+            return true;
         }
     }
 

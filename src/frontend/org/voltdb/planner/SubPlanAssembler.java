@@ -1452,11 +1452,11 @@ public abstract class SubPlanAssembler {
      * assess the data from the table according to the path.
      *
      * @param table The table to get data from.
-     * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
     protected static AbstractPlanNode getAccessPlanForTable(JoinNode tableNode) {
         StmtTableScan tableScan = tableNode.getTableScan();
+        // Access path to access the data in the table (index/scan/etc).
         AccessPath path = tableNode.m_currentAccessPath;
         assert(path != null);
 

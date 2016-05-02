@@ -334,7 +334,33 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
-
+/**
+ * Execute the given fragments serially and in order.
+ * Return 0 if there are no failures and 1 if there are
+ * any failures.  Note that this is the meat of the JNI
+ * call org.voltdb.jni.ExecutionEngine.nativeExecutePlanFragments.
+ *
+ * @param numFragments          The number of fragments to execute.
+ *                              This is directly from the JNI call.
+ * @param planfragmentIds       The array of fragment ids.  This is
+ *                              This is indirectly from the JNI call,
+ *                              but has been translated from Java to
+ *                              C++.
+ * @param serialize_in          A SerializeInput object containing the parameters.
+ *                              The JNI call has an array of Java Objects.  These
+ *                              have been serialized and stuffed into a byte buffer
+ *                              which is shared between the EE and the JVM.  This
+ *                              shared buffer is in the engine on the EE side, and
+ *                              in a pool of ByteBuffers on the Java side.  The
+ *                              Java byte buffer pools own these, but the EE can
+ *                              use them.
+ * @param txnId                 The transaction id.  This comes from the JNI call directly.
+ * @param lastCommittedSpHandle The handle of the last committed single partition handle.
+ *                              This is directly from the JNI call.
+ * @param uniqueId              The unique id, taken directly from the JNI call.
+ * @param undoToken             The undo token, taken directly from
+ *                              the JNI call
+ */
 int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
                                        int64_t inputDependencyIds[],
@@ -480,8 +506,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // write dirty-ness of the batch and number of dependencies output to the FRONT of
     // the result buffer
     if (last) {
-        m_resultOutput.writeIntAt(m_startOfResultBuffer,
-            static_cast<int32_t>((m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)));
+        m_resultOutput.writeIntAt(m_startOfResultBuffer, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
     }
 

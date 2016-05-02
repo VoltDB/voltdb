@@ -466,5 +466,4 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_predicate, aeClass));
         return collected;
     }
-
 }

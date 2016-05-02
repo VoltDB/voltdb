@@ -654,7 +654,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Two Distributed tables join on non-partitioned column
         failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
-                      "Join of multiple partitioned tables has insufficient join criteria.");
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testBasicOuterJoin() {
@@ -864,7 +864,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition");
     }
 
     public void testBasicIndexOuterJoin() {
@@ -1015,7 +1015,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition");
     }
 
     public void testDistributedIndexJoinConditions() {

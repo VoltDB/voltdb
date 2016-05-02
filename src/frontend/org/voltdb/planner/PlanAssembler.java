@@ -497,8 +497,9 @@ public class PlanAssembler {
             rawplan = getNextPlan();
 
             // stop this while loop when no more plans are generated
-            if (rawplan == null)
+            if (rawplan == null) {
                 break;
+            }
             // Update the best cost plan so far
             m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
