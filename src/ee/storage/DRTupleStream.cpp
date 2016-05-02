@@ -28,6 +28,7 @@
 #include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
+#include "storage/TupleStreamException.h"
 
 #include <vector>
 #include <cstdio>
@@ -67,7 +68,12 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, LONG_MAX);
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR truncate table " + tableName);
+            throw;
+        }
     }
 
     size_t tupleMaxLength = TXN_RECORD_HEADER_SIZE + 4 + tableName.size(); // table name length and table name
@@ -75,7 +81,12 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
         tupleMaxLength += HASH_DELIMITER_SIZE;
     }
     if (m_currBlock->remaining() < tupleMaxLength) {
-        extendBufferChain(tupleMaxLength);
+        try {
+            extendBufferChain(tupleMaxLength);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR truncate table " + tableName);
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -178,11 +189,25 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     }
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            char msg[64];
+            snprintf(msg, 64, " DR record type %d", type);
+            e.appendContextToMessage(msg);
+            throw;
+        }
     }
 
     if (m_currBlock->remaining() < tupleMaxLength) {
-        extendBufferChain(tupleMaxLength);
+        try {
+            extendBufferChain(tupleMaxLength);
+        } catch (TupleStreamException &e) {
+            char msg[64];
+            snprintf(msg, 64, " DR record type %d", type);
+            e.appendContextToMessage(msg);
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -242,11 +267,21 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     }
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR update tuple");
+            throw;
+        }
     }
 
     if (m_currBlock->remaining() < maxLength) {
-        extendBufferChain(maxLength);
+        try {
+            extendBufferChain(maxLength);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR update tuple");
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -478,6 +513,11 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         if (spaceNeeded > m_secondaryCapacity) {
             // txn larger than the max buffer size, set blockSize to 0 so that caller will abort
             blockSize = 0;
+
+            char msg[256];
+            snprintf(msg, 256, "Transaction requiring %jd bytes exceeds max DR Buffer size of %jd bytes",
+                     spaceNeeded, m_secondaryCapacity);
+            throw TupleStreamException(SQLException::volt_output_buffer_overflow, msg);
         } else if (spaceNeeded > m_defaultCapacity) {
             blockSize = m_secondaryCapacity;
         }
