@@ -719,7 +719,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
             // so assume max length for variable-length types (VARCHAR and VARBINARY).
-            expr.setValueSize(expr.getInBytes() ? voltType.getMaxLengthInBytes() : VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS);
+            int size = expr.getInBytes() ?
+                    voltType.getMaxLengthInBytes() :
+                        VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
+            expr.setValueSize(size);
             expr.setLeft(colExpr);
 
             // switch the new expression for CAST

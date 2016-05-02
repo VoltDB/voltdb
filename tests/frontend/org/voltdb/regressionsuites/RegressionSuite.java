@@ -502,7 +502,7 @@ public class RegressionSuite extends TestCase {
             }
             else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
+                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValueForTest().toString()), actual);
             }
         }
     }

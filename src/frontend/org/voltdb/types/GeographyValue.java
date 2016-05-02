@@ -48,7 +48,13 @@ public class GeographyValue {
      * The minimum-allowed length (in bytes) for a column with type GEOGRAPHY.
      * This is the length of a polygon with just three vertices.
      */
-    public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes need to store a triangle
+    public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes needed to store a triangle
+
+    /**
+     * The maximum-allowed length (in bytes) for a column with type GEOGRAPHY.
+     * This is the usual max column length.
+     */
+    public static final int MAX_SERIALIZED_LENGTH = 1048576;
 
     //
     // This is a list of loops.  Each loop must be in
