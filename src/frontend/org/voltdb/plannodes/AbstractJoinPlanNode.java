@@ -19,7 +19,6 @@ package org.voltdb.plannodes;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -285,6 +284,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     // right now, only consider the sort direction on the outer table
     public void resolveSortDirection() {
         AbstractPlanNode outerTable = m_children.get(0);
+        if (m_joinType == JoinType.FULL) {
+            // Disable the usual optimizations for ordering join output by
+            // outer table only. In case of FULL join, the unmatched inner table tuples
+            // get appended to the end of the join's output table thus invalidating
+            // the outer table join order.
+            m_sortDirection = SortDirectionType.INVALID;
+            return;
+        }
         if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
             m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
             return;
