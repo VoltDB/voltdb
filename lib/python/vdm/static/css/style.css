@@ -1317,7 +1317,8 @@ input.drop-down-input {
 	border-color: none!important;
 }
 .modal-dialog-center {
-	margin-top: 15%;
+	margin-top: 10%;
+	width:100%;
 }
 .navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, .navbar-inverse .navbar-nav > .active > a:focus {
 	background-color: #76bd1d
@@ -1329,7 +1330,7 @@ input.drop-down-input {
 /**************Button start/Stop******************/
 .clusterBtnWrap {
 	text-align: center;
-	margin-top: 13%;
+	margin-top: 10%;
 }
 .databaseRg, .loadingStart {
 	text-align: center;
@@ -1581,6 +1582,8 @@ select {
 	border-color: #ccc;
 }
 }
+.startFail, .stalledState { padding:15px;}
+.startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0;}
 /**************Button start/Stop ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
@@ -1617,7 +1620,7 @@ ul.nav li:nth-child(1) {
 	width: 100%;
 }
 .clusterBtnWrap {
-	margin-top: 5%;
+	margin-top: 15%;
 	margin-bottom: 5%;
 }
 .tblCluster tr th {
@@ -1626,6 +1629,7 @@ ul.nav li:nth-child(1) {
 .form-horizontal >.panel-group {
 	margin: 0 93px 0 0;
 }
+.clusterStartStop {border-bottom: 1px solid #CCC; border-right:0;}
 }
 @media (max-width: 991px) {
 .clusterConfigLeft {
