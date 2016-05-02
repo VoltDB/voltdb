@@ -48,20 +48,13 @@ public class DRConsumerStatsBase {
             super(false);
         }
 
-        public static void buildTableSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
-            columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
-                                       VoltSystemProcedure.CTYPE_ID));
-            columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
+        @Override
+        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
+            super.populateColumnSchema(columns);
             columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_1M, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_5M, VoltType.BIGINT));
-        }
-
-        @Override
-        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            buildTableSchema(columns);
         }
 
         @Override
@@ -76,22 +69,15 @@ public class DRConsumerStatsBase {
             super(false);
         }
 
-        public static void buildTableSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
-            columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
-                                       VoltSystemProcedure.CTYPE_ID));
-            columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
+        @Override
+        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
+            super.populateColumnSchema(columns);
             columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.IS_COVERED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.COVERING_HOST, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.LAST_RECEIVED_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.LAST_APPLIED_TIMESTAMP, VoltType.TIMESTAMP));
-        }
-
-        @Override
-        protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
-            buildTableSchema(columns);
         }
 
         @Override

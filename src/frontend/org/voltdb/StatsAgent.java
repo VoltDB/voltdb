@@ -531,10 +531,7 @@ public class StatsAgent extends OpsAgent
     public void deregisterStatsSourcesFor(StatsSelector selector, long siteId) {
         assert selector != null;
         final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
-        assert siteIdToStatsSources != null;
-
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
-        if (statsSources != null) {
+        if (siteIdToStatsSources != null) {
             siteIdToStatsSources.remove(siteId);
         }
     }
