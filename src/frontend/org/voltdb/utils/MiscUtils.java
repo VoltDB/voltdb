@@ -17,10 +17,13 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.VoltDB.DEFAULT_HTTP_PORT;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -58,6 +61,8 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.net.HostAndPort;
+import com.google_voltpatches.common.net.InetAddresses;
+import com.google_voltpatches.common.net.InternetDomainName;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -169,6 +174,7 @@ public class MiscUtils {
                     return false;
                 }
 
+                @Override
                 public boolean isDrActiveActiveAllowed() {
                     return false;
                 }
@@ -562,6 +568,48 @@ public class MiscUtils {
     public static HostAndPort getHostAndPortFromHostnameColonPort(String server, int defaultPort) {
         return HostAndPort.fromString(server).withDefaultPort(defaultPort);
     }
+
+    /**
+     * Checks whether or not the given host and port specifier is valid
+     * @param specifier host and optionally port specifier
+     * @return true if it is valid false if it is not
+     */
+    public static boolean isValidHttpHostSpec(String specifier) {
+        return isValidHostSpec(specifier, DEFAULT_HTTP_PORT);
+      }
+
+    /**
+     * Checks whether or not the given host and port specifier is valid
+     * @param specifier host and optionally port specifier
+     * @param defaulPort the default port associated with the host spec
+     * @return true if it is valid false if it is not
+     */
+    public static boolean isValidHostSpec(String specifier, int defaultPort) {
+        if (specifier == null || specifier.trim().isEmpty()) {
+            return false;
+        }
+        final HostAndPort parsedHost = HostAndPort
+                .fromString(specifier)
+                .withDefaultPort(defaultPort);
+        final String host = parsedHost.getHostText();
+
+        // Try to interpret the specifier as an IP address.  Note we build
+        // the address rather than using the .is* methods because we want to
+        // use InetAddresses.toUriString to convert the result to a string in
+        // canonical form.
+        InetAddress addr = null;
+        try {
+          addr = InetAddresses.forString(host);
+        } catch (IllegalArgumentException e) {
+          // It is not an IPv4 or IPv6 literal
+        }
+
+        if (addr != null) {
+          return true;
+        }
+        // It is not any kind of IP address; must be a domain name or invalid.
+        return InternetDomainName.isValid(host);
+      }
 
     /**
      * @param server String containing a hostname/ip, or a hostname/ip:port.

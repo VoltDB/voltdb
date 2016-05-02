@@ -430,10 +430,6 @@ class ServerBundle(JavaBundle):
                              'specify the location of voltdbroot',
                              default = None))
         verb.add_options(
-            cli.StringOption('-N', '--name', 'clustername',
-                             'specify the the cluster designation name',
-                             default = None))
-        verb.add_options(
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
@@ -512,7 +508,7 @@ class ServerBundle(JavaBundle):
             final_args.extend(['placementgroup', runner.opts.placementgroup])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host])
-        else:
+        elif not self.subcommand in ('probe', 'initialize'):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
@@ -536,8 +532,6 @@ class ServerBundle(JavaBundle):
             final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.opts.voltdbroot:
             final_args.extend(['voltdbroot', runner.opts.voltdbroot])
-        if runner.opts.clustername:
-            final_args.extend(['clustername', runner.opts.clustername])
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])

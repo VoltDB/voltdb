@@ -29,13 +29,20 @@
     bundles = VOLT.ServerBundle('initialize',
                                 needs_catalog=False,
                                 supports_live=False,
-                                default_host=True,
+                                default_host=False,
                                 safemode_available=False,
                                 supports_daemon=False,
                                 supports_multiple_daemons=False,
                                 check_environment_config=True,
                                 force_voltdb_create=True),
+    options = (
+        VOLT.StringOption('-N', '--name', 'clustername',
+                         'specify the the cluster designation name',
+                         default = None)
+    ),
     description = 'Initializes a new, empty database.'
 )
 def initialize(runner):
+    if runner.opts.clustername:
+        runner.args.extend(['clustername',runner.opts.clustername])
     runner.go()

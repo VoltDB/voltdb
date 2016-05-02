@@ -30,19 +30,25 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
+import org.apache.http.entity.ContentType;
+import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.annotate.JsonPropertyOrder;
+import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectWriter;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
@@ -58,11 +64,15 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.AuthenticationResult;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
+import org.voltdb.StatusTracker;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
@@ -73,29 +83,50 @@ import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.deploy.ConfigProbeResponse;
+import org.voltdb.deploy.ConfigProbeTracker;
+import org.voltdb.deploy.KSafetyResponse;
+import org.voltdb.iv2.KSafetyStats;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.voltdb.ConfigProvider;
-import org.voltdb.StatusProvider;
 
 public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
+    static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
 
     Server m_server;
     HTTPClientInterface httpClientInterface;
     boolean m_jsonEnabled = false;
-    private StatusProvider m_statusProvider;
-    private ConfigProvider m_configProvider;
+    private StatusTracker m_statusProvider;
+    private ConfigProbeTracker m_configProbeTracker;
 
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final DeploymentRequestHandler m_deploymentHandler;
     final AtomicBoolean m_ready = new AtomicBoolean(false);
     final int m_timeout;
+
+    // ObjectMapper is thread safe, and uses a lot of memory to cache
+    // class specific serializers and deserializers. Use JSR-133
+    // initialization on demand holder to hold a sole instance
+    public final static class MapperHolder {
+        final static public ObjectMapper mapper;
+        final static public JsonFactory factory = new JsonFactory();
+        static {
+            ObjectMapper configurable = new ObjectMapper();
+            // configurable.setSerializationInclusion(Inclusion.NON_NULL);
+            configurable.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            configurable.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            configurable.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+
+            mapper = configurable;
+        }
+    }
+
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
@@ -148,10 +179,7 @@ public class HTTPAdminListener {
         //Build a client response based json response
     private static String buildClientResponse(String jsonp, byte code, String msg) {
         ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
-        if (jsonp != null) {
-            return String.format("%s( %s )", jsonp, rimpl.toJSONString());
-        }
-        return rimpl.toJSONString();
+        return HTTPClientInterface.asJsonp(jsonp, rimpl.toJSONString());
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -308,14 +336,61 @@ public class HTTPAdminListener {
         }
     }
 
+    class ManagementKSafetyHandler extends AbstractHandler implements KSafetyStats.Constants {
+        private final ObjectWriter m_ksafetyWriter =
+                MapperHolder.mapper.writerWithType(KSafetyResponse.class);
+        private final UUID m_startUuid;
+        private final KSafetyResponse m_notYetAvailable;
+
+        public ManagementKSafetyHandler() {
+            m_startUuid = m_configProbeTracker.getInitialConfigProbeResponse().getStartUuid();
+            m_notYetAvailable = new KSafetyResponse(m_startUuid, KSafetyResponse.NYA, KSafetyResponse.NYA);
+        }
+
+        CatalogContext getCatalogContext() {
+            return VoltDB.instance().getCatalogContext();
+        }
+
+        @Override
+        public void handle(String target, Request baseRequest,
+                HttpServletRequest request, HttpServletResponse response)
+                        throws IOException, ServletException {
+            response.setContentType(jsonContentType);
+            response.setStatus(HttpServletResponse.SC_OK);
+            KSafetyResponse ksr = m_notYetAvailable;
+
+            if (m_statusProvider.getNodeState().operational()) {
+                final int hostCount = getCatalogContext().getDeployment().getCluster().getHostcount();
+                AuthUser u = getCatalogContext().authSystem.getInternalAdminUser();
+                SyncCallback syncb = new SyncCallback();
+                if (httpClientInterface.callProcedure(u, false, BatchTimeoutOverrideType.NO_TIMEOUT, syncb, "@Statistics", "KSAFETY", 0)) {
+                    try {
+                        syncb.waitForResponse();
+                    } catch (InterruptedException e) {
+                        throw new IOException("Interruped while waiting for a KSAFETY check response", e);
+                    }
+                    ClientResponseImpl r = ClientResponseImpl.class.cast(syncb.getResponse());
+                    if (r.getStatus() == ClientResponse.SUCCESS) {
+                        VoltTable rs = r.getResults()[0];
+                        int lack = 0;
+                        while (rs.advanceRow()) {
+                            lack = Math.max(((Integer)rs.get(MISSING_REPLICA, VoltType.INTEGER)).intValue(), lack);
+                        }
+                        ksr = new KSafetyResponse(m_startUuid, lack, hostCount);
+                    }
+                }
+            }
+            m_ksafetyWriter.writeValue(response.getWriter(), ksr);
+            baseRequest.setHandled(true);
+        }
+    }
+
     // /management/status handler
     class ManagementStatusHandler extends AbstractHandler {
-        private final ObjectMapper m_mapper;
+        private final ObjectWriter m_respw =
+                MapperHolder.mapper.writerWithType(StatusTracker.class);
 
         public ManagementStatusHandler() {
-            m_mapper = new ObjectMapper();
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
         // GET on /management/status resources.
@@ -325,26 +400,25 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
-            //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
-            try {
-                response.setContentType("application/json;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                m_mapper.writeValue(response.getWriter(), (StatusProvider )m_statusProvider);
-                baseRequest.setHandled(true);
-            } catch (Exception ex) {
-            }
+            response.setContentType(jsonContentType);
+            response.setStatus(HttpServletResponse.SC_OK);
+            m_respw.writeValue(response.getWriter(), m_statusProvider);
+            baseRequest.setHandled(true);
         }
     }
 
     // /management/status handler
     class ManagementConfigHandler extends AbstractHandler {
-        private final ObjectMapper m_mapper;
+        private final ObjectWriter m_respw =
+                MapperHolder.mapper.writerWithType(ConfigProbeResponse.class);
+        private final ConfigProbeResponse m_configProbeResponse =
+                m_configProbeTracker.getInitialConfigProbeResponse();
 
         public ManagementConfigHandler() {
-            m_mapper = new ObjectMapper();
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+        }
+
+        CatalogContext getCatalogContext() {
+            return VoltDB.instance().getCatalogContext();
         }
 
         // GET on /management/config resources.
@@ -354,24 +428,44 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
-            try {
-                response.setContentType("application/json;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                m_mapper.writeValue(response.getWriter(), m_configProvider);
-                baseRequest.setHandled(true);
-            } catch (Exception ex) {
+            response.setContentType(jsonContentType);
+            response.setStatus(HttpServletResponse.SC_OK);
+
+            if ("GET".equalsIgnoreCase(request.getMethod())) {
+                Long meshTimeout = null;
+                UUID id = null;
+                String pval = request.getParameter("mesh-timeout");
+                if (pval != null && !pval.trim().isEmpty()) {
+                    try {
+                        meshTimeout = new Long(Long.parseLong(pval));
+                    } catch (NumberFormatException e) {
+                    }
+                }
+                pval = request.getParameter("start-uuid");
+                if (pval != null && !pval.trim().isEmpty()) {
+                    try {
+                        id = UUID.fromString(pval);
+                    } catch (IllegalArgumentException e) {
+                    }
+                }
+                if (id != null && meshTimeout != null) {
+                    m_configProbeTracker.track(id, meshTimeout);
+                }
             }
+            ConfigProbeResponse cpr = m_configProbeResponse;
+            if (m_statusProvider.getNodeState().catalogued()) {
+                cpr = m_configProbeTracker.getConfigProbeResponse(getCatalogContext().deploymentHashForConfig);
+            }
+            m_respw.writeValue(response.getWriter(), cpr);
+            baseRequest.setHandled(true);
         }
     }
 
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
-        private final ObjectMapper m_mapper;
+        private final ObjectMapper m_mapper = MapperHolder.mapper;
 
         public UserProfileHandler() {
-            m_mapper = new ObjectMapper();
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
         }
 
         // GET on /profile resources.
@@ -387,7 +481,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -444,16 +538,10 @@ public class HTTPAdminListener {
 
     class DeploymentRequestHandler extends VoltRequestHandler {
 
-        final ObjectMapper m_mapper;
+        final ObjectMapper m_mapper = MapperHolder.mapper;
         String m_schema = "";
 
         public DeploymentRequestHandler() {
-            m_mapper = new ObjectMapper();
-            //Mixin for to not output passwords.
-            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
-            //We want jackson to stop closing streams
-            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
@@ -512,7 +600,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
             AuthenticationResult authResult = null;
             try {
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
@@ -871,7 +959,7 @@ public class HTTPAdminListener {
             if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                response.setContentType("application/json;charset=utf-8");
+                response.setContentType(jsonContentType);
                 if (m_jsonEnabled) {
                     httpClientInterface.process(baseRequest, response);
 
@@ -939,11 +1027,11 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(String intf, int port, StatusProvider statusProvider, ConfigProvider configProvider) throws Exception {
+    public HTTPAdminListener(String intf, int port, StatusTracker statusProvider, ConfigProbeTracker configProbeTracker) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         m_timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
         m_statusProvider = statusProvider;
-        m_configProvider = configProvider;
+        m_configProbeTracker = configProbeTracker;
 
         /*
          * Don't force us to look at a huge pile of threads
@@ -1019,6 +1107,9 @@ public class HTTPAdminListener {
             ///management/status
             ContextHandler mgmtStatusHandler = new ContextHandler("/management/status");
             mgmtStatusHandler.setHandler(new ManagementStatusHandler());
+
+            ContextHandler mgmtKsafetyHandler = new ContextHandler("/management/ksafety");
+            mgmtKsafetyHandler.setHandler(new ManagementKSafetyHandler());
             ///management/config
             ContextHandler mgmtConfigHandler = new ContextHandler("/management/config");
             mgmtConfigHandler.setHandler(new ManagementConfigHandler());
@@ -1032,7 +1123,8 @@ public class HTTPAdminListener {
                     profileRequestHandler,
                     dbMonitorHandler,
                     mgmtStatusHandler,
-                    mgmtConfigHandler
+                    mgmtConfigHandler,
+                    mgmtKsafetyHandler
             });
 
             m_server.setHandler(handlers);
@@ -1046,7 +1138,7 @@ public class HTTPAdminListener {
         }
     }
 
-    public void setStatusProvider(StatusProvider statusProvider) {
+    public void setStatusProvider(StatusTracker statusProvider) {
         m_statusProvider = statusProvider;
     }
 
