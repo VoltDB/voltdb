@@ -777,21 +777,23 @@ def check_validation_deployment(req):
             response = json.loads(HTTPListener.check_size_value(size, 'memorylimit').data)
             if 'error' in response:
                 return {'status': 'error', 'error': response['error']}
-            disk_limit_arr = []
-            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
-                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
-                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                    size = feature['size']
-                    if feature['name'] in disk_limit_arr:
-                        return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
-                    disk_limit_arr.append(feature['name'])
-                    response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
-                    if 'error' in response:
-                        return {'status': 'error', 'error': response['error']}
+        disk_limit_arr = []
+        if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
+           'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
+            for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                size = feature['size']
+                if feature['name'] in disk_limit_arr:
+                    return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
+                disk_limit_arr.append(feature['name'])
+                response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
+                if 'error' in response:
+                    return {'status': 'error', 'error': response['error']}
         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
             frequency_unit = ['h', 'm', 's']
             frequency = str(req.json['snapshot']['frequency'])
-            last_char =  frequency[len(frequency)-1]
+            if ' ' in frequency:
+                return {'status': 'error', 'error': 'Snapshot: White spaces not allowed in frequency.'}
+            last_char = frequency[len(frequency)-1]
             if last_char not in frequency_unit:
                 return {'status': 'error', 'error': 'Snapshot: Invalid frequency value.'}
             frequency = frequency[:-1]
@@ -799,4 +801,57 @@ def check_validation_deployment(req):
                 int_frequency = int(frequency)
             except Exception, exp:
                 return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
+    if 'export' in req.json and 'configuration' in req.json['export']:
+        if not req.json['export']['configuration']:
+            return {'status': 'error', 'error': 'Export: Invalid configuration.'}
+        for configuration in req.json['export']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Export: ' + result['error']}
+
+    if 'import' in req.json and 'configuration' in req.json['import']:
+        if not req.json['import']['configuration']:
+            return {'status': 'error', 'error': 'Import: Invalid configuration.'}
+        for configuration in req.json['import']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Import: ' + result['error']}
+
+    return {'status': 'success'}
+
+
+def check_export_property(type, properties):
+    property_list = []
+    is_invalid_property = False;
+    for property in properties:
+        if 'name' in property and 'value' in property:
+            if str(property['name']).strip() == '' or str(property['value']).strip() == '':
+                return {'status': 'error', 'error':'Invalid property.'}
+            if property['name'] not in property_list:
+                property_list.append(property['name'])
+        else:
+            return {'status': 'error', 'error': 'Invalid property.'}
+
+    if str(type).lower() == 'kafka':
+        if 'metadata.broker.list' not in property_list:
+            return {'status': 'error', 'error': 'Default property(metadata.broker.list) of kafka not present.'}
+    if str(type).lower() == 'elasticsearch':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of elasticsearch not present.'}
+    if str(type).lower() == 'file':
+        if 'type' not in property_list or 'nonce' not in property_list \
+                or 'outdir' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(type, nonce, outdir) of file not present.'}
+    if str(type).lower() == 'http':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of  http not present.'}
+    if str(type).lower() == 'jdbc':
+        if 'jdbcdriver' not in property_list or 'jdbcurl' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(jdbcdriver, jdbcurl) of jdbc not present.'}
+    if str(type).lower() == 'rabbitmq':
+        if 'broker.host' not in property_list and 'amqp.uri' not in property_list:
+            return {'status': 'error', 'error': 'Default property(either amqp.uri or broker.host) of '
+                                                'rabbitmq not present.'}
+        elif 'broker.host' in property_list and 'amqp.uri' in property_list:
+            return {'status': 'error', 'error': 'Either broker.host or amqp.uri should be included.'}
     return {'status': 'success'}

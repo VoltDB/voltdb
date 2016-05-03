@@ -331,10 +331,14 @@ def map_deployment(request, database_id):
         deployment['import']['configuration'] = []
         i = 0
         for configuration in request.json['import']['configuration']:
+            if 'module' not in configuration:
+                module = ''
+            else:
+                module = configuration['module']
             deployment['import']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
-                    'module': configuration['module'],
+                    'module': module,
                     'type': configuration['type'],
                     'format': configuration['format'],
                     'property': []
@@ -360,13 +364,18 @@ def map_deployment(request, database_id):
         except Exception, err:
             print err
         i = 0
+
         for configuration in request.json['export']['configuration']:
+            if 'exportconnectorclass' not in configuration:
+                export_connector_class = ''
+            else:
+                export_connector_class = configuration['exportconnectorclass']
             deployment['export']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
                     'stream': configuration['stream'],
                     'type': configuration['type'],
-                    'exportconnectorclass': configuration['exportconnectorclass'],
+                    'exportconnectorclass': export_connector_class,
                     'property': []
                 }
             )
@@ -543,16 +552,26 @@ def check_size_value(value, key):
         try:
             str_value = replace_last(value, '%', '')
             int_value = int(str_value)
-            if int_value < 0 or int_value > 100:
-                return jsonify({'error': key + ' percent value must be between 0 and 100.'})
+            min_value = 0
+            error_msg = key + ' percent value must be between 0 and 99.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' percent value must be between 1 and 99.'
+            if int_value < min_value or int_value > 99:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
         try:
             int_value = int(value)
-            if int_value < 0 or int_value > 2147483647:
-                return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+            min_value = 0
+            error_msg = key + ' value must be between 0 and 2147483647.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' value must be between 1 and 2147483647.'
+            if int_value < min_value or int_value > 2147483647:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
