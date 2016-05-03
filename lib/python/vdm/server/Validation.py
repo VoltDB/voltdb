@@ -457,7 +457,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         },
-                                                    },"additionalProperties": False
+                                                    },"additionalProperties": False,
                                                 }
                                             ]
                                         },
@@ -483,7 +483,7 @@ schema = {
                                     },
 
                                 },
-                                "required": ["stream", "type", "enabled"], "additionalProperties": False
+                                "required": ["stream", "type", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
@@ -521,7 +521,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         }
-                                                    },"additionalProperties": False
+                                                    },"additionalProperties": False,
                                                 }
                                             ],
                                             "required": ["value"]
@@ -546,7 +546,7 @@ schema = {
                                     },
 
                                 },
-                                 "required": ["format", "enabled"], "additionalProperties": False
+                                 "required": ["format", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
