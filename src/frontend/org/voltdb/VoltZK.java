@@ -115,6 +115,9 @@ public class VoltZK {
     public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
+    // root for rejoin nodes
+    public static final String rejoinNodesBlocker = "/db/rejoin_nodes_blocker";
+    public static final String rejoinNodesBlockerHost = ZKUtil.joinZKPath(rejoinNodesBlocker, "host_");
 
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
@@ -134,6 +137,7 @@ public class VoltZK {
             lastKnownLiveNodes,
             syncStateMachine,
             catalogUpdateBlockers,
+            rejoinNodesBlocker,
             request_truncation_snapshot
     };
 
@@ -274,6 +278,36 @@ public class VoltZK {
                 if (log != null) {
                     log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
                 }
+                return false;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return true;
+    }
+
+    public static void createRejoinNodeIndicator(ZooKeeper zk, String node)
+    {
+        try {
+            zk.create(node,
+                      null,
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.EPHEMERAL);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create rejoin node Indicator", true, e);
+            }
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create rejoin node Indicator", true, e);
+        }
+    }
+
+    public static boolean removeRejoinNodeIndicator(ZooKeeper zk, String node)
+    {
+        try {
+            zk.delete(node, -1);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
                 return false;
             }
         } catch (InterruptedException e) {

@@ -1219,7 +1219,7 @@ public class VoltCompiler {
                             break;
                         default:
                             msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                            "Partition columns must be an integer or varchar type.";
+                            "Partition columns must be an integer, varchar or varbinary type.";
                             throw new VoltCompilerException(msg);
                     }
 

@@ -448,6 +448,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             resultTablesLengthBytes.flip();
 
             final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            final boolean dirty  = dirtyBytes.get() > 0;
+            if (dirty)
+                m_dirty = true;
+
+            if (resultTablesLength <= 0)
+                return;
+
             final ByteBuffer resultTablesBuffer = ByteBuffer
                     .allocate(resultTablesLength);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -458,11 +476,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             resultTablesBuffer.flip();
-
-            // check if anything was changed
-            final boolean dirty = resultTablesBuffer.get() > 0;
-            if (dirty)
-                m_dirty = true;
 
             for (int ii = 0; ii < tables.length; ii++) {
                 final int dependencyCount = resultTablesBuffer.getInt(); // ignore the table count
@@ -1268,7 +1281,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             remainingBuffer.flip();
             final long remaining = remainingBuffer.getLong();
 
-            final int[] serialized = new int[count];
+            final int[] serialized;
+
+            if (count > 0) {
+                serialized = new int[count];
+            } else {
+                serialized = new int[]{0};
+            }
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
                 while (lengthBuffer.hasRemaining()) {
@@ -1279,17 +1298,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
                 lengthBuffer.flip();
                 serialized[i] = lengthBuffer.getInt();
-
                 ByteBuffer view = outputBuffers.get(i).b().duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {
                     m_connection.m_socketChannel.read(view);
                 }
             }
-
             return Pair.of(remaining, serialized);
         } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -1355,7 +1371,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
 
-        return null;
+        return retval;
     }
 
     @Override

@@ -493,11 +493,11 @@ def check_port_valid(port_option, server):
 
     if port == server_port:
         return jsonify(success=False,
-                       errors="Port %s for the same host is already used by server %s for %s" % \
+                       errors="Port %s for the same host is already used by server %s for %s." % \
                               (port, server['hostname'], port_option))
 
 
-def validate_server_ports(database_id):
+def validate_server_ports(database_id, server_id=-1):
     arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
            "client-listener"]
 
@@ -516,7 +516,11 @@ def validate_server_ports(database_id):
             if option != port_key and value is not None and specified_port_values[port_key] == value:
                 return jsonify(success=False, errors="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    if server_id == -1:
+        servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    else:
+        servers = [servers for servers in database_servers if servers['hostname'] ==
+                   request.json['hostname'] and servers['id'] != server_id]
     for server in servers:
         for option in arr:
             result = check_port_valid(option, server)
@@ -678,7 +682,7 @@ class ServerAPI(MethodView):
             Information and the status of server if it is saved otherwise the error message.
         """
         if 'id' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' while creating server.'}), 404)
+            return make_response(jsonify({'errors': 'You cannot specify \'Id\' while creating server.'}), 404)
 
         inputs = ServerInputs(request)
         if not inputs.validate():
@@ -691,7 +695,7 @@ class ServerAPI(MethodView):
         if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = len(Global.SERVERS) + 1
+            server_id = Global.SERVERS.keys()[-1] + 1
 
         Global.SERVERS[server_id] = {
             'id': server_id,
@@ -783,7 +787,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'error': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'errors': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -798,7 +802,7 @@ class ServerAPI(MethodView):
             if current_server is None:
                 abort(404)
 
-            result = validate_server_ports(database_id)
+            result = validate_server_ports(database_id, server_id)
             if result is not None:
                 return result
 
@@ -885,7 +889,7 @@ class DatabaseAPI(MethodView):
         if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = len(Global.DATABASES) + 1
+            database_id = Global.DATABASES.keys()[-1] + 1
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
@@ -1017,7 +1021,7 @@ class DeploymentUserAPI(MethodView):
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
-            user_id = len(Global.DEPLOYMENT_USERS) + 1
+            user_id = Global.DEPLOYMENT_USERS.keys()[-1] + 1
 
         try:
 
