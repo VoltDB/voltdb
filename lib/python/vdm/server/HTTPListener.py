@@ -1422,10 +1422,7 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        if 'text/xml' in request.headers['Accept']:
-            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-            return Response(deployment_content, mimetype='text/xml')
-        else:
+        if 'Accept' in request.headers and 'application/json' in request.headers['Accept']:
             deployment = Global.DEPLOYMENT.get(database_id)
 
             new_deployment = deployment.copy()
@@ -1447,9 +1444,10 @@ class DatabaseDeploymentAPI(MethodView):
 
             del new_deployment['databaseid']
 
-
-
             return jsonify({'deployment': new_deployment})
+        else:
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
+            return Response(deployment_content, mimetype='text/xml')
 
     @staticmethod
     def put(database_id):
