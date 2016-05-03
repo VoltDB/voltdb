@@ -31,9 +31,13 @@ for jv in jenkins_vars:
     else:
         stored_vars_map[sv] = 'unknown'
 
-
 #BRANCH is used by downstream jobs
-stored_vars_map['BRANCH'] = os.getenv('BRANCH') or stored_vars_map[sv_prefix + 'git_branch'].split('/')[-1]
+job = os.getenv('JOB_NAME')
+if job.startswith('branch-kit-system-test-build-'):
+    branch = job.replace('branch-kit-system-test-build-','')
+else:
+    branch = os.getenv('BRANCH') or stored_vars_map[sv_prefix + 'git_branch'].split('/')[-1]
+stored_vars_map['BRANCH'] = branch
 
 with open (outfile,'w') as f:
     for sv in stored_vars_map:
