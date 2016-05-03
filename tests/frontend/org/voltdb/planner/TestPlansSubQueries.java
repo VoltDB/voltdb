@@ -1492,7 +1492,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     }
 
-    private final String joinErrorMsg = "Join of multiple partitioned tables has insufficient join criteria.";
+    private final String joinErrorMsg = ".";
     public void testUnsupportedCases() {
         // (1)
         // sub-selected table must have an alias
@@ -1679,7 +1679,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Distinct with GROUP BY
         // TODO: group by partition column cases can be supported
-        String errorMessage = "Join of multiple partitioned tables has insufficient join criteria";
+        String errorMessage = "This query is not plannable.  It has a subquery which needs cross-partition access.";
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A", errorMessage);
@@ -2099,7 +2099,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = upn.getChild(2);
         checkSeqScan(pn, "R3", "A", "C");
 
-        String message = "Join of multiple partitioned tables has insufficient join criteria";
+        String message = "This query is not plannable.  It has a subquery which needs cross-partition access.";
         failToCompile("select * FROM " +
                 "(SELECT A, COUNT(*) FROM P1 GROUP BY A " +
                 "UNION " +

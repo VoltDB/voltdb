@@ -1424,6 +1424,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean isValgrind() {
+        System.out.println("----templateCmdLine.m_backend=" + templateCmdLine.m_backend);
         return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
 

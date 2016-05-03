@@ -49,6 +49,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -132,6 +133,8 @@ public class TestMpTransactionState extends TestCase
                 if (rollback && i == (remoteHSIds.length - 1)) {
                     resp.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR,
                                    new EEException(1234));
+                    resp.addDependency(distributedOutputDepIds.get(0),
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
                 }
                 else {
                     resp.setStatus(FragmentResponseMessage.SUCCESS, null);

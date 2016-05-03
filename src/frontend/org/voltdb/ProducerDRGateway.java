@@ -58,7 +58,8 @@ public interface ProducerDRGateway {
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
      */
-    public void resetDRProducer();
+    public void deactivateDRProducer();
+    public void activateDRProducer();
 
     public void blockOnSyncSnapshotGeneration();
 }

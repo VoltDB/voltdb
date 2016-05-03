@@ -220,6 +220,7 @@ label.ccErrorMsg {
 	background-position: -6px -488px;
 	cursor: pointer;
 }
+
 .deleteDisableDSTxt {
 	padding: 0 0 0 0px;
 	color: #aaa;
@@ -457,6 +458,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 .database {
 	margin: 70px 0 20px 0;
 }
+
 .databaseContainer {
 	background: #fff;
 	padding: 0px 0 0 0;
@@ -475,6 +477,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 table td.tdROle label.error {
 	height: 20px;
 }
+
 .tblDatabase {
 	margin: 0;
 	padding: 0;

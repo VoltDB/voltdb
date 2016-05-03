@@ -115,27 +115,35 @@ public class LegacyHashinator extends TheHashinator {
 
     @Override
     public int pHashToPartition(VoltType type, Object obj) {
+        assert(obj != null);
         // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
-        if (obj == null || VoltType.isNullVoltType(obj)) {
+        if (VoltType.isVoltNullValue(obj)) {
             return 0;
-        } else if (obj instanceof Long) {
-            long value = ((Long) obj).longValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Integer) {
-            long value = ((Integer) obj).intValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Short) {
-            long value = ((Short) obj).shortValue();
-            return pHashinateLong(value);
-        } else if (obj instanceof Byte) {
-            long value = ((Byte) obj).byteValue();
-            return pHashinateLong(value);
-        } else if (obj.getClass() == byte[].class) {
-            obj = bytesToValue(type, (byte[]) obj);
-            return pHashinateBytes(valueToBytes(obj));
+        }
+        long value = 0;
+        if (obj instanceof Long) {
+            value = ((Long) obj).longValue();
+        }
+        else if (obj instanceof Integer) {
+            value = ((Integer) obj).intValue();
+        }
+        else if (obj instanceof Short) {
+            value = ((Short) obj).shortValue();
+        }
+        else if (obj instanceof Byte) {
+            value = ((Byte) obj).byteValue();
+        }
+        else {
+            // The hash formula for a value represented as serialized bytes
+            // must still be appropriate for the expected partitioning type,
+            // even if this requires a round-trip conversion.
+            if (obj.getClass() == byte[].class) {
+                obj = type.bytesToValue((byte[]) obj);
+            }
+            return pHashinateBytes(VoltType.valueToBytes(obj));
         }
 
-        return pHashinateBytes(valueToBytes(obj));
+        return pHashinateLong(value);
     }
 
     @Override
