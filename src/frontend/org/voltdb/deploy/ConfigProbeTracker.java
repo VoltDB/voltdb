@@ -44,6 +44,7 @@ public class ConfigProbeTracker {
     protected final AtomicLong meshTimeout;
     protected final ConcurrentMap<UUID,Long> receivedProbes =new ConcurrentHashMap<>();
     protected final SettableFuture<Map<UUID,Long>> done = SettableFuture.create();
+    protected final SettableFuture<LeaderAllClear> allClear = SettableFuture.create();
     protected final int nodeCount;
 
     public ConfigProbeTracker(
@@ -88,6 +89,11 @@ public class ConfigProbeTracker {
         }
     }
 
+    public void receivedLeaderAllClear(LeaderAllClear allClear) {
+        checkArgument(allClear != null, "leader all clear is null");
+        this.allClear.set(allClear);
+    }
+
     ListenableFuture<Map<UUID,Long>> getAllProbesCompleteFuture() {
         return done;
     }
@@ -101,11 +107,11 @@ public class ConfigProbeTracker {
         return meshTimeout.get();
     }
 
-    public Map<UUID,Long> waitForExpectedProbes() throws InterruptedException, TimeoutException {
+    protected <T> T waitFor(SettableFuture<T> fut) throws InterruptedException, TimeoutException {
         long waitMillis = getMillisToTimeout();
         do {
             try {
-                return done.get(getMillisToTimeout(), TimeUnit.MILLISECONDS);
+                return fut.get(getMillisToTimeout(), TimeUnit.MILLISECONDS);
             } catch (ExecutionException e) {
                 // cannot happen as we don't set exceptions in the settable future
             } catch (TimeoutException e) {
@@ -116,6 +122,14 @@ public class ConfigProbeTracker {
             }
         } while (waitMillis > 0L);
         return null;
+    }
+
+    public Map<UUID,Long> waitForExpectedProbes() throws InterruptedException, TimeoutException {
+        return waitFor(done);
+    }
+
+    public LeaderAllClear waitForLeaderAllClear() throws InterruptedException, TimeoutException {
+        return waitFor(allClear);
     }
 
     public Map<UUID,Long> getTracked() {

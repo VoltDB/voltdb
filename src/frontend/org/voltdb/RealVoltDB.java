@@ -549,7 +549,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         configHash,
                         meshHash,
                         config.m_configUUID,
-                        config.m_internalInterface + ":" + Integer.toString(config.m_internalPort),
+                        config.m_internalPortInterface + ":" + Integer.toString(config.m_internalPort),
                         config.m_startInAdminMode
                         );
                 try {
@@ -645,8 +645,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_config.m_buildStringOverrideForTest != null) {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
-
-            // STEDO: inject command log priming here. Question how can we recover with no truncation snapshot?
 
             buildClusterMesh(isRejoin || m_joining);
 

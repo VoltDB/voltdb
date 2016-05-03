@@ -48,6 +48,7 @@ import org.codehaus.jackson.annotate.JsonPropertyOrder;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectReader;
 import org.codehaus.jackson.map.ObjectWriter;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
@@ -86,6 +87,7 @@ import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.deploy.ConfigProbeResponse;
 import org.voltdb.deploy.ConfigProbeTracker;
 import org.voltdb.deploy.KSafetyResponse;
+import org.voltdb.deploy.LeaderAllClear;
 import org.voltdb.iv2.KSafetyStats;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -411,6 +413,8 @@ public class HTTPAdminListener {
     class ManagementConfigHandler extends AbstractHandler {
         private final ObjectWriter m_respw =
                 MapperHolder.mapper.writerWithType(ConfigProbeResponse.class);
+        private final ObjectReader m_allClearReader =
+                MapperHolder.mapper.reader(LeaderAllClear.class);
         private final ConfigProbeResponse m_configProbeResponse =
                 m_configProbeTracker.getInitialConfigProbeResponse();
 
@@ -429,7 +433,6 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
             response.setContentType(jsonContentType);
-            response.setStatus(HttpServletResponse.SC_OK);
 
             if ("GET".equalsIgnoreCase(request.getMethod())) {
                 Long meshTimeout = null;
@@ -451,12 +454,16 @@ public class HTTPAdminListener {
                 if (id != null && meshTimeout != null) {
                     m_configProbeTracker.track(id, meshTimeout);
                 }
+            } else if ("PUT".equalsIgnoreCase(request.getMethod())) {
+                LeaderAllClear allClear = m_allClearReader.readValue(request.getReader());
+                m_configProbeTracker.receivedLeaderAllClear(allClear);
             }
             ConfigProbeResponse cpr = m_configProbeResponse;
             if (m_statusProvider.getNodeState().catalogued()) {
                 cpr = m_configProbeTracker.getConfigProbeResponse(getCatalogContext().deploymentHashForConfig);
             }
             m_respw.writeValue(response.getWriter(), cpr);
+            response.setStatus(HttpServletResponse.SC_OK);
             baseRequest.setHandled(true);
         }
     }

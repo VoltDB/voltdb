@@ -44,8 +44,11 @@ import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.ParseException;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
@@ -56,6 +59,7 @@ import org.apache.http.nio.reactor.ConnectingIOReactor;
 import org.apache.http.nio.reactor.IOReactorException;
 import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.map.ObjectReader;
+import org.codehaus.jackson.map.ObjectWriter;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -212,6 +216,7 @@ public class ConfigProber implements Closeable {
     protected final ObjectReader m_configReader;
     protected final ObjectReader m_statusReader;
     protected final ObjectReader m_ksafetyReader;
+    protected final ObjectWriter m_allClearWriter;
     protected final AtomicBoolean m_done;
     protected final BlockingDeque<RequestPair> m_deque;
     protected final Map<UUID, ConfigProbeResponse> m_responses;
@@ -282,6 +287,7 @@ public class ConfigProber implements Closeable {
         m_configReader = HTTPAdminListener.MapperHolder.mapper.reader(ConfigProbeResponse.class);
         m_statusReader = HTTPAdminListener.MapperHolder.mapper.reader(StatusTracker.class);
         m_ksafetyReader = HTTPAdminListener.MapperHolder.mapper.reader(KSafetyResponse.class);
+        m_allClearWriter = HTTPAdminListener.MapperHolder.mapper.writerWithType(LeaderAllClear.class);
         m_done = new AtomicBoolean(false);
         m_deque = new LinkedBlockingDeque<>();
         m_responses = new LinkedHashMap<>();
@@ -309,11 +315,29 @@ public class ConfigProber implements Closeable {
     protected static HttpGet asEndpointGet(Endpoint ep, String authority) {
         URI rquri = null;
         try {
-            rquri = new URI("http",authority,ep.path(),null,null);
+            rquri = new URI("http", authority, ep.path(), null, null);
         } catch (URISyntaxException e) {
             throw loggedProberException(e, "failed to build request uri for %s and %s", authority, ep.path());
         }
         return new HttpGet(rquri);
+    }
+
+    protected HttpPut asLeaderAllClear(String authority, LeaderAllClear ac) {
+        URI rquri = null;
+        try {
+            rquri = new URI("http", authority,Endpoint.CONFIG.path(), null, null);
+        } catch (URISyntaxException e) {
+            throw loggedProberException(e, "failed to build request uri for %s and %s", authority, Endpoint.CONFIG.path());
+        }
+        String jsn = null;
+        try {
+            jsn = m_allClearWriter.writeValueAsString(ac);
+        } catch (IOException e) {
+            throw loggedProberException(e, "failed to serialize %s", ac);
+        }
+        HttpPut put = new HttpPut(rquri);
+        put.setEntity(new StringEntity(jsn, ContentType.APPLICATION_JSON));
+        return put;
     }
 
     protected boolean needsMoreResponses() {
