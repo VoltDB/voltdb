@@ -2028,51 +2028,51 @@ public class Expression {
         assert(uniqueColumnrefs.size() > 1);
         VoltXMLElement lastAlternativeExpr = null;
         VoltXMLElement resultColaesceExpr = null;
-        while(!uniqueColumnrefs.isEmpty()) {
+        while (true) {
             VoltXMLElement next = uniqueColumnrefs.pop();
-            if (!uniqueColumnrefs.isEmpty()) {
-                // IS_NULL expression
-                VoltXMLElement isnull_expr = prototypes.get(OpTypes.IS_NULL);
-                if (isnull_expr == null) {
-                    throwForUnsupportedExpression(OpTypes.IS_NULL);
-                }
-                isnull_expr = isnull_expr.duplicate();
-                isnull_expr.attributes.put("id", this.getUniqueId(session));
-                isnull_expr.children.add(next);
-                // Alternative expression
-                VoltXMLElement alt_expr = prototypes.get(OpTypes.ALTERNATIVE);
-                if (alt_expr == null) {
-                    throwForUnsupportedExpression(OpTypes.ALTERNATIVE);
-                }
-                alt_expr = alt_expr.duplicate();
-                alt_expr.attributes.put("id", this.getUniqueId(session));
-                alt_expr.attributes.put("valuetype", dataType.getNameString());
-                // The next expression should be a second child
-                // but for now we keep it as the first one
-                alt_expr.children.add(next);
-
-                // COALESCE expression
-                VoltXMLElement coalesceExpr = exp.duplicate();
-                coalesceExpr.attributes.put("alias", next.attributes.get("alias"));
-                coalesceExpr.attributes.put("column", next.attributes.get("column"));
-
-                // Add IS NULL and ALTERNATIVE expressions to the coalesceExpr
-                coalesceExpr.children.add(isnull_expr);
-                coalesceExpr.children.add(alt_expr);
-                if (resultColaesceExpr == null) {
-                    resultColaesceExpr = coalesceExpr;
-                } else {
-                    assert(lastAlternativeExpr != null);
-                    // Add coalesceExpr as the first child to the last alternative expression
-                    lastAlternativeExpr.children.add(0, coalesceExpr);
-                }
-                lastAlternativeExpr = alt_expr;
-            } else {
-                // Last columnref. Simply plug it in to the last Then Expression
+            if (uniqueColumnrefs.isEmpty()) {
+                // Last columnref. Simply plug it in to the last THEN Expression
                 assert(lastAlternativeExpr != null);
                 // Add next as the first child
                 lastAlternativeExpr.children.add(0, next);
+                break;
             }
+            // IS_NULL expression
+            VoltXMLElement isnull_expr = prototypes.get(OpTypes.IS_NULL);
+            if (isnull_expr == null) {
+                throwForUnsupportedExpression(OpTypes.IS_NULL);
+            }
+            isnull_expr = isnull_expr.duplicate();
+            isnull_expr.attributes.put("id", this.getUniqueId(session));
+            isnull_expr.children.add(next);
+            // Alternative expression
+            VoltXMLElement alt_expr = prototypes.get(OpTypes.ALTERNATIVE);
+            if (alt_expr == null) {
+                throwForUnsupportedExpression(OpTypes.ALTERNATIVE);
+            }
+            alt_expr = alt_expr.duplicate();
+            alt_expr.attributes.put("id", this.getUniqueId(session));
+            alt_expr.attributes.put("valuetype", dataType.getNameString());
+            // The next expression should be a second child
+            // but for now we keep it as the first one
+            alt_expr.children.add(next);
+
+            // COALESCE expression
+            VoltXMLElement coalesceExpr = exp.duplicate();
+            coalesceExpr.attributes.put("alias", next.attributes.get("alias"));
+            coalesceExpr.attributes.put("column", next.attributes.get("column"));
+
+            // Add IS NULL and ALTERNATIVE expressions to the coalesceExpr
+            coalesceExpr.children.add(isnull_expr);
+            coalesceExpr.children.add(alt_expr);
+            if (resultColaesceExpr == null) {
+                resultColaesceExpr = coalesceExpr;
+            } else {
+                assert(lastAlternativeExpr != null);
+                // Add coalesceExpr as the first child to the last alternative expression
+                lastAlternativeExpr.children.add(0, coalesceExpr);
+            }
+            lastAlternativeExpr = alt_expr;
         }
         assert(resultColaesceExpr != null);
         return resultColaesceExpr;

@@ -1344,15 +1344,15 @@ public abstract class StatementDMQL extends Statement {
 
         // Iterate over the columns looking for the first columnref expression that matches input table
         // Once found, replace the input element 'in-place' with the matching columnref
-        for(VoltXMLElement columnref : exprCols) {
-            if ((tableAlias != null && columnref.hasValue("tablealias", tableAlias)) ||
-                    (table != null && columnref.hasValue("table", table))) {
+        for (VoltXMLElement columnref : exprCols) {
+            if (columnref.hasValue("tablealias", tableAlias) || columnref.hasValue("table", table)) {
                 element.children.clear();
                 element.attributes.clear();
 
                 element.name = "columnref";
                 element.children.addAll(columnref.children);
                 element.attributes.putAll(columnref.attributes);
+                break;
             }
         }
     }
