@@ -87,7 +87,7 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
