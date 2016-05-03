@@ -67,13 +67,14 @@ class DefaultDeployment(unittest.TestCase):
         """
         ensure GET Deployment
         """
+        headers = {'Accept': 'application/json'}
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
             dep_url = __db_url__ + str(last_db_id) + '/deployment/'
-            response = requests.get(dep_url)
+            response = requests.get(dep_url, headers=headers)
             value = response.json()
             if not value:
                 print "Cannot get Deployment information"
@@ -87,12 +88,13 @@ class UpdateDeployment(Deployment):
         """
         ensure GET Deployment
         """
+        headers = {'Accept': 'application/json'}
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
-            response = requests.get(__db_url__ + str(last_db_id) + '/deployment/')
+            response = requests.get(__db_url__ + str(last_db_id) + '/deployment/', headers=headers)
             value = response.json()
             if not value:
                 print "Cannot get Deployment information"
