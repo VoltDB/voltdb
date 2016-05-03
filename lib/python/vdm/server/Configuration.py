@@ -802,16 +802,12 @@ def check_validation_deployment(req):
             except Exception, exp:
                 return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
     if 'export' in req.json and 'configuration' in req.json['export']:
-        if not req.json['export']['configuration']:
-            return {'status': 'error', 'error': 'Export: Invalid configuration.'}
         for configuration in req.json['export']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
             if 'status' in result and result['status'] == 'error':
                 return {'status': 'error', 'error': 'Export: ' + result['error']}
 
     if 'import' in req.json and 'configuration' in req.json['import']:
-        if not req.json['import']['configuration']:
-            return {'status': 'error', 'error': 'Import: Invalid configuration.'}
         for configuration in req.json['import']['configuration']:
             result = check_export_property(configuration['type'], configuration['property'])
             if 'status' in result and result['status'] == 'error':
