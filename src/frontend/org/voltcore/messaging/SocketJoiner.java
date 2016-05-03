@@ -462,15 +462,6 @@ public class SocketJoiner {
         String remoteVersionString = jsonVersionInfo.getString("versionString");
         String remoteBuildString = jsonVersionInfo.getString("buildString");
         boolean remoteAcceptsLocalVersion = jsonVersionInfo.getBoolean("versionCompatible");
-        boolean paused;
-        if (jsonVersionInfo.has("paused")) {
-            paused = jsonVersionInfo.getBoolean("paused");
-        } else {
-            paused = false;
-        }
-//        if (paused != m_paused.get()) {
-//            VoltDB.crashLocalVoltDB("Incompatible start mode all nodes must start with same paused state" , false, null);
-//        }
         if (remoteVersionString.equals(localVersionString)) {
             if (localBuildString.equals(remoteBuildString) == false) {
                 // ignore test/eclipse build string so tests still work
@@ -487,6 +478,13 @@ public class SocketJoiner {
                 VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
                         " which is incompatibile with local version " + localVersionString + ".\n", false, null);
             }
+        }
+        //Do this only after we think we are compatible.
+        boolean paused;
+        if (jsonVersionInfo.has("paused")) {
+            paused = jsonVersionInfo.getBoolean("paused");
+        } else {
+            paused = false;
         }
         activeVersions.add(remoteVersionString);
         return paused;
