@@ -1318,7 +1318,7 @@ input.drop-down-input {
 }
 .modal-dialog-center {
 	margin-top: 10%;
-	width:100%;
+
 }
 .navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, .navbar-inverse .navbar-nav > .active > a:focus {
 	background-color: #76bd1d
@@ -1583,7 +1583,7 @@ select {
 }
 }
 .startFail, .stalledState { padding:15px;}
-.startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0;}
+.startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0; width:100%;}
 /**************Button start/Stop ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
