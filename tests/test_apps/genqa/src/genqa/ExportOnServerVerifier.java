@@ -1594,7 +1594,6 @@ public class ExportOnServerVerifier {
         if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
             return error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
 
-        
         // col 23
         String type_null_varchar25 = row[++col].equals("NULL") ? null : row[col];
         if (!(type_null_varchar25 == valid.type_null_varchar25 ||
