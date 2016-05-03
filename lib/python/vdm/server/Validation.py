@@ -542,7 +542,8 @@ schema = {
                                     },
                                     "format": {
                                         "id": "format",
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
 
                                 },
