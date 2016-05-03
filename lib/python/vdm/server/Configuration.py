@@ -1113,9 +1113,14 @@ def set_deployment_for_upload(database_id, request):
                 result = check_validation_deployment(req)
                 if 'status' in result and result['status'] == 'error':
                     return {'status': 'failure', 'error': result['error']}
+
                 is_duplicate_user = check_duplicate_users(req)
                 if not is_duplicate_user:
                     return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
+
+                is_invalid_roles = check_invalid_roles(req)
+                if not is_invalid_roles:
+                    return {'status': 'failure', 'error': 'Invalid user roles.'}
 
                 HTTPListener.map_deployment(req, database_id)
 
@@ -1160,6 +1165,16 @@ def check_duplicate_users(req):
             if user['name'] in user_name_list:
                 return False
             user_name_list.append(user['name'])
+    return True
+
+
+def check_invalid_roles(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        for user in req.json['users']['user']:
+            roles = str(user['roles']).split(',')
+            for role in roles:
+                if role.strip() == '':
+                    return False
     return True
 
 
