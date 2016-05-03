@@ -508,7 +508,7 @@ class ServerBundle(JavaBundle):
             final_args.extend(['placementgroup', runner.opts.placementgroup])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host])
-        elif not self.subcommand in ('probe', 'initialize'):
+        elif not self.subcommand in ('probe'):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])

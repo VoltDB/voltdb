@@ -644,7 +644,17 @@ public class VoltDB {
                 }
                 try {
                     if (m_meshMembers == null || m_meshMembers.trim().isEmpty()) {
-                        m_meshMembers = "localhost";
+                        File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
+                        if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
+                            try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
+                                m_meshMembers = br.readLine();
+                            } catch (IOException e) {
+                                hostLog.fatal("Unable to read cluster name given at initialization from " + cnameFH, e);
+                                referToDocAndExit();
+                            }
+                        } else {
+                            m_meshMembers = "localhost";
+                        }
                     }
                     m_meshProvider = new CommandLineMeshProvider(getNetConfig(), m_meshMembers);
                 } catch (IllegalArgumentException e) {

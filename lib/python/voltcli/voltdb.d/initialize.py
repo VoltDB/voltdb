@@ -29,7 +29,7 @@
     bundles = VOLT.ServerBundle('initialize',
                                 needs_catalog=False,
                                 supports_live=False,
-                                default_host=False,
+                                default_host=True,
                                 safemode_available=False,
                                 supports_daemon=False,
                                 supports_multiple_daemons=False,

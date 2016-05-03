@@ -26,18 +26,21 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -159,54 +162,6 @@ public class ConfigProber implements Closeable {
         public abstract void susceptibleRun() throws Exception;
     }
 
-    public class RequestPair extends ProbeRunnable implements FutureCallback<HttpResponse> {
-        private final HttpGet m_request;
-        private final SettableFuture<HttpResponse> m_fut;
-
-        public RequestPair(HttpGet request) {
-            m_request = request;
-            m_fut = SettableFuture.create();
-        }
-
-        @Override
-        public void completed(HttpResponse result) {
-            if (m_done.get()) return;
-            m_fut.set(result);
-            m_deque.offer(this);
-        }
-
-        @Override
-        public void failed(Exception ex) {
-            if (m_done.get()) return;
-            Optional<IOException> ioe = IOExceptionInCauseChain(ex);
-            if (ioe.isPresent()) {
-                LOG.rateLimitedLog(30, Level.INFO, ex,
-                        "Probe request to %s failed. Retrying in 5 seconds",
-                        m_request.getURI());
-                m_es.schedule(this, 5, TimeUnit.SECONDS);
-            } else {
-                m_fut.setException(ex);
-                m_deque.offer(this);
-            }
-        }
-
-        @Override
-        public void cancelled() {
-            if (m_done.get()) return;
-            m_fut.setException(loggedProberException(null,"request to %s was cancelled", m_request.getURI()));
-            m_deque.offer(this);
-        }
-
-        public ListenableFuture<HttpResponse> getFuture() {
-            return m_fut;
-        }
-
-        @Override
-        public void susceptibleRun() throws Exception {
-            m_client.get().execute(m_request, this);
-        }
-    }
-
     protected final ConfigProbeTracker m_tracker;
     protected final Set<URI> m_configEndpoints;
     protected final Set<URI> m_statusEndpoints;
@@ -325,7 +280,7 @@ public class ConfigProber implements Closeable {
     protected HttpPut asLeaderAllClear(String authority, LeaderAllClear ac) {
         URI rquri = null;
         try {
-            rquri = new URI("http", authority,Endpoint.CONFIG.path(), null, null);
+            rquri = new URI("http", authority, Endpoint.CONFIG.path() + "/", null, null);
         } catch (URISyntaxException e) {
             throw loggedProberException(e, "failed to build request uri for %s and %s", authority, Endpoint.CONFIG.path());
         }
@@ -525,8 +480,31 @@ public class ConfigProber implements Closeable {
                     throw loggedProberException(null, "probed members have mismatching participating nodes configuration");
                 }
             }
+
             StartAction startAction = m_commandLogEnabled ? StartAction.RECOVER : StartAction.CREATE;
-            return new Result(startAction, determineLeader(), m_responses.values().stream().anyMatch(e->e.isAdmin()), tracked.size());
+
+            // wait for the leader to send out the all clear
+            UUID leader = pickLeader();
+            if (!m_self.equals(leader)) {
+                LeaderAllClear allClear;
+                try {
+                    allClear = m_tracker.waitForLeaderAllClear();
+                } catch (InterruptedException e) {
+                    throw loggedProberException(e, "interrupted while waiting for leader all clear");
+                } catch (TimeoutException e) {
+                    throw loggedProberException(null, "could not complete the configuration probe in the alloted time");
+                }
+                if (!leader.equals(allClear.getStartUuid())) {
+                    throw loggedProberException(null, "Reeived an all clear from an unexpected leader");
+                }
+            } else {
+                sendLeaderAllClear();
+            }
+            return new Result(
+                    startAction,
+                    formatLeader(leader),
+                    m_responses.values().stream().anyMatch(e->e.isAdmin()),
+                    tracked.size());
         }
 
         if (operational == 0) {
@@ -546,19 +524,26 @@ public class ConfigProber implements Closeable {
         }
         // if there is no partition that is lacking a replica
         KSafetyResponse ksr = m_lacks.values().iterator().next();
-        StartAction startAction = StartAction.REJOIN;
+        StartAction startAction = StartAction.LIVE_REJOIN;
         int hostCount = ksr.getHosts();
         if (ksr.getLack() == 0) {
             startAction = StartAction.JOIN;
             hostCount += m_safety;
         }
-        return new Result(startAction, determineLeader(), m_responses.values().stream().anyMatch(e->e.isAdmin()), hostCount);
+        return new Result(
+                startAction,
+                formatLeader(pickLeader()),
+                m_responses.values().stream().anyMatch(e->e.isAdmin()),
+                hostCount);
     }
 
-    protected String determineLeader() {
-        UUID pick  = m_statuses.entrySet().stream()
+    protected UUID pickLeader() {
+        return m_statuses.entrySet().stream()
                 .filter(e -> e.getValue().getNodeState().operational() && m_responses.containsKey(e.getKey()))
                 .map(Map.Entry::getKey).findFirst().orElse(ImmutableSortedSet.copyOf(m_alive.keySet()).first());
+    }
+
+    protected String formatLeader(UUID pick) {
         ConfigProbeResponse leaderConfig = m_responses.get(pick);
         HostAndPort leader = HostAndPort.fromString(leaderConfig.getInternalInterface());
         if (leader.getHostText().isEmpty()) {
@@ -566,6 +551,67 @@ public class ConfigProber implements Closeable {
             leader = HostAndPort.fromParts(alive.getHostText(), leader.getPort());
         }
         return leader.toString();
+    }
+
+    protected void sendLeaderAllClear() {
+        final Map<UUID,String> alive = ImmutableMap.copyOf(m_alive);
+        final ConnectingIOReactor ioReactor;
+        try {
+            ioReactor = new DefaultConnectingIOReactor();
+        } catch (IOReactorException e) {
+            throw new ConfigProberException("Unable to setup the http connection io reactor for the all clear sender", e);
+        }
+
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                PoolingNHttpClientConnectionManager connManager =
+                        new PoolingNHttpClientConnectionManager(ioReactor);
+                connManager.setMaxTotal(m_configEndpoints.size());
+                connManager.setDefaultMaxPerRoute(m_configEndpoints.size());
+
+                try (final CloseableHttpAsyncClient client = m_clientBuilder
+                        .setConnectionManager(connManager).build()) {
+                    client.start();
+                    LeaderAllClear allClear = new LeaderAllClear(m_self);
+                    List<Future<HttpResponse>> futs = alive.entrySet().stream()
+                            .filter(e -> !m_self.equals(e.getKey()))
+                            .map(e -> e.getValue())
+                            .map(u -> client.execute(asLeaderAllClear(u, allClear), null))
+                            .collect(Collectors.toList());
+                    for (Future<HttpResponse> fut: futs) {
+                        HttpResponse rsp;
+                        try {
+                            rsp = fut.get();
+                        } catch (InterruptedException e) {
+                            loggedProberException(e, "interrupted while waiting for leader all clear responses");
+                            continue;
+                        } catch (ExecutionException e) {
+                            loggedProberException(e.getCause(), "leader all clear request failed");
+                            continue;
+                        }
+                        String msg;
+                        try {
+                            msg = EntityUtils.toString(rsp.getEntity());
+                        } catch (ParseException | IOException e) {
+                            loggedProberException(e, "failed to decode leader all clear response");
+                            continue;
+                        }
+                        if (rsp.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {
+                            LOG.error("Request to leader all clear failed with " + rsp.getStatusLine().getReasonPhrase() + ", message:\n" + msg);
+                            continue;
+                        }
+                    }
+                } catch (IOException e) {
+                    LOG.error("failed to send leader all clear requests", e);
+                }
+            }
+        };
+
+        Thread sender = new Thread(r);
+        sender.setName("Configuration Prober - Leader All Clear Sender");
+        sender.setDaemon(true);
+        sender.start();
     }
 
     @Override
@@ -586,6 +632,54 @@ public class ConfigProber implements Closeable {
             m_statuses.clear();
             m_lacks.clear();
             m_alive.clear();
+        }
+    }
+
+    public class RequestPair extends ProbeRunnable implements FutureCallback<HttpResponse> {
+        private final HttpGet m_request;
+        private final SettableFuture<HttpResponse> m_fut;
+
+        public RequestPair(HttpGet request) {
+            m_request = request;
+            m_fut = SettableFuture.create();
+        }
+
+        @Override
+        public void completed(HttpResponse result) {
+            if (m_done.get()) return;
+            m_fut.set(result);
+            m_deque.offer(this);
+        }
+
+        @Override
+        public void failed(Exception ex) {
+            if (m_done.get()) return;
+            Optional<IOException> ioe = IOExceptionInCauseChain(ex);
+            if (ioe.isPresent()) {
+                LOG.rateLimitedLog(30, Level.INFO, ex,
+                        "Probe request to %s failed. Retrying in 5 seconds",
+                        m_request.getURI());
+                m_es.schedule(this, 5, TimeUnit.SECONDS);
+            } else {
+                m_fut.setException(ex);
+                m_deque.offer(this);
+            }
+        }
+
+        @Override
+        public void cancelled() {
+            if (m_done.get()) return;
+            m_fut.setException(loggedProberException(null,"request to %s was cancelled", m_request.getURI()));
+            m_deque.offer(this);
+        }
+
+        public ListenableFuture<HttpResponse> getFuture() {
+            return m_fut;
+        }
+
+        @Override
+        public void susceptibleRun() throws Exception {
+            m_client.get().execute(m_request, this);
         }
     }
 }

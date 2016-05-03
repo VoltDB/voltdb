@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +74,7 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.ConnectionLossException;
 import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -148,6 +150,7 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -166,7 +169,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
-    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -573,10 +576,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         return;
                     }
                     hostLog.info("Probed Startup " + probeok);
+
                     config.m_leader = probeok.getLeader();
                     config.m_startAction = probeok.getStartAction();
                     config.m_startInAdminMode = probeok.isAdminMode();
+
                     modifyIfNecessaryDeploymentHostCount(deployment, probeok.getHostCount());
+
+                    EnumSet<StartAction> canWriteMesh = EnumSet.of(StartAction.CREATE,StartAction.RECOVER);
+                    if (canWriteMesh.contains(probeok.getStartAction())) {
+                        stageClusterMembersFile(config);
+                    }
                 }
             }
 
@@ -1276,7 +1286,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     }
                 }
             }
-        } catch (SessionExpiredException e) {
+        } catch (SessionExpiredException|ConnectionLossException e) {
             if (m_config.m_startAction != StartAction.INITIALIZE) {
                 hostLog.error("Failed to validate the start actions", e);
             }
@@ -1564,12 +1574,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltDB.crashLocalVoltDB("Unable to create the config directory " + configLogDir);
             return;
         }
+        File staged = new VoltFile(m_config.m_voltdbRoot, VoltDB.STAGED_DEPLOYMENT);
         try {
-            Files.copy(new VoltFile(m_config.m_voltdbRoot, VoltDB.STAGED_DEPLOYMENT), getConfigLogDeployment());
+            Files.copy(staged, getConfigLogDeployment());
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to initialize voltdbroot " + m_config.m_voltdbRoot.getPath(), false, e);
             return;
         }
+        staged.delete();
     }
 
     private void stageClusterNameDesignation() {
@@ -1578,6 +1590,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             pw.println(m_config.m_clusterName);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to stage cluster name designtion", false, e);
+        }
+    }
+
+    private void stageClusterMembersFile(VoltDB.Configuration config) {
+        File meshFH = new VoltFile(config.m_voltdbRoot, VoltDB.STAGED_MESH);
+        Joiner commaJoiner = Joiner.on(",").skipNulls();
+        try (PrintWriter pw = new PrintWriter(new FileWriter(meshFH), true)) {
+            pw.println(commaJoiner.join(config.m_meshProvider.getMeshMembers()));
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage mesh members file", false, e);
         }
     }
 
