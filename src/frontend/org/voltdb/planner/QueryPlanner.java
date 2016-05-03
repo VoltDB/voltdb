@@ -322,6 +322,48 @@ public class QueryPlanner {
         return m_hasExceptionWhenParameterized;
     }
 
+    /**
+     * Find the best plan given the VoltXMLElement.  By best here we mean the plan
+     * which is scored the best according to our plan metric scoring.  The plan
+     * metric scoring takes into account join order and index use, but it does
+     * not take into account the output schema.  Consequently, we don't compute the
+     * output schema for the plan nodes until after the best plan is discovered.
+     *
+     * The order here is:
+     * <ol>
+     * <li>
+     *   Parse the VoltXMLElement to create an AbstractParsedStatement.  This has
+     *   a second effect of loading lists of join orders and access paths for planning.
+     *   For us, and access path is a way of scanning something scannable.  It's a generalization
+     *   of the notion of scanning a table or an index.
+     * </li>
+     * <li>
+     *   Create a PlanAssembler, and ask it for the best cost plan.  This uses the
+     *   side data created by the parser in the previous step.
+     * </li>
+     * <li>
+     *   If the plan is read only, slap a SendPlanNode on the front.  Presumably
+     *   an insert, delete or upsert will have added the SendPlanNode and perhaps
+     *   a ReceivePlanNode in the plan node tree already.
+     * </li>
+     * <li>
+     *   Compute the output schema.  This computes the output schema for each
+     *   node recursively, using a node specific method.
+     * </li>
+     * <li>
+     *   Resolve the column indices.  This makes sure that the indices of all
+     *   TVEs in the output columns refer to the right input columns.
+     * </li>
+     * <li>
+     *   Do some final cleaning up and verifying of the plan.  For example,
+     *   We renumber the nodes staring at 1.
+     * </li>
+     * </ol>
+     *
+     * @param xmlSQL
+     * @param paramValues
+     * @return
+     */
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
@@ -335,7 +377,7 @@ public class QueryPlanner {
         if (m_isUpsert) {
             // no insert/upsert with joins
             if (parsedStmt.m_tableList.size() != 1) {
-                m_recentErrorMsg = "UPSERT is support only with one single table: " + getOriginalSql();
+                m_recentErrorMsg = "UPSERT is supported only with one single table: " + getOriginalSql();
                 return null;
             }
 

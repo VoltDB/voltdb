@@ -1539,11 +1539,13 @@ public class Expression {
         prototypes.put(OpTypes.VAR_SAMP,      (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
-        prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.CASEWHEN,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
         prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
+        prototypes.put(OpTypes.RANK,          new VoltXMLElement("rank").withValue("percentage", "false"));
+        prototypes.put(OpTypes.PERCENT_RANK,  new VoltXMLElement("rank").withValue("percentage", "true"));
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
+        prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
     }
 
@@ -1642,7 +1644,7 @@ public class Expression {
             exp.attributes.put("alias", getAlias());
         }
 
-        // Add expresion sub type
+        // Add expression sub type
         if (exprSubType == OpTypes.ANY_QUANTIFIED) {
             exp.attributes.put("opsubtype", "any");
         } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
@@ -1780,6 +1782,12 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.RANK:
+            exp.attributes.put("valuetype", Type.SQL_NUMERIC.getNameString());
+            ExpressionRank erank = (ExpressionRank) this;
+
+            return erank.voltAnnotateRankXML(exp, session);
+            
         default:
             return exp;
         }

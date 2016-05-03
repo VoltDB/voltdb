@@ -42,12 +42,16 @@
  */
 package org.voltdb.plannodes;
 
+import java.util.Arrays;
+
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.json_voltpatches.JSONTokener;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
 
@@ -80,8 +84,9 @@ public class TestPartitionByNode extends TestCase {
 
     public void testJSON() throws Exception {
         PartitionByPlanNode pn = new PartitionByPlanNode();
-        addPartitionByExpressions(pn);
-        addSortExpressions(pn);
+        WindowedExpression we = makeWindowedExpression();
+        SchemaColumn col = new SchemaColumn("TMP", "TMP", "TC", "TC", we);
+        pn.setWindowedColumn(col);
         JSONStringer stringer = new JSONStringer();
         stringer.object();
         try {
@@ -93,14 +98,25 @@ public class TestPartitionByNode extends TestCase {
         }
         String json = stringer.toString();
         // Enable this to debug the JSON.
-        // System.out.printf("JSON: %s\n", json);
+        System.out.printf("JSON: %s\n", json);
         JSONObject jobj = new JSONObject(new JSONTokener(json));
         PartitionByPlanNode pn2 = new PartitionByPlanNode();
         pn2.loadFromJSONObject(jobj, m_voltdb.getDatabase());
         assertEquals(pn.numberSortExpressions(), pn2.numberSortExpressions());
         for (int idx = 0; idx < pn2.numberSortExpressions(); idx += 1) {
-            assertEquals(pn2.getSortExpression(idx), pn.getSortExpression(idx));
-            assertEquals(pn2.getSortDirection(idx), pn.getSortDirection(idx));
+            AbstractExpression ae2 = pn2.getSortExpression(idx);
+            AbstractExpression ae  = pn.getSortExpression(idx);
+            assertTrue(ae2 instanceof TupleValueExpression);
+            assertTrue(ae instanceof TupleValueExpression);
+            TupleValueExpression tve2 = (TupleValueExpression)ae2;
+            TupleValueExpression tve = (TupleValueExpression)ae;
+            // Not everything gets serialized.  We don't serialize all
+            // the names, for example.  But the metadata and the column
+            // indices need to match.
+            assertEquals(tve.getValueSize(), tve2.getValueSize());
+            assertEquals(tve.getValueType(), tve2.getValueType());
+            assertEquals(tve.getColumnIndex(), tve2.getColumnIndex());
+            assertEquals(pn.getSortDirection(idx), pn2.getSortDirection(idx));
         }
         assertEquals(SortDirectionType.ASC,  pn.getSortDirection(0));
         assertEquals(SortDirectionType.DESC, pn.getSortDirection(1));
@@ -112,26 +128,24 @@ public class TestPartitionByNode extends TestCase {
         assertEquals(ExpressionType.VALUE_TUPLE, pn.getSortExpression(1).getExpressionType());
     }
 
-    private void addSortExpressions(PartitionByPlanNode pn) {
-
-        TupleValueExpression tve1 = new TupleValueExpression(null, null, null, null, 1);
+    private WindowedExpression makeWindowedExpression() {
+        TupleValueExpression tve1 = new TupleValueExpression("TABLE1", "TABLE1", "COL1", "COL1", 1);
         tve1.setValueType(VoltType.FLOAT);
         tve1.setValueSize(8);
-        TupleValueExpression tve2 = new TupleValueExpression(null, null, null, null, 2);
+        TupleValueExpression tve2 = new TupleValueExpression("TABLE1", "TABLE1", "COL1", "COL1", 2);
         tve2.setValueType(VoltType.INTEGER);
         tve2.setValueSize(4);
-        pn.addSortExpression(tve1, SortDirectionType.ASC);
-        pn.addSortExpression(tve2, SortDirectionType.DESC);
-    }
-
-    private void addPartitionByExpressions(PartitionByPlanNode pn) {
-        TupleValueExpression tve1 = new TupleValueExpression(null, null, null, null, 1);
-        tve1.setValueType(VoltType.FLOAT);
-        tve1.setValueSize(8);
-        TupleValueExpression tve2 = new TupleValueExpression(null, null, null, null, 2);
-        tve2.setValueType(VoltType.INTEGER);
-        tve2.setValueSize(4);
-        pn.addGroupByExpression(tve1);
-        pn.addGroupByExpression(tve2);
+        TupleValueExpression tve3 = new TupleValueExpression("TABLE1", "TABLE1", "COL1", "COL1", 1);
+        tve3.setValueType(VoltType.FLOAT);
+        tve3.setValueSize(8);
+        TupleValueExpression tve4 = new TupleValueExpression("TABLE1", "TABLE1", "COL1", "COL1", 2);
+        tve4.setValueType(VoltType.INTEGER);
+        tve4.setValueSize(4);
+        WindowedExpression we = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
+                                                       Arrays.asList(tve1, tve2),
+                                                       Arrays.asList(tve3, tve4),
+                                                       Arrays.asList(SortDirectionType.ASC, SortDirectionType.DESC),
+                                                       m_voltdb.getDatabase(), true, false);
+        return we;
     }
 }

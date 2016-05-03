@@ -602,7 +602,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     /**
      * For TVEs, it is only serialized column index and table index. In order to match expression,
-     * there needs more information to revert back the table name, table alisa and column name.
+     * there needs more information to revert back the table name, table alias and column name.
      * Without adding extra information, TVEs will only have column index and table index available.
      * This function is only used for various of plan nodes, except AbstractScanPlanNode.
      * @param jobj

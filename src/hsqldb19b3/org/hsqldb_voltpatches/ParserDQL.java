@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
@@ -1552,7 +1554,49 @@ public class ParserDQL extends ParserBase {
         return aggregateExp;
     }
 
-//--------------------------------------
+    private Expression readRank(boolean isPercent) {
+        SortAndSlice sortAndSlice = null;
+
+        read();
+        readThis(Tokens.OPENBRACKET);
+        readThis(Tokens.CLOSEBRACKET);
+        readThis(Tokens.OVER);
+        readThis(Tokens.OPENBRACKET);
+
+        List<Expression> partitionByList = new ArrayList<Expression>();
+        if (token.tokenType == Tokens.PARTITION) {
+            read();
+            readThis(Tokens.BY);
+
+            while (true) {
+                Expression e = XreadValueExpression();
+                partitionByList.add(e);
+
+                if (token.tokenType == Tokens.COMMA) {
+                    read();
+                    continue;
+                }
+                break;
+            }
+        }
+
+        if (token.tokenType != Tokens.ORDER) {
+            throw unexpectedToken();
+        }
+        assert(token.tokenType == Tokens.ORDER);
+        // order by clause
+        read();
+        readThis(Tokens.BY);
+        sortAndSlice = XreadOrderBy();
+
+        readThis(Tokens.CLOSEBRACKET);
+
+        ExpressionRank erank = new ExpressionRank(sortAndSlice, partitionByList, isPercent);
+
+        return erank;
+    }
+
+    //--------------------------------------
     // returns null
     // := <unsigned literal> | <general value specification>
     Expression XreadValueSpecificationOrNull() {
@@ -1910,9 +1954,15 @@ public class ParserDQL extends ParserBase {
 
             case Tokens.LEFT :
             case Tokens.RIGHT :
-
                 // CLI function names
                 break;
+
+            case Tokens.RANK :
+                return readRank(false);
+
+            // No support for PERCENT_RANK here.
+            // case Tokens.PERCENT_RANK :
+            //    return readRank(true);
 
             default :
                 if (isCoreReservedKey()) {

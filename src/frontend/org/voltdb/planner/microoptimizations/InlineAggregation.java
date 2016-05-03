@@ -24,6 +24,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class InlineAggregation extends MicroOptimization {
@@ -33,7 +34,7 @@ public class InlineAggregation extends MicroOptimization {
     {
         assert(planNode != null);
 
-        // breath first:
+        // breadth first:
         //     find AggregatePlanNode with exactly one child
         //     where that child is an AbstractScanPlanNode.
         //     Inline any qualifying AggregatePlanNode to the its AbstractScanPlanNode.
@@ -62,8 +63,10 @@ public class InlineAggregation extends MicroOptimization {
 
     AbstractPlanNode inlineAggregationApply(AbstractPlanNode plan) {
         // check for an aggregation of the right form
-        if ((plan instanceof AggregatePlanNode) == false)
+        if ((plan instanceof AggregatePlanNode) == false
+                || (plan instanceof PartitionByPlanNode)) {
             return plan;
+        }
         assert(plan.getChildCount() == 1);
         AggregatePlanNode aggplan = (AggregatePlanNode)plan;
 

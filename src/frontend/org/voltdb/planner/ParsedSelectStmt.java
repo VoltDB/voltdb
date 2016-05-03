@@ -44,6 +44,8 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -146,6 +148,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
+    private boolean m_hasWindowingExpression = false;
     private boolean m_hasAverage = false;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
@@ -243,7 +246,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (mayNeedAvgPushdown()) {
             processAvgPushdownOptimization(displayElement, groupbyElement, havingElement, orderbyElement);
         }
-
         prepareMVBasedQueryFix();
     }
 
@@ -703,6 +705,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         assert(colExpr != null);
 
+        // Check for windowed expressions.
+        List<AbstractExpression> windowedExprs = ExpressionUtil.findAllExpressionsOfClass(colExpr, WindowedExpression.class);
+        if (windowedExprs != null && !windowedExprs.isEmpty()) {
+            if (m_hasWindowingExpression) {
+                throw new PlanningErrorException(
+                        "At most one windowed display column is supported.");
+            }
+            for (AbstractExpression ex: windowedExprs) {
+                WindowedExpression rankExpr = (WindowedExpression) ex;
+                String tbName = rankExpr.getTableName();
+
+                AbstractExpression predicate = m_joinTree.getAllFilters();
+                StmtTableScan tableScan = m_tableAliasMap.get(tbName);
+                rankExpr.updateWithTheBestIndex(predicate, tableScan);
+                m_hasWindowingExpression = true;
+            }
+        }
+
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
@@ -783,6 +803,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
+        if (m_hasWindowingExpression) {
+            throw new PlanningErrorException(
+                    "windowed operations are not allowed in the same query as an ORDER BY.");
+        }
         for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child);
         }
@@ -1472,12 +1496,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
+    public boolean hasWindowedExpression() {
+        return m_hasWindowingExpression;
+    }
+
     public boolean hasAggregateExpression() {
         return m_hasAggregateExpression;
     }
 
     public boolean hasAggregateOrGroupby() {
-        return m_hasAggregateExpression || isGrouped();
+        return hasAggregateExpression() || isGrouped();
     }
 
     public NodeSchema getFinalProjectionSchema() {
@@ -2024,5 +2052,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
+
+    /**
+     * Walk through the display columns and pick out
+     * the only windowed expression.
+     *
+     * @return
+     */
+    public ParsedColInfo getWindowedColinfo() {
+        for (ParsedColInfo colInfo : m_displayColumns) {
+            AbstractExpression colExpr = colInfo.expression;
+            if (colExpr instanceof WindowedExpression) {
+                return colInfo;
+            }
+        }
+        return null;
+    }
 
 }

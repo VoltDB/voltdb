@@ -464,7 +464,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
             aggType = "Partial";
         } else {
-            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE
+                    || getPlanNodeType() == PlanNodeType.PARTITIONBY);
         }
 
         sb.append(aggType + " AGGREGATION ops: ");

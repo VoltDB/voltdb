@@ -16,17 +16,12 @@
  */
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -35,11 +30,9 @@ import org.voltdb.types.SortDirectionType;
  * The only one we implement now is windowed RANK.  But more
  * could be possible.
  */
-public class PartitionByPlanNode extends HashAggregatePlanNode {
+public class PartitionByPlanNode extends AggregatePlanNode {
     public enum Members {
-        SORT_COLUMNS,
-        SORT_EXPRESSION,
-        SORT_DIRECTION
+        WINDOWED_COLUMN
     };
 
     @Override
@@ -48,110 +41,93 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     }
 
     @Override
-    public void validate() throws Exception {
-        super.validate();
-
-        for (AbstractExpression expr : m_sortExpressions) {
-            expr.validate();
-        }
-    }
-
-    @Override
     public void resolveColumnIndexes() {
         super.resolveColumnIndexes();
-        assert(m_children.size() > 0);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        // get all the TVEs in the output columns
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
-        for (AbstractExpression expr : m_sortExpressions) {
-            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
-        }
-        // and update their indexes against the table schema
-        for (TupleValueExpression tve : sort_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
-        }
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        StringBuilder sb = new StringBuilder(" PARTIION PLAN: " + super.explainPlanForNode(indent));
-        sb.append(indent).append("SORT BY: \n");
-        for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
-            AbstractExpression ae = m_sortExpressions.get(idx);
-            SortDirectionType dir = m_sortDirections.get(idx);
+        StringBuilder sb = new StringBuilder(" PARTITION BY PLAN: " + super.explainPlanForNode(indent) + "\n");
+        sb.append(indent).append(" SORT BY: \n");
+        for (int idx = 0; idx < numberSortExpressions(); idx += 1) {
+            AbstractExpression ae = getSortExpression(idx);
+            SortDirectionType dir = getSortDirection(idx);
             sb.append(indent)
                .append(ae.explain(optionalTableName))
                .append(": ")
                .append(dir.name())
                .append("\n");
         }
-        sb.append(indent).append("PARTITION BY:\n");
+        sb.append("  PARTITION BY:\n");
+        WindowedExpression we = getWindowedExpression();
+        for (int idx = 0; idx < numberPartitionByExpressions(); idx += 1) {
+            sb.append("  ")
+              .append(idx).append(": ")
+              .append(we.getPartitionByExpressions().get(idx).toString())
+              .append("\n");
+        }
         return sb.toString();
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        assert (m_sortExpressions.size() == m_sortDirections.size());
-        /*
-         * Serialize the sort columns.
-         */
-        stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_sortExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
-            stringer.endObject();
+        if (m_windowedSchemaColumn != null) {
+            stringer.key(Members.WINDOWED_COLUMN.name());
+            m_windowedSchemaColumn.toJSONString(stringer, true);
         }
-        stringer.endArray();
     }
 
     @Override
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_sortExpressions.clear();
-        m_sortDirections.clear();
-
-        /*
-         * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
-         * as we need to get a sort expression and a sort order for each column.
-         */
-        if (jobj.has(Members.SORT_COLUMNS.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.SORT_COLUMNS.name());
-            int size = jarray.length();
-            for (int ii = 0; ii < size; ii += 1) {
-                JSONObject tempObj = jarray.getJSONObject(ii);
-                m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-                m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
-            }
+        JSONObject windowedColumn = (JSONObject) jobj.get(Members.WINDOWED_COLUMN.name());
+        if (windowedColumn != null) {
+            m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
         }
     }
 
-    public void addSortExpression(AbstractExpression ae,
-                                  SortDirectionType  dir) {
-        m_sortExpressions.add(ae);
-        m_sortDirections.add(dir);
+    private WindowedExpression getWindowedExpression() {
+        AbstractExpression abstractSE = m_windowedSchemaColumn.getExpression();
+        assert(abstractSE instanceof WindowedExpression);
+        return (WindowedExpression)abstractSE;
+    }
+
+    public AbstractExpression getPartitionByExpression(int idx) {
+        WindowedExpression we = getWindowedExpression();
+        return we.getPartitionByExpressions().get(idx);
+    }
+
+    public int numberPartitionByExpressions() {
+        return getWindowedExpression().getPartitionbySize();
     }
 
     public AbstractExpression getSortExpression(int idx) {
-        return m_sortExpressions.get(idx);
+        WindowedExpression we = getWindowedExpression();
+        return we.getOrderByExpressions().get(idx);
     }
 
     public SortDirectionType getSortDirection(int idx) {
-        return m_sortDirections.get(idx);
+        WindowedExpression we = getWindowedExpression();
+        return (we.getOrderByDirections().get(idx));
     }
 
     public int numberSortExpressions() {
-        return m_sortExpressions.size();
+        WindowedExpression we = getWindowedExpression();
+        return we.getOrderbySize();
     }
-    private List<AbstractExpression> m_sortExpressions = new ArrayList<AbstractExpression>();
-    private List<SortDirectionType>  m_sortDirections = new ArrayList<SortDirectionType>();
+
+    public void addWindowedColumn(SchemaColumn col) {
+        m_windowedSchemaColumn = col;
+    }
+
+    public SchemaColumn getWindowedColumns() {
+        return m_windowedSchemaColumn;
+    }
+
+    public void setWindowedColumn(SchemaColumn col) {
+        m_windowedSchemaColumn = col;
+    }
+    SchemaColumn       m_windowedSchemaColumn;
 }

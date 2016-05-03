@@ -37,6 +37,7 @@ import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 
 /**
  *
@@ -119,7 +120,19 @@ public enum ExpressionType {
     AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
     AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
     AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
-    AGGREGATE_RANK                (AggregateExpression.class, 49, "RANK"),
+    // ----------------------------
+    // Windowed Aggregates.  We need to treat these
+    // somewhat differently than the non-windowed
+    // aggregates.  For example, AGGREGATE_MAX is a
+    // different kind of thing from AGGREGATE_WINDOWED_MAX.
+    // For one thing, windowed aggregates have class WindowedExpression.class,
+    // and non-windowed aggregates have class AggregateExpression.class.
+    //
+    // We only support RANK now, but when we support different
+    // aggregate functions we will want to keep them as
+    // separate ExpressionType enumerals.
+    // ----------------------------
+    AGGREGATE_WINDOWED_RANK       (WindowedExpression.class,  70, "RANK"),
 
     // ----------------------------
     // Function
@@ -145,7 +158,13 @@ public enum ExpressionType {
     // -----------------------------
     ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
     SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
-;
+
+    // ----------------------------
+    // WINDOWING
+    // ----------------------------
+    WINDOWING_RANK                (WindowedExpression.class, 500, "RANK")
+    // TODO: dense_rank, row_number, etc
+    ;
 
     private final int m_value;
     private final String m_symbol;
@@ -212,4 +231,5 @@ public enum ExpressionType {
     public boolean isAggregateExpression() {
         return getExpressionClass() == AggregateExpression.class;
     }
+
 }
