@@ -515,12 +515,12 @@ def validate_server_ports(database_id, server_id=-1):
            "client-listener"]
 
     specified_port_values = {
-        "http-listener": get_port(request.json.get('http-listener', "")),
-        "admin-listener": get_port(request.json.get('admin-listener', "")),
-        "replication-listener": get_port(request.json.get('replication-listener', "")),
-        "client-listener": get_port(request.json.get('client-listener', "")),
-        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-        "internal-listener": get_port(request.json.get('internal-listener', ""))
+        "http-listener": get_port(request.json.get('http-listener', "").strip().lstrip("0")),
+        "admin-listener": get_port(request.json.get('admin-listener', "").strip().lstrip("0")),
+        "replication-listener": get_port(request.json.get('replication-listener', "").strip().lstrip("0")),
+        "client-listener": get_port(request.json.get('client-listener', "").strip().lstrip("0")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "").strip().lstrip("0")),
+        "internal-listener": get_port(request.json.get('internal-listener', "").strip().lstrip("0"))
     }
 
     for option in arr:
@@ -716,15 +716,15 @@ class ServerAPI(MethodView):
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
-            'admin-listener': request.json.get('admin-listener', "").strip(),
-            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip(),
-            'replication-listener': request.json.get('replication-listener', "").strip(),
-            'client-listener': request.json.get('client-listener', "").strip(),
+            'admin-listener': request.json.get('admin-listener', "").strip().lstrip("0"),
+            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip().lstrip("0"),
+            'replication-listener': request.json.get('replication-listener', "").strip().lstrip("0"),
+            'client-listener': request.json.get('client-listener', "").strip().lstrip("0"),
             'internal-interface': request.json.get('internal-interface', "").strip(),
             'external-interface': request.json.get('external-interface', "").strip(),
             'public-interface': request.json.get('public-interface', "").strip(),
-            'internal-listener': request.json.get('internal-listener', "").strip(),
-            'http-listener': request.json.get('http-listener', "").strip(),
+            'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
+            'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
             'placement-group': request.json.get('placement-group', "").strip()
         }
 
