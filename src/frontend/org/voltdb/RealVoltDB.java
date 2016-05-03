@@ -501,7 +501,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            buildClusterMesh(isRejoin || m_joining);
+            MeshResult mode = buildClusterMesh(isRejoin || m_joining);
+            setStartMode(mode.m_mode);
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -1694,7 +1695,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     //Indicating Result of meshing.
     class MeshResult {
-        OperationMode m_mode = OperationMode.RUNNING;
+        public final OperationMode m_mode;
+        public MeshResult(OperationMode mode) {
+             m_mode = mode;
+        }
     }
 
     /**
@@ -1732,8 +1736,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
+        MeshResult mode = new MeshResult(OperationMode.RUNNING);
         try {
-            m_messenger.start();
+            if (m_messenger.start())
+                mode = new MeshResult(OperationMode.PAUSED);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -1753,7 +1759,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     "Please check your command line and start action and try again.", false, null);
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
-        return new MeshResult();
+        return mode;
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {

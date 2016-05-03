@@ -335,6 +335,14 @@ public class SocketJoiner {
              * Read a length prefixed JSON message
              */
             JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
+            boolean paused = false;
+            if (jsObj.has("paused")) {
+                //If connecting server told me paused I will set to start as paused.
+                paused = jsObj.getBoolean("paused");
+            }
+            if (paused) {
+                m_paused.set(paused);
+            }
 
             LOG.info(jsObj.toString(2));
 
@@ -346,6 +354,7 @@ public class SocketJoiner {
             returnJs.put("versionString", VoltDB.instance().getVersionString());
             returnJs.put("buildString", VoltDB.instance().getBuildString());
             returnJs.put("versionCompatible", VoltDB.instance().isCompatibleVersionString(remoteBuildString));
+            //Send leader paused flag.
             returnJs.put("paused", m_paused.get());
             byte jsBytes[] = returnJs.toString(4).getBytes(Constants.UTF8ENCODING);
 
@@ -441,7 +450,7 @@ public class SocketJoiner {
     /**
      * Read version info from a socket and check compatibility.
      */
-    private void processVersionJSONResponse(SocketChannel sc,
+    private boolean processVersionJSONResponse(SocketChannel sc,
                                             String remoteAddress,
                                             String localVersionString,
                                             String localBuildString,
@@ -459,9 +468,9 @@ public class SocketJoiner {
         } else {
             paused = false;
         }
-        if (paused != m_paused.get()) {
-            VoltDB.crashLocalVoltDB("Incompatible start mode all nodes must start with same paused state" , false, null);
-        }
+//        if (paused != m_paused.get()) {
+//            VoltDB.crashLocalVoltDB("Incompatible start mode all nodes must start with same paused state" , false, null);
+//        }
         if (remoteVersionString.equals(localVersionString)) {
             if (localBuildString.equals(remoteBuildString) == false) {
                 // ignore test/eclipse build string so tests still work
@@ -480,8 +489,12 @@ public class SocketJoiner {
             }
         }
         activeVersions.add(remoteVersionString);
+        return paused;
     }
 
+    public boolean isPaused() {
+        return m_paused.get();
+    }
     /*
      * If this node failed to bind to the leader address
      * it must connect to the leader which will generate a host id and
@@ -525,7 +538,6 @@ public class SocketJoiner {
             }
             currentTimeBuf.flip();
             long skew = System.currentTimeMillis() - currentTimeBuf.getLong();
-            skew = 0;
             skews.add(skew);
 
             String localVersionString = VoltDB.instance().getVersionString();
@@ -562,7 +574,11 @@ public class SocketJoiner {
             }
 
             // read the json response from socketjoiner with version info and validate it
-            processVersionJSONResponse(socket, remoteAddress, localVersionString, localBuildString, activeVersions);
+            boolean paused = processVersionJSONResponse(socket, remoteAddress, localVersionString, localBuildString, activeVersions);
+            if (paused) {
+                //Make my action paused.
+                m_paused.set(paused);
+            }
 
             // read the json response sent by HostMessenger with HostID
             JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
@@ -649,7 +665,11 @@ public class SocketJoiner {
                 listeningAddresses[ii] = hostAddr;
 
                 // read the json response from socketjoiner with version info and validate it
-                processVersionJSONResponse(hostSocket, remoteAddress, localVersionString, localBuildString, activeVersions);
+                paused = processVersionJSONResponse(hostSocket, remoteAddress, localVersionString, localBuildString, activeVersions);
+                if (paused) {
+                    //Make my action paused.
+                    m_paused.set(paused);
+                }
             }
 
             checkClockSkew(skews);

@@ -354,7 +354,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Start the host messenger and connect to the leader, or become the leader
      * if necessary.
      */
-    public void start() throws Exception {
+    public boolean start() throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -436,6 +436,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
+        return m_joiner.isPaused();
     }
 
     //For test only
