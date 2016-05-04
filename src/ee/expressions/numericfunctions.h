@@ -244,6 +244,10 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
  *
  * FYI, Fortran semantics: https://gcc.gnu.org/onlinedocs/gfortran/MOD.html
  * It has the same semantics with C99 as: int(a / b) * b + MOD(a,b)  == a
+ *
+ * Here we have some difference about that the int function does.  Fortran trancates
+ * down, just like floor.  So int(-3/2) = -2.  SQL apparently truncates toward
+ * zero, so int(-3/2) == -3/2 = -1.
  */
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
