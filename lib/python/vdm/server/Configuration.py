@@ -849,5 +849,5 @@ def check_export_property(type, properties):
             return {'status': 'error', 'error': 'Default property(either amqp.uri or broker.host) of '
                                                 'rabbitmq not present.'}
         elif 'broker.host' in property_list and 'amqp.uri' in property_list:
-            return {'status': 'error', 'error': 'Either broker.host or amqp.uri should be included.'}
+            return {'status': 'error', 'error': 'Both broker.host and amqp.uri cannot be included as rabbibmq property.'}
     return {'status': 'success'}
