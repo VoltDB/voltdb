@@ -666,11 +666,13 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        String[] ddls = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        m_canonicalDDL = ddls[0];
+        String ddlWithBatchSupport = ddls[1];
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
+            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
