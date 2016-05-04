@@ -22,7 +22,7 @@ import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URI;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.math.NumberUtils;
 import org.voltcore.logging.Level;
@@ -56,7 +56,8 @@ import com.amazonaws.services.kinesis.model.Record;
 public class KinesisStreamImporter extends AbstractImporter {
 
     private KinesisStreamImporterConfig m_config;
-    private final AtomicBoolean m_eos = new AtomicBoolean(false);
+    private AtomicLong m_submitCount = new AtomicLong(0);
+    private AtomicLong m_cbcnt = new AtomicLong(0);
 
     private Worker m_worker;
 
@@ -72,53 +73,37 @@ public class KinesisStreamImporter extends AbstractImporter {
     @Override
     public void accept() {
 
-        if (m_eos.get())
-            return;
+        info(null, "Starting data stream fetcher for " + m_config.getResourceID().toString());
+        try {
+            KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(m_config.getAppName(),
+                    m_config.getStreamName(), credentials(), UUID.randomUUID().toString());
 
-        AtomicBoolean workerInService = new AtomicBoolean(false);
-        while (shouldRun()) {
+            kclConfig.withRegionName(m_config.getRegion()).withMaxRecords((int) m_config.getMaxReadBatchSize())
+                    .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
+                    .withIdleTimeBetweenReadsInMillis(m_config.getIdleTimeBetweenReads())
+                    .withTaskBackoffTimeMillis(m_config.getTaskBackoffTimeMillis()).withKinesisClientConfig(
+                            KinesisStreamImporterConfig.getClientConfigWithUserAgent(m_config.getAppName()));
 
-            if (!workerInService.get() && !m_eos.get()) {
-                try {
-                    KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(m_config.getAppName(),
-                            m_config.getStreamName(), credentials(), UUID.randomUUID().toString());
+            m_worker = new Worker.Builder().recordProcessorFactory(new RecordProcessorFactory()).config(kclConfig)
+                    .build();
 
-                    kclConfig.withRegionName(m_config.getRegion()).withMaxRecords(m_config.getMaxReadBatchSize())
-                            .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
-                            .withIdleTimeBetweenReadsInMillis(m_config.getIdleTimeBetweenReads())
-                            .withTaskBackoffTimeMillis(m_config.getTaskBackoffTimeMillis()).withKinesisClientConfig(
-                                    KinesisStreamImporterConfig.getClientConfigWithUserAgent(m_config.getAppName()));
+            m_worker.run();
 
-                    m_worker = new Worker.Builder().recordProcessorFactory(new RecordProcessorFactory())
-                            .config(kclConfig).build();
+        } catch (Exception e) {
 
-                    info(null, "Starting worker for Kinesis stream  %s", m_config.getStreamName());
-                    workerInService.compareAndSet(false, true);
-                    m_worker.run();
+            rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer %s", m_config.getResourceID());
+            if (null != m_worker)
+                m_worker.shutdown();
 
-                } catch (Exception e) {
-
-                    rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer %s", m_config.getResourceID());
-                    if (null != m_worker)
-                        m_worker.shutdown();
-
-                    // The worker fails, backoff and restart
-                    if (shouldRun()) {
-                        backoffSleep(3);
-                        workerInService.compareAndSet(true, false);
-                    }
-                }
-            }
         }
 
-        m_eos.compareAndSet(false, true);
+        info(null, "Data stream fetcher stopped for %s. Callback Rcvd: %d. Submitted: %d",
+                m_config.getResourceID().toString(), m_cbcnt.get(), m_submitCount.get());
 
-        info(null, "The importer stops: %s", m_config.getResourceID().toString());
     }
 
     @Override
     public void stop() {
-        m_eos.compareAndSet(false, true);
         if (null != m_worker) {
             m_worker.shutdown();
         }
@@ -151,7 +136,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         private String m_shardId;
         private Formatter<String> m_formatter;
-        Gap<BigInteger> m_gapTracker = new Gap<BigInteger>(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
+        Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
 
         public StreamConsumer() {
@@ -180,10 +165,10 @@ public class KinesisStreamImporter extends AbstractImporter {
             }
 
             BigInteger seq = BigInteger.ZERO;
-            m_gapTracker.allocate(BigInteger.class, records.getRecords().size());
+            m_gapTracker.allocate(records.getRecords().size());
             int offset = 0;
             for (Record record : records.getRecords()) {
-
+                m_submitCount.incrementAndGet();
                 BigInteger seqNum = new BigInteger(record.getSequenceNumber());
                 if (seqNum.compareTo(m_lastFetchCommittedSequenceNumber) < 0) {
                     continue;
@@ -203,7 +188,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 try {
                     data = new String(record.getData().array(), "UTF-8");
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
-                    StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_eos);
+                    StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);
                     if (!callProcedure(invocation, cb)) {
                         rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);
                         m_gapTracker.commit(offset, seqNum);
@@ -287,27 +272,24 @@ public class KinesisStreamImporter extends AbstractImporter {
 
     private final static class StreamProcedureCallback implements ProcedureCallback {
 
-        private final Gap<BigInteger> m_tracker;
-        private final AtomicBoolean m_dontCommit;
+        private final Gap m_tracker;
         private final int m_offset;
         private final BigInteger m_seq;
+        private final AtomicLong m_cbcnt;
 
-        public StreamProcedureCallback(final Gap<BigInteger> tracker, final int offset, BigInteger seq,
-                final AtomicBoolean dontCommit) {
+        public StreamProcedureCallback(final Gap tracker, final int offset, BigInteger seq, AtomicLong cbcnt) {
 
             m_tracker = tracker;
-            m_dontCommit = dontCommit;
             m_offset = offset;
             m_seq = seq;
+            m_cbcnt = cbcnt;
             m_tracker.submit(m_offset, m_seq);
         }
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-
-            if (!m_dontCommit.get()) {
-                m_tracker.commit(m_offset, m_seq);
-            }
+            m_tracker.commit(m_offset, m_seq);
+            m_cbcnt.incrementAndGet();
         }
     }
 
@@ -315,12 +297,12 @@ public class KinesisStreamImporter extends AbstractImporter {
      * The class take an array of checkpoint objects and use their indices within the array as offsets to keep track of the safe
      * commit point. use the safe commit offset to look up the commit point for target system.
      */
-    final class Gap<T> {
+    final class Gap {
         long c = 0;
         long s = -1L;
         long[] lag;
         final int lagLen;
-        T[] chceckpoints;
+        BigInteger[] chceckpoints;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -329,16 +311,15 @@ public class KinesisStreamImporter extends AbstractImporter {
             lagLen = leeway;
         }
 
-        @SuppressWarnings("unchecked")
-        synchronized void allocate(Class<T> clazz, int capacity) {
+        synchronized void allocate(int capacity) {
 
-            chceckpoints = (T[]) Array.newInstance(clazz, capacity);
+            chceckpoints = (BigInteger[]) Array.newInstance(BigInteger.class, capacity);
             c = 0;
             s = -1L;
             lag = new long[lagLen];
         }
 
-        synchronized void submit(long offset, T v) {
+        synchronized void submit(long offset, BigInteger v) {
 
             if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] != null) {
                 return;
@@ -358,7 +339,7 @@ public class KinesisStreamImporter extends AbstractImporter {
             return (int) (offset % lagLen);
         }
 
-        synchronized void commit(long offset, T v) {
+        synchronized void commit(long offset, BigInteger v) {
 
             if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] == null) {
                 return;
@@ -377,7 +358,7 @@ public class KinesisStreamImporter extends AbstractImporter {
             }
         }
 
-        synchronized T getSafeCommitPoint() {
+        synchronized BigInteger getSafeCommitPoint() {
             return chceckpoints[(int) c];
         }
 

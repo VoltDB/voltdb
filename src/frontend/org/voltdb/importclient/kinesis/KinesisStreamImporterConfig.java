@@ -53,7 +53,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
     private final String m_secretKey;
     private final String m_accessKey;
     private final long m_idleTimeBetweenReadsInMillis;
-    private final int m_maxReadBatchSize;
+    private final long m_maxReadBatchSize;
     private final long m_taskBackoffTimeMillis;
     private final AbstractFormatterFactory m_formatterFactory;
 
@@ -71,9 +71,10 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
      * @param taskBackoffTimeMillis  Backoff period when tasks encounter an exception
      * @param formatterFactory AbstractFormatterFactory
      */
-    private KinesisStreamImporterConfig(String appName, String region, String streamName, String procedure,
-            String secretKey, String accessKey, long idleTimeBetweenReadsInMillis, int maxReadBatchSize, URI resourceId,
-            long taskBackoffTimeMillis, AbstractFormatterFactory formatterFactory) {
+    private KinesisStreamImporterConfig(final String appName, final String region, final String streamName,
+            final String procedure, final String secretKey, final String accessKey,
+            final long idleTimeBetweenReadsInMillis, final long maxReadBatchSize, final URI resourceId,
+            final long taskBackoffTimeMillis, final AbstractFormatterFactory formatterFactory) {
 
         m_appName = appName;
         m_region = region;
@@ -122,7 +123,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         return m_idleTimeBetweenReadsInMillis;
     }
 
-    public int getMaxReadBatchSize() {
+    public long getMaxReadBatchSize() {
         return m_maxReadBatchSize;
     }
 
@@ -143,15 +144,16 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         String procedure = getProperty(props, "procedure", "");
         String secretKey = getProperty(props, "secret.key", "");
         String accessKey = getProperty(props, "access.key", "");
-        String readInterval = getProperty(props, "idle.time.between.reads", "1000");
-        String maxReadBatchSize = getProperty(props, "max.read.batch.size", "10000");
-        String taskBackoffTimeMillis = getProperty(props, "task.backoff.time.millis", "500");
+        long readInterval = getPropertyAsLong(props, "idle.time.between.reads", 1000);
+        long maxReadBatchSize = getPropertyAsLong(props, "max.read.batch.size", 10000);
+        long taskBackoffTimeMillis = getPropertyAsLong(props, "task.backoff.time.millis", 500);
+
         List<Shard> shards = discoverShards(region, streamName, accessKey, secretKey, appName);
         if (shards == null || shards.isEmpty()) {
             throw new IllegalArgumentException("Kinesis stream " + streamName + " does not have any shards.");
         }
 
-        // build UI per stream, per shard and per application
+        // build URI per stream, per shard and per application
         Map<URI, ImporterConfig> configs = new HashMap<>();
         int shardCnt = 0;
         for (Shard shard : shards) {
@@ -163,8 +165,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
             URI uri = URI.create(builder.toString());
 
             ImporterConfig config = new KinesisStreamImporterConfig(appName, region, streamName, procedure, secretKey,
-                    accessKey, Long.parseLong(readInterval), Integer.parseInt(maxReadBatchSize), uri,
-                    Long.parseLong(taskBackoffTimeMillis), formatterFactory);
+                    accessKey, readInterval, maxReadBatchSize, uri, taskBackoffTimeMillis, formatterFactory);
 
             configs.put(uri, config);
         }
@@ -182,7 +183,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
      * @param appName  The name of stream application
      * @return a list of shards
      */
-    private static List<Shard> discoverShards(String regionName, String streamName, String accessKey, String secretKey,
+    public static List<Shard> discoverShards(String regionName, String streamName, String accessKey, String secretKey,
             String appName) {
 
         Region region = RegionUtils.getRegion(regionName);
@@ -207,13 +208,40 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         }
     }
 
-    private static String getProperty(Properties props, String propertyName, String defaultValue) {
+    /**
+     * get property value. If no value is available, throw IllegalArgumentException
+     * @param props  The properties
+     * @param propertyName  property name
+     * @param defaultValue  The default value
+     * @return property value
+     */
+    public static String getProperty(Properties props, String propertyName, String defaultValue) {
         String value = props.getProperty(propertyName, defaultValue).trim();
         if (value.isEmpty()) {
             throw new IllegalArgumentException(
                     "Property " + propertyName + " is missing in Kinesis importer configuration.");
         }
         return value;
+    }
+
+    /**
+     * get property value as long.
+     * @param props  The properties
+     * @param propertyName  property name
+     * @param defaultValue  The default value
+     * @return property value
+     */
+    public static long getPropertyAsLong(Properties props, String propertyName, long defaultValue) {
+        String value = props.getProperty(propertyName, "").trim();
+        if (value.isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Property " + propertyName + " must be a number in Kinesis importer configuration.");
+        }
     }
 
     public static ClientConfiguration getClientConfigWithUserAgent(String appName) {
