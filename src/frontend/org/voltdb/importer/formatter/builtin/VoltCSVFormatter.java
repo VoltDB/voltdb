@@ -149,10 +149,9 @@ public class VoltCSVFormatter implements Formatter<String> {
                 if (m_nowhitespace && (lineValues[i].charAt(0) == ' '
                         || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
                     throw new FormatException("Whitespace detected--nowhitespace is used");
-                }
-
-                if (m_surroundingSpacesNeedQuotes)
+                } else {
                     lineValues[i] = lineValues[i].trim();
+                }
 
                 if (!m_customNullString.isEmpty()) {
                     if (m_customNullString.equals(lineValues[i])) {

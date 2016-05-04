@@ -205,19 +205,35 @@ public class TestVoltCSVFormatter extends TestCase {
     }
 
     @Test
-    public void testIgnoreLeadingWhiteSpace() throws Exception {
+    public void testSurroundingSpacesNeedQuotes() throws Exception {
         ServiceReference refs[] = m_bundle.getRegisteredServices();
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("surroundingSpacesNeedQuotes", "false");
+        prop.setProperty("surroundingSpacesNeedQuotes", "true");
         o.configureFormatterFactory("csv", prop);
         Formatter formatter = o.create();
         Object[] results = formatter.transform("12,10.05,  test");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
-        assertEquals(results[2], "  test");
+        assertEquals(results[2], "test");
+    }
+
+    @Test
+    public void testNowhitespace() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("nowhitespace", "true");
+        o.configureFormatterFactory("csv", prop);
+        Formatter formatter = o.create();
+        try {
+            Object[] results = formatter.transform("12,10.05,  test");
+            fail();
+        } catch (RuntimeException e) {
+        }
     }
 
     @Test
@@ -233,6 +249,57 @@ public class TestVoltCSVFormatter extends TestCase {
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
+        assertEquals(results[2], "test");
+    }
+
+    @Test
+    public void testBlankError() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("separator", ",");
+        prop.setProperty("blank", "error");
+        o.configureFormatterFactory("csv", prop);
+        Formatter formatter = o.create();
+        try {
+            Object[] results = formatter.transform("12,,test");
+            fail();
+        } catch (RuntimeException e) {
+        }
+    }
+
+    @Test
+    public void testBlankEmpty() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("separator", ",");
+        prop.setProperty("blank", "empty");
+        o.configureFormatterFactory("csv", prop);
+        Formatter formatter = o.create();
+        Object[] results = formatter.transform("12,,test");
+        assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], null);
+        assertEquals(results[2], "test");
+    }
+
+    @Test
+    public void testCustomNull() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("separator", ",");
+        prop.setProperty("customNullString", "empty");
+        o.configureFormatterFactory("csv", prop);
+        Formatter formatter = o.create();
+        Object[] results = formatter.transform("12,empty,test");
+        assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], null);
         assertEquals(results[2], "test");
     }
 
