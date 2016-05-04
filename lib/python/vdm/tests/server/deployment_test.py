@@ -667,6 +667,28 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['error'], 'Export: Default property(endpoint) of elasticsearch not present.')
             self.assertEqual(response.status_code, 200)
 
+    def test_validate_export_duplicate_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"export": {"configuration": [{"enabled": True,
+                                                                        "property": [{"name": "endpoint", "value": "2"},
+                                                                                     {"name": "endpoint", "value": "2"}
+                                                                                     ],
+                                                                        "stream": "test", "type": "elasticsearch"},
+                                                                       ]}},
+                                    headers=headers)
+            value = response.json()
+            self.assertEqual(value['status'], 'error')
+            self.assertEqual(value['error'], 'Export: Duplicate properties are not allowed.')
+            self.assertEqual(response.status_code, 200)
+
     def test_validate_import_invalid_export_type(self):
         """ensure invalid type is not saved in export"""
         response = requests.get(__db_url__)
