@@ -613,6 +613,14 @@ def get_servers_from_database_id(database_id):
     return servers
 
 
+def check_invalid_roles(roles):
+    roles = str(request.json['roles']).split(',')
+    for role in roles:
+        if role.strip() == '':
+            return False
+    return True
+
+
 class DictClass(dict):
     pass
 
@@ -1024,10 +1032,16 @@ class DeploymentUserAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
+        is_invalid_roles = check_invalid_roles(request.json['roles'])
+        if not is_invalid_roles:
+            return make_response(jsonify({'error': 'Invalid user roles.'}))
+
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
+
         user_roles = ','.join(Set(request.json['roles'].split(',')))
+
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
@@ -1068,6 +1082,10 @@ class DeploymentUserAPI(MethodView):
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
         if current_user is None:
             return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
+
+        is_invalid_roles = check_invalid_roles(request.json['roles'])
+        if not is_invalid_roles:
+            return make_response(jsonify({'error': 'Invalid user roles.'}))
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
