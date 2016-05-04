@@ -68,7 +68,7 @@ public class ExportKafkaOnServerVerifier {
     private long expectedRows = 0;
     private final AtomicLong consumedRows = new AtomicLong(0);
     private final AtomicLong verifiedRows = new AtomicLong(0);
-    private final AtomicBoolean testGood = new AtomicBoolean(false);
+    private final AtomicBoolean testGood = new AtomicBoolean(true);
 
     private static class VoltKafkaConsumerConfig {
         final String m_zkhost;
