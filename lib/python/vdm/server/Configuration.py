@@ -818,13 +818,13 @@ def check_validation_deployment(req):
 
 def check_export_property(type, properties):
     property_list = []
-    is_invalid_property = False;
     for property in properties:
         if 'name' in property and 'value' in property:
             if str(property['name']).strip() == '' or str(property['value']).strip() == '':
-                return {'status': 'error', 'error':'Invalid property.'}
-            if property['name'] not in property_list:
-                property_list.append(property['name'])
+                return {'status': 'error', 'error': 'Invalid property.'}
+            if property['name'] in property_list:
+                return {'status': 'error', 'error': 'Duplicate properties are not allowed.'}
+            property_list.append(property['name'])
         else:
             return {'status': 'error', 'error': 'Invalid property.'}
 
