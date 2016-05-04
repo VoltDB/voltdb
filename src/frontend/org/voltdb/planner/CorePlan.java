@@ -26,6 +26,7 @@ import java.util.Arrays;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.utils.Encoder;
 
 /**
  * CorePlan is an immutable representation of a SQL execution plan.
@@ -299,7 +300,11 @@ public class CorePlan {
         return parameterTypes[partitioningParamIndex];
     }
 
-    public boolean wasPlannedAgainstHash(byte[] catalogHash) {
-        return Arrays.equals(catalogHash, this.catalogHash);
+    public boolean wasPlannedAgainstHash(byte[] currentCatalogHash) {
+        return Arrays.equals(currentCatalogHash, catalogHash);
+    }
+
+    public String obsoleteCatalogHashTokenForMessage() {
+        return Encoder.hexEncode(catalogHash).substring(0, 10);
     }
 }

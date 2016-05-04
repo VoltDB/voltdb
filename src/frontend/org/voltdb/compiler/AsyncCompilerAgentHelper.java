@@ -124,10 +124,17 @@ public class AsyncCompilerAgentHelper
                         "original catalog: " + ioe.getMessage();
                     return retval;
                 }
+                catch (Throwable t) {
+                    retval.errorMsg = "Unexpected condition applying DDL statements to " +
+                        "original catalog: " + t.toString();
+                    compilerLog.warn(retval.errorMsg);
+                    return retval;
+                }
                 if (newCatalogBytes == null) {
                     // Shouldn't ever get here
                     retval.errorMsg =
                         "Unexpected failure in applying DDL statements to original catalog";
+                    compilerLog.error(retval.errorMsg);
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null

@@ -31,6 +31,9 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcToTestTypeConversion;
 
 public class TestTypeConversionSuite extends RegressionSuite {
@@ -50,6 +53,35 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltType.GEOGRAPHY
     };
 
+    private String[] m_javaTypeTriedByInsertProc = {
+            Byte.class.getSimpleName(),
+            Short.class.getSimpleName(),
+            Integer.class.getSimpleName(),
+            Long.class.getSimpleName(),
+            Double.class.getSimpleName(),
+            BigDecimal.class.getSimpleName(),
+            TimestampType.class.getSimpleName(),
+            String.class.getSimpleName(),
+            // Required escapes make this not quite just byte[].class.getSimpleName(),
+            byte.class.getSimpleName() + "\\[\\]",
+            GeographyPointValue.class.getSimpleName(),
+            GeographyValue.class.getSimpleName(),
+    };
+
+    private String[] m_javaTypeTriedByInListProc = {
+            Byte.class.getSimpleName(),
+            short.class.getSimpleName() + "\\[\\]",
+            int.class.getSimpleName() + "\\[\\]",
+            long.class.getSimpleName() + "\\[\\]",
+            double.class.getSimpleName() + "\\[\\]",
+            BigDecimal.class.getSimpleName() + "\\[\\]",
+            TimestampType.class.getSimpleName() + "\\[\\]",
+            String.class.getSimpleName() + "\\[\\]",
+            // Required escapes make this not quite just byte[].class.getSimpleName(),
+            byte.class.getSimpleName() + "\\[\\]\\[\\]",
+            GeographyPointValue.class.getSimpleName() + "\\[\\]",
+            GeographyValue.class.getSimpleName() + "\\[\\]",
+    };
     // Row index provides the type converting "from"
     // Column index provides the type converting "to"
     // To see type for column (to) or row (from), map it's
@@ -131,6 +163,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
         for(boolean[] fromType: m_typeConversionMatrix) {
             int colInd = 0;
             typeToTest = m_tableColTypeVal[rowId];
+            String typeTriedByInsertProc = m_javaTypeTriedByInsertProc[rowId];
             for (boolean toType: fromType) {
                 if (toType) {
                     // type conversion feasible
@@ -141,8 +174,8 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 }
                 else {
                     errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeToTest.getName() +
-                            "' to '" + m_tableColTypeVal[colInd].getName() +
+                            + typeToTest.getName() + "\\(" + typeTriedByInsertProc +
+                            "\\)' to '" + m_tableColTypeVal[colInd].getName() +
                             "' for arg " + colInd + " for SQL stmt";
 
                     // type conversion not allowed
@@ -188,6 +221,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
         for(boolean[] fromType: m_typeConversionMatrixInList) {
             int colInd = 0;
             typeToTest = m_tableColTypeVal[rowId];
+            String typeTriedByInListProc = m_javaTypeTriedByInListProc[rowId];
             for (boolean toType: fromType) {
                 if (rowId == 0) {
                     // currently there is known issue in EE where array of tinyInt get's interpreted as
@@ -204,8 +238,8 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 }
                 else {
                     errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeToTest.getName() +
-                            "' to '" + m_tableColTypeVal[colInd].getName() +
+                            + typeToTest.getName() + "\\(" + typeTriedByInListProc +
+                            "\\)' to '" + m_tableColTypeVal[colInd].getName() +
                             "' for arg 0 for SQL stmt";
 
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",

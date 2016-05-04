@@ -231,6 +231,7 @@ public class PlanSelector implements Cloneable {
 
             // get the explained plan for the node
             plan.explainedPlan = planGraph.toExplainPlanString();
+            plan.explainedPlan += plan.expectedParamsExplained();
             outputExplainedPlan(plan, filename);
         }
     }

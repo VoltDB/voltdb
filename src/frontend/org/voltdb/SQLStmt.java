@@ -207,4 +207,14 @@ public class SQLStmt {
     public String getJoinOrder() {
         return joinOrder;
     }
+
+    public String paramTypesExplained() {
+        StringBuilder sb = new StringBuilder();
+        String prefix = "Parameter types: ";
+        for (byte typeByte : statementParamJavaTypes) {
+            sb.append(prefix).append(VoltType.get(typeByte).toSQLString());
+            prefix = ", ";
+        }
+        return sb.toString();
+    }
 }
