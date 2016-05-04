@@ -360,17 +360,17 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // - tables with indexes
 
         // cut-off for table with no views
-        const double tableLFCutoffForTrunc = 0.105666;
+        const double tableWithNoViewLFCutoffForTrunc = 0.105666;
         //cut-off for table with views
         const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
         const double blockLoadFactor = m_data.begin().data()->loadFactor();
-        if ((blockLoadFactor <= tableLFCutoffForTrunc) ||
-            (m_views.size() > 0 && blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) {
+        if ((m_views.empty() && (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) ||    // table with no view
+            (!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc))) {    // table with views
             return deleteAllTuples(true, fallible);
         }
     }
-    //For MAT view dont optimize needs more work.
+    // For MAT view don't optimize, needs more work.
     if (isMaterialized()) {
         return deleteAllTuples(true);
     }
@@ -967,7 +967,9 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    deleteTupleStorage(target); // also frees object columns
+    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
+    // free object columns along with empty tuple block storage
+    deleteTupleStorage(target, block, true);
 }
 
 /*
@@ -1707,7 +1709,19 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
 }
 
 void PersistentTableSurgeon::activateSnapshot() {
-    //All blocks are now pending snapshot
+    TBMapI blockIterator = m_table.m_data.begin();
+
+    // Persistent table should have minimum of one block in it's block map.
+    assert(m_table.m_data.begin() != m_table.m_data.end());
+
+    if ((m_table.m_data.size() == 1) && blockIterator.data()->isEmpty()) {
+        assert(m_table.activeTupleCount() == 0);
+        // The single empty block in an empty table does not need to be considered as pending block
+        // for snapshot(load). CopyOnWriteIterator may not and need not expect empty blocks.
+        return;
+    }
+
+    // All blocks are now pending snapshot
     m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
     m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
     assert(m_table.m_blocksNotPendingSnapshot.empty());

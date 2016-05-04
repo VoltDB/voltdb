@@ -30,6 +30,15 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_currentBlock(NULL),
         m_skippedDirtyRows(0),
         m_skippedInactiveRows(0) {
+
+    if ((m_blocks.size() == 1) && m_blockIterator.data()->isEmpty()) {
+        // Empty persistent table - no tuples in table and table only
+        // has empty tuple storage block associated with it. So no need
+        // to set it up for snapshot
+        m_blockIterator = m_end;
+        return;
+    }
+
     //Prime the pump
     if (m_blockIterator != m_end) {
         m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
@@ -48,6 +57,10 @@ CopyOnWriteIterator::CopyOnWriteIterator(
  * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
  */
 bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
+    if (m_currentBlock == NULL) {
+        return false;
+    }
+
     /**
      * Find out which block the address is contained in. Lower bound returns the first entry
      * in the index >= the address. Unless the address happens to be equal then the block
