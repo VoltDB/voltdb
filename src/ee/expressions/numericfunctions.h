@@ -20,6 +20,9 @@
 
 namespace voltdb {
 
+static const TTInt CONST_ONE("1");
+static const TTInt CONST_FIVE("5");
+
 /** implement the SQL ABS (absolute value) function for all numeric types */
 template<> inline NValue NValue::callUnary<FUNC_ABS>() const {
     if (isNull()) {
@@ -193,6 +196,19 @@ template<> inline NValue NValue::callUnary<FUNC_LN>() const {
     return retval;
 }
 
+/** implement the SQL LOG10 function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_LOG10>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::log10(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function LOG10");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
 
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
@@ -242,27 +258,33 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-numeric type for SQL MOD function");
     }
 
-    bool areAllIntegralType = isIntegralType(baseType) && isIntegralType(divisorType);
+    bool areAllIntegralType = (isIntegralType(baseType) && isIntegralType(divisorType))
+        || (baseType == VALUE_TYPE_DECIMAL && divisorType == VALUE_TYPE_DECIMAL);
 
     if (! areAllIntegralType) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-integral type for SQL MOD function");
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-integral or non-decimal type for SQL MOD function");
     }
+
     if (base.isNull() || divisor.isNull()) {
         return getNullValue(VALUE_TYPE_BIGINT);
-    } else if (divisor.castAsBigIntAndGetValue() == 0) {
+    } else if (divisor.castAsDoubleAndGetValue() == 0) {
         throw SQLException(SQLException::data_exception_division_by_zero, "division by zero");
     }
 
-    NValue retval(divisorType);
-    int64_t baseValue = base.castAsBigIntAndGetValue();
-    int64_t divisorValue = divisor.castAsBigIntAndGetValue();
+    if(isIntegralType(baseType)){
+        int64_t baseValue = base.castAsBigIntAndGetValue();
+        int64_t divisorValue = divisor.castAsBigIntAndGetValue();
 
-    int64_t result = std::abs(baseValue) % std::abs(divisorValue);
-    if (baseValue < 0) {
-        result *= -1;
+        int64_t result = std::abs(baseValue) % std::abs(divisorValue);
+        if (baseValue < 0) {
+            result *= -1;
+        }
+
+        return getBigIntValue(result);
+    } else {
+        TTInt result_decimal = base.castAsDecimalAndGetValue() % divisor.castAsDecimalAndGetValue();
+        return NValue::getDecimalValue(result_decimal);
     }
-
-    return getBigIntValue(result);
 }
 
 /*
@@ -270,6 +292,86 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
  */
 template<> inline NValue NValue::callConstant<FUNC_PI>() {
     return getDoubleValue(boost::math::constants::pi<double>());
+}
+
+/** implement the Volt SQL round function for decimal values */
+template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue &arg1 = arguments[0];
+    if (arg1.isNull()) {
+        return getNullStringValue();
+    }
+    const ValueType type = arg1.getValueType();
+    //only double and decimal is allowed 
+
+    if (type != VALUE_TYPE_DECIMAL && type != VALUE_TYPE_DOUBLE) {
+        throwCastSQLException (type, VALUE_TYPE_DECIMAL);
+    }
+
+    std::ostringstream out;
+
+    TTInt scaledValue;
+    if(type == VALUE_TYPE_DOUBLE) {
+        scaledValue = arg1.castAsDecimal().castAsDecimalAndGetValue();
+    } else {
+        scaledValue = arg1.castAsDecimalAndGetValue();
+    }
+
+    if (scaledValue.IsSign()) {
+        out << '-';
+        scaledValue.ChangeSign();
+    }
+
+    // rounding
+    const NValue &arg2 = arguments[1];
+    int32_t places = arg2.castAsIntegerAndGetValue();
+    if (places >= 12 || places <= -26) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+            "the second parameter should be < 12 and > -26");
+    }
+
+    TTInt ten(10);
+    if (places <= 0) {
+        ten.Pow(-places);
+    }
+    else {
+        ten.Pow(places);
+    }
+    TTInt denominator = (places <= 0) ? (TTInt(kMaxScaleFactor) * ten):
+                                        (TTInt(kMaxScaleFactor) / ten);
+    TTInt fractional(scaledValue);
+    fractional %= denominator;
+    TTInt barrier = CONST_FIVE * (denominator / 10);
+
+    if (fractional > barrier) {
+        scaledValue += denominator;
+    }
+    
+    if (fractional == barrier) {
+        TTInt prev = scaledValue / denominator;
+        if (prev % 2 == CONST_ONE) {
+            scaledValue += denominator;
+        }
+    }
+   
+    if (places <= 0) {
+        scaledValue -= fractional;
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        out << std::fixed << whole;
+    }
+    else {
+        int64_t whole = narrowDecimalToBigInt(scaledValue);
+        int64_t fraction = getFractionalPart(scaledValue);
+        // here denominator is guarateed to be able to converted to int64_t
+        fraction /= denominator.ToInt();
+        out << std::fixed << whole;
+        // fractional part does not need groups
+        out << '.' << std::setfill('0') << std::setw(places) << fraction;
+    }
+    // TODO: Although there should be only one copy of newloc (and money_numpunct),
+    // we still need to test and make sure no memory leakage in this piece of code.
+    std::string rv = out.str();
+    return getDecimalValueFromString(rv);
 }
 
 
