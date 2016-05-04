@@ -243,7 +243,7 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
  * defined it's likely to be implementation defined in the same way.
  *
  * FYI, Fortran semantics: https://gcc.gnu.org/onlinedocs/gfortran/MOD.html
- * It has the same semantics with C99 as: (a / b) * b + MOD(a,b)  == a
+ * It has the same semantics with C99 as: int(a / b) * b + MOD(a,b)  == a
  */
 template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -302,7 +302,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
         return getNullStringValue();
     }
     const ValueType type = arg1.getValueType();
-    //only double and decimal is allowed 
+    //only double and decimal is allowed
 
     if (type != VALUE_TYPE_DECIMAL && type != VALUE_TYPE_DOUBLE) {
         throwCastSQLException (type, VALUE_TYPE_DECIMAL);
@@ -346,14 +346,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_ROUND>(const std::vector<NValue>
     if (fractional > barrier) {
         scaledValue += denominator;
     }
-    
+
     if (fractional == barrier) {
         TTInt prev = scaledValue / denominator;
         if (prev % 2 == CONST_ONE) {
             scaledValue += denominator;
         }
     }
-   
+
     if (places <= 0) {
         scaledValue -= fractional;
         int64_t whole = narrowDecimalToBigInt(scaledValue);

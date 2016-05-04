@@ -496,7 +496,7 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_ROUND:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ROUND>(*arguments);
-            break;    
+            break;
         case FUNC_VOLT_REGEXP_POSITION:
             ret = new GeneralFunctionExpression<FUNC_VOLT_REGEXP_POSITION>(*arguments);
             break;

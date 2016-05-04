@@ -653,13 +653,13 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
 /** implement the Volt SQL STR function for decimal values */
 template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
     if (isNull()) {
-       return getNullValue();  
+       return getNullValue();
     }
 
     if (getValueType() != VALUE_TYPE_DECIMAL && getValueType() != VALUE_TYPE_DOUBLE) {
         throwCastSQLException (getValueType(), VALUE_TYPE_DECIMAL);
     }
-    
+
     std::ostringstream out;
     TTInt scaledValue;
     if(getValueType() == VALUE_TYPE_DOUBLE)
@@ -693,7 +693,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
     if (fractional > barrier) {
         scaledValue += denominator;
     }
-    
+
     if (fractional == barrier) {
         TTInt prev = scaledValue / denominator;
         if (prev % 2 == CONST_ONE) {
@@ -719,7 +719,7 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
     // TODO: Although there should be only one copy of newloc (and money_numpunct),
     // we still need to test and make sure no memory leakage in this piece of code.
     std::string rv = out.str();
-    
+
     //default number length 10
     int32_t numberLength = 10;
 
@@ -762,7 +762,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_STR>(const std::vector<NValue>& 
         out << '-';
         scaledValue.ChangeSign();
     }
-   
+
     //default scale 0
     int32_t scaleLength = 0;
     if( arguments.size() == 3 ){

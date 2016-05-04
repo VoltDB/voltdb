@@ -1782,7 +1782,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // rounding to none-positive places, or say the whole part
         str = result.getString(4);
         assertEquals(str, "123457");      // rounding up
- 
+
         cr = client.callProcedure("@AdHoc", "select STR(DEC,15, 1), STR(DEC, 10, 2),"
                 + "STR(DEC,10), STR(DEC) from D1 where id = 2");
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
@@ -1797,8 +1797,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         str = result.getString(2);
         assertEquals(str, "1123456786");
         str = result.getString(3);
-        assertEquals(str, "1123456786"); 
- 
+        assertEquals(str, "1123456786");
+
         // it will go out of the range of int64_t
         try {
             cr = client.callProcedure("@AdHoc", "select STR(DEC, -19) from D1 where id = 12");
