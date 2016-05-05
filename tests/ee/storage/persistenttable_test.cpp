@@ -287,18 +287,23 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     engine->loadCatalog(0, catalogPayload());
     PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
+    ASSERT_EQ(1, table->allocatedBlockCount());
 
+    beginWork();
     const int tuplesToInsert = 10;
     (void) tuplesToInsert;  // to make compiler happy
-    ASSERT_EQ(1, table->allocatedBlockCount());
     assert(tableutil::addRandomTuples(table, tuplesToInsert));
-    size_t blockCount = table->allocatedBlockCount();
+    commit();
 
+    size_t blockCount = table->allocatedBlockCount();
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(blockCount, table->allocatedBlockCount());
+
+    beginWork();
     assert(tableutil::addRandomTuples(table, tuplesToInsert));
     table->truncateTable(engine);
+    commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
