@@ -102,7 +102,6 @@ public class TestCSVFormatterSuite extends RegressionSuite {
 
         protected void close() {
             try {
-                m_sout.flush();
                 m_sout.close();
             } catch (IOException ex) {
             }

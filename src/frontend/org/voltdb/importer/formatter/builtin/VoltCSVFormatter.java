@@ -17,7 +17,7 @@
 
 package org.voltdb.importer.formatter.builtin;
 
-import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.List;
 import java.util.Properties;
@@ -101,12 +101,11 @@ public class VoltCSVFormatter implements Formatter<String> {
             m_nowhitespace = Boolean.parseBoolean(ignoreWhiteSpaceProp);
         }
 
+        CsvPreference.Builder builder = new CsvPreference.Builder(quotechar, m_separator, "\n");
         if (m_surroundingSpacesNeedQuotes) {
-            m_csvPreference = new CsvPreference.Builder(quotechar, m_separator, "\n").surroundingSpacesNeedQuotes(true)
-                    .build();
-        } else {
-            m_csvPreference = new CsvPreference.Builder(quotechar, m_separator, "\n").build();
+            builder.surroundingSpacesNeedQuotes(true);
         }
+        m_csvPreference = builder.build();
     }
 
     @Override
@@ -116,22 +115,22 @@ public class VoltCSVFormatter implements Formatter<String> {
             return null;
         }
 
-        Tokenizer tokenizer = new Tokenizer(new BufferedReader(new StringReader(sourceData)), m_csvPreference,
-                m_strictquotes, m_escape, DEFAULT_COLUMN_LIMIT_SIZE, 0);
+        Tokenizer tokenizer = new Tokenizer(new StringReader(sourceData), m_csvPreference, m_strictquotes, m_escape,
+                DEFAULT_COLUMN_LIMIT_SIZE, 0);
 
         CsvListReader csvReader = new CsvListReader(tokenizer, m_csvPreference);
 
         List<String> dataList;
         try {
             dataList = csvReader.read();
-        } catch (Exception e) {
-            throw new FormatException(e.getMessage());
+        } catch (IOException e) {
+            throw new FormatException("Fail to parse csv data", e);
         } finally {
             try {
                 if (csvReader != null)
                     csvReader.close();
-            } catch (Exception e) {
-                throw new FormatException(e.getMessage());
+            } catch (IOException e) {
+                throw new FormatException(e);
             }
         }
         String[] data = dataList.toArray(new String[0]);
@@ -159,8 +158,8 @@ public class VoltCSVFormatter implements Formatter<String> {
                     if (m_customNullString.equals(lineValues[i])) {
                         lineValues[i] = null;
                     }
-                } else if (lineValues[i].equals("NULL") || lineValues[i].equals(CSV_NULL)
-                        || lineValues[i].equals(QUOTED_CSV_NULL)) {
+                } else if ("NULL".equals(lineValues[i]) || CSV_NULL.equalsIgnoreCase(lineValues[i])
+                        || QUOTED_CSV_NULL.equals(lineValues[i])) {
                     lineValues[i] = null;
                 }
             }

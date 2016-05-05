@@ -64,12 +64,21 @@ public class TestVoltCSVFormatter extends TestCase {
 
     @Before
     public void setUp() throws Exception {
-        List<String> packages = ImmutableList.<String> builder().add("org.voltcore.network").add("org.voltcore.logging")
-                .add("org.voltdb.importer").add("org.voltdb.importer.formatter").add("org.apache.log4j")
-                .add("org.voltdb.client").add("org.slf4j").add("org.voltcore.utils")
-                .add("com.google_voltpatches.common.base").add("com.google_voltpatches.common.collect")
-                .add("com.google_voltpatches.common.net").add("com.google_voltpatches.common.io")
-                .add("com.google_voltpatches.common.util.concurrent").build();
+        List<String> packages = ImmutableList.<String> builder()
+                .add("org.voltcore.network")
+                .add("org.voltcore.logging")
+                .add("org.voltdb.importer")
+                .add("org.voltdb.importer.formatter")
+                .add("org.apache.log4j")
+                .add("org.voltdb.client")
+                .add("org.slf4j")
+                .add("org.voltcore.utils")
+                .add("com.google_voltpatches.common.base")
+                .add("com.google_voltpatches.common.collect")
+                .add("com.google_voltpatches.common.net")
+                .add("com.google_voltpatches.common.io")
+                .add("com.google_voltpatches.common.util.concurrent")
+                .build();
         String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
         //Create a directory in temp + username
         File f = new File(tmpFilePath, System.getProperty("user.name"));
