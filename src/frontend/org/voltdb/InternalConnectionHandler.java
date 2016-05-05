@@ -198,7 +198,7 @@ public class InternalConnectionHandler {
         int prev = m_backpressureIndication.get();
         int delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
         int next = prev + delta;
-        while (next >= 0 && next <= 7 && !m_backpressureIndication.compareAndSet(prev, next)) {
+        while (next >= 0 && next <= 8 && !m_backpressureIndication.compareAndSet(prev, next)) {
             prev = m_backpressureIndication.get();
             delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
             next = prev + delta;
@@ -210,8 +210,8 @@ public class InternalConnectionHandler {
         final int count = m_backpressureIndication.get();
         if (count > 0) {
             try { // increase sleep time exponentially to a max of 128ms
-                if (count > 7) {
-                    Thread.sleep(128);
+                if (count > 8) {
+                    Thread.sleep(256);
                 } else {
                     Thread.sleep(1<<count);
                 }
