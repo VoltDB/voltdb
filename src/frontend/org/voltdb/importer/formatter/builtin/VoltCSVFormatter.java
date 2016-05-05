@@ -22,6 +22,7 @@ import java.io.StringReader;
 import java.util.List;
 import java.util.Properties;
 
+import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.CsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
@@ -123,7 +124,7 @@ public class VoltCSVFormatter implements Formatter<String> {
         List<String> dataList;
         try {
             dataList = csvReader.read();
-        } catch (IOException e) {
+        } catch (IOException | SuperCsvException e) {
             throw new FormatException("Fail to parse csv data", e);
         } finally {
             try {
