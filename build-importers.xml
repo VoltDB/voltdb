@@ -108,8 +108,8 @@
                 <attribute name="Bundle-SymbolicName" value="VoltCSVFormatter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
-           </manifest>
-       </jar>
+            </manifest>
+        </jar>
     </target>
 
 </project>
