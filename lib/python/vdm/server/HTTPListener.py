@@ -43,7 +43,6 @@ from flask_logging import Filter
 import Configuration
 import signal
 import thread
-from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -1027,7 +1026,7 @@ class DeploymentUserAPI(MethodView):
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-        user_roles = ','.join(Set(request.json['roles'].split(',')))
+        user_roles = ','.join(set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
@@ -1073,7 +1072,7 @@ class DeploymentUserAPI(MethodView):
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-        user_roles = ','.join(Set(request.json.get('roles', current_user['roles']).split(',')))
+        user_roles = ','.join(set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
