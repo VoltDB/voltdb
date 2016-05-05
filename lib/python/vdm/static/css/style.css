@@ -1356,12 +1356,15 @@ input.drop-down-input {
 .stalledState > .modal-dialog > .modal-content > .modal-header h4.modal-title {
 	text-align: left;
 }
-.stalledState > .modal-dialog > .modal-content > .modal-header h4 span, .stalledFail > .modal-dialog > .modal-content > .modal-header h4 span {
+.stalledState > .modal-dialog > .modal-content > .modal-header h4 span, .stalledFail > .modal-dialog > .modal-content > .modal-header h4 span, .startFail > .modal-dialog > .modal-content > .modal-header h4 span, .connectionFail > .modal-dialog > .modal-content > .modal-header h4 span
+
+ {
 	padding-right: 10px;
 	font-size: 25px;
 	position: relative;
 	top: 7px;
 }
+
 .containerStalled {
 	margin: 0 0 0 20px
 }
