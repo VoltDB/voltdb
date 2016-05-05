@@ -66,6 +66,16 @@ public abstract class CatalogSchemaTools {
     // Make sure it's false before committing.
     final static boolean dumpSchema = false;
 
+    // To support inline batch statements and associated comments.
+    private static final String batchSpecificComments =
+            "-- This file uses the --inlinebatch feature. Batching processes all of the DDL in a single step\n" +
+                    "-- dramatically reducing the time required to apply the schema compared to processing each\n" +
+                    "-- command separately.\n" +
+                    "--\n";
+
+    private static final String startBatch = "file -inlinebatch END_OF_BATCH\n";
+    private static final String endBatch = "END_OF_BATCH\n";
+
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
      * constraints, and foreign key references.
@@ -76,17 +86,13 @@ public abstract class CatalogSchemaTools {
      * SQL DDL needs to be generated, so instead, we opt to build the CREATE TABLE DDL
      * separately as we go here, and then fill it in to the StringBuilder being used
      * to construct the full canonical DDL at the appropriate time.
-     * @param sb
+     * @param sb - the schema being built
      * @param catalog_tbl - object to be analyzed
      * @param viewQuery - the Query if this Table is a View
      * @param isExportTableWithTarget - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
     public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, String isExportTableWithTarget) {
-        return toSchema(new StringBuilder[] {sb}, catalog_tbl, viewQuery, isExportTableWithTarget);
-    }
-
-    private static String toSchema(StringBuilder[] sb, Table catalog_tbl, String viewQuery, String isExportTableWithTarget) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -317,11 +323,11 @@ public abstract class CatalogSchemaTools {
 
         // We've built the full CREATE TABLE statement for this table,
         // Append the generated table schema to the canonical DDL StringBuilder
-        append(sb, table_sb.toString());
+        sb.append(table_sb.toString());
 
         // Partition Table for regular tables (non-streams)
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && isExportTableWithTarget == null) {
-            append(sb, "PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
+            sb.append("PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
                     catalog_tbl.getPartitioncolumn().getTypeName() + ";\n" );
         }
 
@@ -331,18 +337,18 @@ public abstract class CatalogSchemaTools {
 
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
-                    append(sb, "CREATE ASSUMEUNIQUE INDEX ");
+                    sb.append("CREATE ASSUMEUNIQUE INDEX ");
                 }
                 else {
-                    append(sb, "CREATE UNIQUE INDEX ");
+                    sb.append("CREATE UNIQUE INDEX ");
                 }
             }
             else {
-                append(sb, "CREATE INDEX ");
+                sb.append("CREATE INDEX ");
             }
 
 
-            append(sb, catalog_idx.getTypeName() +
+            sb.append(catalog_idx.getTypeName() +
                    " ON " + catalog_tbl.getTypeName() + " (");
             add = "";
 
@@ -350,7 +356,7 @@ public abstract class CatalogSchemaTools {
 
             if (jsonstring.isEmpty()) {
                 for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                    append(sb, add + catalog_colref.getColumn().getTypeName() );
+                    sb.append(add + catalog_colref.getColumn().getTypeName() );
                     add = ", ";
                 }
             } else {
@@ -363,31 +369,31 @@ public abstract class CatalogSchemaTools {
                     e.printStackTrace();
                 }
                 for (AbstractExpression expr : indexedExprs) {
-                    append(sb, add + expr.explain(catalog_tbl.getTypeName()) );
+                    sb.append(add + expr.explain(catalog_tbl.getTypeName()) );
                     add = ", ";
                 }
             }
-            append(sb, ")");
+            sb.append(")");
 
             String jsonPredicate = catalog_idx.getPredicatejson();
             if (!jsonPredicate.isEmpty()) {
                 try {
                     AbstractExpression predicate = AbstractExpression.fromJSONString(jsonPredicate,
                         new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
-                    append(sb, " WHERE " + predicate.explain(catalog_tbl.getTypeName()));
+                    sb.append(" WHERE " + predicate.explain(catalog_tbl.getTypeName()));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
             }
-            append(sb, ";\n");
+            sb.append(";\n");
         }
 
         if (catalog_tbl.getIsdred()) {
-            append(sb, "DR TABLE " + catalog_tbl.getTypeName() + ";\n");
+            sb.append("DR TABLE " + catalog_tbl.getTypeName() + ";\n");
         }
 
-        append(sb, "\n");
+        sb.append("\n");
         // Canonical DDL generation for this table is done, now just hand the CREATE TABLE
         // statement to whoever might be interested (DDLCompiler, I'm looking in your direction)
         return table_sb.toString();
@@ -395,34 +401,32 @@ public abstract class CatalogSchemaTools {
 
     /**
      * Convert a Group (Role) into a DDL string.
-     * @param sb
-     * @param grp
+     * sb The ddl
+     * @param grp The group
      */
-    private static void toSchema(StringBuilder[] sb, Group grp) {
+    public static void toSchema(StringBuilder sb, Group grp) {
         // Don't output the default roles because user cannot change them.
         if (grp.getTypeName().equalsIgnoreCase("ADMINISTRATOR") || grp.getTypeName().equalsIgnoreCase("USER")) {
             return;
         }
 
         final EnumSet<Permission> permissions = Permission.getPermissionSetForGroup(grp);
-        append(sb, "CREATE ROLE ");
-        append(sb, grp.getTypeName());
+        sb.append("CREATE ROLE ").append(grp.getTypeName());
 
         String delimiter = " WITH ";
         for (Permission permission : permissions) {
-            append(sb, delimiter);
-            append(sb, permission.name());
+            sb.append(delimiter).append(permission.name());
             delimiter = ", ";
         }
 
-        append(sb, ";\n");
+        sb.append(";\n");
     }
 
     /**
      * Convert a Catalog Procedure into a DDL string.
      * @param proc
      */
-    private static void toSchema(StringBuilder[] sb, Procedure proc)
+    public static void toSchema(StringBuilder sb, Procedure proc)
     {
         // Groovy: hasJava (true), m_language ("GROOVY"), m_defaultproc (false)
         // CRUD: hasJava (false), m_language (""), m_defaultproc (true)
@@ -469,7 +473,7 @@ public abstract class CatalogSchemaTools {
         // Build the appropriate CREATE PROCEDURE statement variant.
         if (!proc.getHasjava()) {
             // SQL Statement procedure
-            append(sb, String.format(
+            sb.append(String.format(
                     "CREATE PROCEDURE %s%s%s\n%sAS\n%s%s",
                     proc.getClassname(),
                     allowClause,
@@ -480,7 +484,7 @@ public abstract class CatalogSchemaTools {
         }
         else if (proc.getLanguage().equals("JAVA")) {
             // Java Class
-            append(sb, String.format(
+            sb.append(String.format(
                     "CREATE PROCEDURE %s%s\n%sFROM CLASS %s",
                     allowClause,
                     partitionClause.toString(),
@@ -489,7 +493,7 @@ public abstract class CatalogSchemaTools {
         }
         else {
             // Groovy procedure
-            append(sb, String.format(
+            sb.append(String.format(
                     "CREATE PROCEDURE %s%s%s\n%sAS ###%s### LANGUAGE GROOVY",
                     proc.getClassname(),
                     allowClause,
@@ -500,89 +504,70 @@ public abstract class CatalogSchemaTools {
 
         // The SQL statement variant may have terminated the CREATE PROCEDURE statement.
         if (!sb.toString().endsWith(";")) {
-            append(sb, ";");
+            sb.append(";");
         }
 
         // Give me some space man.
-        append(sb, "\n\n");
+        sb.append("\n\n");
     }
 
     /**
      * Convert a List of class names into a string containing equivalent IMPORT CLASS DDL statements.
-     * @param sbs Adds import lines to these schemas.
+     * @param sb The ddl being built.
      * @param importLines The import lines to add.
      */
-    private static void toSchema(StringBuilder[] sbs, String[] importLines)
+    public static void toSchema(StringBuilder sb, String[] importLines)
     {
-        for (StringBuilder sb : sbs) {
-            for (String importLine : importLines) {
-                sb.append(importLine);
-            }
-        }
-    }
-
-    private static void append(StringBuilder[] sbs, String line) {
-        for (StringBuilder sb : sbs) {
-            sb.append(line);
+        for (String importLine : importLines) {
+            sb.append(importLine);
         }
     }
 
     /**
      * Convert a catalog into a string containing all DDL statements.
+     * @param catalog
      * @param importLines
      * @return String of DDL statements.
      */
-    public static String[] toSchema(Catalog catalog, String[] importLines)
+    public static String toSchema(Catalog catalog, String[] importLines)
     {
-        StringBuilder[] schemas = new StringBuilder[2];
-        StringBuilder schema = new StringBuilder();
-        // a second schema which includes batch statements.
-        StringBuilder schemaWithBatches;
+        StringBuilder sb = new StringBuilder();
 
-        schema.append("-- This file was generated by VoltDB version ");
-        schema.append(VoltDB.instance().getVersionString());
+        sb.append("-- This file was generated by VoltDB version ");
+        sb.append(VoltDB.instance().getVersionString());
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
         String time = sdf.format(System.currentTimeMillis());
-        schema.append(" on: " + time + ".\n");
+        sb.append(" on: " + time + ".\n");
 
-        schema.append("-- This file represents the current database schema.\n");
-        schema.append("-- Use this file as input to reproduce the current database structure in another database instance.\n");
-        schema.append("--\n");
+        sb.append("-- This file represents the current database schema.\n");
+        sb.append("-- Use this file as input to reproduce the current database structure in another database instance.\n");
+        sb.append("--\n");
 
-        // the two schemas being built will be the same to this point, initialize schemaWithBatches from schema.
-        schemaWithBatches = new StringBuilder(schema);
-        schemas[0] = schema;
-        schemas[1] = schemaWithBatches;
+        sb.append(batchSpecificComments);
 
-        // comments about inline batch are applicable only to schemaWithBatches.
-        schemaWithBatches.append("-- This file uses the --inlinebatch feature. Batching processes all of the DDL in a single step\n");
-        schemaWithBatches.append("-- dramatically reducing the time required to apply the schema compared to processing each\n");
-        schemaWithBatches.append("-- command separately.\n");
-        schemaWithBatches.append("--\n");
-
-        append(schemas, "-- If the schema declares Java stored procedures, be sure to load the .jar file\n");
-        append(schemas, "-- with the classes before loading the schema. For example:\n");
-        append(schemas, "--\n");
-        append(schemas, "-- LOAD CLASSES voltdb-procs.jar;\n");
-        append(schemas, "-- FILE ddl.sql;\n");
+        sb.append("-- If the schema declares Java stored procedures, be sure to load the .jar file\n");
+        sb.append("-- with the classes before loading the schema. For example:\n");
+        sb.append("--\n");
+        sb.append("-- LOAD CLASSES voltdb-procs.jar;\n");
+        sb.append("-- FILE ddl.sql;\n");
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
                 if (db.getIsactiveactivedred()) {
-                    append(schemas, String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
+                    sb.append(String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
                 }
-                toSchema(schemas, importLines);
+                toSchema(sb, importLines);
 
                 for (Group grp : db.getGroups()) {
-                    toSchema(schemas, grp);
+                    toSchema(sb, grp);
                 }
-                append(schemas, "\n");
+                sb.append("\n");
 
                 List<Table> viewList = new ArrayList<Table>();
 
                 CatalogMap<Table> tables = db.getTables();
                 if (! tables.isEmpty()) {
-                    schemaWithBatches.append("file -inlinebatch END_OF_BATCH\n");
+                    sb.append(startBatch);
                     for (Table table : db.getTables()) {
                         Object annotation = table.getAnnotation();
                         if (annotation != null && ((TableAnnotation) annotation).ddl != null
@@ -590,23 +575,23 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(schemas, table, null, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, null, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {
                         String viewQuery = ((TableAnnotation) table.getAnnotation()).ddl;
-                        toSchema(schemas, table, viewQuery, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, viewQuery, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                 }
 
                 CatalogMap<Procedure> procedures = db.getProcedures();
                 if (! procedures.isEmpty()) {
                     for (Procedure proc : db.getProcedures()) {
-                        toSchema(schemas, proc);
+                        toSchema(sb, proc);
                     }
                 }
                 if (! tables.isEmpty()) {
-                    schemaWithBatches.append("END_OF_BATCH\n");
+                    sb.append(endBatch);
                 }
             }
         }
@@ -616,18 +601,36 @@ public abstract class CatalogSchemaTools {
             File f = new File(String.format("/tmp/canonical-%s.sql", ts));
             try {
                 FileWriter fw = new FileWriter(f);
-                fw.write(schema.toString());
+                fw.write(sb.toString());
                 fw.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
-        String[] schemasAsStrings = new String[schemas.length];
-        for (int i = 0; i < schemas.length; i++) {
-            schemasAsStrings[i] = schemas[i].toString();
+        return sb.toString();
+    }
+
+    /**
+     * Given a schema, strips out inline batch statements and associated comments.
+     * @param schema The given schema
+     * @return The given schema without batch statements and comments.
+     */
+    public static String toSchemaWithoutInlineBatches(String schema) {
+        StringBuilder sb = new StringBuilder(schema);
+        int i = sb.indexOf(batchSpecificComments);
+        if (i != -1) {
+            sb.delete(i, i + batchSpecificComments.length());
         }
-        return schemasAsStrings;
+        i = sb.indexOf(startBatch);
+        if (i != -1) {
+            sb.delete(i, i + startBatch.length());
+        }
+        i = sb.indexOf(endBatch);
+        if (i != -1) {
+            sb.delete(i, i + endBatch.length());
+        }
+        return sb.toString();
     }
 
 }

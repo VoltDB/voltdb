@@ -666,9 +666,8 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        String[] ddls = CatalogSchemaTools.toSchema(catalog, m_importLines);
-        m_canonicalDDL = ddls[0];
-        String ddlWithBatchSupport = ddls[1];
+        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
         try {
