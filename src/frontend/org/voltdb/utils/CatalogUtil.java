@@ -1176,12 +1176,6 @@ public abstract class CatalogUtil {
             }
         }
 
-        // override default row length limit for KinesisFirehoseExport
-        if (exportClientClassName.contains("KinesisFirehoseExport")) {
-            processorProperties.setProperty(ROW_LENGTH_LIMIT,
-                    processorProperties.getProperty(ROW_LENGTH_LIMIT,"1_000_000"));
-        }
-
         if (!exportConfiguration.isEnabled()) {
             return processorProperties;
         }
