@@ -670,7 +670,7 @@ public abstract class NonVoltDBBackend {
 
             VoltType type = VoltType.get(paramJavaTypes[i]);
 
-            if (VoltType.isNullVoltType(paramObjs[i])) {
+            if (VoltType.isVoltNullValue(paramObjs[i])) {
                 sqlOut.append("NULL");
             }
             else if (paramObjs[i] instanceof TimestampType) {

@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -200,8 +201,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                    int size,
                    boolean nullable,
                    boolean unique,
-                   String defaultValue)
-        {
+                   String defaultValue) {
             this.name = name;
             this.type = type;
             this.size = size;
@@ -232,7 +232,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         public ColumnInfo clone() {
             try {
                 return (ColumnInfo) super.clone();
-            } catch (CloneNotSupportedException e) {
+            }
+            catch (CloneNotSupportedException e) {
                 assert(false);
                 throw new RuntimeException(e);
             }
@@ -269,11 +270,21 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             }
             VoltTable.ColumnInfo other = (VoltTable.ColumnInfo) obj;
 
-            if (nullable != other.nullable) return false;
-            if (unique != other.unique) return false;
-            if (defaultValue != other.defaultValue) return false;
-            if (size != other.size) return false;
-            if (type != other.type) return false;
+            if (nullable != other.nullable) {
+                return false;
+            }
+            if (unique != other.unique) {
+                return false;
+            }
+            if (defaultValue != other.defaultValue) {
+                return false;
+            }
+            if (size != other.size) {
+                return false;
+            }
+            if (type != other.type) {
+                return false;
+            }
             return name.equals(other.name);
         }
     }
@@ -297,8 +308,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         ExtraMetadata(String name,
                       int partitionColIndex,
                       int[] pkeyIndexes,
-                      ColumnInfo... originalColumnInfos)
-        {
+                      ColumnInfo... originalColumnInfos) {
             this.name = name;
             this.partitionColIndex = partitionColIndex;
             this.pkeyIndexes = pkeyIndexes.clone();
@@ -752,10 +762,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             maxColSize = m_extraMetadata.originalColumnInfos[col].size;
         }
 
-        if (VoltType.isNullVoltType(value))
-        {
+        if (VoltType.isVoltNullValue(value)) {
             // schema checking code that is used for some tests
-            // alllowNulls should always be true in production
+            // allowNulls should always be true in production
             if (allowNulls == false) {
                 throw new IllegalArgumentException(
                         String.format("Column %s at index %d doesn't allow NULL values.",
@@ -818,8 +827,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         throw new ClassCastException();
                     }
                     final Number n1 = (Number) value;
-                    if (columnType.wouldCastOverflow(n1))
-                    {
+                    if (columnType.wouldCastOverflow(n1)) {
                         throw new VoltTypeException("Cast of " +
                                 n1.doubleValue() +
                                 " to " +
@@ -833,8 +841,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         throw new ClassCastException();
                     }
                     final Number n2 = (Number) value;
-                    if (columnType.wouldCastOverflow(n2))
-                    {
+                    if (columnType.wouldCastOverflow(n2)) {
                         throw new VoltTypeException("Cast to " +
                                 columnType.toString() +
                                 " would overflow");
@@ -846,8 +853,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         throw new ClassCastException();
                     }
                     final Number n3 = (Number) value;
-                    if (columnType.wouldCastOverflow(n3))
-                    {
+                    if (columnType.wouldCastOverflow(n3)) {
                         throw new VoltTypeException("Cast to " +
                                 columnType.toString() +
                                 " would overflow");
@@ -859,8 +865,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         throw new ClassCastException();
                     }
                     final Number n4 = (Number) value;
-                    if (columnType.wouldCastOverflow(n4))
-                    {
+                    if (columnType.wouldCastOverflow(n4)) {
                         throw new VoltTypeException("Cast to " +
                                 columnType.toString() +
                                 " would overflow");
@@ -873,8 +878,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         throw new ClassCastException();
                     }
                     final Number n5 = (Number) value;
-                    if (columnType.wouldCastOverflow(n5))
-                    {
+                    if (columnType.wouldCastOverflow(n5)) {
                         throw new VoltTypeException("Cast to " +
                                 columnType.toString() +
                                 " would overflow");
@@ -945,7 +949,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     if (value instanceof java.util.Date ||
                             value instanceof TimestampType) {
                          micros = ParameterSet.timestampToMicroseconds(value);
-                    } else {
+                    }
+                    else {
                         micros = ((Number) value).longValue();
                     }
                     m_buffer.putLong(micros);
@@ -1053,8 +1058,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
         }
-        catch (VoltTypeException vte)
-        {
+        catch (VoltTypeException vte) {
             // revert the row size advance and any other
             // buffer additions
             m_buffer.position(pos);
@@ -1145,8 +1149,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             m_rowCount++;
             m_buffer.putInt(m_rowStart, m_rowCount);
         }
-        catch (VoltTypeException vte)
-        {
+        catch (VoltTypeException vte) {
             // revert the row size advance and any other
             // buffer additions
             m_buffer.position(pos);
@@ -1299,7 +1302,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     if (r.wasNull()) {
                         buffer.append("NULL");
                         assert (tstamp == null);
-                    } else {
+                    }
+                    else {
                         buffer.append(tstamp);
                     }
                     break;
@@ -1308,7 +1312,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     if (r.wasNull()) {
                         buffer.append("NULL");
                         assert (string == null);
-                    } else {
+                    }
+                    else {
                         buffer.append(string);
                     }
                     break;
@@ -1317,8 +1322,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     if (r.wasNull()) {
                         buffer.append("NULL");
                         assert (bin == null);
-                    } else {
-                        buffer.append(VoltType.varbinaryToPrintableString(bin));
+                    }
+                    else {
+                        buffer.append(varbinaryToPrintableString(bin));
                     }
                     break;
                 case DECIMAL:
@@ -1326,7 +1332,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     if (r.wasNull()) {
                         buffer.append("NULL");
                         assert (bd == null);
-                    } else {
+                    }
+                    else {
                         buffer.append(bd.toString());
                     }
                     break;
@@ -1361,6 +1368,36 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
         assert(verifyTableInvariants());
         return buffer.toString();
+    }
+
+    /**
+     * Make a printable, short string for a varbinary.
+     * String includes a CRC and the contents of the varbinary in hex.
+     * Contents longer than 13 chars are truncated and elipsized.
+     * Yes, "elipsized" is totally a word.
+     *
+     * Example: "bin[crc:1298399436,value:0xABCDEF12345...]"
+     *
+     * @param bin The bytes to print out.
+     * @return A string representation that is printable and short.
+     */
+    public static String varbinaryToPrintableString(byte[] bin) {
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        StringBuilder sb = new StringBuilder();
+        sb.append("bin[crc:");
+        crc.update(bin);
+        sb.append(crc.getValue());
+        sb.append(",value:0x");
+        String hex = Encoder.hexEncode(bin);
+        if (hex.length() > 13) {
+            sb.append(hex.substring(0, 10));
+            sb.append("...");
+        }
+        else {
+            sb.append(hex);
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     /**
@@ -1653,7 +1690,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public boolean hasSameContents(VoltTable other) {
         assert(verifyTableInvariants());
-        if (this == other) return true;
+        if (this == other) {
+            return true;
+        }
 
         int mypos = m_buffer.position();
         int theirpos = other.m_buffer.position();
@@ -1676,12 +1715,15 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     @Deprecated
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof VoltTable)) return false;
+        if (!(o instanceof VoltTable)) {
+            return false;
+        }
         return hasSameContents((VoltTable) o);
     }
 
     /**
-     * Also overrides {@link java.lang.Object#hashCode()}  since we are overriding {@link java.lang.Object#equals(Object)}.
+     * Also overrides {@link java.lang.Object#hashCode()} since we are
+     * overriding {@link java.lang.Object#equals(Object)}.
      * Throws an {@link java.lang.UnsupportedOperationException}.
      *
      * @deprecated This only throws. Doesn't do anything.
@@ -1733,7 +1775,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             // this doesn't prove definitively that the string is UTF-8
             // but will find many cases...
             new String(strbytes, "UTF-8");
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             throw new RuntimeException(ex);
         }
         return true;
@@ -1891,8 +1934,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      *
      * @return An ordered array of {@link ColumnInfo} instances for each table column.
      */
-    public ColumnInfo[] getTableSchema()
-    {
+    public ColumnInfo[] getTableSchema() {
         ColumnInfo[] schema = new ColumnInfo[m_colCount];
         for (int i = 0; i < m_colCount; i++) {
             ColumnInfo col = new ColumnInfo(getColumnName(i), getColumnType(i));

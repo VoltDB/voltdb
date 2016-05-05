@@ -124,7 +124,8 @@ public class FunctionExpression extends AbstractExpression {
         if (value_type != param_type) {
             if (value_type == null) {
                 value_type = param_type;
-            } else if (value_type == VoltType.NUMERIC) {
+            }
+            else if (value_type == VoltType.NUMERIC) {
                 if (param_type != null) {
                     value_type = param_type;
                 }
@@ -141,7 +142,10 @@ public class FunctionExpression extends AbstractExpression {
         }
         if (value_type != null) {
             setValueType(value_type);
-            setValueSize(value_type.getMaxLengthInBytes());
+            if (value_type != VoltType.INVALID && value_type != VoltType.NUMERIC) {
+                int size = value_type.getMaxLengthInBytes();
+                setValueSize(size);
+            }
         }
     }
 

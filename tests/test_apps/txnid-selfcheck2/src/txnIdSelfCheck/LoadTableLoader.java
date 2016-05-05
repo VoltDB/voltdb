@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -303,7 +302,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     boolean success = false;
                     if (!m_isMP) {
                         Object rpartitionParam
-                                = TheHashinator.valueToBytes(m_table.fetchRow(0).get(
+                                = VoltType.valueToBytes(m_table.fetchRow(0).get(
                                                 m_partitionedColumnIndex, VoltType.BIGINT));
                         if (upsertHitMode != 0) {// for test upsert an existing row, insert it and then upsert same row again.
                             success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte) 0, m_table);
@@ -343,7 +342,7 @@ public class LoadTableLoader extends BenchmarkThread {
                         m_table.addRow(cidList.get(i), cidList.get(i) + timeList.get(i), timeList.get(i));
                         boolean success;
                         if (!m_isMP) {
-                            Object rpartitionParam = TheHashinator.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
+                            Object rpartitionParam = VoltType.valueToBytes(m_table.fetchRow(0).get(m_partitionedColumnIndex, VoltType.BIGINT));
                             success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, rpartitionParam, m_tableName, (byte )1, m_table);
                         } else {
                             success = client.callProcedure(new InsertCallback(upserHitLatch, p, shouldCopy), m_procName, m_tableName, (byte )1, m_table);

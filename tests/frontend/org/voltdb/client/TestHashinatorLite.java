@@ -27,8 +27,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.LegacyHashinator;
@@ -36,6 +34,8 @@ import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltType;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+
+import junit.framework.TestCase;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -59,15 +59,15 @@ public class TestHashinatorLite extends TestCase {
         configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
         h1 = new HashinatorLite(partitionCount);
         h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-        testExpectNonZeroHash(h1, h2, partitionCount);
+        tandemTestExpectNonZeroHash(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-        testExpectNonZeroHash(h1, h2, partitionCount);
+        tandemTestExpectNonZeroHash(h1, h2, partitionCount);
     }
 
-    private void testExpectNonZeroHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+    private void tandemTestExpectNonZeroHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
         long valueToHash = h1.getConfigurationType() == HashinatorLite.HashinatorLiteType.ELASTIC ? 39 : 2;
 
         int hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
@@ -92,57 +92,27 @@ public class TestHashinatorLite extends TestCase {
         configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
         h1 = new HashinatorLite(partitionCount);
         h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-        testSameLongHash1(h1, h2, partitionCount);
+        tandemTestSameLongHash1(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-        testSameLongHash1(h1, h2, partitionCount);
+        tandemTestSameLongHash1(h1, h2, partitionCount);
     }
 
-    private void testSameLongHash1(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
-        long valueToHash;
-        int hash1, hash2;
-
-        valueToHash = 0;
-        hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        if (hash1 != hash2) {
-            System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
+    private void tandemTestSameLongHash1(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+        for (long valueToHash : new long[] {0, 1, 2, 3}) {
+            byte type = VoltType.typeFromObject(valueToHash).getValue();
+            int hash1 = h1.getHashedPartitionForParameter(type, valueToHash);
+            int hash2 = h2.getHashedPartitionForParameter(type, valueToHash);
+            if (hash1 != hash2) {
+                System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n",
+                        valueToHash, partitionCount, hash1, hash2);
+            }
+            assertEquals(hash1, hash2);
+            assertTrue(hash1 < partitionCount);
+            assertTrue(hash1 >= 0);
         }
-        assertEquals(hash1, hash2);
-        assertTrue(hash1 < partitionCount);
-        assertTrue(hash1 >= 0);
-
-        valueToHash = 1;
-        hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        if (hash1 != hash2) {
-            System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
-        }
-        assertEquals(hash1, hash2);
-        assertTrue(hash1 < partitionCount);
-        assertTrue(hash1 >= 0);
-
-        valueToHash = 2;
-        hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        if (hash1 != hash2) {
-            System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
-        }
-        assertEquals(hash1, hash2);
-        assertTrue(hash1 < partitionCount);
-        assertTrue(hash1 >= 0);
-
-        valueToHash = 3;
-        hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-        if (hash1 != hash2) {
-            System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
-        }
-        assertEquals(hash1, hash2);
-        assertTrue(hash1 < partitionCount);
-        assertTrue(hash1 >= 0);
     }
 
     @Test
@@ -157,22 +127,23 @@ public class TestHashinatorLite extends TestCase {
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
             h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-            testSizeChanges(h1, h2, partitionCount);
+            tandemTestSizeChanges(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-            testSizeChanges(h1, h2, partitionCount);
+            tandemTestSizeChanges(h1, h2, partitionCount);
         }
     }
 
-    private void testSizeChanges(HashinatorLite h1, TheHashinator h2, int partitionCount) {
+    private void tandemTestSizeChanges(HashinatorLite h1, TheHashinator h2, int partitionCount) {
         int hash1, hash2;
 
         // use a short value hashed as a long type
         for (short valueToHash = -7; valueToHash <= 7; valueToHash++) {
-            hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-            hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
+            byte type = VoltType.typeFromObject(valueToHash).getValue();
+            hash1 = h1.getHashedPartitionForParameter(type, valueToHash);
+            hash2 = h2.getHashedPartitionForParameter(type, valueToHash);
             if (hash1 != hash2) {
                 System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
             }
@@ -183,8 +154,9 @@ public class TestHashinatorLite extends TestCase {
 
         // use a long value hashed as a short type
         for (long valueToHash = -7; valueToHash <= 7; valueToHash++) {
-            hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
-            hash2 = h2.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
+            byte type = VoltType.typeFromObject(valueToHash).getValue();
+            hash1 = h1.getHashedPartitionForParameter(type, valueToHash);
+            hash2 = h2.getHashedPartitionForParameter(type, valueToHash);
             if (hash1 != hash2) {
                 System.out.printf("Hash of %d with %d partitions => Lite: %d, Std: %d\n", valueToHash, partitionCount, hash1, hash2);
             }
@@ -208,16 +180,16 @@ public class TestHashinatorLite extends TestCase {
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
             h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-            testEdgeCases(h1, h2, partitionCount);
+            tandemTestEdgeCases(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-            testEdgeCases(h1, h2, partitionCount);
+            tandemTestEdgeCases(h1, h2, partitionCount);
         }
     }
 
-    private void testEdgeCases(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+    private void tandemTestEdgeCases(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
         //
         //  Run with 100k of random values and make sure C++ and Java hash to
         //  the same value.
@@ -251,16 +223,16 @@ public class TestHashinatorLite extends TestCase {
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
             h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-            testSameLongHash(h1, h2, partitionCount);
+            tandemTestSameLongHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-            testSameLongHash(h1, h2, partitionCount);
+            tandemTestSameLongHash(h1, h2, partitionCount);
         }
     }
 
-    private void testSameLongHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+    private void tandemTestSameLongHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
         //
         //  Run with 10k of random values and make sure C++ and Java hash to
         //  the same value.
@@ -293,16 +265,16 @@ public class TestHashinatorLite extends TestCase {
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
             h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-            testSameStringHash(h1, h2, partitionCount);
+            tandemTestSameStringHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-            testSameStringHash(h1, h2, partitionCount);
+            tandemTestSameStringHash(h1, h2, partitionCount);
         }
     }
 
-    private void testSameStringHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+    private void tandemTestSameStringHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
         String valueToHash = Long.toString(r.nextLong());
 
         int hash1 = h1.getHashedPartitionForParameter(VoltType.typeFromObject(valueToHash).getValue(), valueToHash);
@@ -333,15 +305,15 @@ public class TestHashinatorLite extends TestCase {
 
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
-            testNumberCoercionHash(h1, partitionCount);
+            tandemTestNumberCoercionHash(h1, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
-            testNumberCoercionHash(h1, partitionCount);
+            tandemTestNumberCoercionHash(h1, partitionCount);
         }
     }
 
-    private void testNumberCoercionHash(HashinatorLite h1, int partitionCount) throws Exception {
+    private void tandemTestNumberCoercionHash(HashinatorLite h1, int partitionCount) throws Exception {
         long longToHash = r.nextLong();
 
         String stringToHash = Long.toString(longToHash);
@@ -372,52 +344,27 @@ public class TestHashinatorLite extends TestCase {
         configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
         h1 = new HashinatorLite(partitionCount);
         h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-        testNulls(h1, h2, partitionCount);
+        tandemTestNulls(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
         h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-        testNulls(h1, h2, partitionCount);
+        tandemTestNulls(h1, h2, partitionCount);
     }
 
-    private void testNulls(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
-        int hash1, hash2;
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.TINYINT.getValue(), new Byte(VoltType.NULL_TINYINT));
-        hash2 = h2.getHashedPartitionForParameter(VoltType.TINYINT.getValue(), new Byte(VoltType.NULL_TINYINT));
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite " + hash1 + " Std " + hash2);
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.SMALLINT.getValue(), new Short(VoltType.NULL_SMALLINT));
-        hash2 = h2.getHashedPartitionForParameter(VoltType.SMALLINT.getValue(), new Short(VoltType.NULL_SMALLINT));
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite " + hash1 + " Std " + hash2);
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.INTEGER.getValue(), new Integer(VoltType.NULL_INTEGER));
-        hash2 = h2.getHashedPartitionForParameter(VoltType.INTEGER.getValue(), new Integer(VoltType.NULL_INTEGER));
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite " + hash1 + " Std " + hash2);
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.BIGINT.getValue(), new Long(VoltType.NULL_BIGINT));
-        hash2 = h2.getHashedPartitionForParameter(VoltType.BIGINT.getValue(), new Long(VoltType.NULL_BIGINT));
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite " + hash1 + " Std " + hash2);
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.STRING.getValue(), VoltType.NULL_STRING_OR_VARBINARY);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.STRING.getValue(), VoltType.NULL_STRING_OR_VARBINARY);
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite " + hash1 + " Std " + hash2);
-
-        hash1 = h1.getHashedPartitionForParameter(VoltType.VARBINARY.getValue(), null);
-        hash2 = h2.getHashedPartitionForParameter(VoltType.VARBINARY.getValue(), null);
-        assertEquals(0, hash1);
-        assertEquals(hash1, hash2);
-        System.out.println("Lite  " + hash1 + " Std " + hash2);
+    private void tandemTestNulls(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+        VoltType hashableTypes[] = new VoltType[]{ VoltType.TINYINT, VoltType.SMALLINT,
+                VoltType.INTEGER, VoltType.BIGINT, VoltType.STRING, VoltType.VARBINARY};
+        for (VoltType type : hashableTypes) {
+            Object nullToHash = type.getNullValueForTest();
+            int hash1 = h1.getHashedPartitionForParameter(type.getValue(), nullToHash);
+            int hash2 = h2.getHashedPartitionForParameter(type.getValue(), nullToHash);
+            if (hash1 != 0 || hash2 != 0) {
+                System.out.println("Lite " + hash1 + " Std " + hash2);
+            }
+            assertEquals(0, hash1);
+            assertEquals(0, hash2);
+        }
     }
 
     @Test
@@ -434,16 +381,16 @@ public class TestHashinatorLite extends TestCase {
             configBytes = LegacyHashinator.getConfigureBytes(partitionCount);
             h1 = new HashinatorLite(partitionCount);
             h2 = TheHashinator.getHashinator(HashinatorType.LEGACY.hashinatorClass, configBytes, false);
-            testSameBytesHash(h1, h2, partitionCount);
+            tandemTestSameBytesHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
             h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
-            testSameBytesHash(h1, h2, partitionCount);
+            tandemTestSameBytesHash(h1, h2, partitionCount);
         }
     }
 
-    private void testSameBytesHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
+    private void tandemTestSameBytesHash(HashinatorLite h1, TheHashinator h2, int partitionCount) throws Exception {
         byte[] valueToHash = new byte[r.nextInt(1000)];
         r.nextBytes(valueToHash);
 

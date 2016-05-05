@@ -87,7 +87,7 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
@@ -139,10 +139,11 @@ user_schema = {
                 "type": "integer",
             },
             "name": {
-                    "id": "name",
-                    "type": "string",
-                    "minLength": 1
-                },
+                "id": "name",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_.]+$"
+            },
             "password": {
                 "id": "password",
                 "type": "string",
@@ -150,7 +151,8 @@ user_schema = {
             },
             "roles": {
                 "id": "roles",
-                "type":"string"
+                "type":"string",
+                "pattern": "^[a-zA-Z0-9_.,-]+$"
             },
             "plaintext": {
                 "id": "plaintext",
