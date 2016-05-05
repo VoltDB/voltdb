@@ -178,7 +178,7 @@ class UpdateDeploymentUser(DeploymentUser):
                                          json=db_data, headers=headers)
                 value = response.json()
                 self.assertEqual(value['statusstring'], "User Updated")
-                self.assertEqual(value['user']['roles'], "Administrator,Test1")
+                self.assertEqual(value['user']['roles'], "Test1,Administrator")
                 self.assertEqual(response.status_code, 200)
 
     def test_update_deployment_user(self):
