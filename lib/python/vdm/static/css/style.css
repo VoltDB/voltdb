@@ -937,6 +937,7 @@ ul.addServerList li:nth-child(1) {
 	background: #fbfbfb;
 	border-bottom: 1px solid #aaa;
 }
+
 .drAdminHeaderLeft {
 	float: left;
 }
@@ -1649,6 +1650,10 @@ ul.nav li:nth-child(1) {
 	margin: 20% auto;
 	width: 80%;
 }
+}
+@media (min-width: 320px) and (max-width: 360px) {
+.headerAdminContent { width:auto; overflow:auto;}
+.drAdminHeaderRight { width:10px;}
 }
 @media (min-width: 320px) and (max-width: 480px) {
 .headerAdminContent {
