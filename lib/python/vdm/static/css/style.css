@@ -214,6 +214,7 @@ label.ccErrorMsg {
 	background-position: -6px -95px;
 	cursor: pointer;
 	position: relative;
+	top:10px;
 }
 .deleteDisableDS {
 	height: 26px;
@@ -238,7 +239,7 @@ label.ccErrorMsg {
 	background-position: 0 -95px;
 	display: inline-block;
 	position: relative;
-	top: 7px;
+	top: 9px;
 	cursor: pointer;
 }
 .deleteDR {
@@ -778,8 +779,10 @@ ul.addServerList li:nth-child(1) {
 	overflow-x: hidden;
 }
 .rightSide .chooseFile {
-	padding: 4px 0 3px 10px;
+	padding: 6px 0 6px 10px;
 }
+.rightSide .downloadConfig {padding:0 0 5px 0;}
+.rightSide .downloadConfig a {padding:0 10px 0 0; display:block;}
 .main {
 	background-color: #FFFFFF;
 	margin-top: 20px;
@@ -918,6 +921,7 @@ ul.addServerList li:nth-child(1) {
 .network tr td:nth-child(2), .network tr td:nth-child(3) {
 	text-align: center;
 }
+
 .network tr td, .directories tr td {
 	padding: 5px 15px;
 }
@@ -1658,7 +1662,11 @@ ul.drList {
 	top: 0;
 }
 }
+@media (min-width: 320px) and (max-width: 420px) {
+.directories { width:420px; }
+}
 @media (min-width: 320px) and (max-width: 480px) {
+
 .modal.custom .modal-dialog {
 	margin: 30% auto;
 	width: 95%;
