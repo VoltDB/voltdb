@@ -17,10 +17,10 @@
 
 package org.voltdb.importclient.kinesis;
 
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -89,8 +89,9 @@ public class KinesisStreamImporter extends AbstractImporter {
 
             m_worker.run();
 
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
 
+            //aws silences all the exceptions but IllegalArgumentException, throw RuntimeException.
             rateLimitedLog(Level.ERROR, e, "Error in Kinesis stream importer %s", m_config.getResourceID());
             if (null != m_worker)
                 m_worker.shutdown();
@@ -186,19 +187,16 @@ public class KinesisStreamImporter extends AbstractImporter {
 
                 String data = null;
                 try {
-                    data = new String(record.getData().array(), "UTF-8");
+                    data = new String(record.getData().array(), StandardCharsets.UTF_8);
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
                     StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);
                     if (!callProcedure(invocation, cb)) {
                         rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);
                         m_gapTracker.commit(offset, seqNum);
                     }
-                } catch (UnsupportedEncodingException | FormatException e) {
+                } catch (FormatException e) {
                     rateLimitedLog(Level.ERROR, e, "Data error on shard %s, data: %s", m_shardId, data);
                     m_gapTracker.commit(offset, seqNum);
-                } catch (Exception e) {
-                    rateLimitedLog(Level.ERROR, e, "Call procedure error with data %s on shard %s", data, m_shardId);
-                    break;
                 }
                 if (!shouldRun()) {
                     break;
@@ -212,7 +210,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         @Override
         public void shutdown(ShutdownInput shutDownInput) {
 
-            if (shutDownInput.getShutdownReason().equals(ShutdownReason.TERMINATE)) {
+            if (ShutdownReason.TERMINATE.equals(shutDownInput.getShutdownReason())) {
                 //The shard may be split or merged. checkpoint one last time
                 commitCheckPoint(shutDownInput.getCheckpointer());
             }
@@ -259,15 +257,14 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
     }
 
-    private int backoffSleep(int failedCount) {
+    private void backoffSleep(int failedCount) {
         try {
-            Thread.sleep(1000 * failedCount++);
-            if (failedCount > 10)
-                failedCount = 1;
+            Thread.sleep(200 * failedCount);
         } catch (InterruptedException e) {
-            rateLimitedLog(Level.ERROR, e, "Interrupted sleep when checkpointing.");
+
+            //do not propagate exception since aws will swallow all.
+            rateLimitedLog(Level.WARN, e, "Interrupted sleep when checkpointing.");
         }
-        return failedCount;
     }
 
     private final static class StreamProcedureCallback implements ProcedureCallback {
@@ -303,6 +300,8 @@ public class KinesisStreamImporter extends AbstractImporter {
         long[] lag;
         final int lagLen;
         BigInteger[] chceckpoints;
+        long offer = -1L;
+        private final long gapTrackerCheckMaxTimeMs = 2_000;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -328,6 +327,17 @@ public class KinesisStreamImporter extends AbstractImporter {
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
+
+            if ((offset - c) >= lag.length) {
+                offer = offset;
+                try {
+                    wait(gapTrackerCheckMaxTimeMs);
+                } catch (InterruptedException e) {
+                    rateLimitedLog(Level.WARN, e,
+                            "Gap tracker wait was interrupted." + m_config.getResourceID().toString());
+                }
+            }
+
             if (offset > s) {
                 s = offset;
             }
@@ -354,6 +364,11 @@ public class KinesisStreamImporter extends AbstractImporter {
                 lag[idx(offset)] = offset;
                 while (ggap > 0 && lag[idx(c)] + 1 == lag[idx(c + 1)]) {
                     ++c;
+                }
+
+                if (offer >= 0 && (offer - c) < lag.length) {
+                    offer = -1L;
+                    notify();
                 }
             }
         }

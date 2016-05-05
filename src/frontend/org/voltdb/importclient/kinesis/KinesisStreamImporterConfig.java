@@ -237,7 +237,12 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
             return defaultValue;
         }
         try {
-            return Long.parseLong(value);
+            long val = Long.parseLong(value);
+            if (val <= 0) {
+                throw new IllegalArgumentException(
+                        "Value of " + propertyName + " should be positive, but current value is " + val);
+            }
+            return val;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
                     "Property " + propertyName + " must be a number in Kinesis importer configuration.");
