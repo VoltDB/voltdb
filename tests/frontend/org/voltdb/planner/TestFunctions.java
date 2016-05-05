@@ -121,4 +121,8 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE)from bit", errorMsg);
 
     }
+
+    public void testLikeNoopt() {
+        compile("select case when varchar_type like 'M%' then 1 end as m_state from bit;");
+    }
 }
