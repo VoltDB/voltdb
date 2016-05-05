@@ -18,7 +18,6 @@
 package org.voltdb.importer.formatter.builtin;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.StringReader;
 import java.util.List;
 import java.util.Properties;
@@ -83,7 +82,7 @@ public class VoltCSVFormatter implements Formatter<String> {
             m_strictquotes = Boolean.parseBoolean(strictQuotesProp);
         }
 
-        m_surroundingSpacesNeedQuotes = true;
+        m_surroundingSpacesNeedQuotes = false;
         String surroundingSpacesNeedQuotes = prop.getProperty("surroundingSpacesNeedQuotes", "");
         if (!surroundingSpacesNeedQuotes.isEmpty()) {
             m_surroundingSpacesNeedQuotes = Boolean.parseBoolean(surroundingSpacesNeedQuotes);
@@ -102,8 +101,12 @@ public class VoltCSVFormatter implements Formatter<String> {
             m_nowhitespace = Boolean.parseBoolean(ignoreWhiteSpaceProp);
         }
 
-        m_csvPreference = new CsvPreference.Builder(quotechar, m_separator, "\n")
-                .surroundingSpacesNeedQuotes(m_surroundingSpacesNeedQuotes).build();
+        if (m_surroundingSpacesNeedQuotes) {
+            m_csvPreference = new CsvPreference.Builder(quotechar, m_separator, "\n").surroundingSpacesNeedQuotes(true)
+                    .build();
+        } else {
+            m_csvPreference = new CsvPreference.Builder(quotechar, m_separator, "\n").build();
+        }
     }
 
     @Override
@@ -121,19 +124,18 @@ public class VoltCSVFormatter implements Formatter<String> {
         List<String> dataList;
         try {
             dataList = csvReader.read();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new FormatException(e.getMessage());
         } finally {
             try {
                 if (csvReader != null)
                     csvReader.close();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new FormatException(e.getMessage());
             }
         }
         String[] data = dataList.toArray(new String[0]);
         normalize(data);
-
         return data;
     }
 
