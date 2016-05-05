@@ -325,20 +325,50 @@ public class GeographyValue {
     private static final byte INCOMPLETE_ENCODING_FROM_JAVA = 0;
     private static final byte COMPLETE_ENCODING = 1;
 
+    private static long polygonOverheadInBytes() {
+        return 7 + boundLengthInBytes();
+    }
+
     /**
      * Return the number of bytes in the serialization for this polygon.
      * Returned value does not include the 4-byte length prefix that precedes variable-length types.
      * @return The number of bytes in the serialization for this polygon.
      */
     public int getLengthInBytes() {
-        long length = 7;
+        long length = polygonOverheadInBytes();
         for (List<XYZPoint> loop : m_loops) {
             length += loopLengthInBytes(loop.size());
         }
 
-        length += boundLengthInBytes();
-
         return (int)length;
+    }
+
+    /**
+     * Given a column of type GEOGRAPHY(nbytes), return an upper bound on the
+     * number of characters needed to represent any entity of this type in WKT.
+     * @param numBytes  The size of the GEOGRAPHY value in bytes
+     * @return Upper bound of characters needed for WKT string
+     */
+    public static int getValueDisplaySize(int numBytes) {
+        if (numBytes < MIN_SERIALIZED_LENGTH) {
+            throw new IllegalArgumentException("Cannot compute max display size for a GEOGRAPHY value of size "
+                    + numBytes + " bytes, since minimum allowed size is " + MIN_SERIALIZED_LENGTH);
+        }
+
+        // Vertices will dominate the WKT output, so compute the maximum
+        // number of vertices given the number of bytes.  This will be a polygon
+        // with just one loop.
+        int numBytesUsedForVertices = numBytes;
+        numBytesUsedForVertices -= polygonOverheadInBytes();
+        numBytesUsedForVertices -= loopOverheadInBytes();
+
+        int numVertices = numBytesUsedForVertices / 24;
+
+        // display size will be
+        // "POLYGON (())" [12 bytes]
+        // plus the number of bytes used by vertices:
+        // "-180.123456789012 -90.123456789012, " [max of 36 bytes per vertex]
+        return 12 + 36 * numVertices;
     }
 
     /**
@@ -503,14 +533,18 @@ public class GeographyValue {
         return 33;
     }
 
-    private static long loopLengthInBytes(long numberOfVertices) {
+    private static long loopOverheadInBytes() {
         //   1 byte     for encoding version
         //   4 bytes    for number of vertices
         //   number of vertices * 8 * 3  bytes  for vertices as XYZPoints
         //   1 byte     for origin_inside_
         //   4 bytes    for depth_
         //   length of bound
-        return 5 + (numberOfVertices * 24) + 5 + boundLengthInBytes();
+        return 10 + boundLengthInBytes();
+    }
+
+    private static long loopLengthInBytes(long numberOfVertices) {
+        return loopOverheadInBytes() + (numberOfVertices * 24);
     }
 
     private static void flattenEmptyBoundToBuffer(ByteBuffer buf) {
