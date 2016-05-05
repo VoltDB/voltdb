@@ -164,7 +164,7 @@ public abstract class CatalogUtil {
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
-    public static final String ROW_LENGTH_LIMIT = "rowlengthlimit";
+    public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
     private static boolean m_exportEnabled = false;
@@ -1437,14 +1437,14 @@ public abstract class CatalogUtil {
                                     "configured to has row length limit " + rowLengthLimit +
                                     ". But the export table " + tableref.getTypeName() +
                                     " has estimated row length " + rowLength +
-                                    ". The default export target will be disabled.");
+                                    ".");
                         }
                         else {
                             hostLog.error("Export configuration for export target " + targetName + " has" +
                                     "configured to has row length limit " + rowLengthLimit +
                                     ". But the export table " + tableref.getTypeName() +
                                     " has estimated row length " + rowLength +
-                                    ". Export target " + targetName + " will be disabled.");
+                                    ".");
                         }
                         throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
                                 ", exceeding configurated limitation " + rowLengthLimit + ".");
