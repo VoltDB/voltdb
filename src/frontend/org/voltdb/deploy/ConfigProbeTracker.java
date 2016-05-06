@@ -48,15 +48,15 @@ public class ConfigProbeTracker {
     protected final int nodeCount;
 
     public ConfigProbeTracker(
-            int nodeCoount,
+            int nodeCount,
             UUID configHash,
             UUID meshHash,
             UUID startUuid,
             String internalInterface,
             boolean admin
     ) {
-        checkArgument(nodeCoount > 0, "node count must be greater then 0");
-        this.nodeCount = nodeCoount;
+        checkArgument(nodeCount > 0, "node count must be greater then 0");
+        this.nodeCount = nodeCount;
         this.initialProbeResponse =
                 new ConfigProbeResponse(configHash, meshHash, startUuid, internalInterface, admin)
                 ;

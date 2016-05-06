@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Random;
 import java.util.TimeZone;
 import java.util.UUID;
 
@@ -78,7 +79,6 @@ public class VoltDB {
     public static final String STAGED_CLUSTER_NAME = "_CLUSTERNAME";
     public static final String STAGED_DEPLOYMENT = "_DEPLOYMENT";
     public static final String STAGED_MESH = "_MESH";
-    public static final String DEFAULT_CLUSTER_NAME = "aquila"; // Italian for eagle
     public static final String CONFIG_DIR = "config";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
@@ -593,8 +593,20 @@ public class VoltDB {
             }
             if (m_startAction == StartAction.INITIALIZE) {
                 if (m_clusterName == null || m_clusterName.trim().isEmpty()) {
-                    m_clusterName = DEFAULT_CLUSTER_NAME;
+                    hostLog.fatal("Clustername must be defined for initialize");
+                    referToDocAndExit();
                 }
+                Random prtrnd = new Random(m_configUUID.getLeastSignificantBits());
+
+                int pick = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
+                m_leader = "localhost:" + pick;
+                m_internalPort = pick;
+
+                m_port = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
+                m_adminPort = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
+
+                pick = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
+                m_zkInterface = "localhost:" + pick;
             }
 
             if (m_startAction == StartAction.PROBE) {

@@ -108,7 +108,6 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.deploy.ConfigProbeTracker;
@@ -1634,21 +1633,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              * For new startup mode override host count and voltdbroot
              */
             if (m_config.m_startAction == StartAction.INITIALIZE) {
+
                 deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
-                // TODO: this where you would hook the static configuration primer
+
+                if (!Boolean.TRUE.equals(deployment.getHttpd().isEnabled())) {
+                    VoltDB.crashLocalVoltDB(
+                            "Initialize requires http port to be enabled in "
+                           + m_config.m_pathToDeployment, false, null);
+                    return -1;
+                }
+
                 deployment.getPaths().getVoltdbroot().setPath(m_config.m_voltdbRoot.getPath());
                 // override host count so that the deployment is compiled it wont fail cluster config validations
                 // and preserve the value of kfactor
                 int forcedHostCount = deployment.getCluster().getKfactor() + 1;
                 if (deployment.getCluster().getHostcount() < forcedHostCount) {
                     deployment.getCluster().setHostcount(forcedHostCount);
-                }
-                // force http port enabled
-                if (deployment.getHttpd() == null) {
-                    deployment.setHttpd(new HttpdType());
-                }
-                if (!Boolean.TRUE.equals(deployment.getHttpd().isEnabled())) {
-                    deployment.getHttpd().setEnabled(true);
                 }
                 // make the config log deployment the definitive deployment
                 m_config.m_pathToDeployment = getConfigLogDeployment().getPath();
@@ -1872,10 +1872,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         Optional<byte[]> deploymentBytes = Optional.empty();
         if ((deployment.getCluster().getKfactor()+1) > hostCount) {
             VoltDB.crashLocalVoltDB(
-                    "Number cluster members " + hostCount + " must greater than ksafety "
+                    "Number of cluster members " + hostCount + " must greater than ksafety "
                   + deployment.getCluster().getKfactor(), false, null
                   );
-            return null;
+            return Optional.empty();
         }
         if (deployment.getCluster().getHostcount() != hostCount) {
             deployment.getCluster().setHostcount(hostCount);
@@ -1884,14 +1884,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 remarshalled = CatalogUtil.getDeployment(deployment, true /* pretty print indent */);
             } catch (IOException|RuntimeException e) {
                 VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
-                return null;
+                return Optional.empty();
             }
             deploymentBytes = Optional.of(remarshalled.getBytes(StandardCharsets.UTF_8));
             try (FileWriter fw = new FileWriter(getConfigLogDeployment())) {
                 fw.write(remarshalled);
             } catch (IOException|RuntimeException e) {
                 VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
-                return null;
+                return Optional.empty();
             }
         }
         return deploymentBytes;
