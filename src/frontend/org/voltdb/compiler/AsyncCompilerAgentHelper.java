@@ -127,7 +127,7 @@ public class AsyncCompilerAgentHelper
                 catch (Throwable t) {
                     retval.errorMsg = "Unexpected condition applying DDL statements to " +
                         "original catalog: " + t.toString();
-                    compilerLog.warn(retval.errorMsg);
+                    compilerLog.error(retval.errorMsg);
                     return retval;
                 }
                 if (newCatalogBytes == null) {
