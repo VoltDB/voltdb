@@ -834,6 +834,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
             }
+            else {
+                // set up empty stats for the DR Producer
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
+                        new DRProducerStatsBase.DRProducerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
+                        new DRProducerStatsBase.DRProducerPartitionStatsBase());
+            }
             createDRConsumerIfNeeded();
 
             /*
