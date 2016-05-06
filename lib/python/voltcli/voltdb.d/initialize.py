@@ -24,7 +24,8 @@
                                 supports_daemon=False,
                                 supports_multiple_daemons=False,
                                 check_environment_config=True,
-                                force_voltdb_create=True),
+                                force_voltdb_create=True,
+                                supports_paused=False),
     description = 'Initializes a new, empty database.'
 )
 def initialize(runner):

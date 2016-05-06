@@ -498,13 +498,10 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
-<<<<<<< HEAD
                 } else if (arg.equalsIgnoreCase("paused")) {
                     //Start paused.
                     m_isPaused.set(true);
-                } else {
-=======
-                else if (arg.equalsIgnoreCase("clustername"))
+                } else if (arg.equalsIgnoreCase("clustername"))
                     m_clusterName = args[++i].trim();
                 else if (arg.equalsIgnoreCase("voltdbroot")) {
                     m_voltdbRoot = new VoltFile(args[++i]);
@@ -527,7 +524,6 @@ public class VoltDB {
                     }
                 }
                 else {
->>>>>>> origin/ENG-10153
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
