@@ -60,11 +60,11 @@ import org.voltdb.types.ConstraintType;
  */
 public abstract class CatalogSchemaTools {
 
-    final static String spacer = "   ";
+    private final static String spacer = "   ";
 
     // Set to true to enable dumping to /tmp/canonical-<timestamp>.sql
     // Make sure it's false before committing.
-    final static boolean dumpSchema = false;
+    private final static boolean dumpSchema = false;
 
     // To support inline batch statements and associated comments.
     private static final String batchSpecificComments =
@@ -516,7 +516,7 @@ public abstract class CatalogSchemaTools {
      * @param sb The ddl being built.
      * @param importLines The import lines to add.
      */
-    public static void toSchema(StringBuilder sb, String[] importLines)
+    public static void toSchema(StringBuilder sb, Set<String> importLines)
     {
         for (String importLine : importLines) {
             sb.append(importLine);
@@ -526,10 +526,10 @@ public abstract class CatalogSchemaTools {
     /**
      * Convert a catalog into a string containing all DDL statements.
      * @param catalog
-     * @param importLines
+     * @param importLines A set of importLines, should not be mutated.
      * @return String of DDL statements.
      */
-    public static String toSchema(Catalog catalog, String[] importLines)
+    public static String toSchema(Catalog catalog, Set<String> importLines)
     {
         StringBuilder sb = new StringBuilder();
 

@@ -49,6 +49,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -150,7 +151,7 @@ public class VoltCompiler {
     private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
-    String[] m_importLines = null;
+    Set<String> m_importLines = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -1284,7 +1285,7 @@ public class VoltCompiler {
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         // Also, grab the IMPORT CLASS lines so we can add them to the
         // generated DDL
-        m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
+        m_importLines = ImmutableSet.copyOf(voltDdlTracker.m_importLines);
         addExtraClasses(jarOutput);
 
         compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
