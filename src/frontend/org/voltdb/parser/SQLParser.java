@@ -540,7 +540,9 @@ public class SQLParser extends SQLPatternFactory
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat DayDateParser = new SimpleDateFormat("yyyy-MM-dd");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
     private static final Map<String, String> FRIENDLY_TYPE_NAMES =
@@ -1477,21 +1479,46 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Parse a date string.
+     * Parse a date string.  We need to parse three different formats, one
+     * with day-of-year, time-of-day and milliseconds, one with day-of-year
+     * and time-of-day but no milliseconds, and one with only day-of-year
+     * and no time-of-day at all.  In the latter two cases, the missing time
+     * is set to zero.
+     *
      * @param dateIn  input date string
      * @return        Date object
      * @throws SQLParser.Exception
      */
     public static Date parseDate(String dateIn) throws SQLParser.Exception
     {
-        // Don't ask... Java is such a crippled language!
-        DateParser.setLenient(true);
-
         // Remove any quotes around the timestamp value.  ENG-2623
+        String dateRepled = dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", "");
+
+        // Unfortunately, JDBC time does not work for us.  It does not
+        // match a pattern with no time of day.  So, we need to look at
+        // all three formats.
+        //
+        // Don't ask... Java is such a crippled language!
+        // First, try the full pattern - yyyy-MM-DD HH:MM:SS.sss.
+        FullDateParser.setLenient(true);
         try {
-            return DateParser.parse(dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
+            return FullDateParser.parse(dateRepled);
         }
         catch (ParseException e) {
+            ;
+        }
+        // Next, try the pattern without fractional seconds.
+        WholeSecondDateParser.setLenient(true);
+        try {
+            return WholeSecondDateParser.parse(dateRepled);
+        } catch (ParseException e) {
+            ;
+        }
+        // Finally try the pattern without any time of day.
+        DayDateParser.setLenient(true);
+        try {
+            return DayDateParser.parse(dateRepled);
+        } catch (ParseException e) {
             throw new SQLParser.Exception(e);
         }
     }

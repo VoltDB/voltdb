@@ -5,3 +5,17 @@ insert into t values (1);
 insert into t values (2);
 select * from t;
 drop table t;
+
+drop table foo if exists;
+create table foo ( a timestamp );
+insert into FOO values ('2015-11-11 00:00:00.000000');
+insert into FOO values ('2015-11-11 00:00:00.0');
+insert into FOO values ('2015-11-11 00:00:00');
+insert into FOO values ('2015-11-11');
+exec FOO.insert '2015-11-11 00:00:00.000000';
+exec FOO.insert '2015-11-11 00:00:00.0';
+exec FOO.insert '2015-11-11 00:00:00';
+exec FOO.insert '2015-11-11';
+select * from FOO;
+drop table foo if exists;
+
