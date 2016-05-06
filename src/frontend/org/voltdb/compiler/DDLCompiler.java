@@ -212,30 +212,6 @@ public class DDLCompiler {
         return typeDetected;
     }
 
-    // Function to check if the table - TableXML, supplied as VoltXMLElement, does not contain geo types.
-    // If table does contain geo types, VoltCompilerException is generated with information about geo columns
-    // found in table wrapped in exception message
-    private void guardForGeoColumns(VoltXMLElement tableXML, String tableName, String tableVerb)
-            throws VoltCompilerException {
-        assert(tableXML.name.equals("table"));
-        assert(tableVerb != null);
-        assert(tableName != null);
-
-        boolean pointColDetected = false;
-        StringBuffer pointMsg = new StringBuffer();
-        pointColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, pointMsg);
-
-        boolean polygonColDetected = false;
-        StringBuffer polygonMsg = new StringBuffer();
-        polygonColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, polygonMsg);
-        //
-        if (pointColDetected || polygonColDetected) {
-            String separatorStr = (pointColDetected && polygonColDetected) ? "," : "";
-            throw m_compiler.new VoltCompilerException("Can't " + tableVerb + " table '" + tableName.toUpperCase() + "' containing geo type column(s) -" +
-                    pointMsg + separatorStr + polygonMsg + ".");
-        }
-    }
-
     /**
      * Compile a DDL schema from an abstract reader
      * @param reader  abstract DDL reader
@@ -953,8 +929,6 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
 
             if (tableXML != null) {
-                guardForGeoColumns(tableXML, tableName, EXPORT);
-
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid EXPORT statement: table %s is a DR table.", tableName));

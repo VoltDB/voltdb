@@ -1566,6 +1566,17 @@ public class ExportOnServerVerifier {
             return error("type_null_timestamp", type_not_null_timestamp, valid.type_not_null_timestamp);
 
         // col 19
+        BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
+        if ( (!(type_null_decimal == null && valid.type_null_decimal == null)) &&
+             (!type_null_decimal.equals(valid.type_null_decimal)) )
+            return error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
+
+        // col 20
+        BigDecimal type_not_null_decimal = new BigDecimal(row[++col]);
+        if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
+            return error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
+
+        // col 21
         Double type_null_float = row[++col].equals("NULL") ? null : Double.valueOf(row[col]);
         if ( (!(type_null_float == null && valid.type_null_float == null)) &&
              (!type_null_float.equals(valid.type_null_float)) )
@@ -1578,21 +1589,10 @@ public class ExportOnServerVerifier {
             return error("type_null_float", type_null_float, valid.type_null_float);
         }
 
-        // col 20
+        // col 22
         Double type_not_null_float = Double.valueOf(row[++col]);
         if (!type_not_null_float.equals(valid.type_not_null_float))
             return error("type_not_null_float", type_not_null_float, valid.type_not_null_float);
-
-        // col 21
-        BigDecimal type_null_decimal = row[++col].equals("NULL") ? null : new BigDecimal(row[col]);
-        if ( (!(type_null_decimal == null && valid.type_null_decimal == null)) &&
-             (!type_null_decimal.equals(valid.type_null_decimal)) )
-            return error("type_null_decimal", type_null_decimal, valid.type_null_decimal);
-
-        // col 22
-        BigDecimal type_not_null_decimal = new BigDecimal(row[++col]);
-        if (!type_not_null_decimal.equals(valid.type_not_null_decimal))
-            return error("type_not_null_decimal", type_not_null_decimal, valid.type_not_null_decimal);
 
         // col 23
         String type_null_varchar25 = row[++col].equals("NULL") ? null : row[col];
