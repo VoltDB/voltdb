@@ -195,6 +195,7 @@ public class AsyncExportClient
                 }
                 catch (IOException e)
                 {
+                    System.err.println("Exception: " + e);
                     e.printStackTrace();
                 }
             }
@@ -348,6 +349,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
+                    System.err.println("Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
@@ -419,7 +421,7 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.out.println("Exception: " + x);
+            System.err.println("Exception: " + x);
             x.printStackTrace();
         }
     }
