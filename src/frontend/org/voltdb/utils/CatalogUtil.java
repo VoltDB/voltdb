@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -43,6 +44,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
@@ -160,6 +163,8 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+    public final static Pattern XML_COMMENT_RE = Pattern.compile("<--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\w*=\\w*(?:\"\\w*\\d+\\w*\"|'\\w*\\d+\\w*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -983,6 +988,21 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String deploymentText = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(deploymentText);
+        String nocomments = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(nocomments);
+        return Digester.md5AsUUID(matcher.replaceFirst("hostcount=\"0\""));
+    }
 
     /**
      * Given the deployment object generate the XML

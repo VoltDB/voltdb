@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
@@ -65,6 +66,7 @@ public class CatalogContext {
     private final long catalogCRC;
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
+    public final UUID deploymentHashForConfig;
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
@@ -84,6 +86,7 @@ public class CatalogContext {
 
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
+
 
     public CatalogContext(
             long transactionId,
@@ -130,6 +133,7 @@ public class CatalogContext {
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
+        this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
         m_defaultProcs = new DefaultProcedureManager(database);

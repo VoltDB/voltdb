@@ -432,10 +432,6 @@ class ServerBundle(JavaBundle):
                              'specify the location of voltdbroot',
                              default = None))
         verb.add_options(
-            cli.StringOption('-N', '--name', 'clustername',
-                             'specify the the cluster designation name',
-                             default = None))
-        verb.add_options(
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
@@ -467,7 +463,7 @@ class ServerBundle(JavaBundle):
                                   None))
         if self.supports_paused:
             verb.add_options(
-                cli.BooleanOption('-p', '--paused', 'paused',
+                cli.BooleanOption('-p', '--pause', 'paused',
                                   'Start Database in paused mode.'))
 
         if self.force_voltdb_create:
@@ -519,7 +515,7 @@ class ServerBundle(JavaBundle):
             final_args.extend(['placementgroup', runner.opts.placementgroup])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host])
-        else:
+        elif not self.subcommand in ('probe','initialize'):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
@@ -543,12 +539,13 @@ class ServerBundle(JavaBundle):
             final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.opts.voltdbroot:
             final_args.extend(['voltdbroot', runner.opts.voltdbroot])
-        if runner.opts.clustername:
-            final_args.extend(['clustername', runner.opts.clustername])
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])
         if self.subcommand in ('create'):
+            if runner.opts.paused:
+                final_args.extend(['paused'])
+        if self.subcommand in ('probe'):
             if runner.opts.paused:
                 final_args.extend(['paused'])
         if self.subcommand in ('recover'):

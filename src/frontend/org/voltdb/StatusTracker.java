@@ -16,54 +16,140 @@
  */
 package org.voltdb;
 
+import java.util.UUID;
+
 import org.voltdb.common.NodeState;
 
 /**
  *
- * @author akhanzode
  */
-public class StatusTracker implements StatusProvider {
-    private NodeState m_nodeState = NodeState.INITIALIZING;
-    private final String m_buildInfo;
-    private final String m_versionInfo;
-    private final boolean m_isEnterprise;
-    private final String m_clusterName;
+public class StatusTracker {
+    private volatile NodeState nodeState;
+    private final UUID startUuid;
+    private final String clusterName;
+    private final String buildInfo;
+    private final String versionInfo;
+    private final boolean enterprise;
 
-    public StatusTracker(String clusterName, String buildInfo, String versionInfo, boolean enterprise) {
-        m_clusterName = clusterName;
-        m_buildInfo = buildInfo;
-        m_versionInfo = versionInfo;
-        m_isEnterprise = enterprise;
+    public StatusTracker(NodeState nodeState, UUID startUuid,
+            String clusterName, String buildInfo, String versionInfo,
+            boolean enterprise) {
+        this.nodeState = nodeState;
+        this.startUuid = startUuid;
+        this.clusterName = clusterName;
+        this.buildInfo = buildInfo;
+        this.versionInfo = versionInfo;
+        this.enterprise = enterprise;
     }
 
-    @Override
-    public String getVersion() {
-        return m_versionInfo;
+    public StatusTracker(UUID startUuid, String clusterName,
+            String buildInfo, String versionInfo,
+            boolean enterprise) {
+        this(NodeState.INITIALIZING, startUuid, clusterName, buildInfo, versionInfo, enterprise);
     }
 
-    @Override
-    public String getBuild() {
-        return m_buildInfo;
+    public StatusTracker() {
+       this(NodeState.INITIALIZING,new UUID(0L,0L),null,null,null,false);
     }
 
-    @Override
-    public boolean isEnterprise() {
-        return m_isEnterprise;
-    }
-
-    @Override
-    public String getClusterName() {
-        return m_clusterName;
-    }
-
-    @Override
     public NodeState getNodeState() {
-        return m_nodeState;
+        return nodeState;
+    }
+
+    public void setNodeState(NodeState nodeState) {
+        this.nodeState = nodeState;
+    }
+
+    public UUID getStartUuid() {
+        return startUuid;
+    }
+
+    public String getClusterName() {
+        return clusterName;
+    }
+
+    public String getBuildInfo() {
+        return buildInfo;
+    }
+
+    public String getVersionInfo() {
+        return versionInfo;
+    }
+
+    public boolean isEnterprise() {
+        return enterprise;
     }
 
     @Override
-    public void setNodeState(NodeState s) {
-        m_nodeState = s;
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result
+                + ((buildInfo == null) ? 0 : buildInfo.hashCode());
+        result = prime * result
+                + ((clusterName == null) ? 0 : clusterName.hashCode());
+        result = prime * result + (enterprise ? 1231 : 1237);
+        result = prime * result
+                + ((nodeState == null) ? 0 : nodeState.hashCode());
+        result = prime * result
+                + ((startUuid == null) ? 0 : startUuid.hashCode());
+        result = prime * result
+                + ((versionInfo == null) ? 0 : versionInfo.hashCode());
+        return result;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        StatusTracker other = (StatusTracker) obj;
+        if (buildInfo == null) {
+            if (other.buildInfo != null)
+                return false;
+        } else if (!buildInfo.equals(other.buildInfo))
+            return false;
+        if (clusterName == null) {
+            if (other.clusterName != null)
+                return false;
+        } else if (!clusterName.equals(other.clusterName))
+            return false;
+        if (enterprise != other.enterprise)
+            return false;
+        if (nodeState != other.nodeState)
+            return false;
+        if (startUuid == null) {
+            if (other.startUuid != null)
+                return false;
+        } else if (!startUuid.equals(other.startUuid))
+            return false;
+        if (versionInfo == null) {
+            if (other.versionInfo != null)
+                return false;
+        } else if (!versionInfo.equals(other.versionInfo))
+            return false;
+        return true;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("StatusTracker [nodeState=");
+        builder.append(nodeState);
+        builder.append(", startUuid=");
+        builder.append(startUuid);
+        builder.append(", buildInfo=");
+        builder.append(buildInfo);
+        builder.append(", versionInfo=");
+        builder.append(versionInfo);
+        builder.append(", isEnterprise=");
+        builder.append(enterprise);
+        builder.append(", clusterName=");
+        builder.append(clusterName);
+        builder.append("]");
+        return builder.toString();
+    }
 }

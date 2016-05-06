@@ -31,7 +31,8 @@ public enum StartAction {
     REJOIN("rejoin", true, "K-Safety / Node Rejoin"),
     LIVE_REJOIN("live rejoin", true, "K-Safety / Node Rejoin"),
     JOIN("add", true, "Elastic Cluster Sizing"),
-    INITIALIZE("initialize", false, "Layout and prime voltdbroot");
+    INITIALIZE("initialize", false, "Layout and prime voltdbroot"),
+    PROBE("probe",true, "Determine start action");
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
@@ -47,10 +48,10 @@ public enum StartAction {
             EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
 
     final static EnumSet<StartAction> newStartVerbSet =
-            EnumSet.of(INITIALIZE);
+            EnumSet.of(INITIALIZE,PROBE);
 
     final static EnumSet<StartAction> requireEmptyDirsSet =
-            EnumSet.of(CREATE, INITIALIZE);
+            EnumSet.of(CREATE,INITIALIZE);
 
     final String m_verb;
     final boolean m_enterpriseOnly;

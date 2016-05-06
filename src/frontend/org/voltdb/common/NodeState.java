@@ -17,7 +17,10 @@
 
 package org.voltdb.common;
 
-import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+
+import com.google_voltpatches.common.collect.ImmutableList;
 
 //Enup representing state of the node
 public enum NodeState {
@@ -32,8 +35,29 @@ public enum NodeState {
     SHUTTINGDOWN,
     STOPPED;
 
+    static final List<NodeState> values = ImmutableList.copyOf(values());
+    static final EnumSet<NodeState> meshed = EnumSet.of(RECOVERING,REJOINING,PAUSED,UPDATING,UP);
+    static final EnumSet<NodeState> unmeshed = EnumSet.of(INITIALIZING,WAITINGFORLEADER);
+    static final EnumSet<NodeState> operational = EnumSet.of(PAUSED,UPDATING,UP);
+    static final EnumSet<NodeState> catalogued = EnumSet.of(RECOVERING,REJOINING,PAUSED,UPDATING,UP);
+
     public static final String toListString() {
-        return Arrays.asList(values()).toString();
+        return values.toString();
     }
 
+    public boolean meshed() {
+        return meshed.contains(this);
+    }
+
+    public boolean unmeshed() {
+        return unmeshed.contains(this);
+    }
+
+    public boolean operational() {
+        return operational.contains(this);
+    }
+
+    public boolean catalogued() {
+        return catalogued.contains(this);
+    }
 }
