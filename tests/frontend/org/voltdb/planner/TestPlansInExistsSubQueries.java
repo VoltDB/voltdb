@@ -764,7 +764,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                 " (select max(c) from r2) and 3 > 1;", "VoltDB does not support constant Boolean values, like TRUE or FALSE");
     }
 
-    // HSQL failed to parse  these statement
+    // HSQL failed to parse these statement
     public void testHSQLFailed() {
         {
             failToCompile("select a from r1 where exists (" +
@@ -778,10 +778,11 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
         {
-            // This seems to have suddenly started working, not at all sure why . Can we trust it?
-            // failToCompile("select * from r1 join r2 on exists " +
-            //         " (select a from r2 where a > 1) ",
-            //        "Join with filters that do not depend on joined tables is not supported in VoltDB");
+            // This may not actually an HSQL failure
+            // -- at any rate, it gets detected later in the planner.
+            failToCompile("select * from r1 join r2 on exists " +
+                    " (select a from r2 where a > 1) ",
+                    "Join with filters that do not depend on joined tables is not supported in VoltDB");
         }
     }
 
