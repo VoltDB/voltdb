@@ -542,13 +542,7 @@ class ServerBundle(JavaBundle):
         if self.subcommand in ('create', 'initialize'):
             if runner.opts.force:
                 final_args.extend(['force'])
-        if self.subcommand in ('create'):
-            if runner.opts.paused:
-                final_args.extend(['paused'])
-        if self.subcommand in ('probe'):
-            if runner.opts.paused:
-                final_args.extend(['paused'])
-        if self.subcommand in ('recover'):
+        if self.subcommand in ('create', 'probe', 'recover'):
             if runner.opts.paused:
                 final_args.extend(['paused'])
         if runner.args:
