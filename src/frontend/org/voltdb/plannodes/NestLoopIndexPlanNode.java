@@ -234,7 +234,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         assert(indexScan != null);
 
         m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
-        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + childOutputTupleCountEstimate;
+        // Discount outer child estimates based on the number of its filters
+        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + discountEstimatedProcessedTupleCount(m_children.get(0));
     }
 
     @Override

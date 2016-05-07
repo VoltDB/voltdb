@@ -28,6 +28,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -402,4 +403,52 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         return collected;
     }
 
+    /**
+     * Discount join node child estimates based on the number of its filters
+     *
+     * @param childNode
+     * @return discounted estimates
+     */
+    protected long discountEstimatedProcessedTupleCount(AbstractPlanNode childNode) {
+        // Discount estimated processed tuple count for the outer child based on the number of
+        // filter expressions this child has with a rapidly diminishing effect
+        // that ranges from a discount of 0.09 (ORETATION_EQAUL)
+        // or 0.045 (all other expression types) for one post filter to a max discount approaching
+        // 0.888... (=8/9) for many EQUALITY filters.
+        // The discount value is less than the partial index discount (0.1) to make sure
+        // the index wins
+        AbstractExpression predicate = null;
+        if (childNode instanceof AbstractScanPlanNode) {
+            predicate = ((AbstractScanPlanNode) childNode).getPredicate();
+        } else if (childNode instanceof NestLoopPlanNode) {
+            predicate = ((NestLoopPlanNode) childNode).getWherePredicate();
+        } else if (childNode instanceof NestLoopIndexPlanNode) {
+            AbstractPlanNode inlineIndexScan = ((NestLoopIndexPlanNode) childNode).getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            assert(inlineIndexScan != null);
+            predicate = ((AbstractScanPlanNode) inlineIndexScan).getPredicate();
+        } else {
+            return childNode.getEstimatedProcessedTupleCount();
+        }
+
+        if (predicate == null) {
+            return childNode.getEstimatedProcessedTupleCount();
+        }
+
+        List<AbstractExpression> predicateExprs = ExpressionUtil.uncombinePredicate(predicate);
+        // Counters to count the number of equality and all other expressions
+        int eqCount = 0;
+        int otherCount = 0;
+        final double MAX_EQ_POST_FILTER_DISCOUNT = 0.09;
+        final double MAX_OTHER_POST_FILTER_DISCOUNT = 0.045;
+        double discountCountFactor = 1.0;
+        // Discount tuple count.
+        for (AbstractExpression predicateExpr: predicateExprs) {
+            if (ExpressionType.COMPARE_EQUAL == predicateExpr.getExpressionType()) {
+                discountCountFactor -= Math.pow(MAX_EQ_POST_FILTER_DISCOUNT, ++eqCount);
+            } else {
+                discountCountFactor -= Math.pow(MAX_OTHER_POST_FILTER_DISCOUNT, ++otherCount);
+            }
+        }
+        return  (long) (childNode.getEstimatedProcessedTupleCount() * discountCountFactor);
+    }
 }
