@@ -465,8 +465,12 @@ bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDataba
     return m_exportEnabled;
 }
 
+static void
+migrateChangedTuples(catalog::Table const &catalogTable,
+                     PersistentTable* existingTable,
+                     PersistentTable* newTable);
 
-
+static
 void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
                   PersistentTable *existingTable, PersistentTable *newTable,
                   std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
@@ -514,6 +518,7 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
     }
 }
 
+static
 void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
                   StreamedTable *existingTable, StreamedTable *newTable,
                   std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
@@ -564,7 +569,6 @@ void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>
     }
 }
 
-
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
                                            catalog::Table const &catalogTable,
@@ -582,12 +586,20 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
     ///////////////////////////////////////////////
+    // Make this delegate point to the new table,
+    // so we can migrate views below, which may
+    // contains plans that reference this table
+    ///////////////////////////////////////////////
+    newTable->incrementRefcount();
+    m_table = newTable;
+
+    ///////////////////////////////////////////////
     // Move tuples from one table to the other
     ///////////////////////////////////////////////
     migrateChangedTuples(catalogTable, existingTable, newTable);
 
     migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
-    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(m_table);
+    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(existingTable);
     if (streamedTable) {
         StreamedTable *newSTable = dynamic_cast<StreamedTable*>(newTable);
         migrateExportViews(catalogTable.views(), streamedTable, newSTable, delegatesByName);
@@ -596,22 +608,16 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
     // Drop the old table
     ///////////////////////////////////////////////
-    deleteCommand();
+    existingTable->decrementRefcount();
 
-    ///////////////////////////////////////////////
-    // Patch up the new table as a replacement
-    ///////////////////////////////////////////////
-
-    // configure for stats tables
+    // configure for stats for the new table
     newTable->configureIndexStats(catalogDatabase.relativeIndex());
-    newTable->incrementRefcount();
-    m_table = newTable;
 }
 
-void
-TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
-                                           PersistentTable* existingTable,
-                                           PersistentTable* newTable)
+static void
+migrateChangedTuples(catalog::Table const &catalogTable,
+                     PersistentTable* existingTable,
+                     PersistentTable* newTable)
 {
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
