@@ -468,7 +468,139 @@ bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDataba
 static void
 migrateChangedTuples(catalog::Table const &catalogTable,
                      PersistentTable* existingTable,
-                     PersistentTable* newTable);
+                     PersistentTable* newTable)
+{
+    int64_t existingTupleCount = existingTable->activeTupleCount();
+
+    // remove all indexes from the existing table
+    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    for (int i = 0; i < currentIndexes.size(); i++) {
+        existingTable->removeIndex(currentIndexes[i]);
+    }
+
+    // All the (surviving) materialized views depending on the existing table will need to be "transfered"
+    // to the new table -- BUT there's no rush.
+    // The "deleteTupleForSchemaChange" variant of deleteTuple used here on the existing table
+    // leaves any dependent materialized view tables untouched/intact
+    // (technically, temporarily out of synch with the shrinking table).
+    // But the normal "insertPersistentTuple" used here on the new table tries to populate any dependent
+    // serialized views.
+    // Rather than empty the surviving view tables, and transfer them to the new table to be re-populated "retail",
+    // transfer them "wholesale" post-migration.
+
+    // figure out what goes in each columns of the new table
+
+    // set default values once in the temp tuple
+    int columnCount = newTable->columnCount();
+
+    // default values
+    boost::scoped_array<NValue> defaults_array(new NValue[columnCount]);
+    NValue *defaults = defaults_array.get();
+
+    // map from existing table
+    int columnSourceMap[columnCount];
+
+    // Indicator that object allocation is required in the column assignment,
+    // to cover an explosion from an inline-sized to an out-of-line-sized string.
+    bool columnExploded[columnCount];
+
+    vector<std::string> oldColumnNames = existingTable->getColumnNames();
+
+    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
+    for (colIter = catalogTable.columns().begin();
+         colIter != catalogTable.columns().end();
+         colIter++)
+    {
+        std::string colName = colIter->second->name();
+        catalog::Column *column = colIter->second;
+        int newIndex = column->index();
+
+        // assign a default value, if one exists
+        ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
+        if (defaultColType == VALUE_TYPE_INVALID) {
+            defaults[newIndex] = ValueFactory::getNullValue();
+        }
+        else {
+            std::string defaultValue = column->defaultvalue();
+            // this could probably use the temporary string pool instead?
+            // (Instead of passing NULL to use persistant storage)
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, NULL);
+        }
+
+        // find a source column in the existing table, if one exists
+        columnSourceMap[newIndex] = -1; // -1 is code for not found, use defaults
+        for (int oldIndex = 0; oldIndex < oldColumnNames.size(); oldIndex++) {
+            if (oldColumnNames[oldIndex].compare(colName) == 0) {
+                columnSourceMap[newIndex] = oldIndex;
+                columnExploded[newIndex] = (existingTable->schema()->columnIsInlined(oldIndex) &&
+                                            ! newTable->schema()->columnIsInlined(newIndex));
+                break;
+            }
+        }
+    }
+
+    TableTuple scannedTuple(existingTable->schema());
+
+    int64_t tuplesMigrated = 0;
+
+    // going to run until the source table has no allocated blocks
+    size_t blocksLeft = existingTable->allocatedBlockCount();
+    while (blocksLeft) {
+
+        TableIterator &iterator = existingTable->iterator();
+        TableTuple &tupleToInsert = newTable->tempTuple();
+
+        while (iterator.next(scannedTuple)) {
+
+            //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
+
+            // set the values from the old table or from defaults
+            for (int i = 0; i < columnCount; i++) {
+                if (columnSourceMap[i] >= 0) {
+                    NValue value = scannedTuple.getNValue(columnSourceMap[i]);
+                    if (columnExploded[i]) {
+                        value.allocateObjectFromInlinedValue(NULL);
+                    }
+                    tupleToInsert.setNValue(i, value);
+                }
+                else {
+                    tupleToInsert.setNValue(i, defaults[i]);
+                }
+            }
+
+            // insert into the new table
+            newTable->insertPersistentTuple(tupleToInsert, false);
+
+            // delete from the old table
+            existingTable->deleteTupleForSchemaChange(scannedTuple);
+
+            // note one tuple moved
+            ++tuplesMigrated;
+
+            // if a block was just deleted, start the iterator again on the next block
+            // this avoids using the block iterator over a changing set of blocks
+            size_t prevBlocksLeft = blocksLeft;
+            blocksLeft = existingTable->allocatedBlockCount();
+            if (blocksLeft < prevBlocksLeft) {
+                break;
+            }
+        }
+    }
+
+    // release any memory held by the default values --
+    // normally you'd want this in a finally block, but since this code failing
+    // implies serious problems, we'll not worry our pretty little heads
+    for (int i = 0; i < columnCount; i++) {
+        defaults[i].free();
+    }
+
+    // check tuple counts are sane
+    assert(newTable->activeTupleCount() == existingTupleCount);
+    // dumb way to structure an assert avoids unused variable warning (lame)
+    if (tuplesMigrated != existingTupleCount) {
+        assert(tuplesMigrated == existingTupleCount);
+    }
+}
 
 static
 void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
@@ -612,143 +744,6 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
 
     // configure for stats for the new table
     newTable->configureIndexStats(catalogDatabase.relativeIndex());
-}
-
-static void
-migrateChangedTuples(catalog::Table const &catalogTable,
-                     PersistentTable* existingTable,
-                     PersistentTable* newTable)
-{
-    int64_t existingTupleCount = existingTable->activeTupleCount();
-
-    // remove all indexes from the existing table
-    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
-    for (int i = 0; i < currentIndexes.size(); i++) {
-        existingTable->removeIndex(currentIndexes[i]);
-    }
-
-    // All the (surviving) materialized views depending on the existing table will need to be "transfered"
-    // to the new table -- BUT there's no rush.
-    // The "deleteTupleForSchemaChange" variant of deleteTuple used here on the existing table
-    // leaves any dependent materialized view tables untouched/intact
-    // (technically, temporarily out of synch with the shrinking table).
-    // But the normal "insertPersistentTuple" used here on the new table tries to populate any dependent
-    // serialized views.
-    // Rather than empty the surviving view tables, and transfer them to the new table to be re-populated "retail",
-    // transfer them "wholesale" post-migration.
-
-    // figure out what goes in each columns of the new table
-
-    // set default values once in the temp tuple
-    int columnCount = newTable->columnCount();
-
-    // default values
-    boost::scoped_array<NValue> defaults_array(new NValue[columnCount]);
-    NValue *defaults = defaults_array.get();
-
-    // map from existing table
-    int columnSourceMap[columnCount];
-
-    // Indicator that object allocation is required in the column assignment,
-    // to cover an explosion from an inline-sized to an out-of-line-sized string.
-    bool columnExploded[columnCount];
-
-    vector<std::string> oldColumnNames = existingTable->getColumnNames();
-
-    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
-    for (colIter = catalogTable.columns().begin();
-         colIter != catalogTable.columns().end();
-         colIter++)
-    {
-        std::string colName = colIter->second->name();
-        catalog::Column *column = colIter->second;
-        int newIndex = column->index();
-
-        // assign a default value, if one exists
-        ValueType defaultColType = static_cast<ValueType>(column->defaulttype());
-        if (defaultColType == VALUE_TYPE_INVALID) {
-            defaults[newIndex] = ValueFactory::getNullValue();
-        }
-        else {
-            std::string defaultValue = column->defaultvalue();
-            // this could probably use the temporary string pool instead?
-            // (Instead of passing NULL to use persistant storage)
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, NULL);
-        }
-
-        // find a source column in the existing table, if one exists
-        columnSourceMap[newIndex] = -1; // -1 is code for not found, use defaults
-        for (int oldIndex = 0; oldIndex < oldColumnNames.size(); oldIndex++) {
-            if (oldColumnNames[oldIndex].compare(colName) == 0) {
-                columnSourceMap[newIndex] = oldIndex;
-                columnExploded[newIndex] = (existingTable->schema()->columnIsInlined(oldIndex) &&
-                                            ! newTable->schema()->columnIsInlined(newIndex));
-                break;
-            }
-        }
-    }
-
-    TableTuple scannedTuple(existingTable->schema());
-
-    int64_t tuplesMigrated = 0;
-
-    // going to run until the source table has no allocated blocks
-    size_t blocksLeft = existingTable->allocatedBlockCount();
-    while (blocksLeft) {
-
-        TableIterator &iterator = existingTable->iterator();
-        TableTuple &tupleToInsert = newTable->tempTuple();
-
-        while (iterator.next(scannedTuple)) {
-
-            //printf("tuple: %s\n", scannedTuple.debug(existingTable->name()).c_str());
-
-            // set the values from the old table or from defaults
-            for (int i = 0; i < columnCount; i++) {
-                if (columnSourceMap[i] >= 0) {
-                    NValue value = scannedTuple.getNValue(columnSourceMap[i]);
-                    if (columnExploded[i]) {
-                        value.allocateObjectFromInlinedValue(NULL);
-                    }
-                    tupleToInsert.setNValue(i, value);
-                }
-                else {
-                    tupleToInsert.setNValue(i, defaults[i]);
-                }
-            }
-
-            // insert into the new table
-            newTable->insertPersistentTuple(tupleToInsert, false);
-
-            // delete from the old table
-            existingTable->deleteTupleForSchemaChange(scannedTuple);
-
-            // note one tuple moved
-            ++tuplesMigrated;
-
-            // if a block was just deleted, start the iterator again on the next block
-            // this avoids using the block iterator over a changing set of blocks
-            size_t prevBlocksLeft = blocksLeft;
-            blocksLeft = existingTable->allocatedBlockCount();
-            if (blocksLeft < prevBlocksLeft) {
-                break;
-            }
-        }
-    }
-
-    // release any memory held by the default values --
-    // normally you'd want this in a finally block, but since this code failing
-    // implies serious problems, we'll not worry our pretty little heads
-    for (int i = 0; i < columnCount; i++) {
-        defaults[i].free();
-    }
-
-    // check tuple counts are sane
-    assert(newTable->activeTupleCount() == existingTupleCount);
-    // dumb way to structure an assert avoids unused variable warning (lame)
-    if (tuplesMigrated != existingTupleCount) {
-        assert(tuplesMigrated == existingTupleCount);
-    }
 }
 
 void TableCatalogDelegate::deleteCommand()
