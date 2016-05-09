@@ -95,7 +95,7 @@ public final class ExpressionLike extends ExpressionLogical {
     }
 
     private boolean hasEscape() {
-        return (TERNARY <= nodes.length);
+        return (TERNARY <= nodes.length) && (nodes[ESCAPE] != null);
     }
 
     @Override
@@ -107,25 +107,11 @@ public final class ExpressionLike extends ExpressionLogical {
 
         Object leftValue   = nodes[LEFT].getValue(session);
         Object rightValue  = nodes[RIGHT].getValue(session);
-// A VoltDB extension to disable LIKE pattern escape characters
-        Object escapeValue = (!hasEscape() || nodes[ESCAPE] == null) ? null
-/* disable 1 line ...
-        Object escapeValue = nodes[ESCAPE] == null ? null
-... disabled 1 line */
-// End of VoltDB extension
-                                                   : nodes[ESCAPE].getValue(
-                                                       session);
+        Object escapeValue = !hasEscape() ? null : nodes[ESCAPE].getValue(session);
 
         if (likeObject.isVariable) {
             synchronized (likeObject) {
-                likeObject.setPattern(session, rightValue, escapeValue,
-// A VoltDB extension to disable LIKE pattern escape characters
-                        hasEscape() && (nodes[ESCAPE] != null));
-/* disable 1 line ...
-                                      nodes[ESCAPE] != null);
-... disabled 1 line */
-// End of VoltDB extension
-
+                likeObject.setPattern(session, rightValue, escapeValue, hasEscape());
                 return likeObject.compare(session, leftValue);
             }
         }
@@ -144,7 +130,7 @@ public final class ExpressionLike extends ExpressionLogical {
 
         boolean isEscapeFixedConstant = true;
 
-        if (hasEscape() && nodes[ESCAPE] != null) {
+        if (hasEscape()) {
             if (nodes[ESCAPE].isParam) {
                 throw Error.error(ErrorCode.X_42567);
             }
@@ -202,8 +188,7 @@ public final class ExpressionLike extends ExpressionLogical {
         if (!simplified) {
             if (nodes[LEFT].dataType.isCharacterType()
                     && nodes[RIGHT].dataType.isCharacterType()
-                    && (!hasEscape()
-                            || nodes[ESCAPE] == null || nodes[ESCAPE].dataType.isCharacterType())) {
+                    && (!hasEscape()  || nodes[ESCAPE].dataType.isCharacterType())) {
                 boolean ignoreCase =
                         nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
                         || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
@@ -219,17 +204,15 @@ public final class ExpressionLike extends ExpressionLogical {
             }
         }
 
-// A VoltDB extension to disable LIKE pattern escape characters
         /*
          * Remove the unused escape node
          */
-        if (hasEscape() && nodes[ESCAPE] == null) {
+        if (hasEscape()) {
             Expression oldNodes[] = nodes;
             nodes = new Expression[BINARY];
             nodes[LEFT] = oldNodes[LEFT];
             nodes[RIGHT] = oldNodes[RIGHT];
         }
-// End of VoltDB extension
         if (likeObject != null) {
             likeObject.dataType = nodes[LEFT].dataType;
         }
@@ -248,39 +231,26 @@ public final class ExpressionLike extends ExpressionLogical {
         if (isRightArgFixedConstant && isEscapeFixedConstant) {
             likeObject.isVariable = false;
         } else {
-// A VoltDB extension to disable LIKE pattern escape characters
             /*
              * Can guarantee this won't work with an escape in the EE
              */
             if (nodes.length > 2) {
                 throw new RuntimeException("Like with an escape is not supported in parameterized queries");
             }
-// End of VoltDB extension
             return;
         }
 
         Object pattern = isRightArgFixedConstant
                          ? nodes[RIGHT].getConstantValue(session)
                          : null;
-        boolean constantEscape = isEscapeFixedConstant
-// A VoltDB extension to disable LIKE pattern escape characters
-                                 && hasEscape();
-/* disable 1 line ...
-                                 && nodes[ESCAPE] != null;
-... disabled 1 line */
-// End of VoltDB extension
+        boolean constantEscape = isEscapeFixedConstant && hasEscape();
         Object escape = constantEscape
                         ? (nodes[ESCAPE].getConstantValue(session))
                         : null;
 
-// A VoltDB extension to disable LIKE pattern escape characters
         likeObject.setPattern(session, pattern, escape, hasEscape());
-/* disable 1 line ...
-        likeObject.setPattern(session, pattern, escape, nodes[ESCAPE] != null);
-... disabled 1 line */
-// End of VoltDB extension
 
-        if (noOptimisation || simplified) {
+        if (noOptimisation) {
             return;
         }
 
@@ -330,14 +300,12 @@ public final class ExpressionLike extends ExpressionLogical {
             }
 
             if (!between && !larger) {
-// A VoltDB extension to disable LIKE pattern escape characters
                 /*
                  * Escape is not supported in the EE yet
                  */
                 if (nodes.length > 2) {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
-// End of VoltDB extension
                 return;
             }
 
@@ -367,14 +335,12 @@ public final class ExpressionLike extends ExpressionLogical {
                                                        rightBound);
                 ExpressionLike newLike = new ExpressionLike(this);
 
-// A VoltDB extension to disable LIKE pattern escape characters
                 /*
                  * Escape is not supported in the EE yet
                  */
                 if (nodes.length > 2) {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
-// End of VoltDB extension
                 nodes        = new Expression[BINARY];
                 likeObject   = null;
                 nodes[LEFT]  = new ExpressionLogical(OpTypes.AND, gte, lte);
@@ -393,7 +359,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 opType       = OpTypes.AND;
                 simplified = true;
             }
-// A VoltDB extension to disable LIKE pattern escape characters
             else {
                 /*
                  * Escape is not supported in the EE yet
@@ -402,7 +367,6 @@ public final class ExpressionLike extends ExpressionLogical {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
             }
-// End of VoltDB extension
         }
     }
 
@@ -417,7 +381,7 @@ public final class ExpressionLike extends ExpressionLogical {
         sb.append(right);
 
         /** @todo fredt - scripting of non-ascii escapes needs changes to general script logging */
-        if (hasEscape() && nodes[ESCAPE] != null) {
+        if (hasEscape()) {
             sb.append(' ').append(Tokens.T_ESCAPE).append(' ');
             sb.append(nodes[ESCAPE].getSQL());
             sb.append(' ');
