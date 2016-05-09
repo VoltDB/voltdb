@@ -2146,9 +2146,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         boolean paused = false;
         try {
-            if (m_messenger.start()) {
-                paused = true;
-            }
+            paused = m_messenger.start();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }

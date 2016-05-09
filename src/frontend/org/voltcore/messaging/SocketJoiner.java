@@ -335,13 +335,9 @@ public class SocketJoiner {
              * Read a length prefixed JSON message
              */
             JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
-            boolean paused = false;
-            if (jsObj.has("paused")) {
-                //If connecting server told me paused I will set to start as paused.
-                paused = jsObj.getBoolean("paused");
-            }
-            if (paused) {
-                m_paused.set(paused);
+            //If any connecting server told me paused I will set to start as paused.
+            if (jsObj.optBoolean("paused", false)) {
+                m_paused.set(true);
             }
 
             LOG.info(jsObj.toString(2));
@@ -450,6 +446,7 @@ public class SocketJoiner {
 
     /**
      * Read version info from a socket and check compatibility.
+     * After verifying versions return if "paused" start is indicated. True if paused start otherwise normal start.
      */
     private boolean processVersionJSONResponse(SocketChannel sc,
                                             String remoteAddress,

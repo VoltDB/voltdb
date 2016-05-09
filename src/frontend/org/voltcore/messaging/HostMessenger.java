@@ -352,7 +352,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary.
+     * if necessary. return true if any node indicates a paused start.
      */
     public boolean start() throws Exception {
         /*
