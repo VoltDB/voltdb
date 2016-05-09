@@ -130,9 +130,9 @@
     <target name="voltcsvformatter">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/voltcsvformatter.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatter.class"/>
-            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatterFactory.class"/>
-            <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
+            <include name="org/voltdb/importer/formatter/builtin/*.class"/>
+            <include name="org/supercsv_voltpatches/tokenizer/*.class"/>
+            <zipgroupfileset dir="${base.dir}/lib" includes="super-csv-2.1.0.jar" />
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
