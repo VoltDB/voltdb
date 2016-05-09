@@ -465,153 +465,10 @@ bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDataba
     return m_exportEnabled;
 }
 
-
-
-void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
-                  PersistentTable *existingTable, PersistentTable *newTable,
-                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
-{
-    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<MaterializedViewMetadata*> survivingViews;
-    std::vector<MaterializedViewMetadata*> obsoleteViews;
-
-    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
-    existingTable->segregateMaterializedViews(views.begin(), views.end(),
-                                              survivingInfos, survivingViews,
-                                              obsoleteViews);
-
-    // This process temporarily duplicates the materialized view definitions and their
-    // target table reference counts for all the right materialized view tables,
-    // leaving the others to go away with the existingTable.
-    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
-    // there needs to be a way to handle cases where the target table HAS been redefined already and
-    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
-    // At this point, the materialized view makes a best effort to use the
-    // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
-    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
-    // an obsolete target table needs to be brought forward to reference the replacement table.
-    // See initMaterializedViews
-
-    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
-        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
-        // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate =
-            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                delegatesByName));
-        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
-        if (targetDelegate) {
-            PersistentTable* newTargetTable =
-                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
-            if (newTargetTable) {
-                targetTable = newTargetTable;
-            }
-        }
-        // This is not a leak -- the materialized view metadata is self-installing into the new table.
-        // Also, it guards its targetTable from accidental deletion with a refcount bump.
-        new MaterializedViewMetadata(newTable, targetTable, currInfo);
-    }
-}
-
-void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
-                  StreamedTable *existingTable, StreamedTable *newTable,
-                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
-{
-//    std::cout << "Migrating export views\n";
-//    std::cout.flush();
-
-    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<ExportMaterializedViewMetadata*> survivingViews;
-    std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
-
-    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
-    existingTable->segregateMaterializedViews(views.begin(), views.end(),
-                                              survivingInfos, survivingViews,
-                                              obsoleteViews);
-
-    // This process temporarily duplicates the materialized view definitions and their
-    // target table reference counts for all the right materialized view tables,
-    // leaving the others to go away with the existingTable.
-    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
-    // there needs to be a way to handle cases where the target table HAS been redefined already and
-    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
-    // At this point, the materialized view makes a best effort to use the
-    // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
-    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
-    // an obsolete target table needs to be brought forward to reference the replacement table.
-    // See initMaterializedViews
-
-    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
-        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
-        // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate =
-            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                delegatesByName));
-        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
-        if (targetDelegate) {
-            PersistentTable* newTargetTable =
-                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
-            if (newTargetTable) {
-                targetTable = newTargetTable;
-            }
-        }
-        // This is not a leak -- the materialized view metadata is self-installing into the new table.
-        // Also, it guards its targetTable from accidental deletion with a refcount bump.
-        new ExportMaterializedViewMetadata(newTable, targetTable, currInfo);
-    }
-}
-
-
-void
-TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
-                                           catalog::Table const &catalogTable,
-                                           std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
-{
-    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
-
-    ///////////////////////////////////////////////
-    // Create a new table so two tables exist
-    ///////////////////////////////////////////////
-
-    PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
-    assert(newTable);
-    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
-
-    ///////////////////////////////////////////////
-    // Move tuples from one table to the other
-    ///////////////////////////////////////////////
-    migrateChangedTuples(catalogTable, existingTable, newTable);
-
-    migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
-    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(m_table);
-    if (streamedTable) {
-        StreamedTable *newSTable = dynamic_cast<StreamedTable*>(newTable);
-        migrateExportViews(catalogTable.views(), streamedTable, newSTable, delegatesByName);
-    }
-
-    ///////////////////////////////////////////////
-    // Drop the old table
-    ///////////////////////////////////////////////
-    deleteCommand();
-
-    ///////////////////////////////////////////////
-    // Patch up the new table as a replacement
-    ///////////////////////////////////////////////
-
-    // configure for stats tables
-    newTable->configureIndexStats(catalogDatabase.relativeIndex());
-    newTable->incrementRefcount();
-    m_table = newTable;
-}
-
-void
-TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
-                                           PersistentTable* existingTable,
-                                           PersistentTable* newTable)
+static void
+migrateChangedTuples(catalog::Table const &catalogTable,
+                     PersistentTable* existingTable,
+                     PersistentTable* newTable)
 {
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
@@ -743,6 +600,150 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
     if (tuplesMigrated != existingTupleCount) {
         assert(tuplesMigrated == existingTupleCount);
     }
+}
+
+static
+void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
+                  PersistentTable *existingTable, PersistentTable *newTable,
+                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
+{
+    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+    std::vector<MaterializedViewMetadata*> survivingViews;
+    std::vector<MaterializedViewMetadata*> obsoleteViews;
+
+    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
+    existingTable->segregateMaterializedViews(views.begin(), views.end(),
+                                              survivingInfos, survivingViews,
+                                              obsoleteViews);
+
+    // This process temporarily duplicates the materialized view definitions and their
+    // target table reference counts for all the right materialized view tables,
+    // leaving the others to go away with the existingTable.
+    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
+    // there needs to be a way to handle cases where the target table HAS been redefined already and
+    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+    // At this point, the materialized view makes a best effort to use the
+    // current/latest version of the table -- particularly, because it will have made off with the
+    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
+    // an obsolete target table needs to be brought forward to reference the replacement table.
+    // See initMaterializedViews
+
+    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        // Use the now-current definiton of the target table, to be updated later, if needed.
+        TableCatalogDelegate* targetDelegate =
+            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                delegatesByName));
+        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        if (targetDelegate) {
+            PersistentTable* newTargetTable =
+                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+            if (newTargetTable) {
+                targetTable = newTargetTable;
+            }
+        }
+        // This is not a leak -- the materialized view metadata is self-installing into the new table.
+        // Also, it guards its targetTable from accidental deletion with a refcount bump.
+        new MaterializedViewMetadata(newTable, targetTable, currInfo);
+    }
+}
+
+static
+void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
+                  StreamedTable *existingTable, StreamedTable *newTable,
+                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
+{
+//    std::cout << "Migrating export views\n";
+//    std::cout.flush();
+
+    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+    std::vector<ExportMaterializedViewMetadata*> survivingViews;
+    std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
+
+    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
+    existingTable->segregateMaterializedViews(views.begin(), views.end(),
+                                              survivingInfos, survivingViews,
+                                              obsoleteViews);
+
+    // This process temporarily duplicates the materialized view definitions and their
+    // target table reference counts for all the right materialized view tables,
+    // leaving the others to go away with the existingTable.
+    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
+    // there needs to be a way to handle cases where the target table HAS been redefined already and
+    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+    // At this point, the materialized view makes a best effort to use the
+    // current/latest version of the table -- particularly, because it will have made off with the
+    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
+    // an obsolete target table needs to be brought forward to reference the replacement table.
+    // See initMaterializedViews
+
+    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        // Use the now-current definiton of the target table, to be updated later, if needed.
+        TableCatalogDelegate* targetDelegate =
+            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                delegatesByName));
+        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        if (targetDelegate) {
+            PersistentTable* newTargetTable =
+                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+            if (newTargetTable) {
+                targetTable = newTargetTable;
+            }
+        }
+        // This is not a leak -- the materialized view metadata is self-installing into the new table.
+        // Also, it guards its targetTable from accidental deletion with a refcount bump.
+        new ExportMaterializedViewMetadata(newTable, targetTable, currInfo);
+    }
+}
+
+void
+TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
+                                           catalog::Table const &catalogTable,
+                                           std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
+{
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
+
+    ///////////////////////////////////////////////
+    // Create a new table so two tables exist
+    ///////////////////////////////////////////////
+
+    PersistentTable *newTable =
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
+    assert(newTable);
+    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
+
+    ///////////////////////////////////////////////
+    // Make this delegate point to the new table,
+    // so we can migrate views below, which may
+    // contains plans that reference this table
+    ///////////////////////////////////////////////
+    newTable->incrementRefcount();
+    m_table = newTable;
+
+    ///////////////////////////////////////////////
+    // Move tuples from one table to the other
+    ///////////////////////////////////////////////
+    migrateChangedTuples(catalogTable, existingTable, newTable);
+
+    migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
+    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(existingTable);
+    if (streamedTable) {
+        StreamedTable *newSTable = dynamic_cast<StreamedTable*>(newTable);
+        migrateExportViews(catalogTable.views(), streamedTable, newSTable, delegatesByName);
+    }
+
+    ///////////////////////////////////////////////
+    // Drop the old table
+    ///////////////////////////////////////////////
+    existingTable->decrementRefcount();
+
+    // configure for stats for the new table
+    newTable->configureIndexStats(catalogDatabase.relativeIndex());
 }
 
 void TableCatalogDelegate::deleteCommand()
