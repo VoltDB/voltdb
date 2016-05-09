@@ -233,7 +233,7 @@ public class ProcedureRunner {
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
      */
-    long getTransactionId() {
+    public long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
@@ -839,18 +839,19 @@ public class ProcedureRunner {
     }
 
     private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
+        Class<?> argClassToCheck = argClass;
         VoltType argType = VoltType.INVALID;
         boolean isArray = false;
 
         // Argument to param for IN list will come in as array of arguments. The varbinary can also appear
         // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
-        if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
-            argType = VoltType.typeFromClass(argClass.getComponentType());
+        if (argClassToCheck.isArray() && expectedType != VoltType.VARBINARY) {
+            argType = VoltType.typeFromClass(argClassToCheck.getComponentType());
             isArray = true;
         }
         else {
-            if (argClass.isArray() && (argClass.getComponentType().isArray() ||     // supplied argument can be array of varbinary
-                                       argClass != byte[].class)) {                 // supplied argument is not varbinary but array of some other type
+            if (argClassToCheck.isArray() && (argClassToCheck.getComponentType().isArray() ||     // supplied argument can be array of varbinary
+                                       argClassToCheck != byte[].class)) {                 // supplied argument is not varbinary but array of some other type
                 assert(expectedType == VoltType.VARBINARY);
                 // For in list arguments, passed in argument can be an array of
                 // varbinary. It would be nice if the information about expected type
@@ -858,10 +859,10 @@ public class ProcedureRunner {
                 // helped in making logic simple and more concise. In absence of that
                 // will have to weaken the checks so that we don't introduce regression
                 // as we don't know expected type of param is array or not.
-                argClass = argClass.getComponentType();
+                argClassToCheck = argClassToCheck.getComponentType();
                 isArray = true;
             }
-            argType = VoltType.typeFromClass(argClass);
+            argType = VoltType.typeFromClass(argClassToCheck);
         }
 
         if (!VoltTypeUtil.implicitTypeConversionFeasible(argType, expectedType, isArray)) {
@@ -872,10 +873,13 @@ public class ProcedureRunner {
                 argType = VoltType.VARBINARY;
 
             }
-            throw new VoltTypeException("Procedure " + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
-                                         "' to '"+ expectedType.getName() + "' for arg " + argInd +
-                                         " for SQL stmt: " + stmt.getText() + "." +
-                                         " Try explicitly using a " + expectedType.getName()+ " parameter.");
+            throw new VoltTypeException("Procedure " + m_procedureName +
+                    ": Incompatible parameter type: can not convert type '" + argType.getName() +
+                    "(" + argClass.getSimpleName() +
+                    ")' to '" + expectedType.getName() + "' for arg " + argInd +
+                    " for SQL stmt: " + stmt.getText() + ". " +
+                    stmt.paramTypesExplained() +
+                    " Try explicitly using a " + expectedType.getName()+ " compatible parameter.");
         }
     }
 
@@ -887,7 +891,9 @@ public class ProcedureRunner {
         if (inArgs.length != numParamTypes) {
             throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
-                    " where " + numParamTypes + " was expected for statement " + stmt.getText());
+                    " where " + numParamTypes +
+                    " was expected for statement " + stmt.getText() +
+                    ". " + stmt.paramTypesExplained());
         }
 
         for (int ii = 0; ii < numParamTypes; ii++) {

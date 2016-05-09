@@ -114,7 +114,7 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
-        final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
+        final int numLocalSites = context.getCatalogContext().cluster.getDeployment().get("deployment").getSitesperhost();
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
             try {
