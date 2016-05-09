@@ -53,6 +53,7 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.net.HostAndPort;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -236,6 +237,8 @@ public class VoltDB {
         /** Placement group */
         public String m_placementGroup = null;
 
+        public AtomicBoolean m_isPaused = new AtomicBoolean(false);
+
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
             System.out.flush();
@@ -264,9 +267,6 @@ public class VoltDB {
 
         /** command line provided voltdbroot */
         public File m_voltdbRoot = new VoltFile("voltdbroot");
-
-        /** start in admin mode */
-        public boolean m_startInAdminMode = false;
 
         /** configuration UUID */
         public final UUID m_configUUID = UUID.randomUUID();
@@ -538,12 +538,13 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
-                else if (arg.equalsIgnoreCase("force"))
+                else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
-                else if (arg.equalsIgnoreCase("clustername"))
+                } else if (arg.equalsIgnoreCase("paused")) {
+                    //Start paused.
+                    m_isPaused.set(true);
+                } else if (arg.equalsIgnoreCase("clustername"))
                     m_clusterName = args[++i].trim();
-                else if (arg.equalsIgnoreCase("adminmode"))
-                    m_startInAdminMode = true;
                 else if (arg.equalsIgnoreCase("voltdbroot")) {
                     m_voltdbRoot = new VoltFile(args[++i]);
                     if (!"voltdbroot".equals(m_voltdbRoot.getName())) {
@@ -689,7 +690,7 @@ public class VoltDB {
                         m_internalPort,
                         m_port,
                         m_adminPort == DISABLED_PORT ? DEFAULT_ADMIN_PORT : m_adminPort,
-                        m_startInAdminMode);
+                        m_isPaused.get());
             }
         });
 
@@ -736,6 +737,11 @@ public class VoltDB {
                 }
             }
 
+            //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
+            if (m_isPaused.get() && (m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN) ) {
+                isValid = false;
+                hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+            }
             return isValid;
         }
 

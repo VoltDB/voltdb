@@ -67,6 +67,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.primitives.Longs;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -101,6 +102,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
+        public AtomicBoolean isPaused;
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -261,7 +263,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
-                m_config.internalPort,
+                m_config.internalPort, m_config.isPaused,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
@@ -350,9 +352,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary.
+     * if necessary. return true if any node indicates a paused start.
      */
-    public void start() throws Exception {
+    public boolean start() throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -434,6 +436,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
+        return m_joiner.isPaused();
     }
 
     //For test only

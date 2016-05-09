@@ -1,4 +1,4 @@
-## This file is part of VoltDB.
+# This file is part of VoltDB.
 # Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,8 @@
                                 supports_daemon=False,
                                 supports_multiple_daemons=False,
                                 check_environment_config=True,
-                                force_voltdb_create=True),
+                                force_voltdb_create=True,
+                                supports_paused=False),
     options = (
         VOLT.StringOption('-N', '--name', 'clustername',
                          'specify the the cluster designation name',

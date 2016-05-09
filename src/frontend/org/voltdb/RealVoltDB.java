@@ -484,7 +484,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
-     * @param config
+     * @param config configuration that gets passed in from commandline.
      */
     @Override
     public void initialize(VoltDB.Configuration config) {
@@ -552,7 +552,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         meshHash,
                         config.m_configUUID,
                         config.m_internalPortInterface + ":" + Integer.toString(config.m_internalPort),
-                        config.m_startInAdminMode
+                        config.m_isPaused.get()
                         );
                 try {
                     m_deploymentAutomationAvailable = setupAdminListener(deployment, config, m_statusTracker, configProbeTracker);
@@ -578,7 +578,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
                     config.m_leader = probeok.getLeader();
                     config.m_startAction = probeok.getStartAction();
-                    config.m_startInAdminMode = probeok.isAdminMode();
+                    config.m_isPaused.set(probeok.isAdminMode());
 
                     modifyIfNecessaryDeploymentHostCount(deployment, probeok.getHostCount());
 
@@ -655,7 +655,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            buildClusterMesh(isRejoin || m_joining);
+            MeshResult mode = buildClusterMesh(isRejoin || m_joining);
+            if (!isRejoin && !m_joining) {
+                m_startMode = mode.m_mode;
+            }
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -2098,6 +2101,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    //Indicating Result of meshing.
+    private static class MeshResult {
+        public final OperationMode m_mode;
+        public MeshResult(OperationMode mode) {
+             m_mode = mode;
+        }
+    }
+
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -2105,7 +2116,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    void buildClusterMesh(boolean isRejoin) {
+    MeshResult buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
         HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
         String hostname = hostAndPort.getHostText();
@@ -2127,13 +2138,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+        hmconfig.isPaused = m_config.m_isPaused;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
+        boolean paused = false;
         try {
-            m_messenger.start();
+            paused = m_messenger.start();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -2156,6 +2169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (isRejoin) {
             m_statusTracker.setNodeState(NodeState.REJOINING);
         }
+        return new MeshResult(paused ? OperationMode.PAUSED : OperationMode.RUNNING);
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -2967,11 +2981,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         {
             if (mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(true);
                 m_statusTracker.setNodeState(NodeState.PAUSED);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(false);
                 m_statusTracker.setNodeState(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
@@ -3141,9 +3157,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = m_startMode;
         } else {
             // Shouldn't be here, but to be safe
+            m_config.m_isPaused.set(false);
             m_mode = OperationMode.RUNNING;
         }
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        Object args[] = { m_mode.toString() };
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);

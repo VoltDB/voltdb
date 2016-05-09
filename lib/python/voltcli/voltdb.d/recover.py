@@ -23,7 +23,9 @@
                                 safemode_available=True,
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
-                                check_environment_config=True),
+                                check_environment_config=True,
+                                force_voltdb_create=False,
+                                supports_paused=True),
     options = (
         VOLT.BooleanOption('-r', '--replica', 'replica', 'recover replica cluster', default = False),
     ),

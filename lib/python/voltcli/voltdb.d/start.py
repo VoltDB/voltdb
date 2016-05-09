@@ -23,7 +23,8 @@
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True,
-                                force_voltdb_create=False),
+                                force_voltdb_create=False,
+                                supports_paused=True),
     options = (
         VOLT.StringListOption('-C', '--cluster', 'mesh',
                              'specify a comman delimited list of cluster members',
