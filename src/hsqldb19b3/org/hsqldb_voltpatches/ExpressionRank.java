@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.hsqldb_voltpatches.types.Type;
 
 
 /**
@@ -45,7 +44,6 @@ import org.hsqldb_voltpatches.types.Type;
 public class ExpressionRank extends Expression {
     private List<Expression> m_partitionByList;
     private SortAndSlice m_sortAndSlice;
-    private boolean m_isPercent;
 
     ExpressionRank(SortAndSlice sortAndSlice, List<Expression> partitionByList, boolean isPercent) {
         super(OpTypes.RANK);
@@ -53,7 +51,6 @@ public class ExpressionRank extends Expression {
         nodes       = Expression.emptyExpressionArray;
         m_partitionByList = partitionByList;
         m_sortAndSlice = sortAndSlice;
-        m_isPercent = isPercent;
     }
 
     @Override
@@ -67,12 +64,6 @@ public class ExpressionRank extends Expression {
         for(int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
             Expression e = (Expression) m_sortAndSlice.exprList.get(i);
             e.resolveTypes(session, parent);
-        }
-
-        if (m_isPercent) {
-        	dataType = Type.SQL_DECIMAL;
-        } else {
-        	dataType = Type.SQL_NUMERIC;
         }
     }
 
@@ -105,12 +96,6 @@ public class ExpressionRank extends Expression {
     }
 
     public VoltXMLElement voltAnnotateRankXML(VoltXMLElement exp, Session session) throws HSQLParseException {
-    	if (m_isPercent) {
-    		exp.attributes.put("isPercentRank", "true");
-    	} else {
-    		exp.attributes.put("isPercentRank", "false");
-    	}
-
     	if (m_partitionByList.size() > 0) {
             VoltXMLElement pxe = new VoltXMLElement("partitionbyList");
             exp.children.add(pxe);
@@ -136,5 +121,5 @@ public class ExpressionRank extends Expression {
 
         return exp;
     }
-    
+
 }

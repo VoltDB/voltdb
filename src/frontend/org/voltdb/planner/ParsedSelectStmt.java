@@ -45,7 +45,6 @@ import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
-import org.voltdb.planner.ParsedSelectStmt.LimitOffset;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -708,19 +707,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Check for windowed expressions.
         List<AbstractExpression> windowedExprs = ExpressionUtil.findAllExpressionsOfClass(colExpr, WindowedExpression.class);
         if (windowedExprs != null && !windowedExprs.isEmpty()) {
-            if (m_hasWindowingExpression) {
+            if (m_hasWindowingExpression || (windowedExprs.size() > 1)) {
                 throw new PlanningErrorException(
                         "At most one windowed display column is supported.");
             }
-            for (AbstractExpression ex: windowedExprs) {
-                WindowedExpression rankExpr = (WindowedExpression) ex;
-                String tbName = rankExpr.getTableName();
-
-                AbstractExpression predicate = m_joinTree.getAllFilters();
-                StmtTableScan tableScan = m_tableAliasMap.get(tbName);
-                rankExpr.updateWithTheBestIndex(predicate, tableScan);
-                m_hasWindowingExpression = true;
-            }
+            m_hasWindowingExpression = true;
         }
 
         if (isDistributed) {
@@ -805,7 +796,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
         if (m_hasWindowingExpression) {
             throw new PlanningErrorException(
-                    "windowed operations are not allowed in the same query as an ORDER BY.");
+                    "Use of both windowed operations and GROUP BY is not supported.");
         }
         for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child);

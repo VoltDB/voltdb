@@ -17,7 +17,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -25,41 +25,35 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
-import org.voltdb.planner.PlanningErrorException;
-import org.voltdb.planner.SubPlanAssembler;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
-import org.voltdb.utils.CatalogUtil;
 
+/**
+ * Objects of this class represent windowed expressions in the Volt
+ * AST.  We currently implement only the RANK function, and only the
+ * slow path.  This class for the slow path is just a container with
+ * three pieces.
+ * <ol>
+ *   <li>A sequence of partition by expressions.</li>
+ *   <li>A sequence of pairs of order by expressions and sort directions.</li>
+ *   <li> An aggregate operation.
+ * </ol>
+ * The aggregate operation is sotred in the AbstractExpression base class.
+ *
+ * There will be a fast path which will need an index and a single
+ * table, as well as perhaps some other metadata.  But we currently just
+ * implement the slow path.
+ */
 public class WindowedExpression extends AbstractExpression {
     public enum Members {
         PARTITION_BY_EXPRESSIONS,
         ORDER_BY_EXPRESSIONS,
-        ORDER_BY_DIRECTIONS,
-        EXP,
-        DIR
+        SORT_EXPRESSION,
+        SORT_DIRECTION
     }
 
     public static SortDirectionType DEFAULT_ORDER_BY_DIRECTION = SortDirectionType.ASC;
-
-    private boolean m_isPercentRank = false;
-
-    private String m_tableName = null;
-    private String m_indexName = null;
-
-    private List<Index> m_indexCandidates = new ArrayList<Index>();
-    private List<Integer> m_indexColumnsCovered = new ArrayList<Integer>();
-    private Index m_index;
-
-    private boolean m_areAllIndexColumnsCovered = false;
 
     private List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     private List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
@@ -80,34 +74,12 @@ public class WindowedExpression extends AbstractExpression {
             Database db, boolean isDecending, boolean isPercentRank)
     {
         super(operationType);
-        m_tableName = findTableName(orderbyExprs);
-        m_isPercentRank = isPercentRank;
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);
         m_orderByDirections.addAll(orderByDirections);
 
-        Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
-
-        m_index = index;
-        m_indexName = (m_index != null) ? index.getTypeName() : null;
     }
 
-
-    public String getTableName() {
-        return m_tableName;
-    }
-
-    public void setTableName(String tableName) {
-        m_tableName = tableName;
-    }
-
-    public String getIndexName() {
-        return m_indexName;
-    }
-
-    public void setIndexName(String indexName) {
-        m_indexName = indexName;
-    }
 
     public int getOrderbySize() {
         return m_orderByExpressions.size();
@@ -129,76 +101,13 @@ public class WindowedExpression extends AbstractExpression {
         return m_orderByDirections;
     }
 
-    public boolean isPercentRank() {
-        return m_isPercentRank;
-    }
-
-    public void setIsPercentRank(boolean isPercentRank) {
-        m_isPercentRank = isPercentRank;
-    }
-
-    public boolean areAllIndexColumnsCovered() {
-        return m_areAllIndexColumnsCovered;
-    }
-
-    public boolean isIndexUnqiue() {
-        return m_index.getUnique();
-    }
-
-    public Index getIndex() {
-        return m_index;
-    }
-
-    public boolean isUsingPartialIndex() {
-        return ! m_index.getPredicatejson().isEmpty();
-    }
-
-    public boolean hasPartitionTableIssue(Database db, Table targetTable, List<AbstractExpression> partitionbyExprs) {
-        Column partitionCol = targetTable.getPartitioncolumn() ;
-        if (partitionCol == null) {
-            // replicated table has no partition data issue
-            return false;
-        }
-        String colName = partitionCol.getTypeName();
-        TupleValueExpression tve = new TupleValueExpression(
-                m_tableName, m_tableName, colName, colName, partitionCol.getIndex());
-        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
-
-        boolean pkCovered = false;
-        for (AbstractExpression ex: partitionbyExprs) {
-            if (ex.equals(tve)) {
-                pkCovered = true;
-                break;
-            }
-        }
-        // If PARTITION BY not covering PK, we can not use that index to calculate ranking
-        // because our index is not distributed implemented.
-        return ! pkCovered;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (super.equals(obj) && obj instanceof WindowedExpression) {
-            WindowedExpression rankExpr = (WindowedExpression) obj;
-            if (rankExpr.getTableName() == null) {
-                return m_tableName == null;
-            }
-            if (m_tableName == null) {
-                return false;
-            }
-            if (false == rankExpr.getTableName().equals(m_tableName)) {
-                return false;
-            }
-            if (rankExpr.getIndexName() == null) {
-                return m_indexName == null;
-            }
-            if (m_indexName == null) {
-                return false;
-            }
-            if (false == rankExpr.getIndexName().equals(m_indexName)) {
-                return false;
-            }
-            if (rankExpr.isPercentRank() == m_isPercentRank) {
+            WindowedExpression oWindow = (WindowedExpression)obj;
+            if (m_orderByExpressions.equals(oWindow.getOrderByExpressions())
+                    && m_orderByDirections.equals(oWindow.getOrderByDirections())
+                    && m_partitionByExpressions.equals(oWindow.getPartitionByExpressions())) {
                 return true;
             }
         }
@@ -208,33 +117,41 @@ public class WindowedExpression extends AbstractExpression {
     @Override
     public int hashCode() {
         int hash = super.hashCode();
-        if (m_tableName != null) {
-            hash += m_tableName.hashCode();
-        }
-        if (m_indexName != null) {
-            hash += m_indexName.hashCode();
-        }
-
-        hash += m_isPercentRank ? 1 : 0;
-
+        hash += m_orderByDirections.hashCode();
+        hash += m_orderByExpressions.hashCode();
+        hash += m_partitionByExpressions.hashCode();
         return hash;
     }
 
     @Override
     public Object clone() {
         WindowedExpression clone = (WindowedExpression) super.clone();
-        clone.setTableName(m_tableName);
-        clone.setIndexName(m_indexName);
-        clone.setIsPercentRank(m_isPercentRank);
+        clone.getOrderByDirections().addAll(m_orderByDirections);
+        clone.getOrderByExpressions().addAll(copyOrderByExpressions());
+        clone.getPartitionByExpressions().addAll(copyPartitionByExpressions());
         return clone;
+    }
+
+    private Collection<? extends AbstractExpression> copyPartitionByExpressions() {
+        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
+        for (AbstractExpression ae : m_partitionByExpressions) {
+            copy.add((AbstractExpression)ae.clone());
+        }
+        return copy;
+    }
+
+    private Collection<? extends AbstractExpression> copyOrderByExpressions() {
+        List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
+        for (AbstractExpression ae : m_orderByExpressions) {
+            copy.add((AbstractExpression)ae.clone());
+        }
+        return copy;
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject jobj) throws JSONException {
         super.loadFromJSONObject(jobj);
         m_partitionByExpressions.clear();
-        m_orderByExpressions.clear();
-        m_orderByDirections.clear();
 
         /*
          * Load the array of partition expressions.  The AbstractExpression class
@@ -248,12 +165,7 @@ public class WindowedExpression extends AbstractExpression {
          */
         if (jobj.has(Members.ORDER_BY_EXPRESSIONS.name())) {
             JSONArray jarray = jobj.getJSONArray(Members.ORDER_BY_EXPRESSIONS.name());
-            int size = jarray.length();
-            for (int ii = 0; ii < size; ii += 1) {
-                JSONObject tempObj = jarray.getJSONObject(ii);
-                m_orderByDirections.add( SortDirectionType.get(tempObj.getString( Members.DIR.name())) );
-                m_orderByExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.EXP.name()) );
-            }
+            AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, m_orderByDirections, jarray);
         }
     }
 
@@ -267,11 +179,11 @@ public class WindowedExpression extends AbstractExpression {
         stringer.key(Members.ORDER_BY_EXPRESSIONS.name()).array();
         for (int ii = 0; ii < m_orderByExpressions.size(); ii++) {
             stringer.object();
-            stringer.key(Members.EXP.name());
+            stringer.key(Members.SORT_EXPRESSION.name());
             stringer.object();
             m_orderByExpressions.get(ii).toJSONString(stringer);
             stringer.endObject();
-            stringer.key(Members.DIR.name()).value(m_orderByDirections.get(ii).toString());
+            stringer.key(Members.SORT_DIRECTION.name()).value(m_orderByDirections.get(ii).toString());
             stringer.endObject();
         }
         stringer.endArray();
@@ -290,15 +202,6 @@ public class WindowedExpression extends AbstractExpression {
 
     @Override
     public void finalizeValueTypes() {
-//      if (m_isPercentRank) {
-//          m_valueType = VoltType.DECIMAL;
-//            m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
-//      } else {
-//          m_valueType = VoltType.BIGINT;
-//            m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
-//      }
-
-        // HACK!!! for Percent_rank look up later...
         m_valueType = VoltType.BIGINT;
         m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
     }
@@ -307,143 +210,78 @@ public class WindowedExpression extends AbstractExpression {
     public String explain(String impliedTableName) {
         StringBuilder sb = new StringBuilder();
         sb.append("WINDOW expression").append(" expression");
-        if (m_index != null) {
-            sb.append(" expression using index " + m_indexName);
-        }
         return sb.toString();
     }
 
-    private static String findTableName(List<AbstractExpression> orderbyExprs) {
-        String tableName = null;
-        for (AbstractExpression expr : orderbyExprs) {
-            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-            for(TupleValueExpression tve: tves) {
-                if (tableName == null) {
-                    tableName = tve.getTableName();
-                    break;
-                }
-            }
+    /*
+     * Functions to find subexpressions by type.
+     */
+    @Override
+    public ArrayList<AbstractExpression> findAllSubexpressionsOfType(ExpressionType type) {
+        ArrayList<AbstractExpression> list = super.findAllSubexpressionsOfType(type);
+        for (AbstractExpression pbexpr : m_partitionByExpressions) {
+            list.addAll(pbexpr.findAllSubexpressionsOfType(type));
         }
-        return tableName;
+        for (AbstractExpression sortExpr : m_orderByExpressions) {
+            list.addAll(sortExpr.findAllSubexpressionsOfType(type));
+        }
+        return list;
     }
 
-    private Index findTableIndex(
-            List<AbstractExpression> partitionbyExprs,
-            List<AbstractExpression> orderbyExprs, Database db) {
-        Table targetTable = db.getTables().get(m_tableName);
-        // This could be a subquery.  It might not be a persistent
-        // table.  That's ok, but there are no indices here.
-        if (targetTable == null) {
-            return null;
+    @Override
+    public boolean hasAnySubexpressionOfType(ExpressionType type) {
+        if (super.hasAnySubexpressionOfType(type)) {
+            return true;
         }
-        CatalogMap<Index> allIndexes = targetTable.getIndexes();
-
-        for (Index index : allIndexes) {
-            if ( ! IndexType.isScannable(index.getType())) {
-                continue;
+        for (AbstractExpression pbExpr : m_partitionByExpressions) {
+            if (pbExpr.hasAnySubexpressionOfType(type)) {
+                return true;
             }
-
-            ArrayList<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
-            allExprs.addAll(partitionbyExprs);
-
-            if (hasPartitionTableIssue(db, targetTable, partitionbyExprs)) {
-                continue;
+        }
+        for (AbstractExpression sortExpr : m_orderByExpressions) {
+            if (sortExpr.hasAnySubexpressionOfType(type)) {
+                return true;
             }
-            allExprs.addAll(orderbyExprs);
-
-            isExpressionListSubsetOfIndex(allExprs, index);
         }
-        if (m_indexCandidates.size() == 0) {
-            return null;
-        }
-
-        int minValue = Collections.min(m_indexColumnsCovered);
-        int minIndex = m_indexColumnsCovered.indexOf(minValue);
-        Index index = m_indexCandidates.get(minIndex);
-        refreshWithBestIndex(index, minValue);
-        return index;
+        return false;
     }
 
-    private void isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
-        String exprsjson = index.getExpressionsjson();
-        if (exprsjson.isEmpty()) {
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-            if (exprs.size() > indexedColRefs.size()) {
-                return;
-            }
-
-            for (int j = 0; j < exprs.size(); j++) {
-                AbstractExpression expr = exprs.get(j);
-                if (expr instanceof TupleValueExpression == false) {
-                    return;
-                }
-                String indexColumnName = indexedColRefs.get(j).getColumn().getName();
-                String tveColumnName = ((TupleValueExpression)expr).getColumnName();
-                if (! (tveColumnName.equals(indexColumnName))) {
-                    return;
-                }
-            }
-            // find index candidate
-            Integer left = indexedColRefs.size() - exprs.size();
-            assert(left >= 0);
-            m_indexColumnsCovered.add(left);
-            m_indexCandidates.add(index);
-        } else {
-            // TODO(xin): add support of expression index for rank
+    /*
+     * Functions to find subexpressions by class.  We need to search the
+     * partition by and order by lists.
+     */
+    @Override
+    public ArrayList<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        ArrayList<AbstractExpression> list = super.findAllSubexpressionsOfClass(aeClass);
+        for (AbstractExpression pbexpr : m_partitionByExpressions) {
+            list.addAll(pbexpr.findAllSubexpressionsOfClass(aeClass));
         }
+        for (AbstractExpression sortExpr : m_orderByExpressions) {
+            list.addAll(sortExpr.findAllSubexpressionsOfClass(aeClass));
+        }
+        return list;
     }
 
-    private void refreshWithBestIndex(Index index, int indexLeftCovered) {
-        m_index = index;
-        m_indexName = index.getTypeName();
-        m_areAllIndexColumnsCovered = indexLeftCovered == 0 ? true : false;
-    }
-
-    public void updateWithTheBestIndex(AbstractExpression predicate, StmtTableScan tableScan) {
-        List<AbstractExpression> predicateList = ExpressionUtil.uncombine(predicate);
-        List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
-        for (AbstractExpression expr: predicateList) {
-            if (ExpressionUtil.containsTVEFromTable(expr, m_tableName)) {
-                coveringExprs.add(expr);
+    @Override
+    public boolean hasAnySubexpressionOfClass(Class< ? extends AbstractExpression> aeClass) {
+        if (super.hasAnySubexpressionOfClass(aeClass)) {
+            return true;
+        }
+        for (AbstractExpression pbexpr : m_partitionByExpressions) {
+            if (pbexpr.hasAnySubexpressionOfClass(aeClass)) {
+                return true;
             }
         }
-        if (m_indexColumnsCovered.size() == 0
-                || m_indexCandidates.size() == 0) {
-            return;
-        }
-
-        if (coveringExprs.isEmpty()) {
-            // case covered already
-            return;
-        }
-
-        // where clause has predicates, check partial index filter and match them
-        for (int i = 0 ; i < m_indexCandidates.size(); i++) {
-            Index index = m_indexCandidates.get(i);
-            // check partial index
-            if (index.getPredicatejson().isEmpty()) {
-                continue;
+        for (AbstractExpression sortExpr : m_orderByExpressions) {
+            if (sortExpr.hasAnySubexpressionOfClass(aeClass)) {
+                return true;
             }
-
-            List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-            if (! SubPlanAssembler.isPartialIndexPredicateCovered(tableScan, coveringExprs,
-                    index, exactMatchCoveringExprs) ) {
-                continue;
-            }
-
-            // may guard against more extra where clause filters
-
-            //
-            int left = m_indexColumnsCovered.get(i);
-            refreshWithBestIndex(index, left);
-
-            return;
         }
-        throw new PlanningErrorException( m_isPercentRank ? "PERCENT_RANK" : "RANK" +
-                " clause without using partial index matching table where clause is not allowed.");
+        return false;
     }
 
     /**
+     *
      * Given an expression, E, in the partition by list, if E is in the
      * order by list, then return the order direction of E in that list.
      * Otherwise, return the default value.

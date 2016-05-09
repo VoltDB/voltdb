@@ -49,6 +49,14 @@ public class PartitionByPlanNode extends AggregatePlanNode {
     protected String explainPlanForNode(String indent) {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
         StringBuilder sb = new StringBuilder(" PARTITION BY PLAN: " + super.explainPlanForNode(indent) + "\n");
+        sb.append("  PARTITION BY:\n");
+        WindowedExpression we = getWindowedExpression();
+        for (int idx = 0; idx < numberPartitionByExpressions(); idx += 1) {
+            sb.append("  ")
+              .append(idx).append(": ")
+              .append(we.getPartitionByExpressions().get(idx).toString())
+              .append("\n");
+        }
         sb.append(indent).append(" SORT BY: \n");
         for (int idx = 0; idx < numberSortExpressions(); idx += 1) {
             AbstractExpression ae = getSortExpression(idx);
@@ -58,14 +66,6 @@ public class PartitionByPlanNode extends AggregatePlanNode {
                .append(": ")
                .append(dir.name())
                .append("\n");
-        }
-        sb.append("  PARTITION BY:\n");
-        WindowedExpression we = getWindowedExpression();
-        for (int idx = 0; idx < numberPartitionByExpressions(); idx += 1) {
-            sb.append("  ")
-              .append(idx).append(": ")
-              .append(we.getPartitionByExpressions().get(idx).toString())
-              .append("\n");
         }
         return sb.toString();
     }

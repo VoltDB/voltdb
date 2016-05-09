@@ -91,7 +91,7 @@ public class TestWindowingFunctions extends PlannerTestCase {
 
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
-                      "windowed operations are not allowed in the same query as an ORDER BY.");
+                      "Use of both windowed operations and GROUP BY is not supported.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",

@@ -33,6 +33,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.SortDirectionType;
 
 /**
  *
@@ -662,6 +663,37 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         expr.loadFromJSONObject(obj, tableScan);
         return expr;
+    }
+
+    /**
+     * We need some enumerals which are common to PartitionByPlanNode and OrderByPlanNode
+     * and maybe others.  These are use as keys to create JSON.
+     */
+    public enum SortMembers {
+        SORT_DIRECTION,
+        SORT_EXPRESSION
+    }
+
+    /**
+     * Load two lists, one for sort expressions and one for sort directions.
+     * The lists are cleared before they are filled in.
+     *
+     * @param sortExpressions
+     * @param sortDirections
+     * @param jarray
+     * @throws JSONException
+     */
+    public static void loadSortListFromJSONArray(List<AbstractExpression> sortExpressions,
+                                                 List<SortDirectionType>  sortDirections,
+                                                 JSONArray                jarray) throws JSONException {
+        sortExpressions.clear();
+        sortDirections.clear();
+        int size = jarray.length();
+        for (int ii = 0; ii < size; ii += 1) {
+            JSONObject tempObj = jarray.getJSONObject(ii);
+            sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
+            sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION.name()) );
+        }
     }
 
     public static List<AbstractExpression> fromJSONArrayString(String jsontext, StmtTableScan tableScan) throws JSONException

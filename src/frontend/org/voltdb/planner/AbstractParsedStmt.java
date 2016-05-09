@@ -522,17 +522,14 @@ public abstract class AbstractParsedStmt {
             } else if (ele.name.equals("orderbyList")) {
                 for(int i = 0; i < ele.children.size(); i++) {
                     VoltXMLElement childNode = ele.children.get(i);
-                    boolean isDecending = Boolean.valueOf(childNode.attributes.get("decending"));
-                    if (i == 0) {
-                        areAllDecending = isDecending;
-                    } else if (areAllDecending != isDecending) {
-                        throw new PlanningErrorException("invalid RANK order by expression without consistent "
-                                + "ascending order or decending order");
-                    }
+                    SortDirectionType sortDir
+                        = Boolean.valueOf(childNode.attributes.get("decending"))
+                            ? SortDirectionType.DESC
+                            : SortDirectionType.ASC;
 
                     AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
                     orderbyExprs.add(expr);
-                    orderbyDirs.add(isDecending ? SortDirectionType.DESC : SortDirectionType.ASC);
+                    orderbyDirs.add(sortDir);
                 }
             } else {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);

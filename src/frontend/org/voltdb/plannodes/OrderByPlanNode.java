@@ -192,12 +192,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
             jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
         }
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            JSONObject tempObj = jarray.getJSONObject(i);
-            m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-            m_sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, Members.SORT_EXPRESSION.name()) );
-        }
+        AbstractExpression.loadSortListFromJSONArray(m_sortExpressions, m_sortDirections, jarray);
     }
 
     @Override
