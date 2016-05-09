@@ -3068,7 +3068,8 @@ function alertNodeClicked(obj) {
         };
 
 
-        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName, exportTableData = {}) {
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName, exportTableData) {
+            exportTableData = exportTableData ==  undefined ? {} : exportTableData
             var suffix = "";
             if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
