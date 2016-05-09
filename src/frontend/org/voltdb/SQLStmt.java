@@ -56,7 +56,7 @@ public class SQLStmt {
     // hash of the SQL string for determinism checks
     byte[] sqlCRC;
 
-    byte statementParamJavaTypes[];
+    byte statementParamTypes[];
 
     Frag aggregator;
     Frag collector;
@@ -172,9 +172,9 @@ public class SQLStmt {
          * Fill out the parameter types
          */
         if (params != null) {
-            stmt.statementParamJavaTypes = new byte[params.length];
+            stmt.statementParamTypes = new byte[params.length];
             for (int i = 0; i < params.length; i++) {
-                stmt.statementParamJavaTypes[i] = params[i].getValue();
+                stmt.statementParamTypes[i] = params[i].getValue();
             }
         }
 
