@@ -386,6 +386,7 @@
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="kinesis"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

@@ -1346,6 +1346,9 @@ public abstract class CatalogUtil {
             case KAFKA:
                 importBundleUrl = "kafkastream.jar";
                 break;
+            case KINESIS:
+                importBundleUrl = "kinesisstream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
