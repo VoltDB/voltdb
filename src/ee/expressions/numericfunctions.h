@@ -245,7 +245,7 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
  * FYI, Fortran semantics: https://gcc.gnu.org/onlinedocs/gfortran/MOD.html
  * It has the same semantics with C99 as: int(a / b) * b + MOD(a,b)  == a
  *
- * Here we have some difference about that the int function does.  Fortran trancates
+ * Here we have some difference about that the int function does.  Fortran truncates
  * down, just like floor.  So int(-3/2) = -2.  SQL apparently truncates toward
  * zero, so int(-3/2) == -3/2 = -1.
  */
@@ -262,10 +262,10 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-numeric type for SQL MOD function");
     }
 
-    bool areAllIntegralType = (isIntegralType(baseType) && isIntegralType(divisorType))
+    bool areAllIntegralOrDecimalType = (isIntegralType(baseType) && isIntegralType(divisorType))
         || (baseType == VALUE_TYPE_DECIMAL && divisorType == VALUE_TYPE_DECIMAL);
 
-    if (! areAllIntegralType) {
+    if (! areAllIntegralOrDecimalType) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-integral or non-decimal type for SQL MOD function");
     }
 
@@ -275,7 +275,7 @@ template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& argum
         throw SQLException(SQLException::data_exception_division_by_zero, "division by zero");
     }
 
-    if(isIntegralType(baseType)){
+    if (isIntegralType(baseType)){
         int64_t baseValue = base.castAsBigIntAndGetValue();
         int64_t divisorValue = divisor.castAsBigIntAndGetValue();
 

@@ -1713,19 +1713,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // check the validity of the second parameter
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
-
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
+        verifyStmtFails(client,
+                        "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0",
+                        "the second parameter");
+        verifyStmtFails(client,
+                        "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0",
+                        "the second parameter");
     }
 
     public void testFunc_Str() throws Exception
@@ -1800,12 +1793,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(str, "1123456786");
 
         // it will go out of the range of int64_t
-        try {
-            cr = client.callProcedure("@AdHoc", "select STR(DEC, -19) from D1 where id = 12");
-            fail("type validity check failed for STR");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter should be <= 38 and > 0"));
-        }
+        verifyStmtFails(client, "select STR(DEC, -19) from D1 where id = 12", "the second parameter should be <= 38 and > 0");
     }
 
     public void testRound() throws Exception
@@ -1982,89 +1970,40 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // out of int64_t range
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(dec, 2) from D1 where id = 8");
-            fail("range validity check failed for ROUND");
-        }
-        catch (ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(dec, 2) from D1 where id = 9");
-            fail("range validity check failed for ROUND");
-        }
-        catch (ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
+        verifyStmtFails(client, "select ROUND(dec, 2) from D1 where id = 8", "out of range");
 
         // check invalid type
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(id, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(tiny, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(small, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(num, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(big, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(tm, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            // TODO: I have no idea why the exception is different
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(var, 2) from R3 where id = 1");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
-        }
-
-        // it will go out of the range of int64_t
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(DEC, -19) from D1 where id = 12");
-            fail("type validity check failed for ROUND");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
-
+        verifyStmtFails(client,
+                        "select ROUND(id, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(tiny, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(small, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(num, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(big, 2) from R3 where id = 1",
+                        "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                        "select ROUND(tm, 2) from R3 where id = 1",
+                        "incompatible data type in operation");
+        verifyStmtFails(client,
+                        "select ROUND(var, 2) from R3 where id = 1",
+                        "incompatible data type in operation");
+        verifyStmtFails(client,
+                        "select ROUND(DEC, -19) from D1 where id = 12",
+                        "out of range");
         // check the validity of the second parameter
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(DEC, 15) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
-
-        try {
-            cr = client.callProcedure("@AdHoc", "select ROUND(DEC, -26) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
+        verifyStmtFails(client,
+                        "select ROUND(DEC, 15) from D1 where id = 0",
+                        "the second parameter");
+        verifyStmtFails(client,
+                        "select ROUND(DEC, -26) from D1 where id = 0",
+                        "the second parameter");
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
