@@ -244,7 +244,7 @@ public abstract class VoltProcedure {
      * @see <a href="#allowable_params">List of allowable parameter types</a>
      */
     public void voltQueueSQL(final SQLStmt stmt, Object... args) {
-        m_runner.voltQueueSQL(stmt, args);
+        m_runner.voltQueueSQL(stmt, (Expectation) null, args);
     }
 
     /**
