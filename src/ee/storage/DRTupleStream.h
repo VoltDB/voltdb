@@ -38,7 +38,7 @@ public:
     static const size_t HASH_DELIMITER_SIZE = 1 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 4;
+    static const uint8_t PROTOCOL_VERSION = 5;
 
     DRTupleStream(int partitionId, int defaultBufferSize);
 
@@ -52,7 +52,6 @@ public:
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
@@ -65,7 +64,6 @@ public:
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
@@ -75,7 +73,6 @@ public:
                        char *tableHandle,
                        std::string tableName,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
 
@@ -90,13 +87,16 @@ public:
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray catalogCommands);
+
     static int32_t getTestDRBuffer(int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
                                    std::vector<int32_t> flagList,
                                    char *out);
 
 private:
-    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
     void writeRowTuple(TableTuple& tuple,
             size_t rowHeaderSz,
@@ -139,7 +139,6 @@ public:
     size_t appendTuple(int64_t lastCommittedSpHandle,
                            char *tableHandle,
                            int partitionColumn,
-                           int64_t txnId,
                            int64_t spHandle,
                            int64_t uniqueId,
                            TableTuple &tuple,
@@ -155,7 +154,6 @@ public:
                        char *tableHandle,
                        std::string tableName,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) {
         return 0;
