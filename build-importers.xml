@@ -1,7 +1,7 @@
 <!-- Simple build file to build socket stream importer -->
 <project name="socketstream"      basedir="." default="socketstream">
 <property name='base.dir'         location='.' />
-<property name='bundles.dir'      location='./obj/eclipse/bundles' />
+<property name='bundles.dir'      location='./bundles' />
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
