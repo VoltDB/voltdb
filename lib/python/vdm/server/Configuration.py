@@ -18,6 +18,7 @@ import os
 from collections import defaultdict
 import json
 import traceback
+from sets import Set
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 from flask import jsonify
@@ -1205,6 +1206,14 @@ def set_deployment_for_upload(database_id, request):
                 if 'status' in result and result['status'] == 'error':
                     return {'status': 'failure', 'error': result['error']}
 
+                is_duplicate_user = check_duplicate_users(req)
+                if not is_duplicate_user:
+                    return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
+
+                is_invalid_roles = check_invalid_roles(req)
+                if not is_invalid_roles:
+                    return {'status': 'failure', 'error': 'Invalid user roles.'}
+
                 HTTPListener.map_deployment(req, database_id)
 
                 deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
@@ -1218,15 +1227,16 @@ def set_deployment_for_upload(database_id, request):
                             user_id = 1
                         else:
                             user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                        user_roles = ','.join(Set(user['roles'].split(',')))
+
                         HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
                                 'name': user['name'],
-                                'roles': user['roles'],
+                                'roles': user_roles,
                                 'password': user['password'],
                                 'plaintext': user['plaintext'],
                                 'databaseid': database_id,
                                 'userid': user_id
                             }
-
                 HTTPListener.sync_configuration()
                 write_configuration_file()
 
@@ -1240,6 +1250,26 @@ def set_deployment_for_upload(database_id, request):
     return {'status': 'success'}
 
 
+def check_duplicate_users(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        user_name_list = []
+        for user in req.json['users']['user']:
+            if user['name'] in user_name_list:
+                return False
+            user_name_list.append(user['name'])
+    return True
+
+
+def check_invalid_roles(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        for user in req.json['users']['user']:
+            roles = str(user['roles']).split(',')
+            for role in roles:
+                if role.strip() == '':
+                    return False
+    return True
+
+
 def check_validation_deployment(req):
     if 'systemsettings' in req.json and 'resourcemonitor' in req.json['systemsettings']:
         if 'memorylimit' in req.json['systemsettings']['resourcemonitor'] and \
@@ -1248,20 +1278,22 @@ def check_validation_deployment(req):
             response = json.loads(HTTPListener.check_size_value(size, 'memorylimit').data)
             if 'error' in response:
                 return {'status': 'error', 'error': response['error']}
-            disk_limit_arr = []
-            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
-                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
-                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                    size = feature['size']
-                    if feature['name'] in disk_limit_arr:
-                        return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
-                    disk_limit_arr.append(feature['name'])
-                    response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
-                    if 'error' in response:
-                        return {'status': 'error', 'error': response['error']}
+        disk_limit_arr = []
+        if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
+           'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
+            for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                size = feature['size']
+                if feature['name'] in disk_limit_arr:
+                    return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
+                disk_limit_arr.append(feature['name'])
+                response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
+                if 'error' in response:
+                    return {'status': 'error', 'error': response['error']}
         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
             frequency_unit = ['h', 'm', 's']
             frequency = str(req.json['snapshot']['frequency'])
+            if ' ' in frequency:
+                return {'status': 'error', 'error': 'Snapshot: White spaces not allowed in frequency.'}
             last_char = frequency[len(frequency) - 1]
             if last_char not in frequency_unit:
                 return {'status': 'error', 'error': 'Snapshot: Invalid frequency value.'}
@@ -1270,4 +1302,53 @@ def check_validation_deployment(req):
                 int_frequency = int(frequency)
             except Exception, exp:
                 return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
+    if 'export' in req.json and 'configuration' in req.json['export']:
+        for configuration in req.json['export']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Export: ' + result['error']}
+
+    if 'import' in req.json and 'configuration' in req.json['import']:
+        for configuration in req.json['import']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Import: ' + result['error']}
+
+    return {'status': 'success'}
+
+
+def check_export_property(type, properties):
+    property_list = []
+    for property in properties:
+        if 'name' in property and 'value' in property:
+            if str(property['name']).strip() == '' or str(property['value']).strip() == '':
+                return {'status': 'error', 'error': 'Invalid property.'}
+            if property['name'] in property_list:
+                return {'status': 'error', 'error': 'Duplicate properties are not allowed.'}
+            property_list.append(property['name'])
+        else:
+            return {'status': 'error', 'error': 'Invalid property.'}
+
+    if str(type).lower() == 'kafka':
+        if 'metadata.broker.list' not in property_list:
+            return {'status': 'error', 'error': 'Default property(metadata.broker.list) of kafka not present.'}
+    if str(type).lower() == 'elasticsearch':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of elasticsearch not present.'}
+    if str(type).lower() == 'file':
+        if 'type' not in property_list or 'nonce' not in property_list \
+                or 'outdir' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(type, nonce, outdir) of file not present.'}
+    if str(type).lower() == 'http':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of  http not present.'}
+    if str(type).lower() == 'jdbc':
+        if 'jdbcdriver' not in property_list or 'jdbcurl' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(jdbcdriver, jdbcurl) of jdbc not present.'}
+    if str(type).lower() == 'rabbitmq':
+        if 'broker.host' not in property_list and 'amqp.uri' not in property_list:
+            return {'status': 'error', 'error': 'Default property(either amqp.uri or broker.host) of '
+                                                'rabbitmq not present.'}
+        elif 'broker.host' in property_list and 'amqp.uri' in property_list:
+            return {'status': 'error', 'error': 'Both broker.host and amqp.uri cannot be included as rabbibmq property.'}
     return {'status': 'success'}
