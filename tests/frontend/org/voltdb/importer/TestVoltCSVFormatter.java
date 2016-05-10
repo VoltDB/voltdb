@@ -188,13 +188,12 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("escape", "|");
+        prop.setProperty("escape", "~");
         o.configureFormatterFactory("csv", prop);
         Formatter formatter = o.create();
-        Object[] results = formatter.transform("12,\"10.05,|\"test|\"\"");
-        assertEquals(results.length, 2);
-        assertEquals(results[0], "12");
-        assertEquals(results[1], "10.05,\"test\"");
+        Object[] results = formatter.transform("1,~\"escapequotes,1.10,1.11,7777-12-25 14:35:26,POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"");
+        assertEquals(results.length, 7);
+        assertEquals(results[1], "\"escapequotes");
     }
 
     @Test
