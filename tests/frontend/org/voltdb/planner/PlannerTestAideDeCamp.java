@@ -91,9 +91,13 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param detMode
      */
-    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
-    {
+    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
         compile(sql, 0, null, true, false, detMode);
+        return m_currentPlan;
+    }
+
+    CompiledPlan compileAdHocPlan(String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
+        compile(sql, 0, null, inferPartitioning, singlePartition, detMode);
         return m_currentPlan;
     }
 

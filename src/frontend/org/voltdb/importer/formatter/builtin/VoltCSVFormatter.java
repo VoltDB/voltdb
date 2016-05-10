@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.voltdb.common.Constants;
-import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 

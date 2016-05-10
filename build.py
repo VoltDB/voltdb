@@ -316,6 +316,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
+ partitionbynode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -507,6 +508,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
+     PartitionByPlanNodeTest
      PlanNodeFragmentTest
     """
 

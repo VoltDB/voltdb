@@ -41,6 +41,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask_logging import Filter
 import Configuration
+import signal
+import thread
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -54,6 +56,16 @@ __IP__ = "localhost"
 __PORT__ = 8000
 
 ALLOWED_EXTENSIONS = ['xml']
+
+
+def receive_signal(signum, stack):
+
+    config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
+    Configuration.validate_and_convert_xml_to_json(config_path)
+    thread.start_new(sync_configuration, ())
+    # print 'Received:', signum
+
+signal.signal(signal.SIGHUP, receive_signal)
 
 
 @APP.errorhandler(400)
@@ -502,21 +514,21 @@ def check_port_valid(port_option, server):
 
     if port == server_port:
         return jsonify(success=False,
-                       errors="Port %s for the same host is already used by server %s for %s" % \
+                       errors="Port %s for the same host is already used by server %s for %s." % \
                               (port, server['hostname'], port_option))
 
 
-def validate_server_ports(database_id):
+def validate_server_ports(database_id, server_id=-1):
     arr = ["http-listener", "admin-listener", "internal-listener", "replication-listener", "zookeeper-listener",
            "client-listener"]
 
     specified_port_values = {
-        "http-listener": get_port(request.json.get('http-listener', "")),
-        "admin-listener": get_port(request.json.get('admin-listener', "")),
-        "replication-listener": get_port(request.json.get('replication-listener', "")),
-        "client-listener": get_port(request.json.get('client-listener', "")),
-        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-        "internal-listener": get_port(request.json.get('internal-listener', ""))
+        "http-listener": get_port(request.json.get('http-listener', "").strip().lstrip("0")),
+        "admin-listener": get_port(request.json.get('admin-listener', "").strip().lstrip("0")),
+        "replication-listener": get_port(request.json.get('replication-listener', "").strip().lstrip("0")),
+        "client-listener": get_port(request.json.get('client-listener', "").strip().lstrip("0")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "").strip().lstrip("0")),
+        "internal-listener": get_port(request.json.get('internal-listener', "").strip().lstrip("0"))
     }
 
     for option in arr:
@@ -525,7 +537,11 @@ def validate_server_ports(database_id):
             if option != port_key and value is not None and specified_port_values[port_key] == value:
                 return jsonify(success=False, errors="Duplicate port")
     database_servers = get_servers_from_database_id(database_id)
-    servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    if server_id == -1:
+        servers = [servers for servers in database_servers if servers['hostname'] == request.json['hostname']]
+    else:
+        servers = [servers for servers in database_servers if servers['hostname'] ==
+                   request.json['hostname'] and servers['id'] != server_id]
     for server in servers:
         for option in arr:
             result = check_port_valid(option, server)
@@ -603,9 +619,9 @@ def allowed_file(filename):
 
 def get_servers_from_database_id(database_id):
     servers = []
-    database = Global.DATABASES.get(database_id)
+    database = Global.DATABASES.get(int(database_id))
     if database is None:
-        return make_response(jsonify({'statusstring': 'No database found for id: %u' % database_id}), 404)
+        return make_response(jsonify({'statusstring': 'No database found for id: %u' % int(database_id)}), 404)
     else:
         members = database['members']
 
@@ -697,7 +713,7 @@ class ServerAPI(MethodView):
             Information and the status of server if it is saved otherwise the error message.
         """
         if 'id' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' while creating server.'}), 404)
+            return make_response(jsonify({'errors': 'You cannot specify \'Id\' while creating server.'}), 404)
 
         inputs = ServerInputs(request)
         if not inputs.validate():
@@ -718,15 +734,15 @@ class ServerAPI(MethodView):
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
-            'admin-listener': request.json.get('admin-listener', "").strip(),
-            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip(),
-            'replication-listener': request.json.get('replication-listener', "").strip(),
-            'client-listener': request.json.get('client-listener', "").strip(),
+            'admin-listener': request.json.get('admin-listener', "").strip().lstrip("0"),
+            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip().lstrip("0"),
+            'replication-listener': request.json.get('replication-listener', "").strip().lstrip("0"),
+            'client-listener': request.json.get('client-listener', "").strip().lstrip("0"),
             'internal-interface': request.json.get('internal-interface', "").strip(),
             'external-interface': request.json.get('external-interface', "").strip(),
             'public-interface': request.json.get('public-interface', "").strip(),
-            'internal-listener': request.json.get('internal-listener', "").strip(),
-            'http-listener': request.json.get('http-listener', "").strip(),
+            'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
+            'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
             'placement-group': request.json.get('placement-group', "").strip()
         }
 
@@ -748,7 +764,6 @@ class ServerAPI(MethodView):
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def delete(database_id, server_id):
@@ -802,7 +817,7 @@ class ServerAPI(MethodView):
             otherwise the error message.
         """
         if 'id' in request.json and server_id != request.json['id']:
-            return make_response(jsonify({'error': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'errors': 'Server Id mentioned in the payload and url doesn\'t match.'}), 404)
 
         database = Global.DATABASES.get(database_id)
         if database is None:
@@ -817,7 +832,7 @@ class ServerAPI(MethodView):
             if current_server is None:
                 abort(404)
 
-            result = validate_server_ports(database_id)
+            result = validate_server_ports(database_id, server_id)
             if result is not None:
                 return result
 
@@ -855,7 +870,6 @@ class ServerAPI(MethodView):
         else:
             return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
             server_id, database_id)})
-
 
 
 class DatabaseAPI(MethodView):
@@ -927,7 +941,6 @@ class DatabaseAPI(MethodView):
         resp.headers['Location'] = url
 
         return resp
-
 
     @staticmethod
     def put(database_id):
@@ -1032,7 +1045,7 @@ class DeploymentUserAPI(MethodView):
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
@@ -1045,7 +1058,7 @@ class DeploymentUserAPI(MethodView):
                 'databaseid': database_id,
                 'name': request.json['name'],
                 'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
-                'roles': request.json['roles'],
+                'roles': user_roles,
                 'plaintext': True
             }
         except Exception, err:
@@ -1071,18 +1084,20 @@ class DeploymentUserAPI(MethodView):
             return jsonify(success=False, errors=inputs.errors)
 
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
+        if current_user is None:
+            return make_response(jsonify({'statusString': 'No user found for id: %u' % user_id}), 404)
 
         user = [v if type(v) is list else [v] for v in Global.DEPLOYMENT_USERS.values()]
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-
+        user_roles = ','.join(set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
         current_user['password'] = urllib.unquote(
             str(request.json.get('password', current_user['password'])).encode('ascii')).decode('utf-8')
-        current_user['roles'] = request.json.get('roles', current_user['roles'])
+        current_user['roles'] = user_roles
         current_user['plaintext'] = request.json.get('plaintext', current_user['plaintext'])
         sync_configuration()
         Configuration.write_configuration_file()
@@ -1425,10 +1440,7 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        if 'text/xml' in request.headers['Accept']:
-            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-            return Response(deployment_content, mimetype='text/xml')
-        else:
+        if 'Accept' in request.headers and 'application/json' in request.headers['Accept']:
             deployment = Global.DEPLOYMENT.get(database_id)
 
             new_deployment = deployment.copy()
@@ -1450,9 +1462,10 @@ class DatabaseDeploymentAPI(MethodView):
 
             del new_deployment['databaseid']
 
-
-
             return jsonify({'deployment': new_deployment})
+        else:
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
+            return Response(deployment_content, mimetype='text/xml')
 
     @staticmethod
     def put(database_id):
@@ -1662,47 +1675,49 @@ def main(runner, amodule, config_dir, data_dir, server):
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
-                     methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, defaults={'database_id': None},
                      view_func=DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>', strict_slashes=False, view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, view_func=DATABASE_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
 
     # Internal API
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', strict_slashes=False,
+                     view_func=STATUS_DATABASE_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', strict_slashes=False,
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/voltdeploy/status/', strict_slashes=False,
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/', strict_slashes=False,
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/', strict_slashes=False,
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False, view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
