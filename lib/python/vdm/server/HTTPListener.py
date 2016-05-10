@@ -293,7 +293,7 @@ def map_deployment(request, database_id):
             'resourcemonitor'] is None:
             deployment['systemsettings']['resourcemonitor'] = {}
 
-        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and request.json['systemsettings']['resourcemonitor']['memorylimit']:
             deployment['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                     and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
@@ -310,8 +310,8 @@ def map_deployment(request, database_id):
             deployment['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
-            deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
             if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
                 deployment['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
                 if request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
                     for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
@@ -343,10 +343,14 @@ def map_deployment(request, database_id):
         deployment['import']['configuration'] = []
         i = 0
         for configuration in request.json['import']['configuration']:
+            if 'module' not in configuration:
+                module = ''
+            else:
+                module = configuration['module']
             deployment['import']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
-                    'module': configuration['module'],
+                    'module': module,
                     'type': configuration['type'],
                     'format': configuration['format'],
                     'property': []
@@ -363,7 +367,7 @@ def map_deployment(request, database_id):
                     )
                 i += 1
     if 'export' in request.json:
-        if 'export' not in deployment or deployment['export'] is None or deployment['import'] == "None":
+        if 'export' not in deployment or deployment['export'] is None or deployment['export'] == "None":
             deployment['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
@@ -372,13 +376,18 @@ def map_deployment(request, database_id):
         except Exception, err:
             print err
         i = 0
+
         for configuration in request.json['export']['configuration']:
+            if 'exportconnectorclass' not in configuration:
+                export_connector_class = ''
+            else:
+                export_connector_class = configuration['exportconnectorclass']
             deployment['export']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
                     'stream': configuration['stream'],
                     'type': configuration['type'],
-                    'exportconnectorclass': configuration['exportconnectorclass'],
+                    'exportconnectorclass': export_connector_class,
                     'property': []
                 }
             )
@@ -407,37 +416,37 @@ def map_deployment(request, database_id):
             )
 
     if 'dr' in request.json:
-        if 'dr' not in deployment or deployment['dr'] is None:
+        if not request.json['dr']:
             deployment['dr'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr']:
-        if not hasattr(deployment['dr'], 'connection'):
-            deployment['dr']['connection'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr'] and 'source' not in request.json['dr']['connection']:
-        deployment['dr']['connection'] = None
-
-    if 'dr' in request.json and 'id' in request.json['dr']:
-        deployment['dr']['id'] = request.json['dr']['id']
-
-    if 'dr' in request.json and 'listen' in request.json['dr']:
-        deployment['dr']['listen'] = request.json['dr']['listen']
-
-    if 'dr' in request.json and request.json['dr']:
-        if 'port' in request.json['dr']:
-            deployment['dr']['port'] = request.json['dr']['port']
         else:
-            deployment['dr']['port'] = None
+            if 'dr' not in deployment or deployment['dr'] is None:
+                deployment['dr'] = {}
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] \
-            and 'source' in request.json['dr']['connection']:
-        deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            if 'connection' in request.json['dr'] and request.json['dr']['connection']:
+                if not hasattr(deployment['dr'], 'connection'):
+                    deployment['dr']['connection'] = {}
 
-    if 'dr' in request.json and not request.json['dr']:
-        deployment['dr'] = {}
+                if 'source' not in request.json['dr']['connection'] or \
+                        ('source' in request.json['dr']['connection'] and
+                         request.json['dr']['connection']['source'].strip() == ''):
+                    deployment['dr']['connection'] = None
+                else:
+                    deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            else:
+                deployment['dr']['connection'] = None
+            if 'id' in request.json['dr']:
+                deployment['dr']['id'] = request.json['dr']['id']
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] and not request.json['dr']['connection']:
-        deployment['dr']['connection'] = {}
+            if 'listen' in request.json['dr']:
+                deployment['dr']['listen'] = request.json['dr']['listen']
+            else:
+                deployment['dr']['listen'] = True
+
+            if request.json['dr']:
+                if 'port' in request.json['dr']:
+                    deployment['dr']['port'] = request.json['dr']['port']
+                else:
+                    deployment['dr']['port'] = None
 
     return deployment
 
@@ -559,16 +568,26 @@ def check_size_value(value, key):
         try:
             str_value = replace_last(value, '%', '')
             int_value = int(str_value)
-            if int_value < 0 or int_value > 100:
-                return jsonify({'error': key + ' percent value must be between 0 and 100.'})
+            min_value = 0
+            error_msg = key + ' percent value must be between 0 and 99.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' percent value must be between 1 and 99.'
+            if int_value < min_value or int_value > 99:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
         try:
             int_value = int(value)
-            if int_value < 0 or int_value > 2147483647:
-                return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+            min_value = 0
+            error_msg = key + ' value must be between 0 and 2147483647.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' value must be between 1 and 2147483647.'
+            if int_value < min_value or int_value > 2147483647:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
@@ -1457,6 +1476,8 @@ class DatabaseDeploymentAPI(MethodView):
             result = Configuration.check_validation_deployment(request)
             if 'status' in result and result['status'] == 'error':
                 return jsonify(result)
+            if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
+                return jsonify({'status': 'error', 'error': 'DR id is required.'})
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()

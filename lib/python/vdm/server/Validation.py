@@ -458,8 +458,8 @@ schema = {
                                                         "value": {
                                                             "id": "value",
                                                             "type": "string"
-                                                        }
-                                                    }
+                                                        },
+                                                    },"additionalProperties": False,
                                                 }
                                             ]
                                         },
@@ -485,13 +485,14 @@ schema = {
                                     },
 
                                 },
-                             "required": ["stream", "type"]
+                                "required": ["stream", "type", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },
+            "additionalProperties": False
 
         },
         "import": {
@@ -522,7 +523,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         }
-                                                    }
+                                                    },"additionalProperties": False,
                                                 }
                                             ],
                                             "required": ["value"]
@@ -543,17 +544,18 @@ schema = {
                                     },
                                     "format": {
                                         "id": "format",
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
 
                                 },
-                                 "required": ["format"]
+                                 "required": ["format", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },"additionalProperties": False
 
         },
         "commandlog": {
@@ -568,12 +570,12 @@ schema = {
                             "id": "time",
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 5000
+                            "maximum": 1000
                         },
                         "transactions": {
                             "id": "transactions",
                             "type": "integer",
-                            "minimum": 0,
+                            "minimum": 1,
                             "maximum": 2147483647
                         }
                     },
@@ -591,7 +593,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 102400
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
@@ -682,7 +684,9 @@ schema = {
                                         "properties": {
                                             "name": {
                                                 "id": "name",
-                                                "type": "string"
+                                                "type": "string",
+                                                "enum": ["snapshots", "commandlog", "exportoverflow", "droverflow",
+                                                          "commandlogsnapshot"]
                                             },
                                             "size": {
                                                 "id": "size",
@@ -755,9 +759,11 @@ schema = {
                             "id": "source",
                             "type": "string",
                         }
-                    }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False
