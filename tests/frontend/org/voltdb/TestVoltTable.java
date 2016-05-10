@@ -648,7 +648,7 @@ public class TestVoltTable extends TestCase {
             for (int j = 0; j < types.length; ++j) {
                 VoltTable table = new VoltTable(new ColumnInfo("test_table",
                         types[i]));
-                table.addRow(types[j].getNullValueForTest());
+                table.addRow(types[j].getNullValue());
                 VoltTableRow row = table.fetchRow(0);
                 row.get(0, types[i]);
                 assertTrue("Value wasn't null", row.wasNull());

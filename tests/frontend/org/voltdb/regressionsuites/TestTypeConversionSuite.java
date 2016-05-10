@@ -35,8 +35,8 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcToTestTypeConversi
 
 public class TestTypeConversionSuite extends RegressionSuite {
 
-    // stores columns types of table T in order they are defined
-    private VoltType[] m_tableColTypeVal = {
+    // column types of table T in order they are defined
+    private static final VoltType[] m_tableColTypeVal = {
             VoltType.TINYINT,
             VoltType.SMALLINT,
             VoltType.INTEGER,
@@ -47,46 +47,111 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltType.STRING,
             VoltType.VARBINARY,
             VoltType.GEOGRAPHY_POINT,
-            VoltType.GEOGRAPHY
+            VoltType.GEOGRAPHY,
+    };
+    private static final String m_javaTypeNamePatternForInsertTest[] = {
+            "Byte",
+            "Short",
+            "Integer",
+            "Long",
+            "Double",
+            "BigDecimal",
+            "TimestampType",
+            "String",
+            "byte\\[\\]",
+            "GeographyPointValue",
+            "GeographyValue",
+    };
+    private static final VoltType[] m_tableColInListTypeVal = {
+            VoltType.INLIST_OF_BIGINT,
+            VoltType.INLIST_OF_BIGINT,
+            VoltType.INLIST_OF_BIGINT,
+            VoltType.INLIST_OF_BIGINT,
+            null, // IN LIST of FLOAT not supported
+            null, // IN LIST of DECIMAL not supported
+            VoltType.INLIST_OF_BIGINT,
+            VoltType.INLIST_OF_STRING,
+            null, // IN LIST of VARBINARY not supported
+            null, // IN LIST of GEOGRAPHY_POINT not supported
+            null, // IN LIST of GEOGRAPHY not supported
+    };
+    private static final String m_javaTypeNamePatternForInListTest[] = {
+            // Interpretation of byte[] as a list of tiny int is prevented
+            // by an overriding interpretation of byte[] as a VARBINARY value.
+            // So, it can not be supported,
+            // unless/until we find a way around that interpretation.
+            "byte\\[\\]",
+            "short\\[\\]",
+            "int\\[\\]",
+            "long\\[\\]",
+            "double\\[\\]",
+            "BigDecimal\\[\\]",
+            "TimestampType\\[\\]",
+            "String\\[\\]",
+            "byte\\[\\]\\[\\]",
+            "GeographyPointValue\\[\\]",
+            "GeographyValue\\[\\]",
+    };
+    // A list of non-array types that should all fail to type-check when passed
+    // to "IN ?" parameters that expect some kind of array argument.
+    private static final String m_javaTypeNamePatternForInListFailureTest[] = {
+            "Byte",
+            "Short",
+            "Integer",
+            "Long",
+            "Double",
+            "BigDecimal",
+            "TimestampType",
+            "String",
+            // Interpretation of byte[] as a list of tiny int is prevented
+            // by an overriding interpretation of byte[] as a VARBINARY value.
+            // So, it can not be supported,
+            // unless/until we find a way around that interpretation.
+            // Expect the error message for this case to look a little different.
+            "byte\\[\\]",
+            "GeographyPointValue",
+            "GeographyValue",
     };
 
     // Row index provides the type converting "from"
     // Column index provides the type converting "to"
     // To see type for column (to) or row (from), map it's
     // index m_tableColTypeVal to get it's type.
-    private static final boolean [][] m_typeConversionMatrix =
-        {
-            {true, true, true, true, true, true, true, true, false, false, false},          // TinyInt
-            {true, true, true, true, true, true, true, true, false, false, false},          // SmallInt
-            {true, true, true, true, true, true, true, true, false, false, false},          // Integer
-            {true, true, true, true, true, true, true, true, false, false, false},          // BigInt
-            {true, true, true, true, true, true, true, true, false, false, false},          // Float
-            {true, true, true, true, true, true, true, true, false, false, false},          // Decimal
-            {true, true, true, true, true, false, true, true, false, false, false},         // TIMESTAMP
-            {true, true, true, true, true, true, true, true, false, false, false},          // VARCHAR/STRING
-            {false, false, false, false, false, false, false, true, true, false, false},    // VARBINARY
-            {false, false, false, false, false, false, false, false, false, true, false},   // POINT
+    private static final boolean [][] m_typeConversionMatrix = {
+            /* To:
+             tiny   small  int    bigint float  decimal ts    string binary point  polygon  // From: */
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // TinyInt
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // SmallInt
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // Integer
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // BigInt
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // Float
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // Decimal
+            {true,  true,  true,  true,  true,  false, true,  true,  false, false, false},  // TIMESTAMP
+            {true,  true,  true,  true,  true,  true,  true,  true,  false, false, false},  // VARCHAR/STRING
+            {false, false, false, false, false, false, false, true,  true,  false, false},  // VARBINARY
+            {false, false, false, false, false, false, false, false, false, true,  false},  // POINT
             {false, false, false, false, false, false, false, false, false, false, true},   // POLYGON
-        };
+    };
 
     // Row index provides the type converting "from" (user supplied data of certain type).
     // Column index provides the type converting "to" (the actual column type in table).
     // To see type for column (to) or row (from), map it's index m_tableColTypeVal to get it's
     // type this is based on allowed type conversion for comparison which in list param arguments uses
-    private static final boolean [][] m_typeConversionMatrixInList =
-        {
-            {true, true, true, true, true, true, true, false, false, false, false},         // TinyInt
-            {true, true, true, true, true, true, true, false, false, false, false},         // SmallInt
-            {true, true, true, true, true, true, true, false, false, false, false},         // Integer
-            {true, true, true, true, true, true, true, false, false, false, false},         // BigInt
-            {true, true, true, true, true, true, true, false, false, false, false},         // Float
-            {true, true, true, true, true, true, true, false, false, false, false},         // Decimal
-            {true, true, true, true, true, true, true, false, false, false, false},         // TIMESTAMP
-            {false, false, false, false, false, false, false, true, false, false, false},   // VARCHAR/STRING
-            {false, false, false, false, false, false, false, false, true, false, false},   // VARBINARY
-            {false, false, false, false, false, false, false, false, false, true, false},   // POINT
+    private static final boolean [][] m_typeConversionMatrixInList = {
+            /* To:
+             tiny   small  int    bigint float  decimal ts    string binary point  polygon  // From: */
+            {true,  true,  true,  true,  false, false, true,  false, false, false, false},  // TinyInt
+            {true,  true,  true,  true,  false, false, true,  false, false, false, false},  // SmallInt
+            {true,  true,  true,  true,  false, false, true,  false, false, false, false},  // Integer
+            {true,  true,  true,  true,  false, false, true,  false, false, false, false},  // BigInt
+            {false, false, false, false, false, false, false, false, false, false, false},  // Float
+            {false, false, false, false, false, false, false, false, false, false, false},  // Decimal
+            {false, false, false, false, false, false, false, false, false, false, false},  // TIMESTAMP
+            {false, false, false, false, false, false, false, true,  false, false, false},  // VARCHAR/STRING
+            {false, false, false, false, false, false, false, false, true,  false, false},  // VARBINARY
+            {false, false, false, false, false, false, false, false, false, true,  false},  // POINT
             {false, false, false, false, false, false, false, false, false, false, true},   // POLYGON
-        };
+    };
 
     public TestTypeConversionSuite(String name) {
         super(name);
@@ -125,29 +190,24 @@ public class TestTypeConversionSuite extends RegressionSuite {
         // Use the conversion matrix to test type conversion cases that are allowed and blocked.
         // This uses non-array argument list as supplied arguments for params (except varbinary
         // that is byte[])
-        int rowId = 0;
         VoltType typeToTest = VoltType.INVALID;
         String errorMsg = null;
-        for(boolean[] fromType: m_typeConversionMatrix) {
-            int colInd = 0;
-            typeToTest = m_tableColTypeVal[rowId];
-            for (boolean toType: fromType) {
-                if (toType) {
+        for (int fromType = 0; fromType < m_tableColTypeVal.length; ++fromType) {
+            boolean[] supportedFromType = m_typeConversionMatrix[fromType];
+            typeToTest = m_tableColTypeVal[fromType];
+            for (int toType = 0; toType < m_tableColTypeVal.length; ++toType) {
+                if (supportedFromType[toType]) {
                     // type conversion feasible
                     client.callProcedure("ProcToTestTypeConversion",
                                          ProcToTestTypeConversion.TestTypeConvWithInsertProc,
-                                         colInd, typeToTest.getValue());
-
+                                         toType, typeToTest.getValue());
                 }
                 else {
-                    errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeToTest.getName() +
-                            "' to '" + m_tableColTypeVal[colInd].getName() +
-                            "' for arg " + colInd + " for SQL stmt";
+                    String typeTriedByInsert = m_javaTypeNamePatternForInsertTest[fromType];
 
                     // type conversion not allowed
                     if (typeToTest == VoltType.TIMESTAMP &&
-                            m_tableColTypeVal[colInd] == VoltType.DECIMAL) {
+                            m_tableColTypeVal[toType] == VoltType.DECIMAL) {
                         // Conversion from Timestamp -> decimal is allowed in voltqueue
                         // sql as the Timestamp -> decimal is supported in comparison
                         // expression for select and insert statement with select statement with
@@ -156,65 +216,97 @@ public class TestTypeConversionSuite extends RegressionSuite {
                         // as the conversion is flagged in EE with different error message So
                         // test for that
                         errorMsg = "Type "+ typeToTest.getName() +" can't be cast as "
-                                    + m_tableColTypeVal[colInd].getName();
-                    } else if (typeToTest == VoltType.VARBINARY) {
-                        switch (m_tableColTypeVal[colInd]) {
-                        case TINYINT:
-                        case SMALLINT:
-                        case INTEGER:
-                        case BIGINT:
-                        case TIMESTAMP:
-                        case FLOAT:
-                        case DECIMAL:
-                            errorMsg = "Type "+ typeToTest.getName() +" can't be cast as "
-                                    + m_tableColTypeVal[colInd].getName();
-                            break;
-                        default:
-                            break;
-                        }
+                                    + m_tableColTypeVal[toType].getName();
+                    }
+                    else {
+                        errorMsg = "Incompatible parameter type: can not convert type '"
+                                + typeTriedByInsert +
+                                "' to '" + m_tableColTypeVal[toType].getName() +
+                                "' for arg " + toType + " for SQL stmt";
                     }
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
                                     ProcToTestTypeConversion.TestTypeConvWithInsertProc,
-                                    colInd, typeToTest.getValue());
+                                    toType, typeToTest.getValue());
                 }
-                colInd++;
-            }
-            rowId++;
-        }
 
-        // Test cases where supplied is an array of arguments. This internally uses select statements
-        // with IN predicate to test broadest conversion allowed in comparison of in list arguments
-        rowId = 0;
-        for(boolean[] fromType: m_typeConversionMatrixInList) {
-            int colInd = 0;
-            typeToTest = m_tableColTypeVal[rowId];
-            for (boolean toType: fromType) {
-                if (rowId == 0) {
-                    // currently there is known issue in EE where array of tinyInt get's interpreted as
-                    // varbinary. so don't test those cases- ENG-10107. Once the ticket is fixed, enable
-                    // testing of conversion array of tinyint params for different types
-                    colInd++;
+                if (typeToTest == VoltType.TINYINT &&
+                        m_tableColTypeVal[fromType] == VoltType.TINYINT) {
                     continue;
                 }
-                if (toType) {
+
+                // Test that array arguments are not typically compatible
+                // with parameters passed into column comparisons.
+                String typeTriedByCompare = m_javaTypeNamePatternForInListTest[fromType];
+                errorMsg = "Incompatible parameter type: can not convert type '"
+                        + typeTriedByCompare +
+                        "' to '" + m_tableColTypeVal[toType].getName() +
+                        "' for arg 0 for SQL stmt";
+                verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
+                                ProcToTestTypeConversion.TestFailingArrayTypeCompare,
+                                toType, typeToTest.getValue());
+            }
+        }
+
+        // Test cases an array argument is supplied to a select statement with
+        // an IN ? predicate to test the conversions allowed in comparison of in
+        // list arguments,
+        // Purposely starting fromType at index 1 instead of 0 because:
+        // Interpretation of byte[] as a list of tiny int is prevented
+        // by an overriding interpretation of byte[] as a VARBINARY value.
+        // So, it can not be supported,
+        // unless/until we find a way around that interpretation.
+        for (int fromType = 1; fromType < m_tableColTypeVal.length; ++fromType) {
+            boolean[] supportedForFromType = m_typeConversionMatrixInList[fromType];
+            String typeTriedByInListQuery = m_javaTypeNamePatternForInListTest[fromType];
+            typeToTest = m_tableColTypeVal[fromType];
+            for (int toType = 0; toType < m_tableColTypeVal.length; ++toType) {
+                VoltType inListType = m_tableColInListTypeVal[toType];
+                if (supportedForFromType[toType]) {
                     // type conversion feasible
                     client.callProcedure("ProcToTestTypeConversion",
                                          ProcToTestTypeConversion.TestTypesInList,
-                                         colInd, typeToTest.getValue());
+                                         toType, typeToTest.getValue());
+                    if (inListType == null) {
+                        // Some column types (non-integer, non-string) do not support
+                        // IN LIST matching. these should be caught in the statement
+                        // compiler as tested in a statement compiler test, not here.
+                        continue;
+                    }
                 }
                 else {
+                    if (inListType == null) {
+                        // Some column types (non-integer, non-string) do not support
+                        // IN LIST matching. these should be caught in the statement
+                        // compiler as tested in a statement compiler test, not here.
+                        continue;
+                    }
                     errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeToTest.getName() +
-                            "' to '" + m_tableColTypeVal[colInd].getName() +
+                            + typeTriedByInListQuery +
+                            "' to '" + inListType.getName() +
                             "' for arg 0 for SQL stmt";
 
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
                                     ProcToTestTypeConversion.TestTypesInList,
-                                    colInd, typeToTest.getValue());
+                                    toType, typeToTest.getValue());
                 }
-                colInd++;
+
+                // Test that non-array arguments are not allowed for IN LIST params.
+                String typeExpectedToFailInListQuery =
+                        m_javaTypeNamePatternForInListFailureTest[fromType];
+                if (typeExpectedToFailInListQuery.endsWith("]") &&
+                        inListType == VoltType.INLIST_OF_BIGINT) {
+                    errorMsg = "rhs of IN expression is of a non-list type varbinary";
+                }
+                else {
+                    errorMsg = "Incompatible parameter type: can not convert type '"
+                            + typeExpectedToFailInListQuery +
+                            "' to '" + inListType.getName() +
+                            "' for arg 0 for SQL stmt";
+                }
+                verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
+                                ProcToTestTypeConversion.TestFailingTypesInList,
+                                toType, typeToTest.getValue());
             }
-            rowId++;
         }
     }
 

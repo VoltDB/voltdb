@@ -25,6 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -33,8 +35,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-
-import junit.framework.Test;
 
 public class TestLoadingSuite extends RegressionSuite {
 

@@ -596,6 +596,10 @@ public class VoltProjectBuilder {
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
+         addImport(enabled, importType, importFormat, importBundle, config, null);
+    }
+
+    public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
         HashMap<String, Object> importConnector = new HashMap<String, Object>();
         importConnector.put("ilEnabled", enabled);
         importConnector.put("ilModule", importBundle);
@@ -603,6 +607,10 @@ public class VoltProjectBuilder {
         importConnector.put("ilConfig", config);
         if (importFormat != null) {
             importConnector.put("ilFormatter", importFormat);
+        }
+
+        if (formatConfig != null) {
+            importConnector.put("ilFormatterConfig", formatConfig);
         }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
@@ -1129,6 +1137,21 @@ public class VoltProjectBuilder {
                     configProperties.add(prop);
                 }
             }
+
+            Properties formatConfig = (Properties) importConnector.get("ilFormatterConfig");
+            if ((formatConfig != null) && (formatConfig.size() > 0)) {
+                List<PropertyType> configProperties = importConfig.getFormatProperty();
+
+                for (Object nameObj : formatConfig.keySet()) {
+                    String name = String.class.cast(nameObj);
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(formatConfig.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+            }
+
             importt.getConfiguration().add(importConfig);
         }
 
