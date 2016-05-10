@@ -40,6 +40,7 @@ public class DRConsumerStatsBase {
         public static final String COVERING_HOST = "COVERING_HOST";
         public static final String LAST_RECEIVED_TIMESTAMP = "LAST_RECEIVED_TIMESTAMP";
         public static final String LAST_APPLIED_TIMESTAMP = "LAST_APPLIED_TIMESTAMP";
+        public static final String IS_PAUSED = "IS_PAUSED";
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
@@ -78,6 +79,7 @@ public class DRConsumerStatsBase {
             columns.add(new ColumnInfo(Columns.COVERING_HOST, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.LAST_RECEIVED_TIMESTAMP, VoltType.TIMESTAMP));
             columns.add(new ColumnInfo(Columns.LAST_APPLIED_TIMESTAMP, VoltType.TIMESTAMP));
+            columns.add(new ColumnInfo(Columns.IS_PAUSED, VoltType.STRING));
         }
 
         @Override
