@@ -245,27 +245,7 @@ public class Tokenizer extends AbstractTokenizer {
                                         columns.size() + 1, quoteScopeStartingLine, getLineNumber()));
                     }
                 }
-          /*
-           * escape with the quote
-           */
-        if (isEscape) {
-              isEscape = false;
-               if (this.strictQuotes && espectQuote) {
-
-                        throw new SuperCsvException(String.format(
-                                "strictQuotes: quotes needed at line %d column %d. To proceed, "
-                                        + "either quote the column or remove --strictquotes",
-                                        getLineNumber(), columns.size() + 1));
-                }
-                if (!surroundingSpacesNeedQuotes || currentColumn.length() > 0) {
-                        appendSpaces(currentColumn, potentialSpaces);
-                }
-
-                potentialSpaces = 0;
-                currentColumn.append(c);
-        } else if (c == escapeChar && !(line.charAt(charIndex + 1) == 'N')) {
-              isEscape = true;
-        } else if( c == NEWLINE ) {
+		if( c == NEWLINE ) {
 
 		    /*
 		     * Newline. Doesn't count as newline while in QUOTESCOPE. Add the newline char, reset the charIndex

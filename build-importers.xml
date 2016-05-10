@@ -1,7 +1,7 @@
 <!-- Simple build file to build socket stream importer -->
 <project name="socketstream"      basedir="." default="socketstream">
 <property name='base.dir'         location='.' />
-<property name='bundles.dir'      location='./obj/eclipse/bundles' />
+<property name='bundles.dir'      location='./bundles' />
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
@@ -130,9 +130,9 @@
     <target name="voltcsvformatter">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/voltcsvformatter.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importer/formatter/builtin/*.class"/>
-            <include name="org/supercsv_voltpatches/tokenizer/*.class"/>
-            <zipgroupfileset dir="${base.dir}/lib" includes="super-csv-2.1.0.jar" />
+            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatter.class"/>
+            <include name="org/voltdb/importer/formatter/builtin/VoltCSVFormatterFactory.class"/>
+            <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.VoltCSVFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
