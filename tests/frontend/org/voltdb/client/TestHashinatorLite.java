@@ -27,6 +27,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Random;
 
+import junit.framework.TestCase;
+
 import org.junit.Test;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.LegacyHashinator;
@@ -34,8 +36,6 @@ import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltType;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
-
-import junit.framework.TestCase;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -356,7 +356,7 @@ public class TestHashinatorLite extends TestCase {
         VoltType hashableTypes[] = new VoltType[]{ VoltType.TINYINT, VoltType.SMALLINT,
                 VoltType.INTEGER, VoltType.BIGINT, VoltType.STRING, VoltType.VARBINARY};
         for (VoltType type : hashableTypes) {
-            Object nullToHash = type.getNullValueForTest();
+            Object nullToHash = type.getNullValue();
             int hash1 = h1.getHashedPartitionForParameter(type.getValue(), nullToHash);
             int hash2 = h2.getHashedPartitionForParameter(type.getValue(), nullToHash);
             if (hash1 != 0 || hash2 != 0) {

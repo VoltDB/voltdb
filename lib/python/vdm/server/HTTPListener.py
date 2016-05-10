@@ -43,7 +43,6 @@ from flask_logging import Filter
 import Configuration
 import signal
 import thread
-from sets import Set
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -294,7 +293,7 @@ def map_deployment(request, database_id):
             'resourcemonitor'] is None:
             deployment['systemsettings']['resourcemonitor'] = {}
 
-        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and request.json['systemsettings']['resourcemonitor']['memorylimit']:
             deployment['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                     and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
@@ -311,8 +310,8 @@ def map_deployment(request, database_id):
             deployment['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
-            deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
             if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment['systemsettings']['resourcemonitor']['disklimit'] = {}
                 deployment['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
                 if request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
                     for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
@@ -344,10 +343,14 @@ def map_deployment(request, database_id):
         deployment['import']['configuration'] = []
         i = 0
         for configuration in request.json['import']['configuration']:
+            if 'module' not in configuration:
+                module = ''
+            else:
+                module = configuration['module']
             deployment['import']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
-                    'module': configuration['module'],
+                    'module': module,
                     'type': configuration['type'],
                     'format': configuration['format'],
                     'property': []
@@ -364,7 +367,7 @@ def map_deployment(request, database_id):
                     )
                 i += 1
     if 'export' in request.json:
-        if 'export' not in deployment or deployment['export'] is None or deployment['import'] == "None":
+        if 'export' not in deployment or deployment['export'] is None or deployment['export'] == "None":
             deployment['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
@@ -373,13 +376,18 @@ def map_deployment(request, database_id):
         except Exception, err:
             print err
         i = 0
+
         for configuration in request.json['export']['configuration']:
+            if 'exportconnectorclass' not in configuration:
+                export_connector_class = ''
+            else:
+                export_connector_class = configuration['exportconnectorclass']
             deployment['export']['configuration'].append(
                 {
                     'enabled': configuration['enabled'],
                     'stream': configuration['stream'],
                     'type': configuration['type'],
-                    'exportconnectorclass': configuration['exportconnectorclass'],
+                    'exportconnectorclass': export_connector_class,
                     'property': []
                 }
             )
@@ -408,37 +416,37 @@ def map_deployment(request, database_id):
             )
 
     if 'dr' in request.json:
-        if 'dr' not in deployment or deployment['dr'] is None:
+        if not request.json['dr']:
             deployment['dr'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr']:
-        if not hasattr(deployment['dr'], 'connection'):
-            deployment['dr']['connection'] = {}
-
-    if 'dr' in request.json and 'connection' in request.json['dr'] and 'source' not in request.json['dr']['connection']:
-        deployment['dr']['connection'] = None
-
-    if 'dr' in request.json and 'id' in request.json['dr']:
-        deployment['dr']['id'] = request.json['dr']['id']
-
-    if 'dr' in request.json and 'listen' in request.json['dr']:
-        deployment['dr']['listen'] = request.json['dr']['listen']
-
-    if 'dr' in request.json and request.json['dr']:
-        if 'port' in request.json['dr']:
-            deployment['dr']['port'] = request.json['dr']['port']
         else:
-            deployment['dr']['port'] = None
+            if 'dr' not in deployment or deployment['dr'] is None:
+                deployment['dr'] = {}
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] \
-            and 'source' in request.json['dr']['connection']:
-        deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            if 'connection' in request.json['dr'] and request.json['dr']['connection']:
+                if not hasattr(deployment['dr'], 'connection'):
+                    deployment['dr']['connection'] = {}
 
-    if 'dr' in request.json and not request.json['dr']:
-        deployment['dr'] = {}
+                if 'source' not in request.json['dr']['connection'] or \
+                        ('source' in request.json['dr']['connection'] and
+                         request.json['dr']['connection']['source'].strip() == ''):
+                    deployment['dr']['connection'] = None
+                else:
+                    deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
+            else:
+                deployment['dr']['connection'] = None
+            if 'id' in request.json['dr']:
+                deployment['dr']['id'] = request.json['dr']['id']
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] and not request.json['dr']['connection']:
-        deployment['dr']['connection'] = {}
+            if 'listen' in request.json['dr']:
+                deployment['dr']['listen'] = request.json['dr']['listen']
+            else:
+                deployment['dr']['listen'] = True
+
+            if request.json['dr']:
+                if 'port' in request.json['dr']:
+                    deployment['dr']['port'] = request.json['dr']['port']
+                else:
+                    deployment['dr']['port'] = None
 
     return deployment
 
@@ -515,12 +523,12 @@ def validate_server_ports(database_id, server_id=-1):
            "client-listener"]
 
     specified_port_values = {
-        "http-listener": get_port(request.json.get('http-listener', "")),
-        "admin-listener": get_port(request.json.get('admin-listener', "")),
-        "replication-listener": get_port(request.json.get('replication-listener', "")),
-        "client-listener": get_port(request.json.get('client-listener', "")),
-        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "")),
-        "internal-listener": get_port(request.json.get('internal-listener', ""))
+        "http-listener": get_port(request.json.get('http-listener', "").strip().lstrip("0")),
+        "admin-listener": get_port(request.json.get('admin-listener', "").strip().lstrip("0")),
+        "replication-listener": get_port(request.json.get('replication-listener', "").strip().lstrip("0")),
+        "client-listener": get_port(request.json.get('client-listener', "").strip().lstrip("0")),
+        "zookeeper-listener": get_port(request.json.get('zookeeper-listener', "").strip().lstrip("0")),
+        "internal-listener": get_port(request.json.get('internal-listener', "").strip().lstrip("0"))
     }
 
     for option in arr:
@@ -560,16 +568,26 @@ def check_size_value(value, key):
         try:
             str_value = replace_last(value, '%', '')
             int_value = int(str_value)
-            if int_value < 0 or int_value > 100:
-                return jsonify({'error': key + ' percent value must be between 0 and 100.'})
+            min_value = 0
+            error_msg = key + ' percent value must be between 0 and 99.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' percent value must be between 1 and 99.'
+            if int_value < min_value or int_value > 99:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
     else:
         try:
             int_value = int(value)
-            if int_value < 0 or int_value > 2147483647:
-                return jsonify({'error': key + ' value must be between 0 and 2147483647.'})
+            min_value = 0
+            error_msg = key + ' value must be between 0 and 2147483647.'
+            if key == 'memorylimit':
+                min_value = 1
+                error_msg = key + ' value must be between 1 and 2147483647.'
+            if int_value < min_value or int_value > 2147483647:
+                return jsonify({'error': error_msg})
             return jsonify({'status': 'success'})
         except Exception, exp:
             return jsonify({'error': str(exp)})
@@ -724,15 +742,15 @@ class ServerAPI(MethodView):
             'description': request.json.get('description', "").strip(),
             'hostname': request.json.get('hostname', "").strip(),
             'enabled': True,
-            'admin-listener': request.json.get('admin-listener', "").strip(),
-            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip(),
-            'replication-listener': request.json.get('replication-listener', "").strip(),
-            'client-listener': request.json.get('client-listener', "").strip(),
+            'admin-listener': request.json.get('admin-listener', "").strip().lstrip("0"),
+            'zookeeper-listener': request.json.get('zookeeper-listener', "").strip().lstrip("0"),
+            'replication-listener': request.json.get('replication-listener', "").strip().lstrip("0"),
+            'client-listener': request.json.get('client-listener', "").strip().lstrip("0"),
             'internal-interface': request.json.get('internal-interface', "").strip(),
             'external-interface': request.json.get('external-interface', "").strip(),
             'public-interface': request.json.get('public-interface', "").strip(),
-            'internal-listener': request.json.get('internal-listener', "").strip(),
-            'http-listener': request.json.get('http-listener', "").strip(),
+            'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
+            'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
             'placement-group': request.json.get('placement-group', "").strip()
         }
 
@@ -1040,8 +1058,7 @@ class DeploymentUserAPI(MethodView):
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
 
-        user_roles = ','.join(Set(request.json['roles'].split(',')))
-
+        user_roles = ','.join(set(request.json['roles'].split(',')))
         if not Global.DEPLOYMENT_USERS:
             user_id = 1
         else:
@@ -1091,7 +1108,7 @@ class DeploymentUserAPI(MethodView):
         if request.json['name'] in [(d["name"]) for item in user for d in item] and d["databaseid"] == database_id \
                 and request.json["name"] != current_user["name"]:
             return make_response(jsonify({'error': 'user name already exists'}), 404)
-        user_roles = ','.join(Set(request.json.get('roles', current_user['roles']).split(',')))
+        user_roles = ','.join(set(request.json.get('roles', current_user['roles']).split(',')))
         current_user = Global.DEPLOYMENT_USERS.get(user_id)
 
         current_user['name'] = request.json.get('name', current_user['name'])
@@ -1440,10 +1457,7 @@ class DatabaseDeploymentAPI(MethodView):
 
     @staticmethod
     def get(database_id):
-        if 'text/xml' in request.headers['Accept']:
-            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
-            return Response(deployment_content, mimetype='text/xml')
-        else:
+        if 'Accept' in request.headers and 'application/json' in request.headers['Accept']:
             deployment = Global.DEPLOYMENT.get(database_id)
 
             new_deployment = deployment.copy()
@@ -1465,9 +1479,10 @@ class DatabaseDeploymentAPI(MethodView):
 
             del new_deployment['databaseid']
 
-
-
             return jsonify({'deployment': new_deployment})
+        else:
+            deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
+            return Response(deployment_content, mimetype='text/xml')
 
     @staticmethod
     def put(database_id):
@@ -1478,6 +1493,8 @@ class DatabaseDeploymentAPI(MethodView):
             result = Configuration.check_validation_deployment(request)
             if 'status' in result and result['status'] == 'error':
                 return jsonify(result)
+            if 'dr' in request.json and request.json['dr'] and 'id' not in request.json['dr']:
+                return jsonify({'status': 'error', 'error': 'DR id is required.'})
             deployment = map_deployment(request, database_id)
             sync_configuration()
             Configuration.write_configuration_file()
@@ -1675,47 +1692,49 @@ def main(runner, amodule, config_dir, data_dir, server):
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', view_func=SERVER_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', view_func=SERVER_VIEW,
-                     methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', defaults={'database_id': None},
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/', strict_slashes=False,
+                     view_func=SERVER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, defaults={'database_id': None},
                      view_func=DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>', view_func=DATABASE_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>', strict_slashes=False, view_func=DATABASE_VIEW,
                      methods=['GET', 'PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
+    APP.add_url_rule('/api/1.0/databases/', strict_slashes=False, view_func=DATABASE_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
 
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start', strict_slashes=False,
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/stop', strict_slashes=False,
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
 
     # Internal API
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_SERVER_VIEW, methods=['PUT'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', strict_slashes=False,
+                     view_func=STATUS_DATABASE_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/status/', strict_slashes=False,
                      view_func=STATUS_DATABASE_SERVER_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['PUT', 'DELETE'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', view_func=DEPLOYMENT_USER_VIEW,
-                     methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/status/',
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/<int:user_id>/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['PUT', 'DELETE'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/users/', strict_slashes=False,
+                     view_func=DEPLOYMENT_USER_VIEW, methods=['GET', 'POST'])
+    APP.add_url_rule('/api/1.0/voltdeploy/status/', strict_slashes=False,
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
-    APP.add_url_rule('/api/1.0/voltdeploy/configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/configuration/', strict_slashes=False,
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
-    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/',
+    APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/', strict_slashes=False,
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False, view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
-    APP.add_url_rule('/api/1.0/voltdeploy/', view_func=VDM_VIEW,
+    APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')

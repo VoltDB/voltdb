@@ -40,7 +40,7 @@ public class MatchChecks {
     protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        String table = alltypes ? "KafkaMirrorTable1" : "KafkaMirrorTable2";
+        String table = alltypes ? "KafkaMirrorTable2" : "KafkaMirrorTable1";
         ClientResponse response = doAdHoc(client, "select count(*) from " + table);
         VoltTable[] countQueryResult = response.getResults();
         VoltTable data = countQueryResult[0];
@@ -150,6 +150,9 @@ public class MatchChecks {
         long importRowCount = 0;
         long importMax = 0;
         long importMin = 0;
+
+        // check row count in import table
+        // String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
 
         ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
         VoltTable countQueryResult = response.getResults()[0];

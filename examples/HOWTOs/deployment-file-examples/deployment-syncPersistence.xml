@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file config will ensure
+    transactions have been fsynced to disk before
+    they are acknowleged to calling clients as
+    committed.
+
+    The frequency parameter says to use batch
+    fsyncs every 2ms. See the documentation for how
+    best to configure these values.
+
+    See:
+    https://docs.voltdb.com/UsingVoltDB/CmdLogConfig.php
+-->
+<deployment>
+    <cluster hostcount="1"/>
+    <commandlog enabled="true" synchronous="true">
+        <frequency time="2"/>
+    </commandlog>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>

@@ -63,7 +63,6 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTypeUtil;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -328,7 +327,8 @@ public class ProcedureRunner {
                         try {
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
                             results = getResultsFromRawResults(rawResult);
-                        } catch (IllegalAccessException e) {
+                        }
+                        catch (IllegalAccessException e) {
                             // If reflection fails, invoke the same error handling that other exceptions do
                             throw new InvocationTargetException(e);
                         }
@@ -379,7 +379,7 @@ public class ProcedureRunner {
                             getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
                                 m_cachedSingleStmt.stmt,
                                 m_cachedSingleStmt.params,
-                                m_cachedSingleStmt.stmt.statementParamJavaTypes);
+                                m_cachedSingleStmt.stmt.statementParamTypes);
                         results = new VoltTable[] { table };
                     }
                     else {
@@ -612,10 +612,6 @@ public class ProcedureRunner {
         m_batch.add(queuedSQL);
     }
 
-    public void voltQueueSQL(final SQLStmt stmt, Object... args) {
-        voltQueueSQL(stmt, (Expectation) null, args);
-    }
-
     public void voltQueueSQL(final String sql, Object... args) {
         if (sql == null || sql.isEmpty()) {
             throw new IllegalArgumentException("SQL statement '" + sql + "' is null or the empty string");
@@ -677,10 +673,10 @@ public class ProcedureRunner {
                             " where 0 were expected for statement: " + sql);
                 }
                 argumentParams = plannedStatement.extractedParamArray();
-                if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
+                if (argumentParams.length != queuedSQL.stmt.statementParamTypes.length) {
                     String msg = String.format(
                             "The wrong number of arguments (" + argumentParams.length +
-                            " vs. the " + queuedSQL.stmt.statementParamJavaTypes.length +
+                            " vs. the " + queuedSQL.stmt.statementParamTypes.length +
                             " expected) were passed for the parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
@@ -788,7 +784,7 @@ public class ProcedureRunner {
             int i = 0;
             for (QueuedSQL qs : batch) {
                 results[i++] = getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
-                        qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
+                        qs.stmt, qs.params, qs.stmt.statementParamTypes);
             }
         }
         else if (m_isSinglePartition) {
@@ -838,50 +834,78 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class <?> argClass, int argInd, VoltType expectedType) {
-        VoltType argType = VoltType.INVALID;
-        boolean isArray = false;
-
-        // Argument to param for IN list will come in as array of arguments. The varbinary can also appear
-        // as array of tinyint/byte. Check if the expected type is var-binary and filter it based on that
-        if(argClass.isArray() && expectedType != VoltType.VARBINARY) {
-            argType = VoltType.typeFromClass(argClass.getComponentType());
-            isArray = true;
+    private final void throwIfInfeasibleTypeConversion(SQLStmt stmt,
+            Class <?> argClass, int argInd, VoltType expectedType) {
+        if (argClass.isArray()) {
+            // The statement parameter model doesn't currently support a
+            // general concept of an array-typed parameter. Instead, it
+            // defines certain special VoltTypes that are implicitly
+            // convertible from specific array-typed arguments.
+            // These are provided in the sqlType arg.
+            // For example,
+            // VARBINARY parameters accept byte[] arguments,
+            // INLIST_OF_STRING parameters accept String[] arguments,
+            // INLIST_OF_BIGINT parameters accept integer-typed array
+            // arguments like long[], Long[], int[], Integer[], etc.
+            if (expectedType.acceptsArray(argClass)) {
+                return;
+            }
         }
         else {
-            if (argClass.isArray() && (argClass.getComponentType().isArray() ||     // supplied argument can be array of varbinary
-                                       argClass != byte[].class)) {                 // supplied argument is not varbinary but array of some other type
-                assert(expectedType == VoltType.VARBINARY);
-                // For in list arguments, passed in argument can be an array of
-                // varbinary. It would be nice if the information about expected type
-                // being array of types or not was available at this level and would have
-                // helped in making logic simple and more concise. In absence of that
-                // will have to weaken the checks so that we don't introduce regression
-                // as we don't know expected type of param is array or not.
-                argClass = argClass.getComponentType();
-                isArray = true;
+            VoltType argType = VoltType.typeFromClass(argClass);
+
+            if (argType == expectedType) {
+                return;
             }
-            argType = VoltType.typeFromClass(argClass);
+            if (argType == VoltType.STRING) {
+                // TODO: Should we consider String to be a universal donor type?
+                if (expectedType.isNumber() || expectedType == VoltType.TIMESTAMP) {
+                    return;
+                }
+            }
+            else if (argType.isNumber()) {
+                if (expectedType.isNumber() ||
+                        expectedType == VoltType.STRING ||
+                        // Allow timestamp initialization from integer or even
+                        // float (microseconds), yet not decimal (?)
+                        // for backward compatibility.
+                        // TODO: Should we deprecate this soon as something
+                        // easy enough to work around and too easy to abuse?
+                        expectedType == VoltType.TIMESTAMP) {
+                    return;
+                }
+            }
+            // Allow initialization of string or integer or even decimal or float?
+            // (microseconds) yet not decimal (?) from timestamp,
+            // for backward compatibility.
+            // TODO: Should we deprecate some or all of these conversions soon as
+            // something easy enough to work around and too easy to accidentally
+            // abuse?
+            else if (argType.isBackendIntegerType()) {
+                if (expectedType.isNumber() ||
+                        expectedType == VoltType.STRING) {
+                    return;
+                }
+            }
+            // As new non-numeric types are added, early return cases need
+            // to be added here IF the types are used as parameter types
+            // and they are directly convertible from other non-array types
+            // beyond string.
         }
 
-        if (!VoltTypeUtil.implicitTypeConversionFeasible(argType, expectedType, isArray)) {
-            if (isArray && argType == VoltType.TINYINT) {
-                // if arg type is array of tinyint, it was evaluated for array of tiny,
-                // failed and than was evaluated as varbinary. Update the evaluation type
-                // to be for varbinary for the exception msg
-                argType = VoltType.VARBINARY;
+        String argTypeName = argClass.getSimpleName();
+        String preferredType = expectedType.getMostCompatibleJavaTypeName();
 
-            }
-            throw new VoltTypeException("Procedure " + m_procedureName+ ": Incompatible parameter type: can not convert type '"+ argType.getName() +
-                                         "' to '"+ expectedType.getName() + "' for arg " + argInd +
-                                         " for SQL stmt: " + stmt.getText() + "." +
-                                         " Try explicitly using a " + expectedType.getName()+ " parameter.");
-        }
+        throw new VoltTypeException("Procedure " + m_procedureName +
+                ": Incompatible parameter type: can not convert type '"+ argTypeName +
+                "' to '"+ expectedType.getName() + "' for arg " + argInd +
+                " for SQL stmt: " + stmt.getText() + "." +
+                " Try explicitly using a " + preferredType + " parameter.");
     }
 
     private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
-        final int numParamTypes = stmt.statementParamJavaTypes.length;
-        final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
+        final byte stmtParamTypes[] = stmt.statementParamTypes;
+        final int numParamTypes = stmtParamTypes.length;
         final Object[] args = new Object[numParamTypes];
 
         if (inArgs.length != numParamTypes) {
@@ -895,7 +919,8 @@ public class ProcedureRunner {
             // handle non-null values
             if (inArgs[ii] != null) {
                 args[ii] = inArgs[ii];
-                if (verifyTypeConv) {
+                assert(type != VoltType.INVALID);
+                if (verifyTypeConv && type != VoltType.INVALID) {
                     throwIfInfeasibleTypeConversion(stmt, args[ii].getClass(), ii, type);
                 }
                 continue;
@@ -970,22 +995,43 @@ public class ProcedureRunner {
 
         stmt.site = m_site;
 
-        int numStatementParamJavaTypes = catStmt.getParameters().size();
-        stmt.statementParamJavaTypes = new byte[numStatementParamJavaTypes];
+        int numStatementParamTypes = catStmt.getParameters().size();
+        stmt.statementParamTypes = new byte[numStatementParamTypes];
         for (StmtParameter param : catStmt.getParameters()) {
-            stmt.statementParamJavaTypes[param.getIndex()] = (byte)param.getJavatype();
-            // ??? How does the SQLStmt successfully handle IN LIST queries without
-            // caching the value of param.getIsarray() here?
-            // Is the array-ness also reflected in the javatype? --paul
+            int index = param.getIndex();
+            // Array-typed params currently only arise from in-lists.
+            // Tweak the parameter's expected type accordingly.
+            VoltType expectType = VoltType.get((byte)param.getJavatype());
+            if (param.getIsarray()) {
+                if (expectType == VoltType.STRING) {
+                    expectType = VoltType.INLIST_OF_STRING;
+                }
+                else {
+                    expectType = VoltType.INLIST_OF_BIGINT;
+                }
+            }
+            stmt.statementParamTypes[index] = expectType.getValue();
         }
     }
 
 
     protected void reflect() {
+        Map<String, SQLStmt> stmtMap;
+
         // fill in the sql for single statement procs
-        if (m_catProc.getHasjava() == false) {
+        if (m_catProc.getHasjava()) {
+            // this is where, in the case of java procedures, m_procMethod is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
+
+            if (m_procMethod == null && m_language == Language.JAVA) {
+                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
+            }
+            // iterate through the fields and deal with sql statements
+            stmtMap = m_language.accept(sqlStatementsRetriever, this);
+        }
+        else {
             try {
-                Map<String, SQLStmt> stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
                 SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
                 assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
@@ -1008,44 +1054,34 @@ public class ProcedureRunner {
                     // (ParameterConverter.tryToMakeCompatible) before falling through to the EE?
                     if (type == VoltType.INTEGER) {
                         type = VoltType.BIGINT;
-                    } else if (type == VoltType.SMALLINT) {
+                    }
+                    else if (type == VoltType.SMALLINT) {
                         type = VoltType.BIGINT;
-                    } else if (type == VoltType.TINYINT) {
+                    }
+                    else if (type == VoltType.TINYINT) {
                         type = VoltType.BIGINT;
-                    } else if (type == VoltType.NUMERIC) {
+                    }
+                    else if (type == VoltType.NUMERIC) {
                         type = VoltType.FLOAT;
                     }
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 // shouldn't throw anything outside of the compiler
                 e.printStackTrace();
             }
-        }
-        else {
-            // this is where, in the case of java procedures, m_method is set
-            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
 
-            if (m_procMethod == null && m_language == Language.JAVA) {
-                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
-            }
-        }
-
-        // iterate through the fields and deal with sql statements
-        Map<String, SQLStmt> stmtMap = null;
-        if (m_catProc.getHasjava() == false) {
+            // iterate through the fields and deal with sql statements
             try {
                 stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
-            } catch (Exception e1) {
+            }
+            catch (Exception e1) {
                 // shouldn't throw anything outside of the compiler
                 e1.printStackTrace();
-
                 return;
             }
-        }
-        else {
-            stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {

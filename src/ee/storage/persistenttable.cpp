@@ -350,6 +350,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
             return deleteAllTuples(true);
         }
     }
+    //For MAT view dont optimize needs more work.
+    if (isMaterialized()) {
+        return deleteAllTuples(true);
+    }
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);

@@ -23,10 +23,10 @@ VoltDB Features and Patterns
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It is very readable and when executed, shows what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create --new" to start an empty, single-node VoltDB server.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
 3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
 4. Type "./run.sh client" to run the client code.
 5. Open up the index.html the "web" directory to view the status dashboard.
@@ -53,7 +53,7 @@ If you change the client or procedure Java code, you must recompile the jars by 
 
 Client Behavior Options
 ---------------------------
-You can control various characteristics of the demo by modifying the parameters passed into the InvestmentBenchmark java application in the "client" function of the run.sh script.
+You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
 
 **Speed & Duration:**
 
@@ -78,3 +78,6 @@ You can control various characteristics of the demo by modifying the parameters 
     --meancalldurationseconds=5   (mean call duration in seconds)
     --maxcalldurationseconds=60   (max call duration)
 
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
