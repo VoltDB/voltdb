@@ -598,6 +598,52 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testAdHocQueryWithMaxPlusPredicates() throws IOException, Exception {
+        System.out.println("Starting testLongAdHocQuery");
+
+        VoltDB.Configuration config = setUpSPDB();
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        m_client = ClientFactory.createClient();
+        m_client.createConnection("localhost", config.m_port);
+
+        String sql = getQueryWithMaxPlusOnePredicates();
+        try {
+            m_client.callProcedure("@AdHoc", sql);
+            fail("Query with 232+ predicates was expected to fail");
+        }
+        catch (Exception exception) {
+            String expectedMsg;
+            expectedMsg = "Error compiling query";
+            boolean foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+
+            expectedMsg = "Limit of predicate expressions in \"where\" clause exceeded the " +
+                          "maximum limit of 232 predicates, predicates detected:";
+            foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+
+            expectedMsg = "Reduce the number of predicates in the \"where\" clause to 232";
+            foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+        }
+        finally {
+            if (m_client != null) {
+                m_client.close();
+            }
+            m_client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+        }
+    }
+
     private void verifyIncorrectParameterMessage(TestEnv env, String adHocQuery, Object[] params) {
         int expected = 0;
         for (int i=0; i < adHocQuery.length(); i++ ) {

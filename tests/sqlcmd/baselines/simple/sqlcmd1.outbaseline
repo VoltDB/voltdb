@@ -23,5 +23,72 @@ C
 
 (Returned 3 rows in #.##s)
 
+select * FROM t WHERE 
+c = 1 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+C 
+--
+ 1
+
+(Returned 1 rows in #.##s)
+
+select * FROM t WHERE c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+
 drop table t;
 Command succeeded.

@@ -64,6 +64,33 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runAllAdHocSPtests(0, 1, 2, 3);
     }
 
+    public void testAdHocQueryWithPredicates() throws NoConnectionsException, IOException, ProcCallException {
+        // query with max predicates in where clause
+        String sql = getQueryWithMaxPredicates();
+        runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+
+        // query with max + 1 predicates in where clause - expect it to fail
+        sql = getQueryWithMaxPlusOnePredicates();
+        try {
+            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+        }
+        catch (Exception exception) {
+            String expectedMsg;
+            expectedMsg = "Error compiling query";
+            boolean foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+
+            expectedMsg = "Limit of predicate expressions in \"where\" clause exceeded the " +
+                          "maximum limit of 232 predicates, predicates detected:";
+            foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+
+            expectedMsg = "Reduce the number of predicates in the \"where\" clause to 232";
+            foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+        }
+    }
+
     /**
      * For planner-only testing, most of the args are ignored.
      */
