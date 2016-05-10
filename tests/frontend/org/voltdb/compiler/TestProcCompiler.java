@@ -68,6 +68,178 @@ public class TestProcCompiler extends TestCase {
         assertEquals(2, countLinesMatching(lines, "^\\s*\\[TABLE SCAN]\\sselect.*indexed_replicated_blah.*"));
     }
 
+    private String getQueryWithMaxPredicates() {
+        // Query with 233 predicates - max allowable limit is 232 predicate
+        final String query = "SELECT count(*) FROM FOO WHERE "
+                        + "ID = 123 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test';";
+        return query;
+    }
+
+    protected String getQueryWithMaxPlusOnePredicates() {
+        // Query with 233 predicates - max allowable limit is 232 predicate
+        final String query = "SELECT count(*) FROM FOO WHERE "
+                        + "ID = 123 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102 and NAME = 'test' and ID > 102 and NAME = 'test' and "
+                        + "ID > 102;";
+        return query;
+    }
+
+    public void testStmntWithMaxPredicates() throws Exception {
+        String simpleSchema =  "Create Table foo ( " +
+                               "id BIGINT DEFAULT 0 NOT NULL, " +
+                               "name VARCHAR(255) NOT NULL, " +
+                               "PRIMARY KEY(id));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+
+        // Test for stored procedure with max allowable predicates
+        String sql = getQueryWithMaxPredicates();
+        builder.addStmtProcedure("StmntWithMaxPredicates", sql, null);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_predicates.jar"));
+        assert(success);
+    }
+
+    public void testStmntWithMaxPlusOnePredicates() throws Exception {
+        String schema =  "Create Table foo ( " +
+                         "id BIGINT DEFAULT 0 NOT NULL, " +
+                         "name VARCHAR(255) NOT NULL, " +
+                         "PRIMARY KEY(id));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        builder.setCompilerDebugPrintStream(capturing);
+        builder.addLiteralSchema(schema);
+
+        // Test for stored procedure which have more than max allowable predicates in the
+        // results in error and does not crash or hang the system
+        String sql = getQueryWithMaxPlusOnePredicates();
+        builder.addStmtProcedure("StmntWithMaxPlusOnePredicates", sql, null);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_one_predicates.jar"));
+        assert(!success);
+        String captured = capturer.toString("UTF-8");
+        String errMsg = "Error: \"Limit of predicate expressions in \"where\" clause exceeded the maximum "
+                      + "limit of 232 predicates, predicates detected: 233. Reduce the number of predicates "
+                      + "in the \"where\" clause to 232";
+        assert(captured.contains(errMsg));
+    }
+
     private int countLinesMatching(String[] lines, String pattern) {
         int count = 0;
         for (String string : lines) {
