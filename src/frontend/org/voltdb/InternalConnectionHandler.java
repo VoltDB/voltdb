@@ -209,7 +209,7 @@ public class InternalConnectionHandler {
     private void applyBackPressure() {
         final int count = m_backpressureIndication.get();
         if (count > 0) {
-            try { // increase sleep time exponentially to a max of 128ms
+            try { // increase sleep time exponentially to a max of 256ms
                 if (count > 8) {
                     Thread.sleep(256);
                 } else {
