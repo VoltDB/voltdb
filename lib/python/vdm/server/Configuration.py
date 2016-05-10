@@ -18,6 +18,7 @@ import os
 from collections import defaultdict
 import json
 import traceback
+from sets import Set
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 from flask import jsonify
@@ -1205,6 +1206,14 @@ def set_deployment_for_upload(database_id, request):
                 if 'status' in result and result['status'] == 'error':
                     return {'status': 'failure', 'error': result['error']}
 
+                is_duplicate_user = check_duplicate_users(req)
+                if not is_duplicate_user:
+                    return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
+
+                is_invalid_roles = check_invalid_roles(req)
+                if not is_invalid_roles:
+                    return {'status': 'failure', 'error': 'Invalid user roles.'}
+
                 HTTPListener.map_deployment(req, database_id)
 
                 deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
@@ -1218,15 +1227,16 @@ def set_deployment_for_upload(database_id, request):
                             user_id = 1
                         else:
                             user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                        user_roles = ','.join(Set(user['roles'].split(',')))
+
                         HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
                                 'name': user['name'],
-                                'roles': user['roles'],
+                                'roles': user_roles,
                                 'password': user['password'],
                                 'plaintext': user['plaintext'],
                                 'databaseid': database_id,
                                 'userid': user_id
                             }
-
                 HTTPListener.sync_configuration()
                 write_configuration_file()
 
@@ -1238,6 +1248,26 @@ def set_deployment_for_upload(database_id, request):
     else:
         return {'status': 'failure', 'error': 'Invalid file type.'}
     return {'status': 'success'}
+
+
+def check_duplicate_users(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        user_name_list = []
+        for user in req.json['users']['user']:
+            if user['name'] in user_name_list:
+                return False
+            user_name_list.append(user['name'])
+    return True
+
+
+def check_invalid_roles(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        for user in req.json['users']['user']:
+            roles = str(user['roles']).split(',')
+            for role in roles:
+                if role.strip() == '':
+                    return False
+    return True
 
 
 def check_validation_deployment(req):
