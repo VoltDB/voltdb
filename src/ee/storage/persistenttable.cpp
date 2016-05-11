@@ -365,12 +365,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
         const double blockLoadFactor = m_data.begin().data()->loadFactor();
-        if ((m_views.empty() && (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) ||    // table with no view
-            (!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc))) {    // table with views
+        if ((!m_views.empty() && (blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) ||
+            (blockLoadFactor <= tableWithNoViewLFCutoffForTrunc)) {
             return deleteAllTuples(true, fallible);
         }
     }
-    // For MAT view don't optimize, needs more work.
+    // For MAT view don't optimize, needs more work - ENG-10323.
     if (isMaterialized()) {
         return deleteAllTuples(true);
     }
