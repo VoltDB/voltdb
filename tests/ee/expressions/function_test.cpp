@@ -375,6 +375,12 @@ TEST_F(FunctionTest, NaturalModTest) {
     ASSERT_EQ(testBinary(FUNC_MOD, 0, 2, 0), 0);
     ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("2.0"), TTInt("1.000000000000")), 0);
     ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("-2.0"), TTInt("1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("-2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("-7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
 
     //invalid parameter value
     bool sawExecption = false;
