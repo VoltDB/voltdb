@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -47,10 +46,7 @@ import org.voltdb.types.SortDirectionType;
  */
 public class WindowedExpression extends AbstractExpression {
     public enum Members {
-        PARTITION_BY_EXPRESSIONS,
-        ORDER_BY_EXPRESSIONS,
-        SORT_EXPRESSION,
-        SORT_DIRECTION
+        PARTITION_BY_EXPRESSIONS
     }
 
     public static SortDirectionType DEFAULT_ORDER_BY_DIRECTION = SortDirectionType.ASC;
@@ -163,10 +159,7 @@ public class WindowedExpression extends AbstractExpression {
          * Unfortunately we cannot use AbstractExpression.loadFromJSONArrayChild here,
          * as we need to get a sort expression and a sort order for each column.
          */
-        if (jobj.has(Members.ORDER_BY_EXPRESSIONS.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.ORDER_BY_EXPRESSIONS.name());
-            AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, m_orderByDirections, jarray);
-        }
+        AbstractExpression.loadSortListFromJSONArray(m_orderByExpressions, m_orderByDirections, jobj);
     }
 
     @Override
@@ -176,17 +169,9 @@ public class WindowedExpression extends AbstractExpression {
         /*
          * Serialize the sort columns.
          */
-        stringer.key(Members.ORDER_BY_EXPRESSIONS.name()).array();
-        for (int ii = 0; ii < m_orderByExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_orderByExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_orderByDirections.get(ii).toString());
-            stringer.endObject();
-        }
-        stringer.endArray();
+        AbstractExpression.toJSONArrayFromSortList(stringer,
+                                                   m_orderByExpressions,
+                                                   m_orderByDirections);
 
         /*
          * Serialize the partition expressions.

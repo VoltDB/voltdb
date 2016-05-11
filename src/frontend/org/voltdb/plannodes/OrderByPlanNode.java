@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -172,27 +171,13 @@ public class OrderByPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         assert (m_sortExpressions.size() == m_sortDirections.size());
-        stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_sortExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
-            stringer.endObject();
-        }
-        stringer.endArray();
+        AbstractExpression.toJSONArrayFromSortList(stringer, m_sortExpressions, m_sortDirections);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        JSONArray jarray = null;
-        if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
-            jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
-        }
-        AbstractExpression.loadSortListFromJSONArray(m_sortExpressions, m_sortDirections, jarray);
+        AbstractExpression.loadSortListFromJSONArray(m_sortExpressions, m_sortDirections, jobj);
     }
 
     @Override

@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.types.Type;
 
 
 /**
@@ -58,12 +59,23 @@ public class ExpressionRank extends Expression {
         return 0;
     }
 
+    /**
+     * Returns the data type
+     */
+    @Override
+    Type getDataType() {
+        return Type.SQL_BIGINT;
+    }
+
     @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for(int i = 0; i < m_sortAndSlice.exprList.size(); i++) {
             Expression e = (Expression) m_sortAndSlice.exprList.get(i);
             e.resolveTypes(session, parent);
+        }
+        for (Expression expr : m_partitionByList) {
+            expr.resolveTypes(session, parent);
         }
     }
 
