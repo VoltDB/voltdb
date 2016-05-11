@@ -14,13 +14,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.importclient.kinesis;
 
 import org.voltdb.importclient.ImportBaseException;
 
-public class KinesisStreamImporterException extends ImportBaseException
-{
+public class KinesisStreamImporterException extends ImportBaseException {
     private static final long serialVersionUID = 7668280657393399984L;
 
     public KinesisStreamImporterException() {
@@ -34,8 +32,7 @@ public class KinesisStreamImporterException extends ImportBaseException
         super(cause);
     }
 
-    public KinesisStreamImporterException(String format, Throwable cause,
-            Object... args) {
+    public KinesisStreamImporterException(String format, Throwable cause, Object... args) {
         super(format, cause, args);
     }
 }
