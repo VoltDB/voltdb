@@ -885,20 +885,6 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-
-inline void
-PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
-    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
-        if (m_table.m_partitionColumn == -1) {
-            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
-            }
-        } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
-        }
-    }
-}
-
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
 {
     // May not delete an already deleted tuple.
