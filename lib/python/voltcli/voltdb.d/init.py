@@ -33,7 +33,6 @@
     description = 'Initializes a new, empty database.'
 )
 def init(runner):
-    if not runner.opts.clustername:
-        runner.abort_with_help('You must specify the --name option.')
-    runner.args.extend(['clustername', runner.opts.clustername])
+    if runner.opts.clustername:
+        runner.args.extend(['clustername', runner.opts.clustername])
     runner.go()

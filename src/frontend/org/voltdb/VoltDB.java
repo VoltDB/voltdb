@@ -32,9 +32,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Random;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -53,7 +53,6 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.net.HostAndPort;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -81,6 +80,7 @@ public class VoltDB {
     public static final String STAGED_DEPLOYMENT = "_DEPLOYMENT";
     public static final String STAGED_MESH = "_MESH";
     public static final String CONFIG_DIR = "config";
+    public static final String DEFAULT_CLUSTER_NAME = "database";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -263,7 +263,7 @@ public class VoltDB {
         public boolean m_forceVoltdbCreate = false;
 
         /** cluster name designation */
-        public String m_clusterName = null;
+        public String m_clusterName = DEFAULT_CLUSTER_NAME;
 
         /** command line provided voltdbroot */
         public File m_voltdbRoot = new VoltFile("voltdbroot");
@@ -597,17 +597,6 @@ public class VoltDB {
                     hostLog.fatal("Clustername must be defined for initialize");
                     referToDocAndExit();
                 }
-                Random prtrnd = new Random(m_configUUID.getLeastSignificantBits());
-
-                int pick = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
-                m_leader = "localhost:" + pick;
-                m_internalPort = pick;
-
-                m_port = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
-                m_adminPort = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
-
-                pick = 1025 + prtrnd.nextInt(Short.MAX_VALUE-1025);
-                m_zkInterface = "localhost:" + pick;
             }
 
             if (m_startAction == StartAction.PROBE) {

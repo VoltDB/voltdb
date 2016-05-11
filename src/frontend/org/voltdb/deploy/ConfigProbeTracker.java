@@ -53,12 +53,13 @@ public class ConfigProbeTracker {
             UUID meshHash,
             UUID startUuid,
             String internalInterface,
-            boolean admin
+            boolean admin,
+            boolean bare
     ) {
         checkArgument(nodeCount > 0, "node count must be greater then 0");
         this.nodeCount = nodeCount;
         this.initialProbeResponse =
-                new ConfigProbeResponse(configHash, meshHash, startUuid, internalInterface, admin)
+                new ConfigProbeResponse(configHash, meshHash, startUuid, internalInterface, admin, bare)
                 ;
         this.meshTimeout = new AtomicLong(System.currentTimeMillis() + CONFIG_PROBE_TIMEOUT);
     }
@@ -73,7 +74,8 @@ public class ConfigProbeTracker {
                 initialProbeResponse.getMeshHash(),
                 initialProbeResponse.getStartUuid(),
                 initialProbeResponse.getInternalInterface(),
-                initialProbeResponse.isAdmin()
+                initialProbeResponse.isAdmin(),
+                initialProbeResponse.bareAtStartup
                 );
     }
 

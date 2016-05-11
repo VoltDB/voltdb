@@ -35,7 +35,7 @@ public class ConfigProbeResponse {
 
     static {
         UUID poison = UUID.randomUUID();
-        POISON_PILL = new ConfigProbeResponse(poison, poison, poison, DEFAULT_INTFC, false);
+        POISON_PILL = new ConfigProbeResponse(poison, poison, poison, DEFAULT_INTFC, false, false);
     }
 
     protected final UUID configHash;
@@ -43,12 +43,20 @@ public class ConfigProbeResponse {
     protected final UUID startUuid;
     protected final String internalInterface;
     protected final boolean admin;
+    protected final boolean bareAtStartup;
 
     public ConfigProbeResponse() {
-        this(POISON_PILL.configHash,POISON_PILL.meshHash,POISON_PILL.startUuid,DEFAULT_INTFC,false);
+        this(POISON_PILL.configHash,POISON_PILL.meshHash,POISON_PILL.startUuid,DEFAULT_INTFC,false,false);
     }
 
-    public ConfigProbeResponse(UUID configHash, UUID meshHash, UUID startUuid, String internalInterface, boolean admin) {
+    public ConfigProbeResponse(
+            UUID configHash,
+            UUID meshHash,
+            UUID startUuid,
+            String internalInterface,
+            boolean admin,
+            boolean bare
+    ) {
         this.configHash = checkNotNull(configHash, "config has is null");
         this.meshHash = checkNotNull(meshHash, "config has is null");
         this.startUuid = checkNotNull(startUuid, "config has is null");
@@ -58,6 +66,7 @@ public class ConfigProbeResponse {
         checkArgument(mtc.matches(), "invalid internal interface specification: %s", internalInterface);
         this.internalInterface = internalInterface;
         this.admin = admin;
+        this.bareAtStartup = bare;
     }
 
     public UUID getConfigHash() {
@@ -80,6 +89,10 @@ public class ConfigProbeResponse {
         return admin;
     }
 
+    public boolean isBareAtStartup() {
+        return bareAtStartup;
+    }
+
     @JsonIgnore
     public boolean isPoison() {
         return configHash.equals(meshHash) && configHash.equals(startUuid);
@@ -90,6 +103,7 @@ public class ConfigProbeResponse {
         final int prime = 31;
         int result = 1;
         result = prime * result + (admin ? 1231 : 1237);
+        result = prime * result + (bareAtStartup ? 1231 : 1237);
         result = prime * result
                 + ((configHash == null) ? 0 : configHash.hashCode());
         result = prime * result + ((internalInterface == null) ? 0
@@ -111,6 +125,8 @@ public class ConfigProbeResponse {
             return false;
         ConfigProbeResponse other = (ConfigProbeResponse) obj;
         if (admin != other.admin)
+            return false;
+        if (bareAtStartup != other.bareAtStartup)
             return false;
         if (configHash == null) {
             if (other.configHash != null)
@@ -148,6 +164,8 @@ public class ConfigProbeResponse {
         builder.append(internalInterface);
         builder.append(", admin=");
         builder.append(admin);
+        builder.append(", bareAtStartup=");
+        builder.append(bareAtStartup);
         builder.append("]");
         return builder.toString();
     }

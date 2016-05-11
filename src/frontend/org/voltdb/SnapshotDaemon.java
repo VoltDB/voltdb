@@ -620,11 +620,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              * Initialize shuts down as it finishes with the initial truncation snapshot, thus
              * alleviating the danger of having requests heaping on each other.
              */
-            if (startAction == StartAction.INITIALIZE) {
-                m_es.submit(truncationSnapshotRunnable);
-            } else {
-                m_es.schedule(truncationSnapshotRunnable, m_truncationGatheringPeriod, TimeUnit.SECONDS);
-            }
+            m_es.schedule(truncationSnapshotRunnable, m_truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
         } else {
             /*

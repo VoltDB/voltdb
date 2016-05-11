@@ -69,6 +69,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.StartAction;
 import org.voltdb.StatusTracker;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.BiMap;
 import com.google_voltpatches.common.collect.HashBiMap;
@@ -83,6 +84,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class ConfigProber implements Closeable {
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
+    private final static VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     public static enum Endpoint {
         STATUS("/management/status"),
@@ -422,6 +424,8 @@ public class ConfigProber implements Closeable {
     public Result probe() {
         checkState(!m_done.get(), "probe is stale");
 
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_EstablishingClusterCommunication.name(), null, null);
+
         for (URI cep: m_configEndpoints) {
             HttpGet getConfig = asGET(cep);
             m_client.get().execute(getConfig, new RequestPair(getConfig));
@@ -480,8 +484,19 @@ public class ConfigProber implements Closeable {
                     throw loggedProberException(null, "probed members have mismatching participating nodes configuration");
                 }
             }
+            long bareAtStartup = m_responses.values().stream().filter(f -> f.isBareAtStartup()).count();
+            if (bareAtStartup >= m_safety && bareAtStartup < m_hostCount) {
+                throw loggedProberException(null,
+                        "Cannot start because %d out of %d nodes were found without command logs",
+                        bareAtStartup, m_hostCount);
+            }
 
-            StartAction startAction = m_commandLogEnabled ? StartAction.RECOVER : StartAction.CREATE;
+            StartAction startAction = StartAction.CREATE;
+            if (m_commandLogEnabled && bareAtStartup < m_safety) {
+                startAction = StartAction.RECOVER;
+            }
+
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_QuorumEstablished.name(), null, null);
 
             // wait for the leader to send out the all clear
             UUID leader = pickLeader();
@@ -500,6 +515,9 @@ public class ConfigProber implements Closeable {
             } else {
                 sendLeaderAllClear();
             }
+
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ClusterConfigurationComplete.name(), null, null);
+
             return new Result(
                     startAction,
                     formatLeader(leader),
@@ -530,6 +548,9 @@ public class ConfigProber implements Closeable {
             startAction = StartAction.JOIN;
             hostCount += m_safety;
         }
+
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ClusterConfigurationComplete.name(), null, null);
+
         return new Result(
                 startAction,
                 formatLeader(pickLeader()),

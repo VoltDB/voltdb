@@ -47,11 +47,8 @@ public enum StartAction {
     final static EnumSet<StartAction> joinSet =
             EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
 
-    final static EnumSet<StartAction> newStartVerbSet =
-            EnumSet.of(INITIALIZE,PROBE);
-
     final static EnumSet<StartAction> requireEmptyDirsSet =
-            EnumSet.of(CREATE,INITIALIZE);
+            EnumSet.of(CREATE);
 
     final String m_verb;
     final boolean m_enterpriseOnly;
@@ -99,10 +96,6 @@ public enum StartAction {
 
     public boolean doesJoin() {
         return joinSet.contains(this);
-    }
-
-    public boolean doesNewStart() {
-        return newStartVerbSet.contains(this);
     }
 
     public boolean doesRequireEmptyDirectories() {
