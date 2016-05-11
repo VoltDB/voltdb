@@ -390,7 +390,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Execute an arbitrary task represented by the task id and serialized parameters.
          * Returns serialized representation of the results
          */
-        void executeTask(TaskType taskType, const char* taskParams);
+        void executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo);
 
         void rebuildTableCollections();
 
@@ -413,7 +413,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Tasks dispatched by executeTask
          */
-        void dispatchValidatePartitioningTask(const char *taskParams);
+        void dispatchValidatePartitioningTask(ReferenceSerializeInputBE &taskInfo);
 
         void collectDRTupleStreamStateInfo();
 

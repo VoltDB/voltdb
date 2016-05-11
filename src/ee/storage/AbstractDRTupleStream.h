@@ -61,7 +61,6 @@ public:
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
@@ -74,7 +73,6 @@ public:
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
@@ -84,7 +82,6 @@ public:
                        char *tableHandle,
                        std::string tableName,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) = 0;
 
@@ -96,6 +93,9 @@ public:
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) = 0;
 
     bool m_enabled;
 protected:
