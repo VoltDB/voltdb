@@ -246,8 +246,8 @@ public class TestImportStatistics extends RegressionSuite {
     private static final String INVOCATIONS_COL = "INVOCATIONS";
 
     private void waitForLogEvents(Client client, int count) throws Exception {
-        //Wait 40 sec to get out of backpressure.
-        long end = System.currentTimeMillis() + 40000;
+        //Wait 60 sec to get out of backpressure.
+        long end = System.currentTimeMillis() + 60000;
         int successCount = 0;
         Map<String, Boolean> expectedInovcations = new HashMap<>();
         {
