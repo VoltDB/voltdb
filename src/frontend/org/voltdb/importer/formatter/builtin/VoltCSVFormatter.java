@@ -60,47 +60,33 @@ public class VoltCSVFormatter implements Formatter<String> {
 
         m_separator = "csv".equalsIgnoreCase(formatName) ? ',' : '\t';
 
-        String separatorProp = prop.getProperty("separator", "");
+        String separatorProp = prop.getProperty("separator", "").trim();
         if (!separatorProp.isEmpty() && separatorProp.length() == 1) {
             m_separator = separatorProp.charAt(0);
         }
 
         char quotechar = '"';
-        String quoteCharProp = prop.getProperty("quotechar", "");
+        String quoteCharProp = prop.getProperty("quotechar", "").trim();
         if (!quoteCharProp.isEmpty() && quoteCharProp.length() == 1) {
             quotechar = quoteCharProp.charAt(0);
         }
 
         m_escape = '\\';
-        String escapeProp = prop.getProperty("escape", "");
+        String escapeProp = prop.getProperty("escape", "").trim();
         if (!escapeProp.isEmpty() && escapeProp.length() == 1) {
             m_escape = escapeProp.charAt(0);
         }
 
-        m_strictquotes = false;
-        String strictQuotesProp = prop.getProperty("strictquotes", "");
-        if (!strictQuotesProp.isEmpty()) {
-            m_strictquotes = Boolean.parseBoolean(strictQuotesProp);
-        }
+        m_strictquotes = "true".equalsIgnoreCase(prop.getProperty("strictquotes", ""));
+        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("surroundingSpacesNeedQuotes", ""));
+        m_blank = prop.getProperty("blank", "").trim();
 
-        m_surroundingSpacesNeedQuotes = false;
-        String surroundingSpacesNeedQuotes = prop.getProperty("surroundingSpacesNeedQuotes", "");
-        if (!surroundingSpacesNeedQuotes.isEmpty()) {
-            m_surroundingSpacesNeedQuotes = Boolean.parseBoolean(surroundingSpacesNeedQuotes);
-        }
-
-        m_blank = prop.getProperty("blank", "");
-
-        m_customNullString = prop.getProperty("customNullString", "");
+        m_customNullString = prop.getProperty("customNullString", "").trim();
         if (!m_customNullString.isEmpty() && !"error".equals(m_blank)) {
             m_blank = "empty";
         }
 
-        m_nowhitespace = false;
-        String ignoreWhiteSpaceProp = prop.getProperty("nowhitespace", "");
-        if (!ignoreWhiteSpaceProp.isEmpty()) {
-            m_nowhitespace = Boolean.parseBoolean(ignoreWhiteSpaceProp);
-        }
+        m_nowhitespace = "true".equalsIgnoreCase(prop.getProperty("nowhitespace", ""));
 
         CsvPreference.Builder builder = new CsvPreference.Builder(quotechar, m_separator, "\n");
         if (m_surroundingSpacesNeedQuotes) {

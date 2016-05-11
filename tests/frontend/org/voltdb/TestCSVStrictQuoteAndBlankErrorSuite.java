@@ -48,7 +48,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  *
  */
 
-public class TestCSVFormatterSuite2 extends RegressionSuite {
+public class TestCSVStrictQuoteAndBlankErrorSuite extends RegressionSuite {
 
     @Override
     public void setUp() throws Exception {
@@ -159,7 +159,7 @@ public class TestCSVFormatterSuite2 extends RegressionSuite {
         }
     }
 
-    public TestCSVFormatterSuite2(final String name) {
+    public TestCSVStrictQuoteAndBlankErrorSuite(final String name) {
         super(name);
     }
 
@@ -176,7 +176,7 @@ public class TestCSVFormatterSuite2 extends RegressionSuite {
     }
 
     static public MultiConfigSuiteBuilder buildEnv(Properties formatConfig) throws Exception {
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCSVFormatterSuite2.class);
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCSVStrictQuoteAndBlankErrorSuite.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
         //Specify bundle location
         String bundleLocation = System.getProperty("user.dir") + "/bundles";

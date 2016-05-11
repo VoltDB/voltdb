@@ -596,7 +596,7 @@ public class VoltProjectBuilder {
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
-         addImport(enabled, importType, importFormat, importBundle, config, null);
+         addImport(enabled, importType, importFormat, importBundle, config, new Properties());
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
