@@ -494,6 +494,7 @@ $(document).ready(function () {
             var count = 0;
             var src = "";
             for (var k in tables) {
+                tablesArray.push(k);
                 src += '<h3>' + k + '</h3>';
                 var item = tables[k];
                 src += '<div id="column_' + count + '" class="listView">';
@@ -671,6 +672,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         var count = 0;
         var src = "";
         for (var k in tables) {
+            tablesArray.push(k);
             src += '<h3>' + k + '</h3>';
             var item = tables[k];
             src += '<div id="column_' + count + '" class="listView">';
