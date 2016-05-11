@@ -2617,6 +2617,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (m_rejoining) {
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
+                // remove the rejoin blocker
+                final String node = VoltZK.rejoinNodesBlockerHost+String.valueOf(m_myHostId);
+                VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(),node);
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;

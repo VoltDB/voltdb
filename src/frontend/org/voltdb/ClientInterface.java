@@ -2129,11 +2129,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (!m_cartographer.isClusterSafeIfNodeDies(liveHids, ihid)) {
             hostLog.info("Its unsafe to shutdown node with hostId: " + ihid
                     + " Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                    + " And all rejoin nodes should be completed."
                     + " Use shutdown to stop the cluster.");
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     new VoltTable[0],
                     "Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster."
+                            + " And all rejoin nodes should be completed."
                             + " Use shutdown to stop the cluster.", task.clientHandle);
         }
 
