@@ -124,5 +124,6 @@ public class TestFunctions extends PlannerTestCase {
 
     public void testLikeNoopt() {
         compile("select case when varchar_type like 'M%' then 1 end as m_state from bit;");
+        compile("select case when varchar_type like '_%' then 1 end as m_state from bit;");
     }
 }

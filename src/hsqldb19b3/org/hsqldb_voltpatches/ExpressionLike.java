@@ -72,7 +72,6 @@ public final class ExpressionLike extends ExpressionLogical {
 
         this.nodes      = other.nodes;
         this.likeObject = other.likeObject;
-        this.noOptimisation = true;
     }
 
     @Override
@@ -234,7 +233,7 @@ public final class ExpressionLike extends ExpressionLogical {
             /*
              * Can guarantee this won't work with an escape in the EE
              */
-            if (nodes.length > 2) {
+            if (hasEscape()) {
                 throw new RuntimeException("Like with an escape is not supported in parameterized queries");
             }
             return;
@@ -303,7 +302,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 /*
                  * Escape is not supported in the EE yet
                  */
-                if (nodes.length > 2) {
+                if (hasEscape()) {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
                 return;
@@ -338,7 +337,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 /*
                  * Escape is not supported in the EE yet
                  */
-                if (nodes.length > 2) {
+                if (hasEscape()) {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
                 nodes        = new Expression[BINARY];
@@ -363,7 +362,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 /*
                  * Escape is not supported in the EE yet
                  */
-                if (nodes.length > 2) {
+                if (hasEscape()) {
                     throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
                 }
             }
