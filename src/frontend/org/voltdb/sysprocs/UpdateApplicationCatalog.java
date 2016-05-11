@@ -267,8 +267,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             String replayInfo = m_runner.getTxnState().isForReplay() ? " (FOR REPLAY)" : "";
 
             // if this is a new catalog, do the work to update
-            if (context.getCatalogVersion() == expectedCatalogVersion) {
-
+            int catalogVersion = context.getCatalogContext().catalogVersion;
+            if (catalogVersion == expectedCatalogVersion) {
                 // update the global catalog if we get there first
                 @SuppressWarnings("deprecation")
                 Pair<CatalogContext, CatalogSpecificPlanner> p =
@@ -295,18 +295,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         replayInfo));
             }
             // if seen before by this code, then check to see if this is a restart
-            else if ((context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                     (Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                      Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash()))))
-            {
+            else if ((catalogVersion == (expectedCatalogVersion + 1) &&
+                     (Arrays.equals(context.getCatalogContext().getCatalogHash(),
+                             catalogStuff.getCatalogHash()) &&
+                      Arrays.equals(context.getCatalogContext().deploymentHash,
+                              catalogStuff.getDeploymentHash())))) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()),
                             Encoder.hexEncode(catalogStuff.getDeploymentHash())));
             }
             else {
-                VoltDB.crashLocalVoltDB("Invalid catalog update.  Expected version: " + expectedCatalogVersion +
-                        ", current version: " + context.getCatalogVersion(), false, null);
+                VoltDB.crashLocalVoltDB(
+                        "Invalid catalog update.  Expected version: " + expectedCatalogVersion +
+                        ", current version: " + catalogVersion, false, null);
             }
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

@@ -49,7 +49,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
             VoltType.GEOGRAPHY_POINT,
             VoltType.GEOGRAPHY,
     };
-    private static final String m_javaTypeNamePatternForInsertTest[] = {
+    private static final String m_javaClassNamePatternForInsertTest[] = {
             "Byte",
             "Short",
             "Integer",
@@ -75,7 +75,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
             null, // IN LIST of GEOGRAPHY_POINT not supported
             null, // IN LIST of GEOGRAPHY not supported
     };
-    private static final String m_javaTypeNamePatternForInListTest[] = {
+    private static final String m_javaClassNamePatternForInListTest[] = {
             // Interpretation of byte[] as a list of tiny int is prevented
             // by an overriding interpretation of byte[] as a VARBINARY value.
             // So, it can not be supported,
@@ -94,7 +94,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
     };
     // A list of non-array types that should all fail to type-check when passed
     // to "IN ?" parameters that expect some kind of array argument.
-    private static final String m_javaTypeNamePatternForInListFailureTest[] = {
+    private static final String m_javaClassNamePatternForInListFailureTest[] = {
             "Byte",
             "Short",
             "Integer",
@@ -203,8 +203,6 @@ public class TestTypeConversionSuite extends RegressionSuite {
                                          toType, typeToTest.getValue());
                 }
                 else {
-                    String typeTriedByInsert = m_javaTypeNamePatternForInsertTest[fromType];
-
                     // type conversion not allowed
                     if (typeToTest == VoltType.TIMESTAMP &&
                             m_tableColTypeVal[toType] == VoltType.DECIMAL) {
@@ -215,13 +213,13 @@ public class TestTypeConversionSuite extends RegressionSuite {
                         // in voltqueue sql. But in case of insert this conversion is not allowed
                         // as the conversion is flagged in EE with different error message So
                         // test for that
-                        errorMsg = "Type "+ typeToTest.getName() +" can't be cast as "
-                                    + m_tableColTypeVal[toType].getName();
+                        errorMsg = "Type "+ typeToTest.getName() +" can't be cast as " +
+                                m_tableColTypeVal[toType].getName();
                     }
                     else {
-                        errorMsg = "Incompatible parameter type: can not convert type '"
-                                + typeTriedByInsert +
-                                "' to '" + m_tableColTypeVal[toType].getName() +
+                        String classTriedByInsert = m_javaClassNamePatternForInsertTest[fromType];
+                        errorMsg = "Incompatible parameter type: can not convert type '" +
+                                classTriedByInsert  + "' to '" + m_tableColTypeVal[toType].getName() +
                                 "' for arg " + toType + " for SQL stmt";
                     }
                     verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
@@ -236,10 +234,9 @@ public class TestTypeConversionSuite extends RegressionSuite {
 
                 // Test that array arguments are not typically compatible
                 // with parameters passed into column comparisons.
-                String typeTriedByCompare = m_javaTypeNamePatternForInListTest[fromType];
+                String classTriedByCompare = m_javaClassNamePatternForInListTest[fromType];
                 errorMsg = "Incompatible parameter type: can not convert type '"
-                        + typeTriedByCompare +
-                        "' to '" + m_tableColTypeVal[toType].getName() +
+                        + classTriedByCompare + "' to '" + m_tableColTypeVal[toType].getName() +
                         "' for arg 0 for SQL stmt";
                 verifyProcFails(client, errorMsg, "ProcToTestTypeConversion",
                                 ProcToTestTypeConversion.TestFailingArrayTypeCompare,
@@ -257,7 +254,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
         // unless/until we find a way around that interpretation.
         for (int fromType = 1; fromType < m_tableColTypeVal.length; ++fromType) {
             boolean[] supportedForFromType = m_typeConversionMatrixInList[fromType];
-            String typeTriedByInListQuery = m_javaTypeNamePatternForInListTest[fromType];
+            String classTriedByInListQuery = m_javaClassNamePatternForInListTest[fromType];
             typeToTest = m_tableColTypeVal[fromType];
             for (int toType = 0; toType < m_tableColTypeVal.length; ++toType) {
                 VoltType inListType = m_tableColInListTypeVal[toType];
@@ -281,7 +278,7 @@ public class TestTypeConversionSuite extends RegressionSuite {
                         continue;
                     }
                     errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeTriedByInListQuery +
+                            + classTriedByInListQuery +
                             "' to '" + inListType.getName() +
                             "' for arg 0 for SQL stmt";
 
@@ -291,15 +288,15 @@ public class TestTypeConversionSuite extends RegressionSuite {
                 }
 
                 // Test that non-array arguments are not allowed for IN LIST params.
-                String typeExpectedToFailInListQuery =
-                        m_javaTypeNamePatternForInListFailureTest[fromType];
-                if (typeExpectedToFailInListQuery.endsWith("]") &&
+                String classExpectedToFailInListQuery =
+                        m_javaClassNamePatternForInListFailureTest[fromType];
+                if (classExpectedToFailInListQuery.endsWith("]") &&
                         inListType == VoltType.INLIST_OF_BIGINT) {
                     errorMsg = "rhs of IN expression is of a non-list type varbinary";
                 }
                 else {
                     errorMsg = "Incompatible parameter type: can not convert type '"
-                            + typeExpectedToFailInListQuery +
+                            + classExpectedToFailInListQuery +
                             "' to '" + inListType.getName() +
                             "' for arg 0 for SQL stmt";
                 }

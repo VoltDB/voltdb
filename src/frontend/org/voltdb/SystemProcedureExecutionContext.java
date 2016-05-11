@@ -22,15 +22,12 @@ import java.util.Map;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
-
-    public Cluster getCluster();
 
     public long getSpHandleForSnapshotDigest();
 
@@ -39,19 +36,11 @@ public interface SystemProcedureExecutionContext {
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
 
-    public int getClusterId();
-
     public int getHostId();
 
     public int getPartitionId();
 
-    public long getCatalogCRC();
-
-    public int getCatalogVersion();
-
-    public byte[] getCatalogHash();
-
-    public byte[] getDeploymentHash();
+    public CatalogContext getCatalogContext();
 
     // Separate SiteTracker accessor for IV2 use.
     // Snapshot services that need this can get a SiteTracker in IV2, but

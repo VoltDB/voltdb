@@ -353,4 +353,14 @@ public class CompiledPlan {
     public void setNondeterminismDetail(String contentDeterminismMessage) {
         m_contentDeterminismDetail = contentDeterminismMessage;
     }
+
+    public String expectedParamsExplained() {
+        StringBuilder paramAddendum = new StringBuilder();
+        String prefix = "Parameter types: ";
+        for (VoltType paramType : parameterTypes()) {
+            paramAddendum.append(prefix).append(paramType.toSQLString());
+            prefix = ", ";
+        }
+        return paramAddendum.append("\n").toString();
+    }
 }

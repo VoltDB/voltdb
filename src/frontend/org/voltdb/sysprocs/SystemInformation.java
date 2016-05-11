@@ -125,12 +125,11 @@ public class SystemInformation extends VoltSystemProcedure
             VoltTable result = null;
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
-            if (context.isLowestSiteId())
-            {
-                result = populateDeploymentProperties(context.getCluster(), context.getDatabase());
+            if (context.isLowestSiteId()) {
+                result = populateDeploymentProperties(context.getCatalogContext().cluster,
+                        context.getDatabase());
             }
-            else
-            {
+            else {
                 result = new VoltTable(clusterInfoSchema);
             }
             return new DependencyPair(DEP_systemInformationDeployment, result);
