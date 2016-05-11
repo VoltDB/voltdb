@@ -550,8 +550,9 @@ function alertNodeClicked(obj) {
                 var proceduresData = {};
                 var procedureColumnsData = {};
                 var sysProceduresData = {};
-                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
+                var exportTableData = {}
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION', exportTableData);
+                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, exportTableData);
             });
         };
 
@@ -3067,7 +3068,8 @@ function alertNodeClicked(obj) {
         };
 
 
-        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName, exportTableData) {
+            exportTableData = exportTableData ==  undefined ? {} : exportTableData
             var suffix = "";
             if (processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT") {
                 suffix = "_" + processName;
@@ -3085,32 +3087,31 @@ function alertNodeClicked(obj) {
 
             for (var k = 0; k < rawTables.length; k++) {
                 var tableName = rawTables[k][5];
-                if (rawTables[k][6] == 'StreamedTable')
-                    exports[tableName] = { name: tableName };
-                else {
-                    var isView = false;
-                    var item = { name: tableName, key: null, indexes: null, columns: null };
-                    for (var j = 0; j < rawIndexes.length; j++) {
-                        if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
-                            var indexName = rawIndexes[j][5];
-                            if (item.indexes == null)
-                                item.indexes = [];
-                            item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
-                            if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
-                                isView = true;
-                            if (indexName.toUpperCase().indexOf("PK_") > -1)
-                                item.key = indexName;
-                        }
+                var isView = false;
+                var item = { name: tableName, key: null, indexes: null, columns: null };
+                for (var j = 0; j < rawIndexes.length; j++) {
+                    if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
+                        var indexName = rawIndexes[j][5];
+                        if (item.indexes == null)
+                            item.indexes = [];
+                        item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
+                        if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
+                            isView = true;
+                        if (indexName.toUpperCase().indexOf("PK_") > -1)
+                            item.key = indexName;
                     }
-                    if (isView)
-                        views[tableName] = item;
-                    else
-                        tables[tableName] = item;
                 }
+                if (isView)
+                    views[tableName] = item;
+                else if (rawTables[k][6] == 'StreamedTable')
+                    exports[tableName] = item;
+                else
+                    tables[tableName] = item;
             }
 
             connection.Metadata['tables'] = tables;
             connection.Metadata['views'] = views;
+            connection.Metadata['exports'] = exports;
             for (var i = 0; i < rawColumns.length; i++) {
                 var TableName = rawColumns[i][2].toUpperCase();
                 if (connection.Metadata['tables'][TableName] != null) {
@@ -3118,6 +3119,14 @@ function alertNodeClicked(obj) {
                         connection.Metadata['tables'][TableName].columns = [];
                     }
                     connection.Metadata['tables'][TableName].columns[rawColumns[i][16]] =
+                        rawColumns[i][3].toUpperCase() +
+                        ' (' + rawColumns[i][5].toLowerCase() + ')';
+                }
+                else if (connection.Metadata['exports'][TableName] != null) {
+                    if (connection.Metadata['exports'][TableName].columns == null) {
+                        connection.Metadata['exports'][TableName].columns = [];
+                    }
+                    connection.Metadata['exports'][TableName].columns[rawColumns[i][16]] =
                         rawColumns[i][3].toUpperCase() +
                         ' (' + rawColumns[i][5].toLowerCase() + ')';
                 }
@@ -3175,6 +3184,7 @@ function alertNodeClicked(obj) {
             proceduresData['procedures'] = procedures;
             procedureColumnsData['procedureColumns'] = procedureColumns;
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
+            exportTableData['exportTables'] = connection.Metadata['exports']
         }
 
 

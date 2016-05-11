@@ -189,6 +189,37 @@ $(document).ready(function () {
         }
     });
 
+    // Streamed Table Accordion
+    $('#accordionStreamedTable').accordion({
+        collapsible: true,
+        active: false,
+        beforeActivate: function (event, ui) {
+            // The accordion believes a panel is being opened
+            if (ui.newHeader[0]) {
+                var currHeader = ui.newHeader;
+                var currContent = currHeader.next('.ui-accordion-content');
+                // The accordion believes a panel is being closed
+            } else {
+                var currHeader = ui.oldHeader;
+                var currContent = currHeader.next('.ui-accordion-content');
+            }
+            // Since we've changed the default behavior, this detects the actual status
+            var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+            // Toggle the panel's header
+            currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+            // Toggle the panel's icon
+            currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+            // Toggle the panel's content
+            currContent.toggleClass('accordion-content-active', !isPanelSelected)
+            if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+            return false; // Cancels the default action
+        }
+    });
+
     // Implements Scroll in Server List div
     //$('#tabScroller').slimscroll({
     //    disableFadeOut: true,
@@ -217,11 +248,13 @@ $(document).ready(function () {
 
         this.populateTablesAndViews = function () {
             toggleSpinner(true);
-            voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData) {
+            voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData, exportTableData) {
                 var tables = tablesData['tables'];
                 populateTableData(tables);
                 var views = viewsData['views'];
                 populateViewData(views);
+                var streamedTables = exportTableData['exportTables']
+                populateStreamedTablesData(streamedTables);
                 var procedures = proceduresData['procedures'];
                 var procedureColumns = procedureColumnsData['procedureColumns'];
                 var sysProcedure = sysProcedureData['sysProcedures'];
@@ -356,13 +389,13 @@ $(document).ready(function () {
             defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
             defSrcHeader += '<div id="defaultProcedure" class="listView">';
             var defSrcFooter = '</div>';
-            defSrc = defSrcHeader + defSrc + defSrcFooter;
+            defSrc = defSrcHeader + (defSrc != '' ? defSrc : '<div style="font-size:12px">No default stored procedures found.</div>') + defSrcFooter;
             
             var userProcHeader = "";
             userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
             userProcHeader += '<div id="userProcedure" class="listView">';
             var userProcFooter = '</div>';
-            var userSrc = userProcHeader + src + userProcFooter;
+            var userSrc = userProcHeader + (src != '' ? src : '<div style="font-size:12px">No user defined stored procedures found.</div>') + userProcFooter;
 
             $('#accordionProcedures').html(sysScr + defSrc + userSrc);
             
@@ -457,6 +490,33 @@ $(document).ready(function () {
 
         };
 
+        var populateStreamedTablesData = function (tables) {
+            var count = 0;
+            var src = "";
+            for (var k in tables) {
+                tablesArray.push(k);
+                src += '<h3>' + k + '</h3>';
+                var item = tables[k];
+                src += '<div id="column_' + count + '" class="listView">';
+                if (item.columns != null) {
+                    src += '<ul>';
+                    for (var c in item.columns)
+                        src += '<li>' + item.columns[c] + '</li>';
+                    src += '</ul>';
+                } else
+                    src += '<ul><li>Schema could not be read...</li></ul>';
+                src += '</div>';
+                count++;
+            }
+            if (src == "") {
+                src += '<h3>No stream tables found.</h3>';
+                $('#accordionStreamedTable').html(src);
+            } else {
+                $('#accordionStreamedTable').html(src);
+                $("#accordionStreamedTable").accordion("refresh");
+            }
+        };
+
         var toggleSpinner = function (show) {
             if (!show) {
                 $("#sqlQueryOverlay").hide();
@@ -488,7 +548,7 @@ $(document).ready(function () {
 })(window);
 
 function loadSQLQueryPage(serverName, portid, userName) {
-
+    var tablesArray = [];
     SQLQueryRender.server = serverName;
     SQLQueryRender.userName = userName;
     VoltDBService.SetConnectionForSQLExecution(false);
@@ -605,6 +665,33 @@ function loadSQLQueryPage(serverName, portid, userName) {
         } else {
             $('#accordionViews').html(src);
             $("#accordionViews").accordion("refresh");
+        }
+    };
+
+    var populateStreamedTablesData = function (tables) {
+        var count = 0;
+        var src = "";
+        for (var k in tables) {
+            tablesArray.push(k);
+            src += '<h3>' + k + '</h3>';
+            var item = tables[k];
+            src += '<div id="column_' + count + '" class="listView">';
+            if (item.columns != null) {
+                src += '<ul>';
+                for (var c in item.columns)
+                    src += '<li>' + item.columns[c] + '</li>';
+                src += '</ul>';
+            } else
+                src += '<ul><li>Schema could not be read...</li></ul>';
+            src += '</div>';
+            count++;
+        }
+        if (src == "") {
+            src += '<h3>No stream tables found.</h3>';
+            $('#accordionStreamedTable').html(src);
+        } else {
+            $('#accordionStreamedTable').html(src);
+            $("#accordionStreamedTable").accordion("refresh");
         }
     };
 
@@ -743,11 +830,13 @@ function loadSQLQueryPage(serverName, portid, userName) {
     };
 
     var populateTablesAndViews = function () {
-        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData) {
+        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData, sysProcedureData, exportTableData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
             var views = viewsData['views'];
             populateViewData(views);
+            var streamedTables = exportTableData['exportTables']
+            populateStreamedTablesData(streamedTables)
             var procedures = proceduresData['procedures'];
             var procedureColumns = procedureColumnsData['procedureColumns'];
             var sysProcedure = sysProcedureData['sysProcedures'];
