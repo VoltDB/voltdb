@@ -62,7 +62,7 @@ public class SQLParser extends SQLPatternFactory
             super(String.format(message, args), cause);
         }
 
-        private static final long serialVersionUID = -4043500523038225173L;
+        private static final long serialVersionUID  = -4043500523038225173L;
     }
 
     //========== Private Parsing Data ==========
