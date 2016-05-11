@@ -37,6 +37,10 @@ public class VoltCSVFormatter implements Formatter<String> {
     /** String that can be used to indicate NULL value in CSV files */
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
+    public static final char DEFAULT_QUOTE_CHAR='"';
+    
+    public static final char DEFAULT_ESCAPE_CHAR='\\';
+    
     /**
      * Size limit for each column.
      */
@@ -65,23 +69,23 @@ public class VoltCSVFormatter implements Formatter<String> {
             m_separator = separatorProp.charAt(0);
         }
 
-        char quotechar = '"';
+        char quotechar = DEFAULT_QUOTE_CHAR;
         String quoteCharProp = prop.getProperty("quotechar", "").trim();
         if (!quoteCharProp.isEmpty() && quoteCharProp.length() == 1) {
             quotechar = quoteCharProp.charAt(0);
         }
 
-        m_escape = '\\';
+        m_escape = DEFAULT_ESCAPE_CHAR;
         String escapeProp = prop.getProperty("escape", "").trim();
         if (!escapeProp.isEmpty() && escapeProp.length() == 1) {
             m_escape = escapeProp.charAt(0);
         }
 
         m_strictquotes = "true".equalsIgnoreCase(prop.getProperty("strictquotes", ""));
-        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("surroundingSpacesNeedQuotes", ""));
+        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("surrounding.spaces.need.quotes", ""));
         m_blank = prop.getProperty("blank", "").trim();
 
-        m_customNullString = prop.getProperty("customNullString", "").trim();
+        m_customNullString = prop.getProperty("custom.null.string", "").trim();
         if (!m_customNullString.isEmpty() && !"error".equals(m_blank)) {
             m_blank = "empty";
         }

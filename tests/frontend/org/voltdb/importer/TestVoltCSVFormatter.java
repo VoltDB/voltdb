@@ -218,7 +218,7 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("surroundingSpacesNeedQuotes", "true");
+        prop.setProperty("surrounding.spaces.need.quotes", "true");
         o.configureFormatterFactory("csv", prop);
         Formatter formatter = o.create();
         Object[] results = formatter.transform("12,10.05,  test");
@@ -301,7 +301,7 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("separator", ",");
-        prop.setProperty("customNullString", "empty");
+        prop.setProperty("custom.null.string", "empty");
         o.configureFormatterFactory("csv", prop);
         Formatter formatter = o.create();
         Object[] results = formatter.transform("12,empty,test");

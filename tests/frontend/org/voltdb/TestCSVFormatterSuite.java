@@ -225,7 +225,7 @@ public class TestCSVFormatterSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() throws Exception {
         Properties formatConfig = new Properties();
-        formatConfig.setProperty("customNullString", "test");
+        formatConfig.setProperty("custom.null.string", "test");
         formatConfig.setProperty("separator", ",");
         formatConfig.setProperty("blank", "empty");
         formatConfig.setProperty("escape", "\\");
