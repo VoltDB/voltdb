@@ -102,7 +102,7 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
     // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool deleteTuple(TableTuple &tuple, bool);

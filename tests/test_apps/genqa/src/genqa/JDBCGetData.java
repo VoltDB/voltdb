@@ -23,11 +23,13 @@
 
 package genqa;
 
+import java.net.Socket;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Properties;
 
 import genqa.VerifierUtils.Config;
 
@@ -43,6 +45,20 @@ public class JDBCGetData {
      * @return
      */
     public static Connection jdbcConnect(Config config) {
+
+        /* some jdbc drivers may not support connection timout semantics,
+           so pre-test the connection.
+         */
+        String[] a = config.host_port.split(":");
+        try {
+            Socket s = new Socket(a[0], Integer.valueOf(a[1]));
+            s.close();
+        } catch (Exception e) {
+            System.err.println("Service is not up at '" + config.host_port + "' " + e);
+            e.printStackTrace();
+            System.exit(-1);
+        }
+
         try {
             Class.forName(config.driver);
         } catch (ClassNotFoundException e) {
@@ -52,11 +68,15 @@ public class JDBCGetData {
         }
 
         String connectString = "jdbc:" + config.jdbcDBMS + "://" + config.host_port + "/" + config.jdbcDatabase;
+        Properties myProp = new Properties();
+        myProp.put("user", config.jdbcUser);
+        myProp.put("password", config.jdbcPassword);
         try {
-            conn = DriverManager.getConnection(connectString, config.jdbcUser, config.jdbcPassword);
+            conn = DriverManager.getConnection(connectString, myProp);
+            System.out.println("Connected!");
             selectStmt = conn.prepareStatement(selectSql);
         } catch (SQLException e) {
-            System.err.println("Could not connect to the database with connect string " + connectString + ".\n");
+            System.err.println("Could not connect to the database with connect string " + connectString + ", exception: " + e);
             e.printStackTrace();
             System.exit(-1);
         }

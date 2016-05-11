@@ -1382,7 +1382,7 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     }
 }
 
-/** For now, bring the Export system to a steady state with no buffers with content */
+/** Bring the Export and DR system to a steady state with no pending committed data */
 void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     m_executorContext->setupForQuiesce(lastCommittedSpHandle);
     BOOST_FOREACH (TablePair table, m_exportingTables) {
@@ -1783,8 +1783,7 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config, int
     }
 }
 
-void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
-    ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+void VoltDBEngine::dispatchValidatePartitioningTask(ReferenceSerializeInputBE &taskInfo) {
     std::vector<CatalogId> tableIds;
     const int32_t numTables = taskInfo.readInt();
     for (int ii = 0; ii < numTables; ii++) {
@@ -1792,7 +1791,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     }
 
     HashinatorType type = static_cast<HashinatorType>(taskInfo.readInt());
-    const char *config = taskParams + (sizeof(int32_t) * 2) +  (sizeof(int64_t) * tableIds.size());
+    const char *config = taskInfo.getRawPointer();
     TheHashinator* hashinator;
     switch(type) {
         case HASHINATOR_LEGACY:
@@ -1867,16 +1866,15 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
     return rowCount;
 }
 
-void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
+void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo) {
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
-        dispatchValidatePartitioningTask(taskParams);
+        dispatchValidatePartitioningTask(taskInfo);
         break;
     case TASK_TYPE_GET_DR_TUPLESTREAM_STATE:
         collectDRTupleStreamStateInfo();
         break;
     case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
-        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
         int64_t partitionSequenceNumber = taskInfo.readLong();
         int64_t mpSequenceNumber = taskInfo.readLong();
         if (partitionSequenceNumber >= 0) {
@@ -1889,7 +1887,6 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         break;
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
-        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
         uint32_t drVersion = taskInfo.readInt();
         if (drVersion != DRTupleStream::PROTOCOL_VERSION) {
             m_executorContext->setDrStream(m_compatibleDRStream);
@@ -1904,6 +1901,21 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         }
         m_drVersion = drVersion;
         m_resultOutput.writeInt(0);
+        break;
+    }
+    case TASK_TYPE_GENERATE_DR_EVENT: {
+        DREventType type = (DREventType)taskInfo.readInt();
+        int64_t uniqueId = taskInfo.readLong();
+        int64_t lastCommittedSpHandle = taskInfo.readLong();
+        int64_t spHandle = taskInfo.readLong();
+        ByteArray payloads = taskInfo.readBinaryString();
+
+        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
+                spHandle, uniqueId, payloads);
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
+                    spHandle, uniqueId, payloads);
+        }
         break;
     }
     default:

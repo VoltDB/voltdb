@@ -553,7 +553,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     final class Gap {
         long c = 0;
         long s = -1L;
+        long offer = -1L;
         final long [] lag;
+        private final long gapTrackerCheckMaxTimeMs = 2_000;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -565,6 +567,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         synchronized void submit(long offset) {
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
+            }
+            if ((offset - c) >= lag.length) {
+                offer = offset;
+                try {
+                    wait(gapTrackerCheckMaxTimeMs);
+                } catch (InterruptedException e) {
+                    rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
+                }
             }
             if (offset > s) {
                 s = offset;
@@ -580,13 +590,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 throw new IllegalArgumentException("offset is negative");
             }
             lag[idx(offset)] = s = c = offset;
+            offer = -1L;
         }
 
         synchronized long commit(long offset) {
             if (offset <= s && offset > c) {
                 int ggap = (int)Math.min(lag.length, offset-c);
                 if (ggap == lag.length) {
-                    warn(
+                    rateLimitedLog(Level.WARN,
                               null, "Gap tracker moving topic commit point from %d to %d for "
                               + m_topicAndPartition, c, (offset - lag.length + 1)
                             );
@@ -596,6 +607,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 lag[idx(offset)] = offset;
                 while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
                     ++c;
+                }
+                if (offer >=0 && (offer-c) < lag.length) {
+                    offer = -1L;
+                    notify();
                 }
             }
             return c;

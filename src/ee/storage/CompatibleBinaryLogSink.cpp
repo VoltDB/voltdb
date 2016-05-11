@@ -429,28 +429,28 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (existingMetaTableForDelete.get()) {
-        existingMetaTableForDelete.get()->deleteAllTuples(true);
+        existingMetaTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (existingTupleTableForDelete.get()) {
-        existingTupleTableForDelete.get()->deleteAllTuples(true);
+        existingTupleTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (expectedMetaTableForDelete.get()) {
-        expectedMetaTableForDelete.get()->deleteAllTuples(true);
+        expectedMetaTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (expectedTupleTableForDelete.get()) {
-        expectedTupleTableForDelete.get()->deleteAllTuples(true);
+        expectedTupleTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (existingMetaTableForInsert.get()) {
-        existingMetaTableForInsert.get()->deleteAllTuples(true);
+        existingMetaTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (existingTupleTableForInsert.get()) {
-        existingTupleTableForInsert.get()->deleteAllTuples(true);
+        existingTupleTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (newMetaTableForInsert.get()) {
-        newMetaTableForInsert.get()->deleteAllTuples(true);
+        newMetaTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (newTupleTableForInsert.get()) {
-        newTupleTableForInsert.get()->deleteAllTuples(true);
+        newTupleTableForInsert.get()->deleteAllTuples(true, false);
     }
 
     return true;

@@ -1406,7 +1406,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         ReferenceSerializeInputBE input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
         TaskType taskId = static_cast<TaskType>(input.readLong());
-        engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
+        engine->executeTask(taskId, input);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
