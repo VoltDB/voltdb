@@ -142,9 +142,9 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
 
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
                 if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
@@ -181,7 +181,7 @@
                     if (shortApiCallDetails.updatedData == null) {
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
 
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
                         var ah = null;
@@ -201,7 +201,7 @@
                         }
                     }
                 } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                    uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                     var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, true, isSqlQuery, timeoutTime);
                     if (typeof (params) == 'string') {
                         if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
@@ -459,7 +459,7 @@
 
         this.CheckServerConnection = function (server, port, admin, user, password, isHashedPassword, processName, checkConnection) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            var uri = 'http://' + server + ':' + port + '/api/1.0/';
+            var uri = window.location.protocol + '/\/' + server + ':' + port + '/api/1.0/';
             var params = conn.BuildParamSet('@Statistics', ['TABLE', 0]);
             $.ajax({
                 url: uri + '?' + params,
