@@ -483,6 +483,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           threadLocalPoolAllocations();
           result = kErrorCode_None;
           break;
+      case 25:
+          getUSOForExportTable(cmd);
+          result = kErrorCode_None;
+          break;
       case 27:
           updateHashinator(cmd);
           result = kErrorCode_None;
@@ -606,12 +610,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
+        std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
-
+        std::memset(m_tupleBuffer, 0, m_tupleBufferSize);
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
                                  cs->partitionId,
@@ -1239,7 +1244,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeInputBE in1(inptr, sz);
 
         // Pass 1 - calculate size and allow for status code byte and count length integers.
-        size_t outputSize = 1;
+        size_t outputSize = 1 + sizeof(int32_t) + sizeof(int64_t); // status code + buffercount + remaining
         for (size_t i = 0; i < bufferCount; i++) {
             in1.readLong(); in1.readInt(); // skip address and offset, used for jni only
             outputSize += in1.readInt() + 4;
@@ -1285,18 +1290,19 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         offset = 1 + sizeof(int32_t);
         *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
         offset += sizeof(int64_t);
-        if (remaining > 0) {
+        // output position when success (including finished)
+        if (remaining >= 0) {
             std::vector<int>::const_iterator ipos;
             for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
                 int length = *ipos;
                 *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
                 offset += length + sizeof(int32_t);
             }
-        } else {
+        }
+        if (remaining <= 0) {
             // If we failed or finished, we've set the count, so stop right there.
             outputSize = offset;
         }
-
         // Ship it.
         writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
 
@@ -1517,10 +1523,12 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     try {
         execute_task *task = (execute_task*)cmd;
         voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
+        ReferenceSerializeInputBE input(task->task, MAX_MSG_SZ);
         m_engine->resetReusedResultOutputBuffer(1);
-        m_engine->executeTask(taskId, task->task);
+        m_engine->executeTask(taskId, input);
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
+        resultsBuffer[0] = kErrorCode_Success;
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
     } catch (const FatalException& e) {
         crashVoltDB(e);
@@ -1630,9 +1638,9 @@ void *eethread(void *ptr) {
         // size at least length + command
         if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
             printf("bytesread=%zx cmd=%d msgsize=%d\n",
-                   bytesread, cmd->command, ntohl(cmd->msgsize));
+                    bytesread, ntohl(cmd->command), ntohl(cmd->msgsize));
             for (int ii = 0; ii < bytesread; ++ii) {
-                printf("%x ", data[ii]);
+                printf("bytesread data %d is %x ", ii, data[ii]);
             }
             assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
         }

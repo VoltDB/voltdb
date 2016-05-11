@@ -28,6 +28,7 @@
 #include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"
+#include "storage/TupleStreamException.h"
 
 #include <vector>
 #include <cstdio>
@@ -56,7 +57,6 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     char *tableHandle,
                                     std::string tableName,
                                     int partitionColumn,
-                                    int64_t txnId,
                                     int64_t spHandle,
                                     int64_t uniqueId) {
     size_t startingUso = m_uso;
@@ -64,11 +64,16 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
 
-    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
+    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, LONG_MAX);
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR truncate table " + tableName);
+            throw;
+        }
     }
 
     size_t tupleMaxLength = TXN_RECORD_HEADER_SIZE + 4 + tableName.size(); // table name length and table name
@@ -76,7 +81,12 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
         tupleMaxLength += HASH_DELIMITER_SIZE;
     }
     if (m_currBlock->remaining() < tupleMaxLength) {
-        extendBufferChain(tupleMaxLength);
+        try {
+            extendBufferChain(tupleMaxLength);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR truncate table " + tableName);
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -154,7 +164,6 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash) {
 size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   char *tableHandle,
                                   int partitionColumn,
-                                  int64_t txnId,
                                   int64_t spHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
@@ -169,7 +178,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
 
-    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
+    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(tuple, partitionColumn));
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -180,11 +189,25 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     }
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            char msg[64];
+            snprintf(msg, 64, " DR record type %d", type);
+            e.appendContextToMessage(msg);
+            throw;
+        }
     }
 
     if (m_currBlock->remaining() < tupleMaxLength) {
-        extendBufferChain(tupleMaxLength);
+        try {
+            extendBufferChain(tupleMaxLength);
+        } catch (TupleStreamException &e) {
+            char msg[64];
+            snprintf(msg, 64, " DR record type %d", type);
+            e.appendContextToMessage(msg);
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -216,7 +239,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                          char *tableHandle,
                                          int partitionColumn,
-                                         int64_t txnId,
                                          int64_t spHandle,
                                          int64_t uniqueId,
                                          TableTuple &oldTuple,
@@ -232,7 +254,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     size_t newRowMetadataSz = 0;
     size_t maxLength = TXN_RECORD_HEADER_SIZE;
 
-    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
+    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(oldTuple, partitionColumn));
 
     DRRecordType type = DR_RECORD_UPDATE;
@@ -245,11 +267,21 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     }
 
     if (!m_currBlock) {
-        extendBufferChain(m_defaultCapacity);
+        try {
+            extendBufferChain(m_defaultCapacity);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR update tuple");
+            throw;
+        }
     }
 
     if (m_currBlock->remaining() < maxLength) {
-        extendBufferChain(maxLength);
+        try {
+            extendBufferChain(maxLength);
+        } catch (TupleStreamException &e) {
+            e.appendContextToMessage(" DR update tuple");
+            throw;
+        }
     }
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -279,7 +311,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId) {
+void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
@@ -289,7 +321,7 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txn
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
     if (!m_opened) {
         beginTransaction(m_openSequenceNumber, uniqueId);
     }
@@ -481,6 +513,11 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         if (spaceNeeded > m_secondaryCapacity) {
             // txn larger than the max buffer size, set blockSize to 0 so that caller will abort
             blockSize = 0;
+
+            char msg[256];
+            snprintf(msg, 256, "Transaction requiring %jd bytes exceeds max DR Buffer size of %jd bytes",
+                     spaceNeeded, m_secondaryCapacity);
+            throw TupleStreamException(SQLException::volt_output_buffer_overflow, msg);
         } else if (spaceNeeded > m_defaultCapacity) {
             blockSize = m_secondaryCapacity;
         }
@@ -491,6 +528,25 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     }
     assert(!m_opened);
     return false;
+}
+
+void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+        int64_t uniqueId, ByteArray payloads) {
+    switch (type) {
+    case CATALOG_UPDATE: {
+        // Make sure current block is empty
+        extendBufferChain(0);
+        ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
+        io.writeBinaryString(payloads.data(), payloads.length());
+        m_currBlock->consumed(io.position());
+        m_uso += io.position();
+
+        commit(lastCommittedSpHandle, spHandle, uniqueId, false, true, type);
+        break;
+    }
+    default:
+        assert(false);
+    }
 }
 
 int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
@@ -524,22 +580,22 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
         tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));
 
         if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
         }
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT);
+            stream.appendTuple(lastUID, tableHandle, partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
         }
 
         if (flagList[ii] == TXN_PAR_HASH_MULTI) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii] + 1));
             for (int zz = 0; zz < 5; zz++) {
-                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, uid, tuple, DR_RECORD_INSERT);
+                stream.appendTuple(lastUID, tableHandle,  partitionId == 16383 ? -1 : 0, uid, uid, tuple, DR_RECORD_INSERT);
             }
         }
         else if (flagList[ii] == TXN_PAR_HASH_SPECIAL) {
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
-            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
+            stream.truncateTable(lastUID, tableHandle, "foobar", partitionId == 16383 ? -1 : 0, uid, uid);
         }
 
         stream.endTransaction(uid);
@@ -549,7 +605,7 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     TupleSchema::freeTupleSchema(schema);
 
     int64_t committedUID = lastUID;
-    stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
+    stream.commit(committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);

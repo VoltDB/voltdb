@@ -164,6 +164,9 @@ public abstract class CatalogUtil {
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
+    public static final String ROW_LENGTH_LIMIT = "row.length.limit";
+    public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
+
     private static boolean m_exportEnabled = false;
 
     private static JAXBContext m_jc;
@@ -1203,6 +1206,8 @@ public abstract class CatalogUtil {
         }
 
         processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
+
+
         return processorProperties;
     }
 
@@ -1419,6 +1424,38 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
+
+            // checking rowLengthLimit
+            int rowLengthLimit = Integer.parseInt(processorProperties.getProperty(ROW_LENGTH_LIMIT,"0"));
+            if (rowLengthLimit > 0) {
+                for (ConnectorTableInfo catTableinfo : catconn.getTableinfo()) {
+                    Table tableref = catTableinfo.getTable();
+                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ? 0 : EXPORT_INTERNAL_FIELD_Length;
+                    for (Column catColumn: tableref.getColumns()) {
+                        rowLength += catColumn.getSize();
+                    }
+                    if (rowLength > rowLengthLimit) {
+                        if (defaultConnector) {
+                            hostLog.error("Export configuration for the default export target has " +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        else {
+                            hostLog.error("Export configuration for export target " + targetName + " has" +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
+                                ", exceeding configurated limitation " + rowLengthLimit + ".");
+                    }
+                }
+            }
+
+
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);

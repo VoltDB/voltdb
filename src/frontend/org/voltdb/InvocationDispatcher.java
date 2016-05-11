@@ -1399,7 +1399,7 @@ public final class InvocationDispatcher {
             byte[] param = null;
             if (partitionParam != null) {
                 type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
-                param = TheHashinator.valueToBytes(partitionParam);
+                param = VoltType.valueToBytes(partitionParam);
             }
             partition = TheHashinator.getPartitionForParameter(type, partitionParam);
 

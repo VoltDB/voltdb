@@ -40,7 +40,7 @@
 </export>
 <heartbeat timeout="90"/>
 <import>
-<configuration enabled="true" format="" module="test" type="kafka">
+<configuration enabled="true" format="test" module="test" type="kafka">
 <property name="metadata.broker.list">2</property>
 </configuration>
 </import>

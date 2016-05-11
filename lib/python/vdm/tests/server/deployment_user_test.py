@@ -101,6 +101,20 @@ class UpdateDeploymentUser(DeploymentUser):
         else:
             print "The database list is empty"
 
+    def test_validate_invalid_username(self):
+        db_data = {"name":"@@@@", "password": "voltdb", "plaintext": True, "roles": "Administrator", "databaseid": 1}
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.]+$'")
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
+
     def test_validate_password_empty(self):
         """ensure password value is not empty"""
 
@@ -133,10 +147,51 @@ class UpdateDeploymentUser(DeploymentUser):
         else:
             print "The database list is empty"
 
+    def test_validate_invalid_role(self):
+        db_data = {"name": "voltdb", "password": "test", "plaintext": True,"roles":"@@@@", "databaseid": 1}
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "u'@@@@' does not match '^[a-zA-Z0-9_.,-]+$'")
+            self.assertEqual(response.status_code, 200)
+
+            db_data = {"name": "voltdb", "password": "test", "plaintext": True,"roles":",", "databaseid": 1}
+            response = requests.post(user_url,
+                                    json=db_data, headers=headers)
+            value = response.json()
+            self.assertEqual(value['error'], "Invalid user roles.")
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
+
+    def test_ensure_no_duplicate_role(self):
+        """ensure no duplicate roles are inserted"""
+        db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Test1,Test1", "databaseid": 1}
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        last_db_id = GetLastDbId()
+        if last_db_id != -1:
+            user_url = '%s%u/users/' % (__db_url__, last_db_id)
+            response = requests.get(user_url)
+            value = response.json()
+            if value:
+                user_length = len(value['deployment'])
+                last_user_id = value['deployment'][user_length-1]['userid']
+                user_update_url = '%s%u/' % (user_url, last_user_id)
+                response = requests.put(user_update_url,
+                                         json=db_data, headers=headers)
+                value = response.json()
+                self.assertEqual(value['statusstring'], "User Updated")
+                self.assertEqual(value['user']['roles'], "Test1")
+                self.assertEqual(response.status_code, 200)
+
     def test_update_deployment_user(self):
         """ensure deployment user is updated"""
 
-        db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator,Test1", "databaseid": 1}
+        db_data = {"name": "test", "password": "admin", "plaintext": True, "roles": "Administrator,Test2", "databaseid": 1}
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         last_db_id = GetLastDbId()
         if last_db_id != -1:

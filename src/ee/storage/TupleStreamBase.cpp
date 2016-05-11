@@ -98,7 +98,8 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t uniqueId,
+        bool sync, bool flush, DREventType eventType)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -156,6 +157,17 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_openSpHandle = currentSpHandle;
         m_openSequenceNumber++;
         m_openUniqueId = uniqueId;
+
+        if (eventType != NOT_A_EVENT) {
+            m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+            m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
+            if (UniqueId::isMpUniqueId(uniqueId)) {
+                m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+            } else {
+                m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            }
+            m_currBlock->markAsEventBuffer(eventType);
+        }
 
         if (flush) {
             extendBufferChain(0);
@@ -360,6 +372,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
+        commit(lastCommittedSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
     }
 }

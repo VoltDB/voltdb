@@ -2049,7 +2049,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         sql = "SELECT CAST(VB1 AS VARBINARY) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         vt.advanceRow();
-        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
+        assertTrue(VoltTable.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
     }
 
     private void subtestVarCharCasts(Client client) throws Exception

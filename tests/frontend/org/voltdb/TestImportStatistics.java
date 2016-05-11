@@ -235,8 +235,8 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     private void waitForLogEvents(Client client, int count) throws Exception {
-        //Wait 20 sec to get out of backpressure.
-        long end = System.currentTimeMillis() + 20000;
+        //Wait 40 sec to get out of backpressure.
+        long end = System.currentTimeMillis() + 40000;
         while (System.currentTimeMillis() < end) {
             ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from log_events");
             assertEquals(ClientResponse.SUCCESS, response.getStatus());

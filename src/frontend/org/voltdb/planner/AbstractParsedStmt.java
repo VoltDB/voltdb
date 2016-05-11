@@ -406,13 +406,12 @@ public abstract class AbstractParsedStmt {
             VoltType vt = VoltType.typeFromString(type);
             assert(vt != VoltType.VOLTTABLE);
 
-            int size = (vt == VoltType.NULL) ? 0 :
-                vt.isVariableLength() ?
-                        VoltType.MAX_VALUE_LENGTH :
-                            vt.getLengthInBytesForFixedTypes();
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
-            cve.setValueSize(size);
+            if ((vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
+                int size = vt.getMaxLengthInBytes();
+                cve.setValueSize(size);
+            }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
                 cve.setValue(valueStr);
@@ -598,7 +597,6 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
-
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -609,7 +607,8 @@ public abstract class AbstractParsedStmt {
 
         try {
             expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -653,7 +652,8 @@ public abstract class AbstractParsedStmt {
             AbstractExpression rightExpr = parseExpressionNode(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
-        } else {
+        }
+        else {
             assert(rightExprNode == null);
             if (exprType == ExpressionType.OPERATOR_CAST) {
                 String valuetype = exprNode.attributes.get("valuetype");
@@ -662,7 +662,8 @@ public abstract class AbstractParsedStmt {
                 expr.setValueType(voltType);
                 // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
                 // so assume max length for variable-length types (VARCHAR and VARBINARY).
-                expr.setValueSize(voltType.getMaxLengthInBytes());
+                int size = voltType.getMaxLengthInBytes();
+                expr.setValueSize(size);
             }
         }
 
@@ -672,7 +673,8 @@ public abstract class AbstractParsedStmt {
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
             expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
-        } else if (exprType == ExpressionType.OPERATOR_EXISTS) {
+        }
+        else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
         }
         return expr;
@@ -959,7 +961,10 @@ public abstract class AbstractParsedStmt {
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
-            expr.setValueSize(value_type.getMaxLengthInBytes());
+            if (value_type != VoltType.INVALID && value_type != VoltType.NUMERIC) {
+                int size = value_type.getMaxLengthInBytes();
+                expr.setValueSize(size);
+            }
         }
 
         if (result_type_parameter_index != null) {

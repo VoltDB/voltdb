@@ -66,7 +66,7 @@ public abstract class DeprecatedProcedureAPIAccess {
      * <p>Currently unsupported in VoltDB.</p>
      * <p>Batch load method for populating a table with a large number of records.</p>
      *
-     * <p>Faster then calling {@link #voltQueueSQL(SQLStmt, Object...)} and {@link #voltExecuteSQL()} to
+     * <p>Faster than calling {@link #voltQueueSQL(SQLStmt, Expectation, Object...)} and {@link #voltExecuteSQL()} to
      * insert one row at a time.</p>
      *
      * @deprecated This method is not fully tested to be used in all contexts.

@@ -57,126 +57,7 @@ def get_last_server_id():
     return last_server_id
 
 
-class Database(unittest.TestCase):
-    """
-    setup a new database for test
-    """
-
-    def setUp(self):
-        # Create a db
-        headers = {'Content-Type': 'application/json; charset=utf-8'}
-        db_data = {'name': 'testDB'}
-        response = requests.post(__db_url__, json=db_data, headers=headers)
-        if response.status_code == 201:
-            self.assertEqual(response.status_code, 201)
-        else:
-            self.assertEqual(response.status_code, 404)
-
-    def tearDown(self):
-        # Delete database
-
-        last_db_id = get_last_db_id()
-        db_url = __db_url__ + str(last_db_id)
-        response = requests.delete(db_url)
-        self.assertEqual(response.status_code, 204)
-
-
-class XML(unittest.TestCase):
-    """
-    test case for testing valid deployment.xml
-    """
-
-    def test_valid_xml(self):
-        """
-            test valid xml
-        """
-        data = requests.get(__url__)
-        try:
-            doc = ElementTree.fromstring(data.content)
-        except:
-            raise self.fail('Input is not a valid XML document')
-
-        return doc
-
-
-class UpdateDatabase(Database):
-    """
-    Update Database and check deployment xml in vdm.xml
-    """
-    def test_update_database_xml(self):
-        """update database xml"""
-        last_db_id = get_last_db_id()
-        data = requests.get(__url__)
-        root = ElementTree.fromstring(data.content)
-
-        for database in root.findall('database'):
-            if database.attrib['id'] == last_db_id:
-                self.assertEqual(database.attrib['deployment'], "")
-                self.assertEqual(database.attrib['name'], "testDB")
-                self.assertEqual(database.attrib['members'], "[]")
-                self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.findall('deployment'):
-            if deployment.attrib['databaseid'] == str(last_db_id):
-                for child in deployment:
-                    if child.tag == "paths":
-                        for subnode in child:
-                            if subnode.tag == "snapshots":
-                                self.assertEqual(subnode.attrib['path'], "snapshots")
-                            if subnode.tag == "commandlogsnapshot":
-                                self.assertEqual(subnode.attrib['path'], "command_log_snapshot")
-                            if subnode.tag == "voltdbroot":
-                                self.assertEqual(subnode.attrib['path'], "voltdbroot")
-                            if subnode.tag == "exportoverflow":
-                                self.assertEqual(subnode.attrib['path'], "export_overflow")
-                    if child.tag == "snapshots":
-                        self.assertEqual(child.attrib['enabled'], "true")
-                        self.assertEqual(child.attrib['frequency'], "24h")
-                        self.assertEqual(child.attrib['prefix'], "AUTOSHAP")
-                        self.assertEqual(child.attrib['retain'], "2")
-                    if child.tag == "httpd":
-                        self.assertEqual(child.attrib['enabled'], "true")
-                        self.assertEqual(child.attrib['port'], "8080")
-                        for subnode in child:
-                            if subnode.tag == "jsonapi":
-                                self.assertEqual(subnode.attrib['enabled'], "true")
-                    if child.tag == "systemsettings":
-                        for subnode in child:
-                            if subnode.tag == "query":
-                                self.assertEqual(subnode.attrib['timeout'], "10000")
-                            if subnode.tag == "temptables":
-                                self.assertEqual(subnode.attrib['maxsize'], "100")
-                            if subnode.tag == "snapshot":
-                                self.assertEqual(subnode.attrib['priority'], "6")
-                            if subnode.tag == "elastic":
-                                self.assertEqual(subnode.attrib['duration'], "50")
-                                self.assertEqual(subnode.attrib['throughput'], "2")
-                            if subnode.tag == "resourcemonitor":
-                                for supersubnode in subnode:
-                                    self.assertEqual(supersubnode.attrib['size'], "80%")
-                    if child.tag == "admin-mode":
-                        self.assertEqual(child.attrib['adminstartup'], "false")
-                        self.assertEqual(child.attrib['port'], "21211")
-                    if child.tag == "cluster":
-                        self.assertEqual(child.attrib['elastic'], "enabled")
-                        self.assertEqual(child.attrib['hostcount'], "1")
-                        self.assertEqual(child.attrib['kfactor'], "0")
-                        self.assertEqual(child.attrib['schema'], "ddl")
-                        self.assertEqual(child.attrib['sitesperhost'], "8")
-                    if child.tag == "snapshot":
-                        self.assertEqual(child.attrib['enabled'], "false")
-                        self.assertEqual(child.attrib['frequency'], "24h")
-                        self.assertEqual(child.attrib['prefix'], "AUTOSNAP")
-                        self.assertEqual(child.attrib['retain'], "2")
-                    if child.tag == "security":
-                        self.assertEqual(child.attrib['enabled'], "false")
-                        self.assertEqual(child.attrib['provider'], "hash")
-                    if child.tag == "partition-detection":
-                        self.assertEqual(child.attrib['enabled'], "true")
-                        for subnode in child:
-                            self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
-
-
-class Server(unittest.TestCase):
+class DatabaseServer(unittest.TestCase):
     """
     test cases for Server
     """
@@ -239,7 +120,116 @@ class Server(unittest.TestCase):
             print "The database list is empty"
 
 
-class UpdateMember(Server):
+class XML(unittest.TestCase):
+    """
+    test case for testing valid deployment.xml
+    """
+
+    def test_valid_xml(self):
+        """
+            test valid xml
+        """
+        data = requests.get(__url__)
+        try:
+            doc = ElementTree.fromstring(data.content)
+        except:
+            raise self.fail('Input is not a valid XML document')
+
+        return doc
+
+
+class UpdateDatabase(DatabaseServer):
+    """
+    Update Database and check deployment xml in vdm.xml
+    """
+    def test_update_database_xml(self):
+        """update database xml"""
+        last_db_id = get_last_db_id()
+        data = requests.get(__url__)
+        root = ElementTree.fromstring(data.content)
+
+        for database in root.findall('databases')[0].findall('database'):
+            if int(database.attrib['id']) == last_db_id:
+                self.assertEqual(database.attrib['name'], "testDB")
+                self.assertEqual(database.attrib['id'], str(last_db_id))
+                for member in database.findall('members')[0].findall('member'):
+                    self.assertEqual(member.attrib['hostname'], __host_or_ip__)
+                    self.assertEqual(member.attrib['description'], 'test')
+                    self.assertEqual(member.attrib['name'], 'test')
+                    self.assertEqual(member.attrib['admin-listener'], '')
+                    self.assertEqual(member.attrib['replication-listener'], '')
+                    self.assertEqual(member.attrib['enabled'], 'true')
+                    self.assertEqual(member.attrib['public-interface'], '')
+                    self.assertEqual(member.attrib['internal-listener'], '')
+                    self.assertEqual(member.attrib['http-listener'], '')
+                    self.assertEqual(member.attrib['client-listener'], '')
+                    self.assertEqual(member.attrib['placement-group'], '')
+                    self.assertEqual(member.attrib['external-interface'], '')
+                    self.assertEqual(member.attrib['internal-interface'], '')
+                    self.assertEqual(member.attrib['id'], str(get_last_server_id()))
+                    self.assertEqual(member.attrib['zookeeper-listener'], '')
+        for deployment in root.findall('deployments')[0].findall('deployment'):
+            if deployment.attrib['databaseid'] == str(last_db_id):
+                for child in deployment:
+                    if child.tag == "paths":
+                        for subnode in child:
+                            if subnode.tag == "snapshots":
+                                self.assertEqual(subnode.attrib['path'], "snapshots")
+                            if subnode.tag == "commandlogsnapshot":
+                                self.assertEqual(subnode.attrib['path'], "command_log_snapshot")
+                            if subnode.tag == "voltdbroot":
+                                self.assertEqual(subnode.attrib['path'], "voltdbroot")
+                            if subnode.tag == "exportoverflow":
+                                self.assertEqual(subnode.attrib['path'], "export_overflow")
+                    if child.tag == "snapshots":
+                        self.assertEqual(child.attrib['enabled'], "true")
+                        self.assertEqual(child.attrib['frequency'], "24h")
+                        self.assertEqual(child.attrib['prefix'], "AUTOSHAP")
+                        self.assertEqual(child.attrib['retain'], "2")
+                    if child.tag == "httpd":
+                        self.assertEqual(child.attrib['enabled'], "true")
+                        self.assertEqual(child.attrib['port'], "8080")
+                        for subnode in child:
+                            if subnode.tag == "jsonapi":
+                                self.assertEqual(subnode.attrib['enabled'], "true")
+                    if child.tag == "systemsettings":
+                        for subnode in child:
+                            if subnode.tag == "query":
+                                self.assertEqual(subnode.attrib['timeout'], "10000")
+                            if subnode.tag == "temptables":
+                                self.assertEqual(subnode.attrib['maxsize'], "100")
+                            if subnode.tag == "snapshot":
+                                self.assertEqual(subnode.attrib['priority'], "6")
+                            if subnode.tag == "elastic":
+                                self.assertEqual(subnode.attrib['duration'], "50")
+                                self.assertEqual(subnode.attrib['throughput'], "2")
+                            if subnode.tag == "resourcemonitor":
+                                for supersubnode in subnode:
+                                    self.assertEqual(supersubnode.attrib['size'], "80%")
+                    if child.tag == "admin-mode":
+                        self.assertEqual(child.attrib['adminstartup'], "false")
+                        self.assertEqual(child.attrib['port'], "21211")
+                    if child.tag == "cluster":
+                        self.assertEqual(child.attrib['elastic'], "enabled")
+                        self.assertEqual(child.attrib['hostcount'], "1")
+                        self.assertEqual(child.attrib['kfactor'], "0")
+                        self.assertEqual(child.attrib['schema'], "ddl")
+                        self.assertEqual(child.attrib['sitesperhost'], "8")
+                    if child.tag == "snapshot":
+                        self.assertEqual(child.attrib['enabled'], "false")
+                        self.assertEqual(child.attrib['frequency'], "24h")
+                        self.assertEqual(child.attrib['prefix'], "AUTOSNAP")
+                        self.assertEqual(child.attrib['retain'], "2")
+                    if child.tag == "security":
+                        self.assertEqual(child.attrib['enabled'], "false")
+                        self.assertEqual(child.attrib['provider'], "hash")
+                    if child.tag == "partition-detection":
+                        self.assertEqual(child.attrib['enabled'], "true")
+                        for subnode in child:
+                            self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
+
+
+class UpdateMember(DatabaseServer):
     """
         Update member and check in vdm.xml
     """
@@ -251,12 +241,13 @@ class UpdateMember(Server):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for member in root.findall('member'):
-            if member.attrib['id'] == last_server_id:
-                self.assertEqual(member.attrib['hostname'], "test")
-                self.assertEqual(member.attrib['name'], "test")
-                self.assertEqual(member.attrib['description'], "test")
-                self.assertEqual(member.attrib['id'], str(last_server_id))
+        if root.findall('members'):
+            for member in root.findall('members')[0].findall('member'):
+                if member.attrib['id'] == last_server_id:
+                    self.assertEqual(member.attrib['hostname'], "test")
+                    self.assertEqual(member.attrib['name'], "test")
+                    self.assertEqual(member.attrib['description'], "test")
+                    self.assertEqual(member.attrib['id'], str(last_server_id))
 
 
 class Deployment(unittest.TestCase):
@@ -297,17 +288,17 @@ class Deployment(unittest.TestCase):
                                "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
-                                                       {"name": "SNAPSHOTS", "size": "2"}
+                                                       {"name": "snapshots", "size": "2"}
                                                    ],
                                                        "size": "10"},
                                                    "frequency": 5}},
             "security": {"enabled": True, "provider": "HASH"},
             "export": {"configuration": [{"enabled": False,
                                           "type": "kafka", "exportconnectorclass": "test",
-                                          "stream": "test", "property": [{"name": "test",
+                                          "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "test", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
         }
 
         response = requests.put(url_dep,
@@ -335,13 +326,13 @@ class UpdateDatabaseDeployment(Deployment):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for database in root.findall('database'):
-            if database.attrib['id'] == last_db_id:
-                self.assertEqual(database.attrib['deployment'], "")
+        for database in root.findall('databases')[0].findall('database'):
+            if database.attrib['id'] == str(last_db_id):
                 self.assertEqual(database.attrib['name'], "testDB")
-                self.assertEqual(database.attrib['members'], "[]")
                 self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.findall('deployment'):
+                self.assertEqual(database.findall('members')[0].findall('member'), [])
+
+        for deployment in root.findall('deployments')[0].findall('deployment'):
             if deployment.attrib['databaseid'] == str(last_db_id):
                 for child in deployment:
                     if child.tag == "paths":
@@ -377,7 +368,7 @@ class UpdateDatabaseDeployment(Deployment):
                                         self.assertEqual(supersubnode.attrib['size'], "1")
                                     if supersubnode.tag == "disklimit":
                                         for disklimit in supersubnode:
-                                            self.assertEqual(disklimit.attrib['name'], "SNAPSHOTS")
+                                            self.assertEqual(disklimit.attrib['name'], "snapshots")
                                             self.assertEqual(disklimit.attrib['size'], "2")
 
                     if child.tag == "admin-mode":
