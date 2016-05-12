@@ -20,6 +20,7 @@ package org.voltdb.importclient.kinesis;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -311,10 +312,11 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized void resetTo() {
-
-            for(int i = 0; i < checkpoints.length; i++){
-                checkpoints[i] = null;
-            }
+            
+            //reset this to take new checkpoints. The offsets after checkpoint commit are not relevant anymore
+            Arrays.fill(checkpoints, null);
+            
+            //The offset is the index among the fetched records. 
             c = 0;
             s = -1L;
             lag = new long[lagLen];

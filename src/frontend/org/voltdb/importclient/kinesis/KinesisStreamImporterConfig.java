@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
@@ -44,6 +45,8 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 
     public static final String APP_NAME = "KinesisStreamImporter";
     public static final String APP_VERSION = "1.0.0";
+
+    private static VoltLogger LOGGER = new VoltLogger(KinesisStreamImporterConfig.APP_NAME);
 
     private final String m_appName;
     private final URI m_resourceID;
@@ -138,6 +141,8 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
     public static Map<URI, ImporterConfig> createConfigEntries(Properties props,
             AbstractFormatterFactory formatterFactory) {
 
+        Map<URI, ImporterConfig> configs = new HashMap<>();
+
         String appName = getProperty(props, "app.name", "");
         String streamName = getProperty(props, "stream.name", "");
         String region = getProperty(props, "region", "");
@@ -150,11 +155,10 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 
         List<Shard> shards = discoverShards(region, streamName, accessKey, secretKey, appName);
         if (shards == null || shards.isEmpty()) {
-            throw new IllegalArgumentException("Kinesis stream " + streamName + " does not have any shards.");
+            return configs;
         }
 
         // build URI per stream, per shard and per application
-        Map<URI, ImporterConfig> configs = new HashMap<>();
         int shardCnt = 0;
         for (Shard shard : shards) {
 
@@ -185,27 +189,26 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
      */
     public static List<Shard> discoverShards(String regionName, String streamName, String accessKey, String secretKey,
             String appName) {
-
-        Region region = RegionUtils.getRegion(regionName);
-        if (region == null) {
-            throw new IllegalArgumentException(regionName + " is not a valid AWS region.");
-        }
-
-        final AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
-        AmazonKinesis kinesisClient = new AmazonKinesisClient(credentials, getClientConfigWithUserAgent(appName));
-        kinesisClient.setRegion(region);
-
         try {
-            DescribeStreamResult result = kinesisClient.describeStream(streamName);
-            if (!"ACTIVE".equals(result.getStreamDescription().getStreamStatus())) {
-                throw new IllegalArgumentException("Kinesis stream " + streamName + " is not active.");
+            Region region = RegionUtils.getRegion(regionName);
+            if (region != null) {
+                final AWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
+                AmazonKinesis kinesisClient = new AmazonKinesisClient(credentials,
+                        getClientConfigWithUserAgent(appName));
+                kinesisClient.setRegion(region);
+
+                DescribeStreamResult result = kinesisClient.describeStream(streamName);
+                if (!"ACTIVE".equals(result.getStreamDescription().getStreamStatus())) {
+                    throw new IllegalArgumentException("Kinesis stream " + streamName + " is not active.");
+                }
+                return result.getStreamDescription().getShards();
             }
-            return result.getStreamDescription().getShards();
         } catch (ResourceNotFoundException e) {
-            throw new IllegalArgumentException("Kinesis stream " + streamName + " does not exist.");
+            LOGGER.warn("Kinesis stream " + streamName + " does not exist.", e);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Error found while describing the kinesis stream " + streamName);
+            LOGGER.warn("Error found while describing the kinesis stream " + streamName, e);
         }
+        return null;
     }
 
     /**
