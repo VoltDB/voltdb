@@ -25,6 +25,7 @@ import java.io.Serializable;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.processtools.ShellTools;
 
 
@@ -237,7 +238,7 @@ public class PlatformProperties implements Serializable {
 
         sb.append(String.format("OS PROFILE:       %s %s %s %s\n",
                                 osName, osVersion, osArch, locale));
-
+        sb.append(String.format("DB VERSION:       %s\n", VoltDB.instance().getVersionString()));
         sb.append(String.format("JAVA VERSION:     %s\n", javaVersion));
         sb.append(String.format("JAVA RUNTIME:     %s\n", javaRuntime));
         sb.append(String.format("JAVA VM:          %s\n", javaVMInfo));
@@ -257,7 +258,7 @@ public class PlatformProperties implements Serializable {
 
         sb.append(String.format("OS PROFILE:       %s %s %s %s<br/>\n",
                                 osName, osVersion, osArch, locale));
-
+        sb.append(String.format("DB VERSION:       %s<br>\n", VoltDB.instance().getVersionString()));
         sb.append(String.format("JAVA VERSION:     %s<br/>\n", javaVersion));
         sb.append(String.format("JAVA RUNTIME:     %s<br/>\n", javaRuntime));
         sb.append(String.format("JAVA VM:          %s<br/>\n", javaVMInfo));
