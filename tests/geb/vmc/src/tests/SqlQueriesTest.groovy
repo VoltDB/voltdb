@@ -960,7 +960,6 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
 
-
     def "Check sqlquery client to admin port switching for ok poup"() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
@@ -1040,6 +1039,51 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
+    }
 
+
+    def verifyTestForSingleQuote() {
+        String createQuery  = "create table FOO (i integer, v varchar, w varchar);"
+        String insertQuery  = "insert into FOO values (1, 'can''t', 'doin''');"
+        String execQueryOne = "exec FOO.insert 2 'can''t' 'doin''';"
+        String execQueryTwo = "exec FOO.insert 3, can''t, doin'';"
+        String selectQuery  = "select * from foo;"
+        String dropQuery    = "drop table foo;"
+        String resultValue  = "I V W\n" +
+                "1 can't doin'\n" +
+                "2 can't doin'\n" +
+                "3 can't doin'"
+        String dropValue    = "STATUS\n" +
+                "0"
+
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
+
+        when: 'run query to create the'
+        runQuery(createQuery)
+        runQuery(insertQuery)
+        and: 'click on refresh'
+        refreshquery.click()
+        then: 'run query exec'
+        runQuery(execQueryOne)
+        runQuery(execQueryTwo)
+
+        when: 'run select query'
+        runQuery(selectQuery)
+        and: 'Change the result format'
+        selectQueryResultFormat("Monospace")
+        then: 'the real value contains the expected text'
+        assert getQueryResultText().contains(resultValue)
+
+        when: 'drop table'
+        runQuery(dropQuery)
+        and: 'click on refresh'
+        refreshquery.click()
+        then: 'check for error'
+        !queryErrHtml.isDisplayed()
+        then: 'check for result'
+        getQueryResultText().contains(dropValue)
     }
 }
