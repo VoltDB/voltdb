@@ -17,7 +17,6 @@
 
 package org.voltdb.importclient.kinesis;
 
-import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -166,7 +165,7 @@ public class KinesisStreamImporter extends AbstractImporter {
             }
 
             BigInteger seq = BigInteger.ZERO;
-            m_gapTracker.allocate(records.getRecords().size());
+            m_gapTracker.resetTo();
             int offset = 0;
             for (Record record : records.getRecords()) {
                 m_submitCount.incrementAndGet();
@@ -308,11 +307,14 @@ public class KinesisStreamImporter extends AbstractImporter {
                 throw new IllegalArgumentException("leeways is zero or negative");
             }
             lagLen = leeway;
+            checkpoints = new BigInteger[(int)m_config.getMaxReadBatchSize()];
         }
 
-        synchronized void allocate(int capacity) {
+        synchronized void resetTo() {
 
-            checkpoints = (BigInteger[]) Array.newInstance(BigInteger.class, capacity);
+            for(int i = 0; i < checkpoints.length; i++){
+                checkpoints[i] = null;
+            }
             c = 0;
             s = -1L;
             lag = new long[lagLen];
