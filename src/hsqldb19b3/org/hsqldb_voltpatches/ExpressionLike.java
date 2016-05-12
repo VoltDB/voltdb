@@ -49,7 +49,6 @@ public final class ExpressionLike extends ExpressionLogical {
     private final static int ESCAPE  = 2;
     private final static int TERNARY = 3;
     private Like             likeObject;
-    private boolean          simplified = false;
     /**
      * Creates a LIKE expression
      */
@@ -183,24 +182,27 @@ public final class ExpressionLike extends ExpressionLogical {
         if (nodes[LEFT].dataType == null || nodes[RIGHT].dataType == null) {
             throw Error.error(ErrorCode.X_42567);
         }
+        if (nodes[LEFT].dataType.isCharacterType()
+                && nodes[RIGHT].dataType.isCharacterType()
+                && (!hasEscape()  || nodes[ESCAPE].dataType.isCharacterType())) {
+            boolean ignoreCase =
+                    nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
+                    || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
 
-        if (!simplified) {
-            if (nodes[LEFT].dataType.isCharacterType()
-                    && nodes[RIGHT].dataType.isCharacterType()
-                    && (!hasEscape()  || nodes[ESCAPE].dataType.isCharacterType())) {
-                boolean ignoreCase =
-                        nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
-                        || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
-
-                likeObject.setIgnoreCase(ignoreCase);
-            } else if (nodes[LEFT].dataType.isBinaryType()
-                       && nodes[RIGHT].dataType.isBinaryType()
-                       && (nodes[ESCAPE] == null
-                           || nodes[ESCAPE].dataType.isBinaryType())) {
-                likeObject.isBinary = true;
-            } else {
-                throw Error.error(ErrorCode.X_42565);
-            }
+            likeObject.setIgnoreCase(ignoreCase);
+        } else if (nodes[LEFT].dataType.isBinaryType()
+                   && nodes[RIGHT].dataType.isBinaryType()
+                   && (!hasEscape()
+                       || nodes[ESCAPE].dataType.isBinaryType())) {
+            likeObject.isBinary = true;
+        } else if (false == (nodes[LEFT].dataType.isBooleanType()
+                             && nodes[RIGHT].dataType.isBooleanType())) {
+            //
+            // If we have rewritten this to be a string
+            // comparison, then the types are all ok.  Otherwise
+            // the statement is badly typed.
+            //
+            throw Error.error(ErrorCode.X_42565);
         }
 
         /*
@@ -325,7 +327,6 @@ public final class ExpressionLike extends ExpressionLogical {
                                                      leftOld, rightBound);
                 opType     = OpTypes.AND;
                 likeObject = null;
-                simplified = true;
             } else if (between && like) {
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);
@@ -345,7 +346,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[LEFT]  = new ExpressionLogical(OpTypes.AND, gte, lte);
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
-                simplified = true;
             } else if (larger) {
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);
@@ -356,7 +356,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[LEFT]  = gte;
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
-                simplified = true;
             }
             else {
                 /*
