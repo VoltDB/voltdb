@@ -226,7 +226,7 @@ public class KinesisStreamImporter extends AbstractImporter {
             while (retries < 4 && shouldRun()) {
 
                 final BigInteger safe = m_gapTracker.getSafeCommitPoint();
-                if (safe == null) {
+                if (safe == null || safe.intValue() < 1) {
                     break;
                 }
                 if (isDebugEnabled()) {
@@ -374,7 +374,11 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized BigInteger getSafeCommitPoint() {
-            return chceckpoints[(int) c];
+            if(chceckpoints != null){
+               return chceckpoints[(int) c];
+            }
+
+            return BigInteger.ZERO;
         }
 
         private boolean validateOffset(int offset) {
