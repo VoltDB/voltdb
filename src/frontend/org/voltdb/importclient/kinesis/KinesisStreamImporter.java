@@ -374,7 +374,10 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized BigInteger getSafeCommitPoint() {
-            return chceckpoints[(int) c];
+            if(chceckpoints != null && validateOffset((int) c)){
+                 return chceckpoints[(int) c];
+            }
+            return null;
         }
 
         private boolean validateOffset(int offset) {
