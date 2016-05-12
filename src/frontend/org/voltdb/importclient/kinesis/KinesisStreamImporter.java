@@ -299,7 +299,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         long s = -1L;
         long[] lag;
         final int lagLen;
-        BigInteger[] chceckpoints;
+        BigInteger[] checkpoints;
         long offer = -1L;
         private final long gapTrackerCheckMaxTimeMs = 2_000;
 
@@ -312,7 +312,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         synchronized void allocate(int capacity) {
 
-            chceckpoints = (BigInteger[]) Array.newInstance(BigInteger.class, capacity);
+            checkpoints = (BigInteger[]) Array.newInstance(BigInteger.class, capacity);
             c = 0;
             s = -1L;
             lag = new long[lagLen];
@@ -320,7 +320,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         synchronized void submit(long offset, BigInteger v) {
 
-            if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] != null) {
+            if (!validateOffset((int) offset) || v == null || checkpoints[(int) offset] != null) {
                 return;
             }
 
@@ -342,7 +342,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 s = offset;
             }
 
-            chceckpoints[(int) offset] = v;
+            checkpoints[(int) offset] = v;
         }
 
         private final int idx(long offset) {
@@ -351,11 +351,11 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         synchronized void commit(long offset, BigInteger v) {
 
-            if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] == null) {
+            if (!validateOffset((int) offset) || v == null || checkpoints[(int) offset] == null) {
                 return;
             }
 
-            if (offset <= s && offset > c && v.equals(chceckpoints[(int) offset])) {
+            if (offset <= s && offset > c && v.equals(checkpoints[(int) offset])) {
                 int ggap = (int) Math.min(lagLen, offset - c);
                 if (ggap == lagLen) {
                     c = offset - lagLen + 1;
@@ -374,14 +374,14 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized BigInteger getSafeCommitPoint() {
-            if(chceckpoints != null && validateOffset((int) c)){
-                 return chceckpoints[(int) c];
+            if(checkpoints != null && validateOffset((int) c)){
+                 return checkpoints[(int) c];
             }
             return null;
         }
 
         private boolean validateOffset(int offset) {
-            return (offset >= 0 && offset < chceckpoints.length);
+            return (offset >= 0 && offset < checkpoints.length);
         }
     }
 }
