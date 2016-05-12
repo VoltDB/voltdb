@@ -254,7 +254,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
-void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
+void PersistentTable::deleteAllTuples(bool, bool fallible) {
     // Instead of recording each tuple deletion, log it as a table truncation DR.
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);

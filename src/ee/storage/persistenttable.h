@@ -246,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible = true);
+    virtual void deleteAllTuples(bool, bool fallible = true);
 
     virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
