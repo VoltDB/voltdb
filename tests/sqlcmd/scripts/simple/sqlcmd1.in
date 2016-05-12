@@ -6,16 +6,26 @@ insert into t values (2);
 select * from t;
 drop table t;
 
-drop table foo if exists;
-create table foo ( a timestamp );
-insert into FOO values ('2015-11-11 00:00:00.000000');
-insert into FOO values ('2015-11-11 00:00:00.0');
-insert into FOO values ('2015-11-11 00:00:00');
+drop table FOO if exists;
+create table FOO ( a timestamp );
+insert into FOO values ('2015-11-11 10:11:12.123');
+insert into FOO values ('2015-11-11 10:11:12.12');
+insert into FOO values ('2015-11-11 10:11:12.1');
+insert into FOO values ('2015-11-11 10:11:12');
 insert into FOO values ('2015-11-11');
-exec FOO.insert '2015-11-11 00:00:00.000000';
-exec FOO.insert '2015-11-11 00:00:00.0';
-exec FOO.insert '2015-11-11 00:00:00';
-exec FOO.insert '2015-11-11';
-select * from FOO;
-drop table foo if exists;
 
+-- Try some negative cases.  We can't actually do these
+-- in sqlcmdtest, because they cause sqlcmd to fail.
+-- insert into FOO values('2016-31-99');
+-- insert into FOO values('2016-11-99');
+
+-- Now try the same things as before, but with a CRUD procedure.
+-- This is problematic because sqlcmd tries to parse the datetime.
+exec FOO.insert '2015-11-11 10:11:12.123';
+exec FOO.insert '2015-11-11 10:11:12.12';
+exec FOO.insert '2015-11-11 10:11:12.1';
+exec FOO.insert '2015-11-11 10:11:12';
+exec FOO.insert '2015-11-11';
+
+select * from FOO;
+drop table FOO if exists;

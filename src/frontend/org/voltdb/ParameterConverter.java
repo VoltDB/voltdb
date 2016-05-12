@@ -415,6 +415,12 @@ public class ParameterConverter {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
+                    return SQLParser.parseDate(timestring);
+                }
+                catch (IllegalArgumentException e) {
+                    // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+                try {
                     return new TimestampType(timestring);
                 }
                 catch (IllegalArgumentException e) {

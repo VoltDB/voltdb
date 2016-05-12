@@ -26,31 +26,37 @@ C
 drop table t;
 Command succeeded.
 
-drop table foo if exists;
+drop table FOO if exists;
 Command succeeded.
 
-create table foo ( a timestamp );
+create table FOO ( a timestamp );
 Command succeeded.
 
-insert into FOO values ('2015-11-11 00:00:00.000000');
+insert into FOO values ('2015-11-11 10:11:12.123');
 (Returned 1 rows in #.##s)
 
-insert into FOO values ('2015-11-11 00:00:00.0');
+insert into FOO values ('2015-11-11 10:11:12.12');
 (Returned 1 rows in #.##s)
 
-insert into FOO values ('2015-11-11 00:00:00');
+insert into FOO values ('2015-11-11 10:11:12.1');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12');
 (Returned 1 rows in #.##s)
 
 insert into FOO values ('2015-11-11');
 (Returned 1 rows in #.##s)
 
-exec FOO.insert '2015-11-11 00:00:00.000000';
+exec FOO.insert '2015-11-11 10:11:12.123';
 (Returned 1 rows in #.##s)
 
-exec FOO.insert '2015-11-11 00:00:00.0';
+exec FOO.insert '2015-11-11 10:11:12.12';
 (Returned 1 rows in #.##s)
 
-exec FOO.insert '2015-11-11 00:00:00';
+exec FOO.insert '2015-11-11 10:11:12.1';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12';
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11';
@@ -59,16 +65,18 @@ exec FOO.insert '2015-11-11';
 select * from FOO;
 A                          
 ---------------------------
+2015-11-11 10:11:12.123000 
+2015-11-11 10:11:12.120000 
+2015-11-11 10:11:12.100000 
+2015-11-11 10:11:12.000000 
 2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
-2015-11-11 00:00:00.000000 
+2015-11-11 10:11:12.123000 
+2015-11-11 10:11:12.120000 
+2015-11-11 10:11:12.100000 
+2015-11-11 10:11:12.000000 
 2015-11-11 00:00:00.000000 
 
-(Returned 8 rows in #.##s)
+(Returned 10 rows in #.##s)
 
-drop table foo if exists;
+drop table FOO if exists;
 Command succeeded.

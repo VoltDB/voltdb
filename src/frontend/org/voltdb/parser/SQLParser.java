@@ -23,10 +23,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -34,6 +32,7 @@ import java.util.regex.Pattern;
 
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -1479,48 +1478,26 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Parse a date string.  We need to parse three different formats, one
-     * with day-of-year, time-of-day and milliseconds, one with day-of-year
-     * and time-of-day but no milliseconds, and one with only day-of-year
-     * and no time-of-day at all.  In the latter two cases, the missing time
-     * is set to zero.
+     * Parse a date string.  We parse the documented forms, which are:
+     * <ul>
+     *   <li>YYYY-MM-DD</li>
+     *   <li>YYYY-MM-DD HH:MM:SS</li>
+     *   <li>YYYY-MM-DD HH:MM:SS.SSSSSS</li>
+     * </ul>
+     *
+     * As it turns out, TimestampType takes string parameters in just this
+     * format.  So, we defer to TimestampType, and return what it
+     * constructs.  This has microsecond granularity.
      *
      * @param dateIn  input date string
-     * @return        Date object
+     * @return        TimestampType object
      * @throws SQLParser.Exception
      */
-    public static Date parseDate(String dateIn) throws SQLParser.Exception
+    public static TimestampType parseDate(String dateIn)
     {
         // Remove any quotes around the timestamp value.  ENG-2623
         String dateRepled = dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", "");
-
-        // Unfortunately, JDBC time does not work for us.  It does not
-        // match a pattern with no time of day.  So, we need to look at
-        // all three formats.
-        //
-        // Don't ask... Java is such a crippled language!
-        // First, try the full pattern - yyyy-MM-DD HH:MM:SS.sss.
-        FullDateParser.setLenient(true);
-        try {
-            return FullDateParser.parse(dateRepled);
-        }
-        catch (ParseException e) {
-            ;
-        }
-        // Next, try the pattern without fractional seconds.
-        WholeSecondDateParser.setLenient(true);
-        try {
-            return WholeSecondDateParser.parse(dateRepled);
-        } catch (ParseException e) {
-            ;
-        }
-        // Finally try the pattern without any time of day.
-        DayDateParser.setLenient(true);
-        try {
-            return DayDateParser.parse(dateRepled);
-        } catch (ParseException e) {
-            throw new SQLParser.Exception(e);
-        }
+        return new TimestampType(dateRepled);
     }
 
     public static GeographyPointValue parseGeographyPoint(String param) {
