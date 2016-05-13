@@ -66,27 +66,20 @@ public class TestAdHocPlans extends AdHocQueryTester {
 
     public void testAdHocQueryWithPredicates() throws NoConnectionsException, IOException, ProcCallException {
         // query with max predicates in where clause
-        String sql = getQueryWithMaxPredicates();
+        String sql = getQueryForLongQueryTable(300);
         runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
 
-        // query with max + 1 predicates in where clause - expect it to fail
-        sql = getQueryWithMaxPlusOnePredicates();
+        // generate query with lots of predicate to simulate stack overflow when parsing the expression
+        sql = getQueryForLongQueryTable(2000);
         try {
             runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            fail("Query was expected to generate stack over flow error");
         }
         catch (Exception exception) {
             String expectedMsg;
-            expectedMsg = "Error compiling query";
+            expectedMsg = "Encountered stack overflow error. " +
+                          "Try reducing the number of predicate expressions in the query";
             boolean foundMsg = exception.getMessage().contains(expectedMsg);
-            assertTrue(foundMsg);
-
-            expectedMsg = "Limit of predicate expressions in \"where\" clause exceeded the " +
-                          "maximum limit of 232 predicates, predicates detected:";
-            foundMsg = exception.getMessage().contains(expectedMsg);
-            assertTrue(foundMsg);
-
-            expectedMsg = "Reduce the number of predicates in the \"where\" clause to 232";
-            foundMsg = exception.getMessage().contains(expectedMsg);
             assertTrue(foundMsg);
         }
     }

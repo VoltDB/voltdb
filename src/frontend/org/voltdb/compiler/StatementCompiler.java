@@ -34,6 +34,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
@@ -309,10 +310,20 @@ public abstract class StatementCompiler {
     /**
      * Update the plan fragment and return the bytes of the plan
      */
-    static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph) {
+    static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
+    throws VoltCompilerException {
+        String json = null;
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
-        String json = node_list.toJSONString();
+        try {
+            PlanNodeList node_list = new PlanNodeList(planGraph);
+            json = node_list.toJSONString();
+        }
+        catch (StackOverflowError error) {
+            //
+            String msg = "Encountered stack overflow error. "
+                       + "Try reducing the number of predicate expressions in the query.";
+            throw compiler.new VoltCompilerException(msg);
+        }
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);

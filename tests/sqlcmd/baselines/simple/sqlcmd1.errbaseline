@@ -1,1 +1,1 @@
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Limit of predicate expressions in "where" clause exceeded the maximum limit of 232 predicates, predicates detected: 233. Reduce the number of predicates in the "where" clause to 232
+Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Encountered stack overflow error. Try reducing the number of predicate expressions in the query.

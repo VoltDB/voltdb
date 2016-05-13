@@ -74,8 +74,6 @@ public class RangeVariableResolver {
     MultiValueHashMap map               = new MultiValueHashMap();
     int               inExpressionCount = 0;
     boolean           hasOuterJoin      = false;
-    // max number of predicates in where expression
-    final int         whereExpressionElementsUpperBound = 232;
 
     RangeVariableResolver(RangeVariable[] rangeVars, Expression conditions,
                           CompileContext compileContext) {
@@ -248,21 +246,6 @@ public class RangeVariableResolver {
 
     void expandConditions() {
         expandConditions(whereExpressions, false);
-        for (HsqlArrayList whereExpression : whereExpressions) {
-            if (whereExpression.size() > whereExpressionElementsUpperBound) {
-                // If the query's where clause is composed of 240+ predicate expressions, when parsing these
-                // expressions, due to mutual recursion, thread stack can grow to it's maximum capacity,
-                // resulting in stack overflow error. The optimal solution to avoid this is to convert the
-                // mutual recursion into tail-recursion or iterative approach. Though the change needed
-                // are at multiple places like generating unique id for the expression during construction
-                // of volt XML elements and converting the expression tree for the plan to json-string.
-                // So at present guard against query whose where clause has more than 232 predicates.
-                String msg = "Limit of predicate expressions in \"where\" clause exceeded the maximum limit of " +
-                             whereExpressionElementsUpperBound + " predicates, predicates detected: " + whereExpression.size() +
-                             ". Reduce the number of predicates in the \"where\" clause to " + whereExpressionElementsUpperBound;
-                throw new HsqlException(msg, "", ErrorCode.X_47002);
-            }
-        }
         expandConditions(joinExpressions, false);
     }
 
