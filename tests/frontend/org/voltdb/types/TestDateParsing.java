@@ -116,12 +116,18 @@ public class TestDateParsing extends TestCase {
 
         parseDateFails("20016-05-11");
         parseDateFails("16-05-11");
-        // The month and day may only have 1 or 2 digits.
+        // The month and day may only have 2 digits, not 1, and not
+        // more than one.
+        parseDateFails("2016-1-10");
         parseDateFails("2016-100-10");
+        parseDateFails("2016-10-1");
         parseDateFails("2016-10-100");
-        // The fractional seconds may have zero through 6 digits but no more.
+        // The fractional seconds may have 1 through 6 digits but no more and no less.
         parseDateFails("2016-10-11 10:10:10.123456789");
-        // Tab characters are not right out.
+        parseDateFails("2016-10-11 10:10:10.");
+        // Tab characters are right out.
         parseDateFails("2016-10-11\t10:10:10.123456");
+        // Only one fractional seconds field.
+        parseDateFails("2016-10-11 10:10:10.123.456");
     }
 }
