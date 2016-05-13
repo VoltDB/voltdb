@@ -43,25 +43,28 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     static final String SQL_QUERY_FILE = 'src/resources/sqlQueries.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the Voter example app
-    static final String VOTER_TABLES_FILE = 'src/resources/expectedVoterTables.txt';
-    static final String VOTER_VIEWS_FILE  = 'src/resources/expectedVoterViews.txt';
+    // Files used to determine the expected Tables, Streams, Views, and (Default
+    // and User-defined) Stored Procedures, when running the Voter example app
+    static final String VOTER_TABLES_FILE  = 'src/resources/expectedVoterTables.txt';
+    static final String VOTER_STREAMS_FILE = 'src/resources/expectedVoterStreams.txt';
+    static final String VOTER_VIEWS_FILE   = 'src/resources/expectedVoterViews.txt';
     static final String VOTER_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedVoterDefaultStoredProcs.txt';
     static final String VOTER_USER_STORED_PROCS_FILE    = 'src/resources/expectedVoterUserStoredProcs.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the Genqa test app
-    static final String GENQA_TABLES_FILE = 'src/resources/expectedGenqaTables.txt';
-    static final String GENQA_VIEWS_FILE  = 'src/resources/expectedGenqaViews.txt';
+    // Files used to determine the expected Tables, Streams, Views, and (Default
+    // and User-defined) Stored Procedures, when running the Genqa test app
+    static final String GENQA_TABLES_FILE  = 'src/resources/expectedGenqaTables.txt';
+    static final String GENQA_STREAMS_FILE = 'src/resources/expectedGenqaStreams.txt';
+    static final String GENQA_VIEWS_FILE   = 'src/resources/expectedGenqaViews.txt';
     static final String GENQA_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedGenqaDefaultStoredProcs.txt';
     static final String GENQA_USER_STORED_PROCS_FILE    = 'src/resources/expectedGenqaUserStoredProcs.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the GEB VMC test server
+    // Files used to determine the expected Tables, Streams, Views, and (Default,
+    // User-defined and System) Stored Procedures, when running the GEB VMC test server
     // (which is the default; see voltdb/tests/geb/vmc/server/run_voltdb_server.sh)
-    static final String TABLES_FILE = 'src/resources/expectedTables.txt';
-    static final String VIEWS_FILE  = 'src/resources/expectedViews.txt';
+    static final String TABLES_FILE  = 'src/resources/expectedTables.txt';
+    static final String STREAMS_FILE = 'src/resources/expectedStreams.txt';
+    static final String VIEWS_FILE   = 'src/resources/expectedViews.txt';
     static final String DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedDefaultStoredProcs.txt';
     static final String USER_STORED_PROCS_FILE    = 'src/resources/expectedUserStoredProcs.txt';
     static final String SYSTEM_STORED_PROCS_FILE  = 'src/resources/expectedSystemStoredProcs.txt';
@@ -81,29 +84,33 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     // Indicates whether the corresponding table has been created
     static List<Boolean> createdStandardTestTable = [false, false]
 
-    static List<String> savedTables = []
-    static List<String> savedViews = []
+    static List<String> savedTables  = []
+    static List<String> savedStreams = []
+    static List<String> savedViews  = []
     static Boolean initialized  = false;
     static Boolean runningVoter = null;
     static Boolean runningGenqa = null;
     static Boolean runningVmcTestSever = null;
     static Map<String,Object> sqlQueryVariables = [:]
 
-    @Shared String tablesFileName = TABLES_FILE
-    @Shared String viewsFileName  = VIEWS_FILE
+    @Shared String tablesFileName  = TABLES_FILE
+    @Shared String streamsFileName = STREAMS_FILE
+    @Shared String viewsFileName   = VIEWS_FILE
     @Shared String defaultStoredProcsFileName = DEFAULT_STORED_PROCS_FILE
     @Shared String userStoredProcsFileName    = USER_STORED_PROCS_FILE
 
     @Shared def sqlQueriesFile = new File(SQL_QUERY_FILE)
-    @Shared def tablesFile = new File(TABLES_FILE)
-    @Shared def viewsFile  = new File(VIEWS_FILE)
+    @Shared def tablesFile  = new File(TABLES_FILE)
+    @Shared def streamsFile = new File(STREAMS_FILE)
+    @Shared def viewsFile   = new File(VIEWS_FILE)
     @Shared def systemStoredProcsFile  = new File(SYSTEM_STORED_PROCS_FILE)
     @Shared def defaultStoredProcsFile = new File(DEFAULT_STORED_PROCS_FILE)
     @Shared def userStoredProcsFile    = new File(USER_STORED_PROCS_FILE)
 
     @Shared def sqlQueryLines = []
-    @Shared def tableLines = []
-    @Shared def viewLines  = []
+    @Shared def tableLines  = []
+    @Shared def streamLines = []
+    @Shared def viewLines   = []
     @Shared def systemStoredProcLines = []
     @Shared def defaultStoredProcLines = []
     @Shared def userStoredProcLines = []
@@ -111,6 +118,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def fileLinesPairs = [
             [sqlQueriesFile, sqlQueryLines],
             [tablesFile, tableLines],
+            [streamsFile, streamLines],
             [viewsFile, viewLines],
             [systemStoredProcsFile, systemStoredProcLines],
             [defaultStoredProcsFile, defaultStoredProcLines],
@@ -214,6 +222,19 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Returns the list of stream names, as displayed on the page, but saving
+     * the list for later, so you don't need to get it over and over again.
+     * @param sqp - the SqlQueryPage from which to get the list of stream names.
+     * @return the list of stream names, as displayed on the page.
+     */
+    static List<String> getStreams(SqlQueryPage sqp) {
+        if (savedStreams == null || savedStreams.isEmpty()) {
+            savedStreams = sqp.getStreamNames()
+        }
+        return savedStreams
+    }
+
+    /**
      * Returns the list of view names, as displayed on the page, but saving
      * the list for later, so you don't need to get it over and over again.
      * @param sqp - the SqlQueryPage from which to get the list of view names.
@@ -236,6 +257,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         if (clearValues) {
             sqlQueryLines = []
             tableLines = []
+            streamLines  = []
             viewLines  = []
             systemStoredProcLines = []
             defaultStoredProcLines = []
@@ -243,6 +265,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             fileLinesPairs = [
                 [sqlQueriesFile, sqlQueryLines],
                 [tablesFile, tableLines],
+                [streamsFile, streamLines],
                 [viewsFile, viewLines],
                 [systemStoredProcsFile, systemStoredProcLines],
                 [defaultStoredProcsFile, defaultStoredProcLines],
@@ -256,10 +279,12 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     /**
      * Creates a table with the specified name, if that table does not already
      * exist in the database, and with the column names and types found in the
-     * PARTITIONED_TABLE and REPLICATED_TABLE, in the 'genqa' test app.
-     * @param sqp - the SqlQueryPage from which to get the list of view names.
-     * @param sqp - the name of the table to be created (if necessary).
-     * @return the list of view names, as displayed on the page.
+     * PARTITIONED_TABLE and REPLICATED_TABLE, in the usual test app (which is
+     * based on an old version of 'genqa').
+     * @param sqp - the SqlQueryPage on which to create the table.
+     * @param tableName - the name of the table to be created (if necessary).
+     * @param partitionColumn - the name of the table to be created (if necessary).
+     * @return true if the table needed to be created.
      */
     def boolean createTableIfDoesNotExist(SqlQueryPage sqp, String tableName, String partitionColumn='') {
         if (getTables(sqp).contains(tableName)) {
@@ -338,7 +363,8 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      * view, a 'select * from ...' query, with an 'order by' and a limit 10'
      * clause. (Also, if DEBUG is true, prints: the table or view name, a list
      * of all column names, a list of all column types; and everything that
-     * that runQuery prints, for each query.)
+     * that runQuery prints, for each query.) (Note: streams are deliberately
+     * omitted here, since you cannot query from a stream.)
      * @param sqp - the SqlQueryPage on which to run the query.
      * @param tables - the list of tables or views to be queried.
      * @param tableOrView - this should be "Table" or "View" - whichever is
@@ -618,7 +644,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of Tables displayed on the page matches the expected
-     * list (for the 'genqa' test app).
+     * list (for the default test app).
      */
     def checkTables() {
         expect: 'List of displayed Tables should match expected list'
@@ -626,8 +652,17 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Check that the list of Streams displayed on the page matches the expected
+     * list (for the default test app).
+     */
+    def checkStreams() {
+        expect: 'List of displayed Streams should match expected list'
+        printAndCompare('Streams', streamsFileName, true, streamLines, getStreams(page))
+    }
+
+    /**
      * Check that the list of Views displayed on the page matches the expected
-     * list (for the 'genqa' test app).
+     * list (for the default test app).
      */
     def checkViews() {
         expect: 'List of displayed Views should match expected list'
@@ -636,7 +671,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of System Stored Procedures displayed on the page
-     * matches the expected list (for any app, not just 'genqa'!).
+     * matches the expected list (for any app, not just the default one!).
      */
     def checkSystemStoredProcs() {
         expect: 'List of displayed System Stored Procedures should match expected list'
@@ -646,7 +681,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of Default Stored Procedures displayed on the page
-     * matches the expected list (for the 'genqa' test app).
+     * matches the expected list (for the default test app).
      */
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
@@ -656,7 +691,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of User Stored Procedures displayed on the page
-     * matches the expected list (for the 'genqa' test app).
+     * matches the expected list (for the default test app).
      */
     def checkUserStoredProcs() {
         expect: 'List of displayed User-defined Stored Procedures should match expected list'
