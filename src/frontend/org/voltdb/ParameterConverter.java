@@ -420,12 +420,6 @@ public class ParameterConverter {
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
-                try {
-                    return new TimestampType(timestring);
-                }
-                catch (IllegalArgumentException e) {
-                    // Defer errors to the generic Exception throw below, if it's not the right format
-                }
             }
         }
         else if (expectedClz == java.sql.Timestamp.class) {
