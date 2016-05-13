@@ -1904,17 +1904,20 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         break;
     }
     case TASK_TYPE_GENERATE_DR_EVENT: {
-        DREventType type = (DREventType)taskInfo.readInt();
-        int64_t uniqueId = taskInfo.readLong();
-        int64_t lastCommittedSpHandle = taskInfo.readLong();
-        int64_t spHandle = taskInfo.readLong();
-        ByteArray payloads = taskInfo.readBinaryString();
+        // we start using in-band CATALOG_UPDATE at version 5
+        if (m_drVersion >= 5) {
+            DREventType type = (DREventType)taskInfo.readInt();
+            int64_t uniqueId = taskInfo.readLong();
+            int64_t lastCommittedSpHandle = taskInfo.readLong();
+            int64_t spHandle = taskInfo.readLong();
+            ByteArray payloads = taskInfo.readBinaryString();
 
-        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                spHandle, uniqueId, payloads);
-        if (m_executorContext->drReplicatedStream()) {
-            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
+            m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
                     spHandle, uniqueId, payloads);
+            if (m_executorContext->drReplicatedStream()) {
+                m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
+                        spHandle, uniqueId, payloads);
+            }
         }
         break;
     }
