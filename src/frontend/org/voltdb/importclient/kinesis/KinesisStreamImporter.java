@@ -312,11 +312,11 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized void resetTo() {
-            
+
             //reset this to take new checkpoints. The offsets after checkpoint commit are not relevant anymore
             Arrays.fill(checkpoints, null);
-            
-            //The offset is the index among the fetched records. 
+
+            //The offset is the index among the fetched records.
             c = 0;
             s = -1L;
             lag = new long[lagLen];
