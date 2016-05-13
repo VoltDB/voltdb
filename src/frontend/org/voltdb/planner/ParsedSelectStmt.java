@@ -466,7 +466,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (hasComplexAgg()) {
                 expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             }
-            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr, col.differentiator);
             m_projectSchema.addColumn(schema_col);
         }
 
@@ -689,12 +689,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
+        int index = 0;
         for (VoltXMLElement child : columnsNode.children) {
-            parseDisplayColumn(child, isDistributed);
+            parseDisplayColumn(index, child, isDistributed);
+            ++index;
         }
     }
 
-    private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
+    private void parseDisplayColumn(int index, VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
         AbstractExpression colExpr = parseExpressionTree(child);
@@ -779,6 +781,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
 
+        // The differentiator is used when ParsedColInfo is converted to
+        // a SchemaColumn object, to differentiate between columns that have the
+        // same name within a table (which can happen for subqueries or joins).
+        col.differentiator = index;
         m_displayColumns.add(col);
     }
 
@@ -983,7 +989,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
             SchemaColumn schema_col = new SchemaColumn(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
+                    col.tableName, col.tableAlias, col.columnName, col.alias, tve, col.differentiator);
             m_distinctProjectSchema.addColumn(schema_col);
         }
 

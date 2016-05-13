@@ -453,9 +453,23 @@ public abstract class AbstractParsedStmt {
         String columnAlias = exprNode.attributes.get("alias");
         TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
 
+        // Whether or not this column is the coalesced column produced by a join with a
+        // USING predicate.
+        String usingAttr = exprNode.attributes.get("using");
+        boolean isUsingColumn = usingAttr != null ? Boolean.parseBoolean(usingAttr) : false;
+
         // Use the index produced by HSQL as a way to differentiate columns that have
         // the same name with a single table (which can happen for subqueries containing joins).
         int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
+        if (differentiator == -1 && isUsingColumn) {
+            for (VoltXMLElement usingElem : exprNode.children) {
+                String usingTableAlias = usingElem.attributes.get("tablealias");
+                if (usingTableAlias != null && usingTableAlias.equals(tableAlias)) {
+                    differentiator = Integer.parseInt(usingElem.attributes.get("index"));
+                }
+            }
+        }
+
         expr.setDifferentiator(differentiator);
         // Collect the unique columns used in the plan for a given scan.
 
