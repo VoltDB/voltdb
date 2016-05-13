@@ -32,7 +32,7 @@ import org.voltdb.VoltDB.Configuration;
 
 public class TestProcCompiler extends TestCase {
 
-    public void notestIndexOnConstant() throws Exception {
+    public void testIndexOnConstant() throws Exception {
         String simpleSchema =
             "create table indexed_replicated_blah (" +
             "ival smallint default 0 not null, " +
@@ -72,7 +72,7 @@ public class TestProcCompiler extends TestCase {
         StringBuilder string = new StringBuilder("SELECT * FROM FOO ");
         if (numberOfPredicates > 0) {
             string.append("WHERE ID = 10 ");
-            for (int i = 2; i < numberOfPredicates; i++) {
+            for (int i = 1; i < numberOfPredicates; i++) {
                 string.append("AND ID > 1 ");
             }
         }
@@ -80,7 +80,7 @@ public class TestProcCompiler extends TestCase {
         return string.toString();
     }
 
-    public void testStmntWithMaxPredicates() throws Exception {
+    public void testStmntWithLotsOfPredicates() throws Exception {
         String simpleSchema =  "Create Table foo ( " +
                                "id BIGINT DEFAULT 0 NOT NULL, " +
                                "name VARCHAR(255) NOT NULL, " +
@@ -93,11 +93,11 @@ public class TestProcCompiler extends TestCase {
         String sql = getQueryForFoo(350);
         builder.addStmtProcedure("StmntWithPredicates", sql, null);
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_predicates.jar"));
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("lots_of_predicates.jar"));
         assert(success);
     }
 
-    public void testStmntWithMaxPlusOnePredicates() throws Exception {
+    public void testStmntForStackOverflowCondition() throws Exception {
         String schema =  "Create Table foo ( " +
                          "id BIGINT DEFAULT 0 NOT NULL, " +
                          "name VARCHAR(255) NOT NULL, " +
@@ -112,12 +112,11 @@ public class TestProcCompiler extends TestCase {
         // Test for stored procedure which have more than max allowable predicates in the
         // results in error and does not crash or hang the system
         String sql = getQueryForFoo(1800);
-        builder.addStmtProcedure("StmntWithMaxPlusOnePredicates", sql, null);
+        builder.addStmtProcedure("StmntForStaclOverFlow", sql, null);
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_one_predicates.jar"));
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));
         assert(!success);
         String captured = capturer.toString("UTF-8");
-        System.out.println(captured);
         String errMsg = "Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query";
         assert(captured.contains(errMsg));

@@ -271,7 +271,7 @@ public abstract class AdHocQueryTester extends TestCase {
         StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
         if (numberOfPredicates > 0) {
             string.append("WHERE ID = 123 ");
-            for (int i = 2; i < numberOfPredicates; i++) {
+            for (int i = 1; i < numberOfPredicates; i++) {
                 string.append("AND ID > 100 ");
             }
         }

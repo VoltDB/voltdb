@@ -64,7 +64,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runAllAdHocSPtests(0, 1, 2, 3);
     }
 
-    public void testAdHocQueryWithPredicates() throws NoConnectionsException, IOException, ProcCallException {
+    public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
         // query with max predicates in where clause
         String sql = getQueryForLongQueryTable(300);
         runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
