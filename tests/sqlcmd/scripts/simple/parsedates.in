@@ -1,0 +1,33 @@
+drop table FOO if exists;
+create table FOO ( a timestamp );
+insert into FOO values ('2015-11-11 10:11:12.123456');
+insert into FOO values ('2015-11-11 10:11:12.12345');
+insert into FOO values ('2015-11-11 10:11:12.1234');
+insert into FOO values ('2015-11-11 10:11:12.123');
+insert into FOO values ('2015-11-11 10:11:12.12');
+insert into FOO values ('2015-11-11 10:11:12.1');
+insert into FOO values ('2015-11-11 10:11:12');
+insert into FOO values ('2015-11-11');
+
+-- Try some negative cases.  We can't actually do these
+-- in sqlcmdtest, because they cause sqlcmd to fail.
+insert into FOO values ('20150-11-11 10:10:10');
+insert into FOO values ('201-11-11 10:10:10');
+insert into FOO values ('2015-111-11 10:10:10');
+insert into FOO values ('2015-1-11 10:10:10');
+insert into FOO values ('2015-11-111 10:10:10');
+insert into FOO values ('2015-11-1 10:10:10');
+
+-- Now try the same things as before, but with a CRUD procedure.
+-- This is problematic because sqlcmd tries to parse the datetime.
+exec FOO.insert '2015-11-11 10:11:12.123456';
+exec FOO.insert '2015-11-11 10:11:12.12345';
+exec FOO.insert '2015-11-11 10:11:12.1234';
+exec FOO.insert '2015-11-11 10:11:12.123';
+exec FOO.insert '2015-11-11 10:11:12.12';
+exec FOO.insert '2015-11-11 10:11:12.1';
+exec FOO.insert '2015-11-11 10:11:12';
+exec FOO.insert '2015-11-11';
+
+select * from FOO;
+drop table FOO if exists;

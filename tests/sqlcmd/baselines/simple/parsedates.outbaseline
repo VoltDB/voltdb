@@ -1,0 +1,95 @@
+
+drop table FOO if exists;
+Command succeeded.
+
+create table FOO ( a timestamp );
+Command succeeded.
+
+insert into FOO values ('2015-11-11 10:11:12.123456');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.12345');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.1234');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.123');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.12');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.1');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('20150-11-11 10:10:10');
+
+insert into FOO values ('201-11-11 10:10:10');
+
+insert into FOO values ('2015-111-11 10:10:10');
+
+insert into FOO values ('2015-1-11 10:10:10');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-111 10:10:10');
+
+insert into FOO values ('2015-11-1 10:10:10');
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.123456';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.12345';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.1234';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.123';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.12';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.1';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11';
+(Returned 1 rows in #.##s)
+
+select * from FOO;
+A                          
+---------------------------
+2015-11-11 10:11:12.123456 
+2015-11-11 10:11:12.123450 
+2015-11-11 10:11:12.123400 
+2015-11-11 10:11:12.123000 
+2015-11-11 10:11:12.120000 
+2015-11-11 10:11:12.100000 
+2015-11-11 10:11:12.000000 
+2015-11-11 00:00:00.000000 
+2015-01-11 10:10:10.000000 
+2015-11-01 10:10:10.000000 
+2015-11-11 10:11:12.123456 
+2015-11-11 10:11:12.123450 
+2015-11-11 10:11:12.123400 
+2015-11-11 10:11:12.123000 
+2015-11-11 10:11:12.120000 
+2015-11-11 10:11:12.100000 
+2015-11-11 10:11:12.000000 
+2015-11-11 00:00:00.000000 
+
+(Returned 18 rows in #.##s)
+
+drop table FOO if exists;
+Command succeeded.
