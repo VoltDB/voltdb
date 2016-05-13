@@ -24,10 +24,12 @@
 
 import sys
 import cgi
-import os
+import codecs
 import cPickle
 import decimal
 import datetime
+import os
+import traceback
 from distutils.util import strtobool
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
@@ -74,6 +76,8 @@ def generate_table_str(res, key):
 def generate_modified_query(cmpdb, sql, modified_sql):
     result = ''
     mod_sql = modified_sql.get(sql, None)
+    # print 'DEBUG generate_modified_query:', sql
+    # print 'DEBUG mod_sql                :', mod_sql
     if mod_sql:
         result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
     return result
@@ -300,7 +304,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     cmpdb_file = open(cmpdb_path, "rb")
     jni_file = open(jni_path, "rb")
     if modified_sql_path:
-        modified_sql_file = open(modified_sql_path, "rb")
+        modified_sql_file = codecs.open(modified_sql_path, encoding='utf-8')
     else:
         modified_sql_file = None
     modified_sql = {}
@@ -367,14 +371,24 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                 try:
                     orig_sql = modified_sql_file.readline().rstrip('\n').replace('original SQL: ', '')
                     mod_sql  = modified_sql_file.readline().rstrip('\n').replace('modified SQL: ', '')
+                    # print 'DEBUG orig_sql:', orig_sql
+                    # print 'DEBUG mod_sql :', mod_sql
                     if orig_sql and mod_sql:
-                        modified_sql[orig_sql] = mod_sql
+                        modified_sql[cgi.escape(orig_sql).encode('ascii', 'xmlcharrefreplace')] \
+                                    = cgi.escape(mod_sql).encode('ascii', 'xmlcharrefreplace')
                     else:
                         break
                 except EOFError as e:
                     break
-        except Error as e:
+            modified_sql_file.close()
+        except Exception as e:
+            traceback.print_exc()
             raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
+
+    # print '\nDEBUG modified_sql dictionary:\n'
+    # for key in modified_sql:
+        # print 'DEBUG   key:', key
+        # print 'DEBUG   val:', modified_sql[key], '\n'
 
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
