@@ -18,6 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
+import java.util.Properties;
 
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
@@ -39,4 +40,6 @@ public interface ImporterConfig
     public URI getResourceID();
 
     public AbstractFormatterFactory getFormatterFactory();
+
+    public Properties getFormatterProperties();
 }

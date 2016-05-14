@@ -39,9 +39,9 @@ public class PullSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Properties formatProps, AbstractFormatterFactory formatterFactory)
     {
-        return PullSocketImporterConfig.createConfigEntries(props, formatterFactory);
+        return PullSocketImporterConfig.createConfigEntries(props, formatProps, formatterFactory);
     }
 
     @Override

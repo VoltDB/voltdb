@@ -77,8 +77,8 @@ public class ImportProcessor implements ImportDataProcessor {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props, AbstractFormatterFactory formatterFactory) {
-            m_importerTypeMgr.configure(props, formatterFactory);
+        public void configure(Properties props, Properties formatProp, AbstractFormatterFactory formatterFactory) {
+            m_importerTypeMgr.configure(props, formatProp, formatterFactory);
         }
 
         public void stop() {
@@ -98,6 +98,11 @@ public class ImportProcessor implements ImportDataProcessor {
 
     public void addProcessorConfig(ImportConfiguration config) {
         Properties properties = config.getmoduleProperties();
+        Properties formatProp = config.getformatterProperties();
+        if (formatProp == null)
+            formatProp = new Properties();
+        formatProp.put(AbstractFormatterFactory.FORMAT_NAME, config.getFormatName());
+
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
@@ -136,11 +141,11 @@ public class ImportProcessor implements ImportDataProcessor {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                wrapper.configure(properties, formatterFactory);
+                wrapper.configure(properties, formatProp, formatterFactory);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             } else {
-                wrapper.configure(properties, formatterFactory);
+                wrapper.configure(properties, formatProp, formatterFactory);
             }
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);

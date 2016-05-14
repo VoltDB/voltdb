@@ -148,7 +148,8 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void initialize(InitializationInput initInput) {
 
             m_shardId = initInput.getShardId();
-            m_formatter = ((Formatter<String>) m_config.getFormatterFactory().create());
+            m_formatter = ((Formatter<String>) m_config.getFormatterFactory()
+                    .create(m_config.getFormatterProperties()));
 
             String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
             if (NumberUtils.isDigits(seq)) {
@@ -308,7 +309,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 throw new IllegalArgumentException("leeways is zero or negative");
             }
             lagLen = leeway;
-            checkpoints = new BigInteger[(int)m_config.getMaxReadBatchSize()];
+            checkpoints = new BigInteger[(int) m_config.getMaxReadBatchSize()];
         }
 
         synchronized void resetTo() {
@@ -378,8 +379,8 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized BigInteger getSafeCommitPoint() {
-            if(checkpoints != null && validateOffset((int) c)){
-                 return checkpoints[(int) c];
+            if (checkpoints != null && validateOffset((int) c)) {
+                return checkpoints[(int) c];
             }
             return null;
         }

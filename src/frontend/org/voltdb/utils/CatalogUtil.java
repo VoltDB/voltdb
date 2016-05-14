@@ -1550,15 +1550,11 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return processorConfig;
         }
-        List<String> streamList = new ArrayList<String>();
         int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (!streamList.contains(importConfiguration.getModule())) {
-                streamList.add(importConfiguration.getModule());
-            }
 
             ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
 
