@@ -18,6 +18,7 @@
 package org.voltdb.importer.formatter.builtin;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
 import java.util.Properties;
@@ -37,16 +38,15 @@ public class VoltCSVFormatter implements Formatter<String> {
     /** String that can be used to indicate NULL value in CSV files */
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
-    public static final char DEFAULT_QUOTE_CHAR='"';
-    
-    public static final char DEFAULT_ESCAPE_CHAR='\\';
-    
+    public static final char DEFAULT_QUOTE_CHAR = '"';
+
+    public static final char DEFAULT_ESCAPE_CHAR = '\\';
+
     /**
      * Size limit for each column.
      */
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
-    private CsvPreference m_csvPreference;
     private String m_blank;
     private String m_customNullString;
     private boolean m_nowhitespace;
@@ -54,6 +54,8 @@ public class VoltCSVFormatter implements Formatter<String> {
     private char m_separator;
     private char m_escape;
     private boolean m_strictquotes;
+    private VoltCVSTokenizer m_tokenizer;
+    CsvListReader m_csvReader;
 
     VoltCSVFormatter(String formatName, Properties prop) {
 
@@ -96,7 +98,12 @@ public class VoltCSVFormatter implements Formatter<String> {
         if (m_surroundingSpacesNeedQuotes) {
             builder.surroundingSpacesNeedQuotes(true);
         }
-        m_csvPreference = builder.build();
+        CsvPreference csvPreference = builder.build();
+
+        m_tokenizer = new VoltCVSTokenizer(new StringReader(""), csvPreference, m_strictquotes, m_escape,
+                DEFAULT_COLUMN_LIMIT_SIZE, 0);
+
+        m_csvReader = new CsvListReader(m_tokenizer, csvPreference);
     }
 
     @Override
@@ -106,23 +113,12 @@ public class VoltCSVFormatter implements Formatter<String> {
             return null;
         }
 
-        Tokenizer tokenizer = new Tokenizer(new StringReader(sourceData), m_csvPreference, m_strictquotes, m_escape,
-                DEFAULT_COLUMN_LIMIT_SIZE, 0);
-
-        CsvListReader csvReader = new CsvListReader(tokenizer, m_csvPreference);
-
+        m_tokenizer.setSourceString(sourceData);
         List<String> dataList;
         try {
-            dataList = csvReader.read();
+            dataList = m_csvReader.read();
         } catch (IOException | SuperCsvException e) {
             throw new FormatException("Fail to parse csv data", e);
-        } finally {
-            try {
-                if (csvReader != null)
-                    csvReader.close();
-            } catch (IOException e) {
-                throw new FormatException(e);
-            }
         }
         String[] data = dataList.toArray(new String[0]);
         normalize(data);
@@ -155,5 +151,59 @@ public class VoltCSVFormatter implements Formatter<String> {
                 }
             }
         }
+    }
+
+    /**
+     * Importers transform the source one row at time. VoltCVSTokenizer will cut significant amount time on processing data
+     * via reader and cell processor and improve the performance.
+     *
+     */
+    private class VoltCVSTokenizer extends Tokenizer {
+
+        private String m_sourceString;
+
+        public VoltCVSTokenizer(Reader reader, CsvPreference preferences, boolean strictquotes, char escapechar,
+                long columnsizelimit, long skipNum) {
+            super(reader, preferences, strictquotes, escapechar, columnsizelimit, skipNum);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String readLine() throws IOException {
+
+            String tempStr = m_sourceString;
+
+            //set to null to mark EOF
+            m_sourceString = null;
+
+            return tempStr;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getLineNumber() {
+            return 1;
+        }
+
+        public void setSourceString(String sourceString) {
+            m_sourceString = sourceString;
+        }
+    }
+
+    public static void main(String args[]) {
+
+        VoltCSVFormatter formatter = new VoltCSVFormatter("csv", new Properties());
+        final String source = "1 ,1,1,11111111,first,1.10,1.11,currentTime,POINT(1 1)";
+
+        long start = System.currentTimeMillis();
+        for (long i = 0; i < 6000000; i++) {
+            formatter.transform(source);
+        }
+
+        System.out.println("total time for 6m row:" + (System.currentTimeMillis() - start) + "ms");
     }
 }
