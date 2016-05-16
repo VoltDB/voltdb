@@ -18,11 +18,27 @@
 package org.voltdb.importer.formatter.builtin;
 
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.Formatter;
 
 public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
+
+    public static final String[]  SUPER_CVS_PROPS = {"surrounding.spaces.need.quotes","nowhitespace","blank",
+                "custom.null.string"};
+
     @Override
-    public VoltCSVFormatter create() {
-        VoltCSVFormatter formatter = new VoltCSVFormatter(m_formatName, m_formatProps);
-        return formatter;
+    public Formatter<String> create() {
+        if(IsSuperCSVConfigured()){
+            return new VoltSuperCSVFormatter(m_formatName, m_formatProps);
+        }
+        return  new VoltCSVFormatter(m_formatName, m_formatProps);
+    }
+
+    private boolean IsSuperCSVConfigured(){
+
+        for(String prop : SUPER_CVS_PROPS){
+            if(m_formatProps.containsKey(prop)) return true;
+        }
+
+        return false;
     }
 }

@@ -18,192 +18,71 @@
 package org.voltdb.importer.formatter.builtin;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.util.List;
 import java.util.Properties;
 
-import org.supercsv.exception.SuperCsvException;
-import org.supercsv.io.CsvListReader;
-import org.supercsv.prefs.CsvPreference;
-import org.supercsv_voltpatches.tokenizer.Tokenizer;
+import org.voltdb.common.Constants;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 public class VoltCSVFormatter implements Formatter<String> {
+    final CSVParser m_parser;
 
-    /** String that can be used to indicate NULL value in CSV files */
-    public static final String CSV_NULL = "\\N";
-
-    /** String that can be used to indicate NULL value in CSV files */
-    public static final String QUOTED_CSV_NULL = "\"\\N\"";
-
-    public static final char DEFAULT_QUOTE_CHAR = '"';
-
-    public static final char DEFAULT_ESCAPE_CHAR = '\\';
-
-    /**
-     * Size limit for each column.
-     */
-    public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
-
-    private String m_blank;
-    private String m_customNullString;
-    private boolean m_nowhitespace;
-    private boolean m_surroundingSpacesNeedQuotes;
-    private char m_separator;
-    private char m_escape;
-    private boolean m_strictquotes;
-    private VoltCVSTokenizer m_tokenizer;
-    CsvListReader m_csvReader;
-
-    VoltCSVFormatter(String formatName, Properties prop) {
-
+    VoltCSVFormatter (String formatName, Properties prop) {
         if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
-            throw new IllegalArgumentException(
-                    "Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
+            throw new IllegalArgumentException("Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
         }
+        char separator = "csv".equalsIgnoreCase(formatName) ? ',' : '\t';
 
-        m_separator = "csv".equalsIgnoreCase(formatName) ? ',' : '\t';
-
-        String separatorProp = prop.getProperty("separator", "").trim();
+        String separatorProp = prop.getProperty("separator", "");
         if (!separatorProp.isEmpty() && separatorProp.length() == 1) {
-            m_separator = separatorProp.charAt(0);
+            separator = separatorProp.charAt(0);
         }
 
-        char quotechar = DEFAULT_QUOTE_CHAR;
-        String quoteCharProp = prop.getProperty("quotechar", "").trim();
+        char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
+        String quoteCharProp = prop.getProperty("quotechar", "");
         if (!quoteCharProp.isEmpty() && quoteCharProp.length() == 1) {
             quotechar = quoteCharProp.charAt(0);
         }
 
-        m_escape = DEFAULT_ESCAPE_CHAR;
-        String escapeProp = prop.getProperty("escape", "").trim();
+        char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+        String escapeProp = prop.getProperty("escape", "");
         if (!escapeProp.isEmpty() && escapeProp.length() == 1) {
-            m_escape = escapeProp.charAt(0);
+            escape = escapeProp.charAt(0);
         }
 
-        m_strictquotes = "true".equalsIgnoreCase(prop.getProperty("strictquotes", ""));
-        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("surrounding.spaces.need.quotes", ""));
-        m_blank = prop.getProperty("blank", "").trim();
-
-        m_customNullString = prop.getProperty("custom.null.string", "").trim();
-        if (!m_customNullString.isEmpty() && !"error".equals(m_blank)) {
-            m_blank = "empty";
+        boolean strictQuotes = CSVParser.DEFAULT_STRICT_QUOTES;
+        String strictQuotesProp = prop.getProperty("strictquotes", "");
+        if (!strictQuotesProp.isEmpty()) {
+            strictQuotes = Boolean.parseBoolean(strictQuotesProp);
         }
 
-        m_nowhitespace = "true".equalsIgnoreCase(prop.getProperty("nowhitespace", ""));
-
-        CsvPreference.Builder builder = new CsvPreference.Builder(quotechar, m_separator, "\n");
-        if (m_surroundingSpacesNeedQuotes) {
-            builder.surroundingSpacesNeedQuotes(true);
+        boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+        String ignoreLeadingWhiteSpaceProp = prop.getProperty("ignoreleadingwhitespace", "");
+        if (!ignoreLeadingWhiteSpaceProp.isEmpty()) {
+            ignoreLeadingWhiteSpace = Boolean.parseBoolean(ignoreLeadingWhiteSpaceProp);
         }
-        CsvPreference csvPreference = builder.build();
 
-        m_tokenizer = new VoltCVSTokenizer(new StringReader(""), csvPreference, m_strictquotes, m_escape,
-                DEFAULT_COLUMN_LIMIT_SIZE, 0);
-
-        m_csvReader = new CsvListReader(m_tokenizer, csvPreference);
+        m_parser = new CSVParser(separator, quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace);
     }
 
     @Override
     public Object[] transform(String sourceData) throws FormatException {
-
-        if (sourceData == null) {
-            return null;
-        }
-
-        m_tokenizer.setSourceString(sourceData);
-        List<String> dataList;
         try {
-            dataList = m_csvReader.read();
-        } catch (IOException | SuperCsvException e) {
-            throw new FormatException("Fail to parse csv data", e);
-        }
-        String[] data = dataList.toArray(new String[0]);
-        normalize(data);
-        return data;
-    }
-
-    private void normalize(String[] lineValues) throws FormatException {
-
-        for (int i = 0; i < lineValues.length; i++) {
-
-            if (lineValues[i] == null) {
-                if ("error".equals(m_blank)) {
-                    throw new FormatException("Blank values are not allowed");
-                }
-            } else {
-                if (m_nowhitespace && (lineValues[i].charAt(0) == ' '
-                        || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
-                    throw new FormatException("Whitespace detected--nowhitespace is used");
-                } else {
-                    lineValues[i] = lineValues[i].trim();
-                }
-
-                if (!m_customNullString.isEmpty()) {
-                    if (m_customNullString.equals(lineValues[i])) {
-                        lineValues[i] = null;
+            Object list[] = m_parser.parseLine(sourceData);
+            if (list != null) {
+                for (int i = 0; i < list.length; i++) {
+                    if ("NULL".equals(list[i])
+                            || Constants.CSV_NULL.equals(list[i])
+                            || Constants.QUOTED_CSV_NULL.equals(list[i])) {
+                        list[i] = null;
                     }
-                } else if ("NULL".equals(lineValues[i]) || CSV_NULL.equalsIgnoreCase(lineValues[i])
-                        || QUOTED_CSV_NULL.equals(lineValues[i])) {
-                    lineValues[i] = null;
                 }
             }
+            return list;
+        } catch (IOException e) {
+            throw new FormatException("failed to format " + sourceData, e);
         }
-    }
-
-    /**
-     * Importers transform the source one row at time. VoltCVSTokenizer will cut significant amount time on processing data
-     * via reader and cell processor and improve the performance.
-     *
-     */
-    private class VoltCVSTokenizer extends Tokenizer {
-
-        private String m_sourceString;
-
-        public VoltCVSTokenizer(Reader reader, CsvPreference preferences, boolean strictquotes, char escapechar,
-                long columnsizelimit, long skipNum) {
-            super(reader, preferences, strictquotes, escapechar, columnsizelimit, skipNum);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public String readLine() throws IOException {
-
-            String tempStr = m_sourceString;
-
-            //set to null to mark EOF
-            m_sourceString = null;
-
-            return tempStr;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public int getLineNumber() {
-            return 1;
-        }
-
-        public void setSourceString(String sourceString) {
-            m_sourceString = sourceString;
-        }
-    }
-
-    public static void main(String args[]) {
-
-        VoltCSVFormatter formatter = new VoltCSVFormatter("csv", new Properties());
-        final String source = "1 ,1,1,11111111,first,1.10,1.11,currentTime,POINT(1 1)";
-
-        long start = System.currentTimeMillis();
-        for (long i = 0; i < 6000000; i++) {
-            formatter.transform(source);
-        }
-
-        System.out.println("total time for 6m row:" + (System.currentTimeMillis() - start) + "ms");
     }
 }
