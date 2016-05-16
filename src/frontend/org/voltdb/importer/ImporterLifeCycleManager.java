@@ -74,10 +74,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      *
      * @param props Properties defined in a configuration section for this importer
      */
-    public final void configure(Properties props, Properties formatProps, AbstractFormatterFactory formatterFactory)
+    public final void configure(Properties props, String formatName, Properties formatProps, AbstractFormatterFactory formatterFactory)
     {
         ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props, formatProps, formatterFactory));
+        builder.putAll(m_factory.createImporterConfigurations(props, formatName, formatProps, formatterFactory));
         m_configs = builder.build();
     }
 

@@ -77,8 +77,8 @@ public class ImportProcessor implements ImportDataProcessor {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props, Properties formatProp, AbstractFormatterFactory formatterFactory) {
-            m_importerTypeMgr.configure(props, formatProp, formatterFactory);
+        public void configure(Properties props, String formatName, Properties formatProp, AbstractFormatterFactory formatterFactory) {
+            m_importerTypeMgr.configure(props, formatName, formatProp, formatterFactory);
         }
 
         public void stop() {
@@ -141,7 +141,7 @@ public class ImportProcessor implements ImportDataProcessor {
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             }
-            wrapper.configure(properties, formatProp, formatterFactory);
+            wrapper.configure(properties, config.getFormatName(), formatProp, formatterFactory);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);

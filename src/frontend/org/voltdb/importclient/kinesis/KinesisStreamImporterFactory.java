@@ -38,9 +38,9 @@ public class KinesisStreamImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Properties formatPorps, AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, String formatName, Properties formatPorps, AbstractFormatterFactory formatterFactory)
     {
-        return KinesisStreamImporterConfig.createConfigEntries(props, formatPorps, formatterFactory);
+        return KinesisStreamImporterConfig.createConfigEntries(props, formatName, formatPorps, formatterFactory);
     }
 
     @Override

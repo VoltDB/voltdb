@@ -48,11 +48,13 @@ public class PullSocketImporterConfig implements ImporterConfig
     private final String m_procedure;
     private final AbstractFormatterFactory m_formatterFactory;
     private final Properties m_formatProps;
-    public PullSocketImporterConfig(URI resourceID, String procedure, AbstractFormatterFactory formatterFactory, Properties formatProps)
+    private final String m_formatName;
+    public PullSocketImporterConfig(URI resourceID, String procedure, AbstractFormatterFactory formatterFactory, String formatName, Properties formatProps)
     {
         m_resourceID = resourceID;
         m_procedure = procedure;
         m_formatterFactory = formatterFactory;
+        m_formatName = formatName;
         m_formatProps = formatProps;
     }
 
@@ -72,7 +74,7 @@ public class PullSocketImporterConfig implements ImporterConfig
         return m_procedure;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Properties formatProps,  AbstractFormatterFactory formatterFactory)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, String formatName,  Properties formatProps,  AbstractFormatterFactory formatterFactory)
     {
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
@@ -85,7 +87,7 @@ public class PullSocketImporterConfig implements ImporterConfig
 
         ImmutableMap.Builder<URI, ImporterConfig> sbldr = ImmutableMap.builder();
         for (String host: COMMA_SPLITTER.split(hosts)) {
-            checkHostAndAddConfig(host, procedure, sbldr, formatterFactory, formatProps);
+            checkHostAndAddConfig(host, procedure, sbldr, formatterFactory, formatName, formatProps);
         }
         try {
             return sbldr.build();
@@ -96,7 +98,7 @@ public class PullSocketImporterConfig implements ImporterConfig
     }
 
     private static void checkHostAndAddConfig(String hspec, String procedure, ImmutableMap.Builder<URI, ImporterConfig> builder,
-            AbstractFormatterFactory formatterFactory,  Properties formatProps) {
+            AbstractFormatterFactory formatterFactory, String formatName,  Properties formatProps) {
         Matcher mtc = HOST_RE.matcher(hspec);
         if (!mtc.matches()) {
             throw new IllegalArgumentException(String.format("Address spec %s is malformed", hspec));
@@ -120,13 +122,18 @@ public class PullSocketImporterConfig implements ImporterConfig
             InetSocketAddress sa = new InetSocketAddress(a, p);
             PullSocketImporterConfig config =
                     new PullSocketImporterConfig(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"), procedure,
-                            formatterFactory, formatProps);
+                            formatterFactory, formatName, formatProps);
             builder.put(config.getResourceID(), config);
         }
     }
 
     @Override
-    public Properties getFormatterProperties() {
+    public Properties getFormatProps() {
         return m_formatProps;
+    }
+
+    @Override
+    public String getFormatName() {
+        return m_formatName;
     }
 }

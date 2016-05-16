@@ -39,9 +39,9 @@ public class KafkaStreamImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Properties formatProps, AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, String formatName, Properties formatProps, AbstractFormatterFactory formatterFactory)
     {
-        return KafkaStreamImporterConfig.createConfigEntries(props, formatProps, formatterFactory);
+        return KafkaStreamImporterConfig.createConfigEntries(props, formatName, formatProps, formatterFactory);
     }
 
     @Override

@@ -60,7 +60,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
     private final long m_taskBackoffTimeMillis;
     private final AbstractFormatterFactory m_formatterFactory;
     private final Properties m_formatProps;
-
+    private final String m_formatName;
     /**
      * Kinesis stream importer configurations
      * @param appName applicationName Name of the Kinesis application
@@ -79,7 +79,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
             final String procedure, final String secretKey, final String accessKey,
             final long idleTimeBetweenReadsInMillis, final long maxReadBatchSize, final URI resourceId,
             final long taskBackoffTimeMillis, final AbstractFormatterFactory formatterFactory,
-            final Properties formatProps) {
+            final Properties formatProps, final String formatName) {
 
         m_appName = appName;
         m_region = region;
@@ -93,6 +93,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         m_taskBackoffTimeMillis = taskBackoffTimeMillis;
         m_formatterFactory = formatterFactory;
         m_formatProps = formatProps;
+        m_formatName = formatName;
     }
 
     @Override
@@ -141,7 +142,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         return m_taskBackoffTimeMillis;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Properties formatProps,
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, String formatName, Properties formatProps,
             AbstractFormatterFactory formatterFactory) {
 
         Map<URI, ImporterConfig> configs = new HashMap<>();
@@ -174,7 +175,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 
             ImporterConfig config = new KinesisStreamImporterConfig(appName, region, streamName, procedure, secretKey,
                     accessKey, readInterval, maxReadBatchSize, uri, taskBackoffTimeMillis, formatterFactory,
-                    formatProps);
+                    formatProps, formatName);
 
             configs.put(uri, config);
         }
@@ -267,7 +268,12 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
     }
 
     @Override
-    public Properties getFormatterProperties() {
+    public Properties getFormatProps() {
         return m_formatProps;
+    }
+
+    @Override
+    public String getFormatName() {
+        return m_formatName;
     }
 }

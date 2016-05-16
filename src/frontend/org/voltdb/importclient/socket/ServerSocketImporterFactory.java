@@ -41,9 +41,9 @@ public class ServerSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Properties formatProps,  AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, String formatName, Properties formatProps,  AbstractFormatterFactory formatterFactory)
     {
-        ImporterConfig config = new ServerSocketImporterConfig(props, formatterFactory, formatProps);
+        ImporterConfig config = new ServerSocketImporterConfig(props, formatterFactory, formatName, formatProps);
         return ImmutableMap.of(config.getResourceID(), config);
     }
 

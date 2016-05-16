@@ -38,9 +38,11 @@ public class ServerSocketImporterConfig implements ImporterConfig
     private final String m_procedure;
     private final int m_port;
     private final ServerSocket m_serverSocket;
-    private Properties m_formatProps;
+    private final Properties m_formatProps;
+    private final String m_formatName;
 
-    public ServerSocketImporterConfig(Properties props, AbstractFormatterFactory formatterFactory, Properties formatProps)
+
+    public ServerSocketImporterConfig(Properties props, AbstractFormatterFactory formatterFactory, String formatName, Properties formatProps)
     {
         Properties propsCopy = (Properties) props.clone();
 
@@ -73,6 +75,7 @@ public class ServerSocketImporterConfig implements ImporterConfig
 
         m_formatterFactory = formatterFactory;
         m_formatProps = formatProps;
+        m_formatName = formatName;
     }
 
     @Override
@@ -103,7 +106,12 @@ public class ServerSocketImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Properties getFormatterProperties() {
+    public Properties getFormatProps() {
         return m_formatProps;
+    }
+
+    @Override
+    public String getFormatName() {
+        return m_formatName;
     }
 }

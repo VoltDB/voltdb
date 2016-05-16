@@ -40,6 +40,7 @@ public class Log4jSocketImporterConfig implements ImporterConfig
     private final ServerSocket m_serverSocket;
     private final URI m_resourceID;
     private Properties m_formatProps;
+    private String m_formatName;
 
     /**
      * This is called with the properties that are supplied in the deployment.xml
@@ -101,7 +102,12 @@ public class Log4jSocketImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Properties getFormatterProperties() {
+    public Properties getFormatProps() {
         return m_formatProps;
+    }
+
+    @Override
+    public String getFormatName() {
+        return m_formatName;
     }
 }

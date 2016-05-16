@@ -24,8 +24,8 @@ import org.voltdb.importer.formatter.AbstractFormatterFactory;
 public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
     @Override
-    public VoltCSVFormatter create(Properties props) {
-        VoltCSVFormatter formatter = new VoltCSVFormatter(props);
+    public VoltCSVFormatter create(String formatName, Properties props) {
+        VoltCSVFormatter formatter = new VoltCSVFormatter(formatName, props);
         return formatter;
     }
 }

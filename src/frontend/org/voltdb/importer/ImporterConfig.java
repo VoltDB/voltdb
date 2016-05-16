@@ -41,5 +41,13 @@ public interface ImporterConfig
 
     public AbstractFormatterFactory getFormatterFactory();
 
-    public Properties getFormatterProperties();
+    /**
+     * @return  Return the properties of formatter's configuration
+     */
+    public Properties getFormatProps();
+
+    /**
+     * @return  Return the name of formatter for the importer configuration
+     */
+    public String getFormatName();
 }

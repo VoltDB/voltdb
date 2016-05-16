@@ -21,7 +21,6 @@ import java.util.Properties;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.voltdb.importer.ImportDataProcessor;
 
 /**
  * Factory class that formatter bundles should extend, extending classes
@@ -53,20 +52,17 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
 
     /**
      * Abstract method for constructing the class implementing Formatter
+     * @param formatName  the type of the formatter
      * @param props - the properties used for the construction of formatter.
      * @return formatter instance created with the importer id
      */
-    public abstract Formatter<?> create(Properties props);
+    public abstract Formatter<?> create(String  formatName, Properties props);
 
     /**
      * construct a formatter
      * @return formatter instance created with the name and properties
      */
     public Formatter<?> create() {
-        String name = m_formatProps.getProperty(ImportDataProcessor.IMPORT_FORMATTER_NAME);
-        if(name == null){
-            m_formatProps.put(ImportDataProcessor.IMPORT_FORMATTER_NAME, m_formatName);
-        }
-        return create(m_formatProps);
+        return create(m_formatName, m_formatProps);
     }
 }

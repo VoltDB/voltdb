@@ -41,7 +41,7 @@ public class Log4jSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Properties formatProps, AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, String formatName, Properties formatProps, AbstractFormatterFactory formatterFactory)
     {
         System.out.println("***Creating log4j importer for " + props);
         ImporterConfig config = new Log4jSocketImporterConfig(props);

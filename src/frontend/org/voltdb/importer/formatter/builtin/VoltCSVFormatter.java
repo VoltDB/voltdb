@@ -30,9 +30,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 public class VoltCSVFormatter implements Formatter<String> {
     final CSVParser m_parser;
 
-    VoltCSVFormatter (Properties prop) {
+    VoltCSVFormatter (String formatName, Properties prop) {
 
-        String formatName = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER_NAME);
         if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
             throw new IllegalArgumentException("Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
         }

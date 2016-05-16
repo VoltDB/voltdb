@@ -149,7 +149,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
             m_shardId = initInput.getShardId();
             m_formatter = ((Formatter<String>) m_config.getFormatterFactory()
-                    .create(m_config.getFormatterProperties()));
+                    .create(m_config.getFormatName(), m_config.getFormatProps()));
 
             String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
             if (NumberUtils.isDigits(seq)) {
