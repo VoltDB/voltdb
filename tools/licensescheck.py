@@ -24,7 +24,9 @@ prunelist = ('hsqldb19b3',
              'helloworld',
              'jaxb',
              'pmsg',
-             'customer-workloads')
+             'customer-workloads',
+             'bin',
+             'pkg')
 
 def licenseStartsHere(content, approvedLicenses):
     for license in approvedLicenses:
@@ -32,7 +34,7 @@ def licenseStartsHere(content, approvedLicenses):
             return 1
     return 0
 
-def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
+def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo):
     if f.endswith('.py'):
         if not content.startswith("#"):
             if content.lstrip().startswith("#"):
@@ -54,6 +56,18 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
 
         # verify license
         if licenseStartsHere(content, approvedLicensesPython):
+            return 0
+        print "ERROR: \"%s\" does not start with an approved license." % f
+    elif f.endswith('.go'):
+        if not content.startswith("//"):
+            if content.lstrip().startswith("//"):
+                print "ERROR: \"%s\" contains whitespace before initial comment." % f
+                return 1
+            else:
+                print "ERROR: \"%s\" does not begin with a comment." % f
+                return 1
+        # verify license
+        if licenseStartsHere(content, approvedLicensesGo):
             return 0
         print "ERROR: \"%s\" does not start with an approved license." % f
     else:
@@ -248,13 +262,13 @@ def fixLicensePython(f, content, approvedLicensesPython):
     print "Fix: Inserting a default license before the original content."
     return writeRepairedContent(f, preserved + approvedLicensesPython[-1] + revisedcontent, content)
 
-def fixLicenseJavaC(f, content, approvedLicensesJavaC):
-    if licenseStartsHere(content.lstrip(), approvedLicensesJavaC):
+def fixLicenseGeneral(f, content, approvedLicenses):
+    if licenseStartsHere(content.lstrip(), approvedLicenses):
         print "Fix: removing whitespace before the approved license."
         revisedcontent = content.lstrip()
     else:
         print "Fix: Inserting a default license before the original content."
-        revisedcontent = approvedLicensesJavaC[-1] + content
+        revisedcontent = approvedLicenses[-1] + content
     return writeRepairedContent(f, revisedcontent,  content)
 
 def fixTabs(f, content):
@@ -285,8 +299,8 @@ def fixTrailingNewline(f, content):
 
 FIX_LICENSES_LEVEL = 2
 
-def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
-    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy'):
+def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo):
+    for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py', '.groovy', '.go'):
         if f.endswith(suffix):
             break
     else:
@@ -299,22 +313,25 @@ def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
         rmBakFile(f)
     (fixed, found) = (0, 0)
 
-    retval = verifyLicense(f, content,  approvedLicensesJavaC, approvedLicensesPython)
+    retval = verifyLicense(f, content,  approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo)
     if retval != 0:
         if fix > FIX_LICENSES_LEVEL:
             fixed += retval
             if f.endswith('.py'):
                 content = fixLicensePython(f, content, approvedLicensesPython)
+            elif f.endswith('.go'):
+                content = fixLicenseGeneral(f, content, approvedLicensesGo)
             else:
-                content = fixLicenseJavaC(f, content, approvedLicensesJavaC)
+                content = fixLicenseGeneral(f, content, approvedLicensesJavaC)
         found += retval
 
-    retval = verifyTabs(f, content)
-    if retval != 0:
-        if fix:
-            fixed += retval
-            content = fixTabs(f, content)
-        found += retval
+    if extension != '.go':
+        retval = verifyTabs(f, content)
+        if retval != 0:
+            if fix:
+                fixed += retval
+                content = fixTabs(f, content)
+            found += retval
 
     retval = verifyTrailingWhitespace(f, content)
     if (retval != 0):
@@ -352,16 +369,16 @@ def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
 
     return (fixed, found)
 
-def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython):
+def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo):
     files = os.listdir(d)
     (fixcount, errcount) = (0, 0)
     for f in [f for f in files if not f.startswith('.') and f not in prunelist]:
         fullpath = os.path.join(d,f)
         # print fullpath
         if os.path.isdir(fullpath):
-            (fixinc, errinc) = processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
+            (fixinc, errinc) = processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo)
         else:
-            (fixinc, errinc) = processFile(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
+            (fixinc, errinc) = processFile(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython, approvedLicensesGo)
         fixcount += fixinc
         errcount += errinc
     return (fixcount, errcount)
@@ -396,26 +413,32 @@ testLicensesPy = [basepath + 'tools/approved_licenses/mit_x11_voltdb_python.txt'
 
 srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
+srcLicensesGo =  [basepath + 'tools/approved_licenses/gpl3_voltdb_go.txt']
+
 
 (fixcount, errcount) = (0, 0)
 (fixinc, errinc) = processAllFiles(basepath + "src", fix,
     tuple([readFile(f) for f in srcLicenses]),
-    tuple([readFile(f) for f in srcLicensesPy]))
+    tuple([readFile(f) for f in srcLicensesPy]),
+    tuple([readFile(f) for f in srcLicensesGo]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "lib/python", fix,
     tuple([readFile(f) for f in srcLicenses]),
-    tuple([readFile(f) for f in srcLicensesPy]))
+    tuple([readFile(f) for f in srcLicensesPy]),
+    tuple([readFile(f) for f in srcLicensesGo]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "tests", fix,
     tuple([readFile(f) for f in testLicenses]),
-    tuple([readFile(f) for f in testLicensesPy]))
+    tuple([readFile(f) for f in testLicensesPy]),
+    tuple([readFile(f) for f in srcLicensesGo]))
 fixcount += fixinc
 errcount += errinc
 (fixinc, errinc) = processAllFiles(basepath + "examples", fix,
     tuple([readFile(f) for f in testLicenses]),
-    tuple([readFile(f) for f in testLicensesPy]))
+    tuple([readFile(f) for f in testLicensesPy]),
+    tuple([readFile(f) for f in srcLicensesGo]))
 fixcount += fixinc
 errcount += errinc
 
@@ -444,16 +467,19 @@ if not ascommithook:
                 pathprefix = os.path.join("..", arg)
             proLicenses = [pathprefix + '/tools/approved_licenses/license.txt']
             proLicensesPy = [pathprefix + '/tools/approved_licenses/license_python.txt']
+            proLicensesGo = [pathprefix + '/tools/approved_licenses/license_go.txt']
             (fixcount, errcount) = (0, 0)
             (fixinc, errinc) = processAllFiles(pathprefix + "/src/", fix,
                 tuple([readFile(f) for f in proLicenses]),
-                tuple([readFile(f) for f in proLicensesPy]))
+                tuple([readFile(f) for f in proLicensesPy]),
+                tuple([readFile(f) for f in proLicensesGo]))
             fixcount += fixinc
             errcount += errinc
 
             (fixinc, errinc) = processAllFiles(pathprefix + "/tests/", fix,
                 tuple([readFile(f) for f in proLicenses]),
-                tuple([readFile(f) for f in proLicensesPy]))
+                tuple([readFile(f) for f in proLicensesPy]),
+                tuple([readFile(f) for f in proLicensesGo]))
             fixcount += fixinc
             errcount += errinc
 
