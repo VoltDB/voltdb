@@ -14,25 +14,36 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.importclient.kinesis;
 
-import org.voltdb.importclient.ImportBaseException;
+#ifndef DRTUPLESTREAMUNDOACTION_H
+#define DRTUPLESTREAMUNDOACTION_H
 
-public class KinesisStreamImporterException extends ImportBaseException {
-    private static final long serialVersionUID = 7668280657393399984L;
+#include "common/UndoAction.h"
 
-    public KinesisStreamImporterException() {
+namespace voltdb {
+
+class DRTupleStreamUndoAction : public voltdb::UndoAction {
+public:
+DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
+    : m_stream(stream), m_mark(mark), m_cost(cost)
+    {
     }
 
-    public KinesisStreamImporterException(String format, Object... args) {
-        super(format, args);
+    void undo() {
+        if (m_stream) {
+            m_stream->rollbackTo(m_mark, m_cost);
+        }
     }
 
-    public KinesisStreamImporterException(Throwable cause) {
-        super(cause);
+    void release() {
     }
 
-    public KinesisStreamImporterException(String format, Throwable cause, Object... args) {
-        super(format, cause, args);
-    }
+private:
+    AbstractDRTupleStream *m_stream;
+    size_t m_mark;
+    size_t m_cost;
+};
+
 }
+
+#endif

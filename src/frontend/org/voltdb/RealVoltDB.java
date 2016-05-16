@@ -1809,7 +1809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
-        String[] lines = pp.toLogLines().split("\n");
+        String[] lines = pp.toLogLines(getVersionString()).split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
         }

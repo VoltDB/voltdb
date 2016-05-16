@@ -771,7 +771,7 @@ public class VoltDB {
                     writer.println();
                     writer.println("Platform Properties:");
                     PlatformProperties pp = PlatformProperties.getPlatformProperties();
-                    String[] lines = pp.toLogLines().split("\n");
+                    String[] lines = pp.toLogLines(instance().getVersionString()).split("\n");
                     for (String line : lines) {
                         writer.println(line.trim());
                     }

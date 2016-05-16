@@ -30,10 +30,12 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.Level;
@@ -234,16 +236,57 @@ public class TestImportStatistics extends RegressionSuite {
         }
     }
 
+    private static Set<String> expectedImporters = new HashSet<>();
+    static {
+        expectedImporters.add("SocketServerImporter");
+        expectedImporters.add("Log4jSocketHandlerImporter");
+    };
+    private static final String CONN_HOST_COL = "CONNECTION_HOSTNAME";
+    private static final String PROC_NAME_COL = "PROCEDURE_NAME";
+    private static final String INVOCATIONS_COL = "INVOCATIONS";
+
     private void waitForLogEvents(Client client, int count) throws Exception {
-        //Wait 40 sec to get out of backpressure.
-        long end = System.currentTimeMillis() + 40000;
+        //Wait 60 sec to get out of backpressure.
+        long end = System.currentTimeMillis() + 60000;
+        int successCount = 0;
+        Map<String, Boolean> expectedInovcations = new HashMap<>();
+        {
+            expectedInovcations.put("TestImportStatistics$TestStatsProcedure7",
+                            false);
+            expectedInovcations.put("TestImportStatistics$TestStatsProcedure11",
+                            false);
+            expectedInovcations.put("log_events.insert",
+                            false);
+        };
         while (System.currentTimeMillis() < end) {
-            ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from log_events");
+            ClientResponse response = client.callProcedure("@Statistics", "INITIATOR", 0);
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            if (count == response.getResults()[0].asScalarLong()) {
-                break;
+            VoltTable stats = response.getResults()[0];
+            for (int i=0; i<stats.getRowCount(); i++) {
+                VoltTableRow row = stats.fetchRow(i);
+                String name = row.getString(CONN_HOST_COL);
+                if (!expectedImporters.contains(name)) {
+                    continue;
+                }
+
+                String proc = row.getString(PROC_NAME_COL);
+                assert(expectedInovcations.containsKey(proc));
+                if (!expectedInovcations.get(proc)) {
+                    long invocations = row.getLong(INVOCATIONS_COL);
+                    if (count == invocations) {
+                        expectedInovcations.put(proc, true);
+                        successCount += 1;
+                    }
+
+                }
+            }
+            if (successCount == expectedInovcations.size()) {
+                    break;
             }
             Thread.sleep(50);
+        }
+        if (successCount < expectedInovcations.size()) {
+            fail("fail to get out backpressure for 40 Sec");
         }
     }
 
