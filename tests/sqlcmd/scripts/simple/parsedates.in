@@ -1,0 +1,40 @@
+drop table FOO if exists;
+create table FOO ( a timestamp, source varchar);
+insert into FOO values ('2015-11-11 10:11:12.123456', 'sql');
+insert into FOO values ('2015-11-11 10:11:12.12345',  'sql');
+insert into FOO values ('2015-11-11 10:11:12.1234',   'sql');
+insert into FOO values ('2015-11-11 10:11:12.123',    'sql');
+insert into FOO values ('2015-11-11 10:11:12.12',     'sql');
+insert into FOO values ('2015-11-11 10:11:12.1',      'sql');
+insert into FOO values ('2015-11-11 10:11:12',        'sql');
+insert into FOO values ('2015-11-11',                 'sql');
+
+-- Try some negative cases.
+insert into FOO values ('20150-11-11 10:10:10', 'sqlfail');
+insert into FOO values ('201-11-11 10:10:10',   'sqlfail');
+insert into FOO values ('2015-111-11 10:10:10', 'sqlfail');
+insert into FOO values ('2015-11-111 10:10:10', 'sqlfail');
+insert into FOO values ('2015-11-11 10:10:10.', 'sqlfail');
+
+-- Now try the same things as before, but with a CRUD procedure.
+-- This is problematic because sqlcmd tries to parse the datetime.
+exec FOO.insert '2015-11-11 10:11:12.123456' 'crud';
+exec FOO.insert '2015-11-11 10:11:12.12345'  'crud';
+exec FOO.insert '2015-11-11 10:11:12.1234'   'crud';
+exec FOO.insert '2015-11-11 10:11:12.123'    'crud';
+exec FOO.insert '2015-11-11 10:11:12.12'     'crud';
+exec FOO.insert '2015-11-11 10:11:12.1'      'crud';
+exec FOO.insert '2015-11-11 10:11:12'        'crud';
+exec FOO.insert '2015-11-11'                 'crud';
+
+-- Try some negative CRUD tests.
+exec FOO.insert '20150-11-11 10:10:10' 'crudfail';
+exec FOO.insert '201-11-11 10:10:10'   'crudfail';
+exec FOO.insert '2015-111-11 10:10:10' 'crudfail';
+exec FOO.insert '2015-11-111 10:10:10' 'crudfail';
+exec FOO.insert '2015-11-11 10:11:12.' 'crudfail';
+
+
+-- We should not see any with sqlfail or crudfail as sources.
+select * from FOO;
+drop table FOO if exists;
