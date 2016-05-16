@@ -1222,6 +1222,9 @@ public abstract class CatalogUtil {
             m_formatName = formatName;
             m_moduleProps = moduleProps;
             m_formatterProps = formatterProps;
+            if (m_formatterProps != null && m_formatName != null) {
+                m_formatterProps.put(ImportDataProcessor.IMPORT_FORMATTER_NAME, m_formatName);
+            }
         }
 
         public String getFormatName() {

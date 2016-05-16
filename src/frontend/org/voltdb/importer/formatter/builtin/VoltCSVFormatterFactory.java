@@ -25,8 +25,7 @@ public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
     @Override
     public VoltCSVFormatter create(Properties props) {
-        String formatName = props.getProperty(FORMAT_NAME);
-        VoltCSVFormatter formatter = new VoltCSVFormatter(formatName, props);
+        VoltCSVFormatter formatter = new VoltCSVFormatter(props);
         return formatter;
     }
 }
