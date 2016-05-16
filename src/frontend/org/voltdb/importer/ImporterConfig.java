@@ -44,10 +44,10 @@ public interface ImporterConfig
     /**
      * @return  Return the properties of formatter's configuration
      */
-    public Properties getFormatProps();
+    public Properties getFormatterProperties();
 
     /**
      * @return  Return the name of formatter for the importer configuration
      */
-    public String getFormatName();
+    public String getFormatterName();
 }

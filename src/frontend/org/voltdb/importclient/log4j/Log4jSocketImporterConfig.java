@@ -102,12 +102,13 @@ public class Log4jSocketImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Properties getFormatProps() {
+    public Properties getFormatterProperties() {
         return m_formatProps;
     }
 
+
     @Override
-    public String getFormatName() {
+    public String getFormatterName() {
         return m_formatName;
     }
 }
