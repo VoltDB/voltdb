@@ -189,7 +189,15 @@ DECL_UNSIGNED_INT_LIMITS(unsigned long long int)
   static bool IsInf(const Type x) { return (_fpclass(x) & (_FPCLASS_NINF | _FPCLASS_PINF)) != 0; } \
   static bool IsPosInf(const Type x) { return _fpclass(x) == _FPCLASS_PINF; } \
   static bool IsNegInf(const Type x) { return _fpclass(x) == _FPCLASS_NINF; }
-#else
+#elif __GNUC__ > 4  //  libraries used with gcc version 5 and greater have isnan and isinf in namespace std
+#define DECL_FP_LIMIT_FUNCS \
+  static bool IsFinite(const Type x) { return !std::isinf(x)  &&  !std::isnan(x); } \
+  static bool IsNaN(const Type x) { return std::isnan(x); } \
+  static bool IsInf(const Type x) { return std::isinf(x); } \
+  static bool IsPosInf(const Type x) { return std::isinf(x)  &&  x > 0; } \
+  static bool IsNegInf(const Type x) { return std::isinf(x)  &&  x < 0; }
+#else // On older platforms isnan and isinf are in the global namespace
+      // note that clang comes here too since it sets its "gcc version" to 4.2.1
 #define DECL_FP_LIMIT_FUNCS \
   static bool IsFinite(const Type x) { return !isinf(x)  &&  !isnan(x); } \
   static bool IsNaN(const Type x) { return isnan(x); } \
