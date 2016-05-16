@@ -193,17 +193,4 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
             m_sourceString = sourceString;
         }
     }
-
-    public static void main(String args[]) {
-
-        VoltCSVFormatter formatter = new VoltCSVFormatter("csv", new Properties());
-        final String source = "1 ,1,1,11111111,first,1.10,1.11,currentTime,POINT(1 1)";
-
-        long start = System.currentTimeMillis();
-        for (long i = 0; i < 6000000; i++) {
-            formatter.transform(source);
-        }
-
-        System.out.println("total time for 6m row:" + (System.currentTimeMillis() - start) + "ms");
-    }
 }
