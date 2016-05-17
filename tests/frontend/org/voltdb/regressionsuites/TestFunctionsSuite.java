@@ -75,10 +75,15 @@ public class TestFunctionsSuite extends RegressionSuite {
         // Edge case: MOD 0
         verifyStmtFails(client, "select MOD(-25,0) from R1", "division by zero");
 
-        // Test guards on other types
-        verifyStmtFails(client, "select MOD(-25.32, 2.5) from R1", "unsupported non-integral type for SQL MOD function");
-        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "unsupported non-integral type for SQL MOD function");
+        validateTableOfScalarDecimals(client, "select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",  new BigDecimal[]{new BigDecimal("1.000000000000")});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{new BigDecimal("-0.020000000000")});
 
+        // //double%int
+        verifyStmtFails(client, "select MOD(-25.32, 2) from R1", "unsupported non-integral or non-decimal type for SQL MOD function");
+
+        // // Test guards on other types
+        verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "incompatible data type in operation");
+        verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "unsupported non-integral or non-decimal type for SQL MOD function");
     }
 
     // Test some false alarm cases in HSQLBackend that were interfering with sqlcoverage.
@@ -1590,6 +1595,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         subtestPower07x();
         subtestSqrt();
         subtestNaturalLog();
+        subtestNaturalLog10();
     }
 
     public void subtestCeiling() throws Exception
@@ -1759,6 +1765,60 @@ public class TestFunctionsSuite extends RegressionSuite {
             sql = "select LOG(-10) from P1";
             client.callProcedure("@AdHoc", sql);
             fail("Expected resultfor Log(negative #): invalid result value (nan)");
+        } catch (ProcCallException excp) {
+            if (isHSQL()) {
+                assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
+            } else {
+                assertTrue(excp.getMessage().contains("Invalid result value (nan)"));
+            }
+        }
+    }
+
+    public void subtestNaturalLog10() throws Exception
+    {
+        final String[] fname = {"LOG10"};
+        final double[] resultValues = new double[nonnegnonzeros.length];
+        final Set<Double> filters = new HashSet<Double>();
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = Math.log10(nonnegnonzeros[kk]);
+            filters.add(resultValues[kk]);
+        }
+
+        final boolean monotonic = true;
+        final boolean ascending = true;
+        final String expectedFormat = "DOUBLE";
+        for (String log : fname) {
+            functionTest(log, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectedFormat);
+        }
+
+        // Adhoc Queries
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (510, 'wEoiXIuJwSIKBujWv', -405636, 1.38145922788945552107e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (210, 'wEoiXIuJwSIKBujWv', -29914, 8.98500019539639316335e-01, NULL)");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES (410, 'WCfDDvZBPoqhanfGN', -1309657, 9.34160160574919795629e-01, NULL)");
+
+        // valid adhoc SQL query
+        String sql = "select * from P1 where ID > LOG10(1)";
+        client.callProcedure("@AdHoc", sql);
+
+        // execute Log10() with invalid arguments
+        try {
+            sql = "select LOG10(0) from P1";
+            client.callProcedure("@AdHoc", sql);
+            fail("Expected for Log10(zero) result: invalid result value (-inf)");
+        } catch (ProcCallException excp) {
+            if (isHSQL()) {
+                assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
+            } else {
+                assertTrue(excp.getMessage().contains("Invalid result value (-inf)"));
+            }
+        }
+
+        try {
+            sql = "select LOG10(-10) from P1";
+            client.callProcedure("@AdHoc", sql);
+            fail("Expected resultfor Log10(negative #): invalid result value (nan)");
         } catch (ProcCallException excp) {
             if (isHSQL()) {
                 assertTrue(excp.getMessage().contains("invalid argument for natural logarithm"));
@@ -3712,6 +3772,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("WHERE_LOG_FLOAT",    "select count(*) from NUMBER_TYPES where LOG(FLOATNUM) = ?");
         project.addStmtProcedure("WHERE_LOG_DECIMAL",  "select count(*) from NUMBER_TYPES where LOG(DECIMALNUM) = ?");
 
+        project.addStmtProcedure("DISPLAY_LOG10", "select LOG10(INTEGERNUM), LOG10(TINYNUM), LOG10(SMALLNUM), LOG10(BIGNUM), LOG10(FLOATNUM), LOG10(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
+        project.addStmtProcedure("ORDER_LOG10_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_LOG10_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(TINYNUM)");
+        project.addStmtProcedure("ORDER_LOG10_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by LOG10(SMALLNUM)");
+        project.addStmtProcedure("ORDER_LOG10_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by LOG10(BIGNUM)");
+        project.addStmtProcedure("ORDER_LOG10_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by LOG10(FLOATNUM)");
+        project.addStmtProcedure("ORDER_LOG10_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by LOG10(DECIMALNUM)");
+
+        project.addStmtProcedure("WHERE_LOG10_INTEGER",  "select count(*) from NUMBER_TYPES where LOG10(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_TINYINT",  "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_SMALLINT", "select count(*) from NUMBER_TYPES where LOG10(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_BIGINT",   "select count(*) from NUMBER_TYPES where LOG10(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_FLOAT",    "select count(*) from NUMBER_TYPES where LOG10(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_LOG10_DECIMAL",  "select count(*) from NUMBER_TYPES where LOG10(DECIMALNUM) = ?");
 
         project.addStmtProcedure("DISPLAY_INTEGER", "select CAST(INTEGERNUM AS INTEGER), CAST(TINYNUM AS INTEGER), CAST(SMALLNUM AS INTEGER), CAST(BIGNUM AS INTEGER), CAST(FLOATNUM AS INTEGER), CAST(DECIMALNUM AS INTEGER) from NUMBER_TYPES order by INTEGERNUM");
 
