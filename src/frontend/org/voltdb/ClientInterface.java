@@ -181,9 +181,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    //This validator will verify params or per procedure invocation vaidation.
-    private final InvocationValidator m_invocationValidator;
-
     //Dispatched strore procedure invocations
     private final InvocationDispatcher m_dispatcher;
 
@@ -1098,7 +1095,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1232,7 +1228,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        m_invocationValidator.setReplicationRole(role);
+        m_dispatcher.setReplicationRole(role);
     }
 
     /**
@@ -1265,6 +1261,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_cihm.put(adapter.connectionId(), cihm);
         }
         return m_cihm.get(adapter.connectionId());
+    }
+
+    public void unbindAdapter(final Connection adapter) {
+        ClientInterfaceHandleManager cihm = m_cihm.remove(adapter.connectionId());
+        if (cihm != null) {
+            m_numConnections.decrementAndGet();
+            /*
+             * It's necessary to free all the resources held
+             * Outstanding requests may actually still be at large
+             */
+            m_allACGs.remove(cihm.m_acg);
+            m_notifier.removeConnection(adapter);
+            cihm.freeOutstandingTxns();
+        }
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

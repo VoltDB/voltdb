@@ -25,7 +25,6 @@
 #include <deque>
 
 namespace voltdb {
-class TableIndex;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
@@ -62,12 +61,10 @@ public:
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
-                       DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       DRRecordType type) = 0;
 
     /**
      * write an update record to the stream
@@ -76,18 +73,15 @@ public:
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
-                       TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair) = 0;
+                       TableTuple &newTuple) = 0;
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        std::string tableName,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId) = 0;
 
@@ -99,6 +93,9 @@ public:
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) = 0;
 
     bool m_enabled;
 protected:

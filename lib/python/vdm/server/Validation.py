@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 from wtforms.validators import DataRequired, IPAddress, ValidationError, Optional, Regexp
 from flask_inputs import Inputs
@@ -100,7 +87,7 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
@@ -152,10 +139,11 @@ user_schema = {
                 "type": "integer",
             },
             "name": {
-                    "id": "name",
-                    "type": "string",
-                    "minLength": 1
-                },
+                "id": "name",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_.]+$"
+            },
             "password": {
                 "id": "password",
                 "type": "string",
@@ -163,7 +151,8 @@ user_schema = {
             },
             "roles": {
                 "id": "roles",
-                "type":"string"
+                "type":"string",
+                "pattern": "^[a-zA-Z0-9_.,-]+$"
             },
             "plaintext": {
                 "id": "plaintext",
@@ -416,7 +405,8 @@ schema = {
                                     "name": {
                                         "id": "name",
                                         "type": "string",
-                                        "minLength": 1
+                                        "minLength": 1,
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "password": {
                                         "id": "password",
@@ -426,6 +416,7 @@ schema = {
                                     "roles": {
                                         "id": "roles",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.,-]+$"
                                     },
                                     "plaintext": {
                                         "id": "plaintext",
@@ -469,8 +460,8 @@ schema = {
                                                         "value": {
                                                             "id": "value",
                                                             "type": "string"
-                                                        }
-                                                    }
+                                                        },
+                                                    },"additionalProperties": False,
                                                 }
                                             ]
                                         },
@@ -496,13 +487,14 @@ schema = {
                                     },
 
                                 },
-                             "required": ["stream", "type"]
+                                "required": ["stream", "type", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },
+            "additionalProperties": False
 
         },
         "import": {
@@ -533,7 +525,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         }
-                                                    }
+                                                    },"additionalProperties": False,
                                                 }
                                             ],
                                             "required": ["value"]
@@ -554,17 +546,18 @@ schema = {
                                     },
                                     "format": {
                                         "id": "format",
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
 
                                 },
-                                 "required": ["format"]
+                                 "required": ["format", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },"additionalProperties": False
 
         },
         "commandlog": {
@@ -579,12 +572,12 @@ schema = {
                             "id": "time",
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 5000
+                            "maximum": 1000
                         },
                         "transactions": {
                             "id": "transactions",
                             "type": "integer",
-                            "minimum": 0,
+                            "minimum": 1,
                             "maximum": 2147483647
                         }
                     },
@@ -602,7 +595,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 102400
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
@@ -693,7 +686,9 @@ schema = {
                                         "properties": {
                                             "name": {
                                                 "id": "name",
-                                                "type": "string"
+                                                "type": "string",
+                                                "enum": ["snapshots", "commandlog", "exportoverflow", "droverflow",
+                                                          "commandlogsnapshot"]
                                             },
                                             "size": {
                                                 "id": "size",
@@ -766,9 +761,11 @@ schema = {
                             "id": "source",
                             "type": "string",
                         }
-                    }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False

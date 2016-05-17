@@ -401,4 +401,29 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("closing points of ring are not equal", "POLYGON ((10 10, 20 20, 30 30, 40 40))");
 
     }
+
+    public void testGetValueDisplaySize() {
+
+        // Minumum size of serialized polygon is 155, which would be just
+        // three vertices.
+        try {
+            GeographyValue.getValueDisplaySize(154);
+            fail("Expected exception to be thrown");
+        }
+        catch (IllegalArgumentException iae) {
+            assertEquals(iae.getMessage(),
+                    "Cannot compute max display size for a GEOGRAPHY value of size 154 bytes, "
+                    + "since minimum allowed size is 155");
+        }
+
+        // We need a max 120 characters to represent a triangle
+        assertEquals(120, GeographyValue.getValueDisplaySize(155));
+
+        // An extra 10 bytes is not enough to represent another vertex, so
+        // display size is the same.
+        assertEquals(120, GeographyValue.getValueDisplaySize(165));
+
+        // We can fit 4 vertices in 179 bytes.
+        assertEquals(120 + 36, GeographyValue.getValueDisplaySize(179));
+    }
 }

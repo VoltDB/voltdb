@@ -48,7 +48,7 @@
       </div>
 
       <div id="dbWarningText" class="overlayText" style="display:none"><span class="glyphicon glyphicon-warning-sign iconModify"></span>
-          <p>No database has been added. Please click the down icon besides the Database to add a new database.</p>
+          <p id="warningMsg">No database has been added. Please click the down icon besides the Database to add a new database.</p>
       <div class="clear"></div>
       </div>
       <div id="divOverlayWrapper" class="overlayWrapper" style="display:none" title="No database has been added. Please click the down icon besides the Database to add a new database.">
@@ -74,11 +74,11 @@
     	<p>Starting.......</p>
     </div>    
     <div id="startSuccess" class="databaseRg" style="display:none;">
-    <a id="vmcLink" class="btn">Go to Manangement Center</a>
+    <a id="vmcLink" class="btn">Go to Management Center</a>
     <p>Database Running</p>
     </div>
     <div id="stallFailed" class="stalledState"  style="display:none;">
-      <div class="modal-dialog modal-dialog-center">
+      <div class="modal-dialog modal-dialog-center stalledStateContainer">
         <!-- Modal content-->
         <div class="modal-content">
           <div class="modal-header">
@@ -97,7 +97,7 @@
   </div>
 </div>	
 	<div id="startFailed" class="startFail" style="display:none;" >
-      <div class="modal-dialog modal-dialog-center">
+      <div class="modal-dialog modal-dialog-center startFailContainer">
         <!-- Modal content-->
         <div class="modal-content">
           <div class="modal-header">
@@ -199,7 +199,10 @@
                   <!--<input type="file" multiple>-->
                   <!--</span> </div>-->
                 <div id="upload-file-btn" class="leftSide upDownBtn"><span class="uploadIcon" ></span> Upload Configuration</div>
-                <div class="leftSide upDownBtn"><span class="downloadIcon" ></span> Download Configuration</div>
+               <div class="leftSide upDownBtn downloadConfig">
+                <a id="downloadConfigurations" href="#" download="deployment.xml">
+                  <span class="downloadIcon" ></span>Download Configuration</a>
+                 </div>
               </form>
             </div>
             <!--<form id="upload-file" method="post" enctype="multipart/form-data">-->
@@ -521,14 +524,16 @@
              <div class="drWrapperAdmin" id="divDrWrapperAdmin" >
               <div class="headerAdminContent">
                 <h1>
-                  <div class="drAdminHeaderLeft">Database Replication (DR)</div>
-                  <div class="drAdminHeaderRight">
-                    <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
-                      <!--<span class="editIcon"></span></a>-->
-                      <div id="onOffIcon" class="icheckbox_square-blue hover active onIconDR"> <span class="onOffDR" id="chkDrOnOffVal"width="10%"> </span> </div>
-                    </a>
+                  <div class="headerAdminContainer">
+                    <div class="drAdminHeaderLeft">Database Replication (DR)</div>
+                    <div class="drAdminHeaderRight">
+                      <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
+                        <!--<span class="editIcon"></span></a>-->
+                        <div id="onOffIcon" class="icheckbox_square-blue hover active onIconDR"> <span class="onOffDR" id="chkDrOnOffVal"width="10%"> </span> </div>
+                      </a>
+                    </div>
+                    <div class="clear"></div>
                   </div>
-                  <div class="clear"></div>
                 </h1>
               </div>
               <div class="drContent">

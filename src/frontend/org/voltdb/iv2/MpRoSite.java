@@ -208,7 +208,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
-                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -527,7 +527,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
-            boolean requireExistingSequenceNumbers)
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

@@ -47,20 +47,20 @@ class VoltDBManagementCenterPage extends Page {
     static content = {
         navTabs { $('#nav') }
         dbMonitorTab { navTabs.find('#navDbmonitor') }
-	adminTab { navTabs.find('#navAdmin') }
+    adminTab { navTabs.find('#navAdmin') }
         schemaTab    { navTabs.find('#navSchema') }
         sqlQueryTab  { navTabs.find('#navSqlQuery') }
         dbMonitorLink(to: DbMonitorPage) { dbMonitorTab.find('a') }
-	adminLink(to: AdminPage) { adminTab.find('a') }
+    adminLink(to: AdminPage) { adminTab.find('a') }
         schemaLink   (to: SchemaPage)    { schemaTab.find('a') }
         sqlQueryLink (to: SqlQueryPage)  { sqlQueryTab.find('a') }
         loginDialog  (required: false) { $('#loginBox') }
         usernameInput   (required: false) { loginDialog.find('input#username') }
         passwordInput   (required: false) { loginDialog.find('input#password') }
         loginButton  (required: false) { loginDialog.find('#LoginBtn') }
-	
-	header { module Header }
-        footer { module Footer }	
+
+    header { module Header }
+        footer { module Footer }
     }
     static at = {
         title == 'VoltDB Management Center'
@@ -213,7 +213,7 @@ class VoltDBManagementCenterPage extends Page {
      * should refer to a "table" HTML element. The table contents are returned
      * in the form of a Map, with each element a List of Strings; each Key of
      * the Map is a column header of the table, and its List contains the
-     * displayed text of that column. 
+     * displayed text of that column.
      * @param tableElement - a Navigator specifying the "table" element whose
      * contents are to be returned.
      * @param colHeaderFormat - the case in which you want the table's column
@@ -317,7 +317,7 @@ class VoltDBManagementCenterPage extends Page {
      * Clicks the "Schema" link, opening the "Schema" page (or tab);
      * if the "Schema" page is already open, no action is taken.
      */
-   
+
 
     def void openSchemaPage() {
         if (!isSchemaPageOpen()) {
@@ -405,20 +405,20 @@ class VoltDBManagementCenterPage extends Page {
 
     }
 
-	def void loginEmpty(username = "", password = "") {
+    def void loginEmpty(username = "", password = "") {
         usernameInput = username
         passwordInput = password
         loginButton.click()
-		waitFor() { !loginDialog.displayed }
-   
+        waitFor() { !loginDialog.displayed }
+
     }
-    
+
     def void loginInvalid(username = "invalid", password = "invalid") {
         usernameInput = username
         passwordInput = password
         loginButton.click()
-		waitFor() { !loginDialog.displayed }
-   
+        waitFor() { !loginDialog.displayed }
+
     }
 
     def String getUsername() {

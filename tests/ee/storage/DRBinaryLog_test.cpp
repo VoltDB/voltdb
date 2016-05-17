@@ -553,12 +553,6 @@ public:
     }
 
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-        ASSERT_FALSE(indexPair.first == NULL);
-        ASSERT_FALSE(indexPairReplica.first == NULL);
-        EXPECT_EQ(indexPair.second, indexPairReplica.second);
-
         beginTxn(m_engine, 99, 99, 98, 70);
         TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
@@ -1021,12 +1015,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     m_engine->setIsActiveActiveDREnabled(true);
     m_engineReplica->setIsActiveActiveDREnabled(true);
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_TRUE(indexPair.first == NULL);
-    ASSERT_TRUE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, 0);
-    EXPECT_EQ(indexPairReplica.second, 0);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
@@ -1052,11 +1040,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
-
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair1.first == NULL);
-    ASSERT_TRUE(indexPair2.first == NULL);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
@@ -1099,9 +1082,6 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNullColumn) {
     createIndexes();
-
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair1.first == NULL);
 
     beginTxn(m_engine, 99, 99, 98, 70);
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();
@@ -1148,11 +1128,6 @@ TEST_F(DRBinaryLogTest, BasicUpdate) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair.first == NULL);
-    ASSERT_FALSE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, indexPairReplica.second);
     simpleUpdateTest();
 }
 
@@ -1161,12 +1136,6 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
     m_engine->setIsActiveActiveDREnabled(true);
     m_engineReplica->setIsActiveActiveDREnabled(true);
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_TRUE(indexPair.first == NULL);
-    ASSERT_TRUE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, 0);
-    EXPECT_EQ(indexPairReplica.second, 0);
     simpleUpdateTest();
 }
 
@@ -1205,11 +1174,6 @@ TEST_F(DRBinaryLogTest, UpdateWithNulls) {
 
 TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
-    ASSERT_FALSE(indexPair.first == NULL);
-    ASSERT_FALSE(indexPairReplica.first == NULL);
-    EXPECT_EQ(indexPair.second, indexPairReplica.second);
     updateWithNullsTest();
 }
 
@@ -2028,6 +1992,36 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
         return;
     }
     ASSERT_TRUE(false);
+}
+
+// This test doesn't run in the memcheck build because the tuple block can only
+// hold one tuple at a time, so it will never trigger the optimized truncation
+// path. The normal truncation path will fail because we don't have a catalog
+// loaded.
+TEST_F(DRBinaryLogTest, TruncateTable) {
+#ifndef MEMCHECK
+    createIndexes();
+    const int total = 150;
+    int spHandle = 1;
+
+    for (int i = 1; i <= total; i++, spHandle++) {
+        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
+        endTxn(m_engine, true);
+    }
+
+    flushAndApply(spHandle - 1);
+    EXPECT_EQ(total, m_table->activeTupleCount());
+    EXPECT_EQ(total, m_tableReplica->activeTupleCount());
+
+    beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
+    m_table->truncateTable(m_engine);
+    endTxn(m_engine, true);
+
+    flushAndApply(spHandle);
+    EXPECT_EQ(0, m_table->activeTupleCount());
+    EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+#endif
 }
 
 TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {

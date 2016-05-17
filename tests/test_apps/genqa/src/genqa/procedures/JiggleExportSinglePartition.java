@@ -52,6 +52,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
           Uncomment this to duplicate the export data in memory.
           Useful for debugging export data correctness, but not useful
           for not running out of memory....
+         */
 
         voltQueueSQL(
                       insert
@@ -79,7 +80,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
-        */
+        /**/
 
         voltQueueSQL(
                      export

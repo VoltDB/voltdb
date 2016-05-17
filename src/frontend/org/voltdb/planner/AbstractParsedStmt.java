@@ -406,13 +406,12 @@ public abstract class AbstractParsedStmt {
             VoltType vt = VoltType.typeFromString(type);
             assert(vt != VoltType.VOLTTABLE);
 
-            int size = (vt == VoltType.NULL) ? 0 :
-                vt.isVariableLength() ?
-                        VoltType.MAX_VALUE_LENGTH :
-                            vt.getLengthInBytesForFixedTypes();
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
-            cve.setValueSize(size);
+            if ((vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
+                int size = vt.getMaxLengthInBytes();
+                cve.setValueSize(size);
+            }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
                 cve.setValue(valueStr);
@@ -598,7 +597,6 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
-
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -609,7 +607,8 @@ public abstract class AbstractParsedStmt {
 
         try {
             expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -653,7 +652,8 @@ public abstract class AbstractParsedStmt {
             AbstractExpression rightExpr = parseExpressionNode(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
-        } else {
+        }
+        else {
             assert(rightExprNode == null);
             if (exprType == ExpressionType.OPERATOR_CAST) {
                 String valuetype = exprNode.attributes.get("valuetype");
@@ -662,7 +662,8 @@ public abstract class AbstractParsedStmt {
                 expr.setValueType(voltType);
                 // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
                 // so assume max length for variable-length types (VARCHAR and VARBINARY).
-                expr.setValueSize(voltType.getMaxLengthInBytes());
+                int size = voltType.getMaxLengthInBytes();
+                expr.setValueSize(size);
             }
         }
 
@@ -672,7 +673,8 @@ public abstract class AbstractParsedStmt {
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
             expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
-        } else if (exprType == ExpressionType.OPERATOR_EXISTS) {
+        }
+        else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
         }
         return expr;
@@ -959,7 +961,10 @@ public abstract class AbstractParsedStmt {
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
-            expr.setValueSize(value_type.getMaxLengthInBytes());
+            if (value_type != VoltType.INVALID && value_type != VoltType.NUMERIC) {
+                int size = value_type.getMaxLengthInBytes();
+                expr.setValueSize(size);
+            }
         }
 
         if (result_type_parameter_index != null) {
@@ -1806,5 +1811,84 @@ public abstract class AbstractParsedStmt {
 
     public boolean isContentDetermistic() {
         return m_contentDeterminismMessage != null;
+    }
+
+    // Function evaluates whether the statement results in at most
+    // one output row. This is implemented for single table by checking
+    // value equivalence of predicates in where clause and checking
+    // if all defined unique indexes are in value equivalence set.
+    // Returns true if the statement results is at most one output
+    // row else false
+    protected boolean producesOneRowOutput () {
+        if (m_tableAliasMap.size() != 1) {
+            return false;
+        }
+
+        // Get the table.  There's only one.
+        StmtTableScan scan = m_tableAliasMap.values().iterator().next();
+        Table table = getTableFromDB(scan.getTableName());
+        // May be sub-query? If can't find the table there's no use to continue.
+        if (table == null) {
+            return false;
+        }
+
+        // Get all the indexes defined on the table
+        CatalogMap<Index> indexes = table.getIndexes();
+        if (indexes == null || indexes.size() == 0) {
+            // no indexes defined on the table
+            return false;
+        }
+
+        // Collect value equivalence expression for the SQL statement
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+
+        // If no value equivalence filter defined in SQL statement, there's no use to continue
+        if (valueEquivalence.isEmpty()) {
+            return false;
+        }
+
+        // Collect all tve expressions from value equivalence set which have equivalence
+        // defined to parameterized or constant value expression.
+        // Eg: T.A = ? or T.A = 1
+        Set <AbstractExpression> parameterizedConstantKeys = new HashSet<AbstractExpression>();
+        Set<AbstractExpression> valueEquivalenceKeys = valueEquivalence.keySet();   // get all the keys
+        for (AbstractExpression key : valueEquivalenceKeys) {
+            if (key instanceof TupleValueExpression) {
+                Set<AbstractExpression> values = valueEquivalence.get(key);
+                for (AbstractExpression value : values) {
+                    if ((value instanceof ParameterValueExpression) ||
+                        (value instanceof ConstantValueExpression)) {
+                        TupleValueExpression tve = (TupleValueExpression) key;
+                        parameterizedConstantKeys.add(tve);
+                    }
+                }
+            }
+        }
+
+        // Iterate over the unique indexes defined on the table to check if the unique
+        // index defined on table appears in tve equivalence expression gathered above.
+        for (Index index : indexes) {
+            // Perform lookup only on pure column indices which are unique
+            if (!index.getUnique() || !index.getExpressionsjson().isEmpty()) {
+                continue;
+            }
+
+            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
+            CatalogMap<ColumnRef> indexColRefs = index.getColumns();
+            for (ColumnRef indexColRef:indexColRefs) {
+                Column col = indexColRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(scan.getTableName(),
+                                                                    scan.getTableAlias(),
+                                                                    col.getName(),
+                                                                    col.getName(),
+                                                                    col.getIndex());
+                indexExpressions.add(tve);
+            }
+
+            if (parameterizedConstantKeys.containsAll(indexExpressions)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

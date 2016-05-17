@@ -217,7 +217,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_PROJECTION       = 54,
     PLAN_NODE_TYPE_MATERIALIZE      = 55,
     PLAN_NODE_TYPE_LIMIT            = 56,
-    PLAN_NODE_TYPE_PARTIALAGGREGATE = 57
+    PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
+    PLAN_NODE_TYPE_PARTITIONBY      = 58
 };
 
 // ------------------------------------------------------------------
@@ -482,7 +483,18 @@ enum TaskType {
     TASK_TYPE_GET_DR_TUPLESTREAM_STATE = 1,
     TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 2,
     TASK_TYPE_SET_DR_PROTOCOL_VERSION = 3,
-    TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4      // not supported in EE
+    TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
+    TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
+    TASK_TYPE_GENERATE_DR_EVENT = 6
+};
+
+// ------------------------------------------------------------------
+// Types of DR in-band events
+// ------------------------------------------------------------------
+enum DREventType {
+    NOT_A_EVENT = 0,
+    POISON_PILL = 1,      // not supported in EE
+    CATALOG_UPDATE = 2,
 };
 
 

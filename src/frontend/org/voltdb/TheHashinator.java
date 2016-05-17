@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
@@ -32,7 +31,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
@@ -167,7 +165,10 @@ public abstract class TheHashinator {
     abstract public Pair<Integer, Integer> pPredecessor(int partition, int token);
     abstract public Map<Integer, Integer> pGetRanges(int partition);
     public abstract HashinatorType getConfigurationType();
-    abstract public int pHashToPartition(VoltType type, Object obj);
+    // This method is only called within this class,
+    // {@see getHashedPartitionForParameter}
+    // but it must be declared protected to allow the required overriding.
+    abstract protected int pHashToPartition(VoltType type, Object obj);
     abstract protected Set<Integer> pGetPartitions();
     abstract public int getPartitionFromHashedToken(int hashedToken);
 
@@ -208,83 +209,6 @@ public abstract class TheHashinator {
             return 0;
         } else {
             return pHashinateBytes(bytes);
-        }
-    }
-
-    /**
-     * Given an object, map it to a partition. DON'T EVER MAKE ME PUBLIC
-     */
-    private static int hashToPartition(TheHashinator hashinator, VoltType type, Object obj) {
-        return hashinator.pHashToPartition(type, obj);
-
-    }
-
-    /**
-     * Converts the object into bytes for hashing.
-     * @param obj
-     * @return null if the obj is null or is a Volt null type.
-     */
-    public static byte[] valueToBytes(Object obj) {
-        long value = 0;
-        byte[] retval = null;
-
-        if (VoltType.isNullVoltType(obj)) {
-            return null;
-        } else if (obj instanceof Long) {
-            value = ((Long) obj).longValue();
-        } else if (obj instanceof String ) {
-            retval = ((String) obj).getBytes(Charsets.UTF_8);
-        } else if (obj instanceof Integer) {
-            value = ((Integer)obj).intValue();
-        } else if (obj instanceof Short) {
-            value = ((Short)obj).shortValue();
-        } else if (obj instanceof Byte) {
-            value = ((Byte)obj).byteValue();
-        } else if (obj instanceof byte[]) {
-            retval = (byte[]) obj;
-        }
-
-        if (retval == null) {
-            ByteBuffer buf = ByteBuffer.allocate(8);
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-            buf.putLong(value);
-            retval = buf.array();
-        }
-
-        return retval;
-    }
-
-    /**
-     * Converts a byte array with type back to the original partition value.
-     * This is the inverse of {@see TheHashinator#valueToBytes(Object)}.
-     * @param type VoltType of partition parameter.
-     * @param value Byte array representation of partition parameter.
-     * @return Java object of the correct type.
-     */
-    protected static Object bytesToValue(VoltType type, byte[] value) {
-        if ((type == VoltType.NULL) || (value == null)) {
-            return null;
-        }
-
-        ByteBuffer buf = ByteBuffer.wrap(value);
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-
-        switch (type) {
-        case BIGINT:
-            return buf.getLong();
-        case STRING:
-            return new String(value, Charsets.UTF_8);
-        case INTEGER:
-            return buf.getInt();
-        case SMALLINT:
-            return buf.getShort();
-        case TINYINT:
-            return buf.get();
-        case VARBINARY:
-            return value;
-        default:
-            throw new RuntimeException(
-                    "TheHashinator#bytesToValue failed to convert a non-partitionable type.");
         }
     }
 
@@ -352,24 +276,25 @@ public abstract class TheHashinator {
         // requiring the loader to know precise the schema.
         // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
         // array, convert the byte array back to the numeric value
-        if (partitionValue != null && partitionParamType.isPartitionableNumber()) {
+        if (partitionValue != null && partitionParamType.isAnyIntegerType()) {
             if (partitionValue.getClass() == String.class) {
-                {
-                    Object tempParam = ParameterConverter.stringToLong(
-                            partitionValue,
-                            partitionParamType.classFromType());
-                    // Just in case someone managed to feed us a non integer
-                    if (tempParam != null) {
-                        partitionValue = tempParam;
-                    }
+                try {
+                    partitionValue = Long.parseLong((String) partitionValue);
+                }
+                catch (NumberFormatException nfe) {
+                    throw new VoltTypeException(
+                            "getHashedPartitionForParameter: Unable to convert string " +
+                                    ((String) partitionValue) + " to "  +
+                                    partitionParamType.getMostCompatibleJavaTypeName() +
+                                    " target parameter ");
                 }
             }
             else if (partitionValue.getClass() == byte[].class) {
-                partitionValue = bytesToValue(partitionParamType, (byte[]) partitionValue);
+                partitionValue = partitionParamType.bytesToValue((byte[]) partitionValue);
             }
         }
 
-        return hashToPartition(this, partitionParamType, partitionValue);
+        return pHashToPartition(partitionParamType, partitionValue);
     }
 
     /**

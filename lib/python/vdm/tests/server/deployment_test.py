@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
 import requests
@@ -80,13 +67,14 @@ class DefaultDeployment(unittest.TestCase):
         """
         ensure GET Deployment
         """
+        headers = {'Accept': 'application/json'}
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
             dep_url = __db_url__ + str(last_db_id) + '/deployment/'
-            response = requests.get(dep_url)
+            response = requests.get(dep_url, headers=headers)
             value = response.json()
             if not value:
                 print "Cannot get Deployment information"
@@ -100,12 +88,13 @@ class UpdateDeployment(Deployment):
         """
         ensure GET Deployment
         """
+        headers = {'Accept': 'application/json'}
         response = requests.get(__db_url__)
         value = response.json()
         if value:
             db_length = len(value['databases'])
             last_db_id = value['databases'][db_length - 1]['id']
-            response = requests.get(__db_url__ + str(last_db_id) + '/deployment/')
+            response = requests.get(__db_url__ + str(last_db_id) + '/deployment/', headers=headers)
             value = response.json()
             if not value:
                 print "Cannot get Deployment information"
@@ -243,7 +232,7 @@ class UpdateDeployment(Deployment):
                                                    'commandlog': {'frequency': {'time': maximum_value}}}, headers=headers)
             value = response.json()
             self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than "
-                                                                      "the maximum of 5000")
+                                                                      "the maximum of 1000")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_transaction_empty(self):
@@ -273,7 +262,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                                    'commandlog': {'frequency': {'transactions': -1}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 0")
+            self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_commandlog_frequency_transaction_maximum(self):
@@ -340,7 +329,7 @@ class UpdateDeployment(Deployment):
                                           'commandlog': {'logsize': maximum_value}}, headers=headers)
             value = response.json()
             self.assertEqual(value['errors'][0], str(maximum_value) + " is greater "
-                                                                      "than the maximum of 102400")
+                                                                      "than the maximum of 3000")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_heart_beat_timeout_empty(self):
@@ -554,7 +543,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1'}}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "memorylimit value must be between 0 and 2147483647.")
+            self.assertEqual(value['error'], "memorylimit value must be between 1 and 2147483647.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_memory_limit_negative_percent(self):
@@ -570,7 +559,7 @@ class UpdateDeployment(Deployment):
                                     json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                           'systemsettings': {'resourcemonitor': {'memorylimit': {'size': '-1%'}}}}, headers=headers)
             value = response.json()
-            self.assertEqual(value['error'], "memorylimit percent value must be between 0 and 100.")
+            self.assertEqual(value['error'], "memorylimit percent value must be between 1 and 99.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_export_invalid_export_type(self):
@@ -607,6 +596,25 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['success'],False)
             self.assertEqual(response.status_code, 200)
 
+    def test_validate_export_stream_invalid(self):
+        """ensure export stream is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"export": {"configuration": [{"stream":"e e","enabled": True,
+                                                                        "property": [{"name": "endpoint",
+                                                                                      "value": "1"}],
+                                                                        "type": "elasticsearch"}]}},
+                                    headers=headers)
+            value = response.json()
+            self.assertEqual(value['success'],False)
+            self.assertEqual(response.status_code, 200)
+
     def test_validate_export_property_value_empty(self):
         """ensure property value is not empty"""
         response = requests.get(__db_url__)
@@ -622,6 +630,65 @@ class UpdateDeployment(Deployment):
                                                                       "property":[{"name":"test"}]}]}}, headers=headers)
             value = response.json()
             self.assertEqual(value['success'],False)
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_export_extra_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"export": {"configuration": [{"enabled":False,"type": "KAFKA", "extra": "extra",
+                                                                        "exportconnectorclass": "test",
+                                                                        "property":[{"name": "metadata.broker.list",
+                                                                                     "value": "1"}]}]}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['success'],False)
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_export_invalid_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"export": {"configuration": [{"enabled":True,
+                                                                      "property":[{"name":"test", "value": "2"}],
+                                                                        "stream": "test", "type": "elasticsearch"}]}},
+                                    headers=headers)
+            value = response.json()
+            self.assertEqual(value['status'], 'error')
+            self.assertEqual(value['error'], 'Export: Default property(endpoint) of elasticsearch not present.')
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_export_duplicate_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"export": {"configuration": [{"enabled": True,
+                                                                        "property": [{"name": "endpoint", "value": "2"},
+                                                                                     {"name": "endpoint", "value": "2"}
+                                                                                     ],
+                                                                        "stream": "test", "type": "elasticsearch"},
+                                                                       ]}},
+                                    headers=headers)
+            value = response.json()
+            self.assertEqual(value['status'], 'error')
+            self.assertEqual(value['error'], 'Export: Duplicate properties are not allowed.')
             self.assertEqual(response.status_code, 200)
 
     def test_validate_import_invalid_export_type(self):
@@ -675,6 +742,61 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['success'],False)
             self.assertEqual(response.status_code, 200)
 
+    def test_validate_import_extra_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"import": {"configuration": [{"enabled":False,"type":"KAFKA",
+                                                                      "format":"test", "extra": "extra",
+                                                                      "property":[{"name":"metadata.broker.list",
+                                                                                   "value": "2"}
+                                                                                  ]}]}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['success'],False)
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_import_property(self):
+        """ensure property value is not empty"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json={"import":{"configuration":
+                                                        [{"enabled": True,
+                                                          "format": "2",
+                                                          "module": "",
+                                                          "property":
+                                                              [{"name": "metadata.brokerd.list","value": "2"}],
+                                                          "type": "kafka"}]}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['status'], 'error')
+            self.assertEqual(value['error'], 'Import: Default property(metadata.broker.list) of kafka not present.')
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_no_additional_property(self):
+        """ensure no additional properties are inserted"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'id': 2, "extraproperty":"extra"}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['errors'][0], "Additional properties are not allowed (u'extraproperty' was unexpected)")
+            self.assertEqual(response.status_code, 200)
+
     def test_validate_dr_id_empty(self):
         """ensure dr id  is not empty"""
         response = requests.get(__db_url__)
@@ -687,6 +809,20 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url, json={'dr': {'id': ''}}, headers=headers)
             value = response.json()
             self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_no_id(self):
+        """ensure id is required field"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'port': 22}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['error'], "DR id is required.")
             self.assertEqual(response.status_code, 200)
 
     def test_validate_dr_id_negative(self):
@@ -762,17 +898,17 @@ class UpdateDeployment(Deployment):
                                    "query": {"timeout": 0},
                                    "resourcemonitor": {"memorylimit": {"size": "1"},
                                                        "disklimit": {"feature": [
-                                                           {"name": "SNAPSHOTS", "size": "2"},
-                                                           {"name": "COMMANDLOG", "size": "2"}],
+                                                           {"name": "snapshots", "size": "2"},
+                                                           {"name": "commandlog", "size": "2"}],
                                                            "size": "10"},
                                                        "frequency": 5}},
                 "security": {"enabled": False, "provider": "HASH"},
                 "export":{"configuration":[{"enabled":False,
                                             "type": "kafka", "exportconnectorclass":"test",
-                                            "stream": "test", "property":[{"name": "test",
+                                            "stream": "test", "property":[{"name": "metadata.broker.list",
                                                                            "value": "test"}]}]},
                 "import": {"configuration": [{"enabled":False,"type":"kafka", "module": "test", "format": "test",
-                                                                      "property":[{"name":"test","value":"test"}]}]},
+                                                                      "property":[{"name":"metadata.broker.list","value":"test"}]}]},
                 # "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": []}}
             }
             headers = {'Content-Type': 'application/json; charset=UTF-8'}

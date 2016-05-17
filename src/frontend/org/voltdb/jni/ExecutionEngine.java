@@ -61,13 +61,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         SET_DR_SEQUENCE_NUMBERS(2),
         SET_DR_PROTOCOL_VERSION(3),
         SP_JAVA_GET_DRID_TRACKER(4),
-        SET_DRID_TRACKER(5);
+        SET_DRID_TRACKER(5),
+        GENERATE_DR_EVENT(6);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
         }
 
         public final int taskId;
+    }
+
+    // keep sync with DREventType in ee/src/common/types.h
+    public static enum EventType {
+        NOT_A_EVENT(0),
+        POISON_PILL(1),
+        CATALOG_UPDATE(2);
+
+        private EventType(int typeId) {
+            this.typeId = typeId;
+        }
+
+        public final int typeId;
     }
 
     // is the execution site dirty

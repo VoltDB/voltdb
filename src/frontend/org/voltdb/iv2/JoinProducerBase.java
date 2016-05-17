@@ -175,10 +175,11 @@ public abstract class JoinProducerBase extends SiteTasker {
                                    Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                    Map<Integer, Long> drSequenceNumbers,
                                    Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
-                                   boolean requireExistingSequenceNumbers)
+                                   boolean requireExistingSequenceNumbers,
+                                   long clusterCreateTime)
     {
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers,
-                allConsumerSiteTrackers, requireExistingSequenceNumbers);
+                allConsumerSiteTrackers, requireExistingSequenceNumbers, clusterCreateTime);
     }
 
     protected void registerSnapshotMonitor(String nonce) {

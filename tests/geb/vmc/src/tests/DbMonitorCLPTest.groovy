@@ -323,7 +323,7 @@ class DbMonitorCLPTest extends TestBase {
             waitFor(waitTime) { page.isCmdLogSectionOpen() }
         } catch(geb.waiting.WaitTimeoutException e) {
         }
-        
+
         if(!page.isCmdLogSectionOpen()) {
             println("CLP section is not present")
             isCLPOpen = false

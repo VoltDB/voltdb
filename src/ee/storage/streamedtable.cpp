@@ -183,7 +183,7 @@ TableIterator* StreamedTable::makeIterator() {
                                   "May not iterate a streamed table.");
 }
 
-void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
+void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not delete all tuples of a streamed"
