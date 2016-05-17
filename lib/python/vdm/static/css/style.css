@@ -270,6 +270,11 @@ label.ccErrorMsg {
 	background-position: 0 -233px;
 	display: inline-block;
 }
+.uploadOkBtn{
+    width: 8px;
+	height: 22px;
+	display: inline-block;
+}
 .downloadIcon {
 	width: 30px;
 	height: 22px;
@@ -358,7 +363,7 @@ label.ccErrorMsg {
 	cursor: pointer;
 }
 .btn {
-	background-color: #aa1f2f;
+	background-color: #76BD1D;
 	cursor: pointer;
 	padding: 8px 10px;
 	text-align: center;
@@ -382,13 +387,14 @@ label.ccErrorMsg {
 	border: none;
 }
 .saveBtn {
-	background-color: #c70000;
-	color: #FFF;
-}
-.saveBtn:hover, .btn:hover {
 	background-color: #76BD1D;
 	color: #FFF;
 }
+.saveBtn:hover, .btn:hover {
+	background-color: #aa1f2f;
+	color: #FFF;
+}
+
 .overlay-title {
 	background: #fbfbfb;
 	height: 42px;
@@ -778,11 +784,26 @@ ul.addServerList li:nth-child(1) {
 	margin-left: 5px;
 	overflow-x: hidden;
 }
+
+#upload-file-btn-ok {
+    background: none repeat scroll 0 0 #76BD1D;
+    color: #FFFFFF;
+    text-align:center;
+
+}
+#upload-file-btn-Cancel{text-align:center; color: #FFFFFF; background-color:#999;}
+
+#upload-file-btn-ok:hover, #upload-file-btn-Cancel:hover {
+	background-color: #aa1f2f;
+	color: #FFF;
+}
+
 .rightSide .chooseFile {
 	padding: 6px 0 6px 10px;
 }
 .rightSide .downloadConfig {padding:0 0 5px 0;}
 .rightSide .downloadConfig a {padding:0 10px 0 0; display:block;}
+.uploadCancel {display:none;margin-right:10px}
 .main {
 	background-color: #FFFFFF;
 	margin-top: 20px;
