@@ -3,6 +3,9 @@
 ///
 ///
 
+using std::isinf;
+using std::isnan;
+
 #include "s2geo/util/math/mathlimits.h"
 
 #include "s2geo/base/integral_types.h"
