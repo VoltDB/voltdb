@@ -1,0 +1,107 @@
+show classes;
+
+-- Expect to fail because the jar has not been loaded yet.
+create procedure from class sqlcmdtest.Trivial;
+show procedures;
+
+-- Expect to fail as Breakable should have failed proc creation.
+exec Trivial;
+
+-- This succeeds in spite of how the jar has been sabotaged by dropping
+-- dependent classes. For better or worse, the corruption is only detected
+-- upon exec unless classes have missing STATIC dependencies.
+load classes sqlcmdtest-sabotaged-procs.jar;
+show classes;
+
+show procedures;
+
+create procedure from class sqlcmdtest.Trivial;
+show procedures;
+show classes;
+
+exec Trivial;
+
+-- Expect to fail because of failure to "redefine" the Trivial proc with its
+-- underlying class removed. The error message could be better here.
+remove classes sqlcmdtest.*;
+show classes;
+
+exec Trivial;
+
+drop procedure Trivial;
+
+-- expect to succeed.
+remove classes sqlcmdtest.*;
+
+-- expect to fail now that class has been successfully removed
+create procedure from class sqlcmdtest.Trivial;
+
+list proc;
+
+list classes;
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+show classes;
+
+-- This succeeds in spite of how the jar has been sabotaged by dropping
+-- dependent classes. For better or worse, the corruption is only detected
+-- upon exec unless classes have missing STATIC dependencies.
+create procedure from class sqlcmdtest.Breakable0;
+show procedures;
+show classes;
+
+-- Expect to fail because the jar has been sabotaged by dropping dependent classes
+exec Breakable0;
+
+-- Expect to succeed.
+create procedure from class sqlcmdtest.Trivial;
+exec Trivial;
+
+drop procedure Trivial;
+
+drop procedure Breakable0;
+
+show proc;
+
+remove classes sqlcmdtest.*;
+
+show classes;
+
+-- Expect to fail because the jar has been killed by dropping a statically
+-- dependent class.
+load classes sqlcmdtest-killed-procs.jar;
+show classes;
+
+--
+-- Repeat a block of tests to show no permanent damage to the server process
+-- or class loader.
+--
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+show classes;
+
+-- This succeeds in spite of how the jar has been sabotaged by dropping
+-- dependent classes. For better or worse, the corruption is only detected
+-- upon exec unless classes have missing STATIC dependencies.
+create procedure from class sqlcmdtest.Breakable0;
+show procedures;
+show classes;
+
+-- Expect to fail because the jar has been sabotaged by dropping dependent classes
+exec Breakable0;
+
+-- Expect to succeed.
+create procedure from class sqlcmdtest.Trivial;
+exec Trivial;
+
+drop procedure Trivial;
+
+drop procedure Breakable0;
+
+show proc;
+
+remove classes sqlcmdtest.*;
+
+show classes;
+
+
