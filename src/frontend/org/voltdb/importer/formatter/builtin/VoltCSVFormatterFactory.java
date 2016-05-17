@@ -27,13 +27,13 @@ public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
     @Override
     public Formatter<String> create() {
-        if(IsSuperCSVConfigured()){
+        if(useSuperCsv()){
             return new VoltSuperCSVFormatter(m_formatName, m_formatProps);
         }
         return  new VoltCSVFormatter(m_formatName, m_formatProps);
     }
 
-    private boolean IsSuperCSVConfigured(){
+    private boolean useSuperCsv(){
 
         for(String prop : SUPER_CVS_PROPS){
             if(m_formatProps.containsKey(prop)) return true;
