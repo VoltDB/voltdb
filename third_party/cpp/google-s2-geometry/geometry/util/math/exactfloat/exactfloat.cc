@@ -10,8 +10,11 @@ using std::min;
 using std::max;
 using std::swap;
 using std::reverse;
-using std::isnan;
+
+#if __cplusplus >= 201103L
 using std::isinf;
+using std::isnan;
+#endif
 
 #include <limits>
 using std::numeric_limits;
