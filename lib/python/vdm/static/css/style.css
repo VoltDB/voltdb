@@ -567,8 +567,10 @@ table td.tdROle label.error {
 .startSelect {
 	margin: 0 auto;
 	padding: 75px 0 0 0;
+
 }
-.startSelect span { position:relative; top:2px;}
+.startSelect input[type="checkbox"] {cursor:pointer;}
+.startSelect label { position:relative; top:2px; cursor:pointer; font-weight:normal; }
 .startSelect >.form-control {
 	height: 45px;
 	border-radius: 5px;
@@ -1594,6 +1596,9 @@ select {
 }
 .startFail, .stalledState { padding:15px;}
 .startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0; width:100%;}
+.redcData {color: #ff0000; padding-right:5px; font-size:25px;}
+.warningData {color: #ff0000;font-size: 15px;}
+.warningTxtData { position:relative; top:20px; font-weight:bold; }
 /**************Button start/Stop ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
