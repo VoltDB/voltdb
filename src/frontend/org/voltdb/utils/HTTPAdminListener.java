@@ -85,6 +85,7 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 
 public class HTTPAdminListener {
 
@@ -988,7 +989,7 @@ public class HTTPAdminListener {
             }
             if (StringUtils.isBlank(value) && throwForNull) {
                     throw new IllegalArgumentException(
-                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property");
+                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
             } else {
                 return value;
             }
@@ -1024,11 +1025,14 @@ public class HTTPAdminListener {
         HttpConfiguration httpsConfig = new HttpConfiguration();
         httpsConfig.setSecureScheme("https");
         httpsConfig.setSecurePort(port);
+        //Add this customizer to indicate we are in https land
+        httpsConfig.addCustomizer(new SecureRequestCustomizer());
+        HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
 
         // SSL Connector
         ServerConnector connector = new ServerConnector(m_server,
             new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
-            new HttpConnectionFactory(httpsConfig));
+            factory);
         if (intf != null && intf.length() > 0) {
             connector.setHost(intf);
         }

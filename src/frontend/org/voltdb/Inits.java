@@ -473,10 +473,10 @@ public class Inits {
 
             boolean success = false;
             int httpPort = httpPortStart;
+            HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
+                    m_deployment.getHttpd().getHttps() : null;
             for (; true; httpPort++) {
                 try {
-                    HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
-                            m_deployment.getHttpd().getHttps() : null;
                     m_rvdb.m_adminListener = new HTTPAdminListener(
                             m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
                             );
@@ -484,7 +484,11 @@ public class Inits {
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        if (httpsType!=null || httpsType.isEnabled()) {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
+                        } else {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        }
                         System.exit(-1);
                     }
                 }
