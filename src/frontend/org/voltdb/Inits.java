@@ -484,7 +484,7 @@ public class Inits {
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        if (httpsType!=null || httpsType.isEnabled()) {
+                        if (httpsType != null && httpsType.isEnabled()) {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
                         } else {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
