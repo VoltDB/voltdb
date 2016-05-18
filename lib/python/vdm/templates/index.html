@@ -59,12 +59,8 @@
       <a href="javaScript:void(0);" id="btnStartCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
       <!--<a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>-->
       
-       <div class="form-group startSelect">
-        <select id="startOption" class="form-control">
-        <option value="1">Create new</option>
-        <option value="2">Recover existing</option>
-       
-        </select>
+       <div class="startSelect">
+        <input type="checkbox" id="startOption"> <span>Overwrite data from previous sessions</span>
         </div>
     <div class="clear"></div>
       </div>
@@ -1232,6 +1228,27 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Disk Limit End-->
+
+<!-- Overwrite data confirmation during starting database-->
+<div id="overwriteConfirmation" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Overwrite data</h4>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure to overwrite existing data?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="btnOverwriteYes" data-dismiss="modal">Yes</button>
+        <button type="button" class="btn btn-gray" id="btnOverwriteNo" data-dismiss="modal">No</button>
+
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="loader" ></div>
 </div>

@@ -565,11 +565,10 @@ table td.tdROle label.error {
 	min-height: 266px;
 }
 .startSelect {
-	width: 160px;
-	height: 100px;
 	margin: 0 auto;
-	padding: 20px 0 0 0;
+	padding: 75px 0 0 0;
 }
+.startSelect span { position:relative; top:2px;}
 .startSelect >.form-control {
 	height: 45px;
 	border-radius: 5px;
@@ -1601,6 +1600,7 @@ select {
 .form-horizontal .control-label {
 	padding-top: 3px;
 }
+
 }
 @media (max-width: 767px) {
 ul.nav li a {
@@ -1641,6 +1641,7 @@ ul.nav li:nth-child(1) {
 	margin: 0 93px 0 0;
 }
 .clusterStartStop {border-bottom: 1px solid #CCC; border-right:0;}
+
 }
 @media (max-width: 991px) {
 .clusterConfigLeft {
@@ -1653,7 +1654,9 @@ ul.nav li:nth-child(1) {
 	margin: 20% auto;
 	width: 80%;
 }
+
 }
+
 @media (min-width: 320px) and (max-width: 360px) {
 .headerAdminContent { width:auto; overflow:auto;}
 .drAdminHeaderRight { width:10px;}
@@ -1669,6 +1672,7 @@ ul.drList {
 	float: none;
 	top: 0;
 }
+.startSelect { padding-top:95px;}
 }
 @media (min-width: 320px) and (max-width: 420px) {
 .directories { width:420px; }
@@ -1743,6 +1747,7 @@ ul.drList {
 .overlayWrapper {
 	width: 95.9%;
 }
+.startSelect { padding-top:105px;}
 }
 .ui-menu {
 	z-index: 9999;
