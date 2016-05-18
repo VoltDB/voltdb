@@ -57,10 +57,6 @@ CopyOnWriteIterator::CopyOnWriteIterator(
  * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
  */
 bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
-    if (m_currentBlock == NULL) {
-        return false;
-    }
-
     /**
      * Find out which block the address is contained in. Lower bound returns the first entry
      * in the index >= the address. Unless the address happens to be equal then the block
