@@ -51,6 +51,7 @@ import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
 import org.voltcore.logging.Level;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
@@ -657,7 +658,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            if (!m_dontCommit.get()) {
+            if (!m_dontCommit.get() && response.getStatus() != ClientResponseImpl.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
         }
