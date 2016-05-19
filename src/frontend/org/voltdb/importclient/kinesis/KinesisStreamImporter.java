@@ -17,10 +17,10 @@
 
 package org.voltdb.importclient.kinesis;
 
-import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -166,7 +166,7 @@ public class KinesisStreamImporter extends AbstractImporter {
             }
 
             BigInteger seq = BigInteger.ZERO;
-            m_gapTracker.allocate(records.getRecords().size());
+            m_gapTracker.resetTo();
             int offset = 0;
             for (Record record : records.getRecords()) {
                 m_submitCount.incrementAndGet();
@@ -299,7 +299,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         long s = -1L;
         long[] lag;
         final int lagLen;
-        BigInteger[] chceckpoints;
+        BigInteger[] checkpoints;
         long offer = -1L;
         private final long gapTrackerCheckMaxTimeMs = 2_000;
 
@@ -308,11 +308,15 @@ public class KinesisStreamImporter extends AbstractImporter {
                 throw new IllegalArgumentException("leeways is zero or negative");
             }
             lagLen = leeway;
+            checkpoints = new BigInteger[(int)m_config.getMaxReadBatchSize()];
         }
 
-        synchronized void allocate(int capacity) {
+        synchronized void resetTo() {
 
-            chceckpoints = (BigInteger[]) Array.newInstance(BigInteger.class, capacity);
+            //reset this to take new checkpoints. The offsets after checkpoint commit are not relevant anymore
+            Arrays.fill(checkpoints, null);
+
+            //The offset is the index among the fetched records.
             c = 0;
             s = -1L;
             lag = new long[lagLen];
@@ -320,7 +324,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         synchronized void submit(long offset, BigInteger v) {
 
-            if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] != null) {
+            if (!validateOffset((int) offset) || v == null || checkpoints[(int) offset] != null) {
                 return;
             }
 
@@ -342,7 +346,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 s = offset;
             }
 
-            chceckpoints[(int) offset] = v;
+            checkpoints[(int) offset] = v;
         }
 
         private final int idx(long offset) {
@@ -351,11 +355,11 @@ public class KinesisStreamImporter extends AbstractImporter {
 
         synchronized void commit(long offset, BigInteger v) {
 
-            if (!validateOffset((int) offset) || v == null || chceckpoints[(int) offset] == null) {
+            if (!validateOffset((int) offset) || v == null || checkpoints[(int) offset] == null) {
                 return;
             }
 
-            if (offset <= s && offset > c && v.equals(chceckpoints[(int) offset])) {
+            if (offset <= s && offset > c && v.equals(checkpoints[(int) offset])) {
                 int ggap = (int) Math.min(lagLen, offset - c);
                 if (ggap == lagLen) {
                     c = offset - lagLen + 1;
@@ -374,11 +378,14 @@ public class KinesisStreamImporter extends AbstractImporter {
         }
 
         synchronized BigInteger getSafeCommitPoint() {
-            return chceckpoints[(int) c];
+            if(checkpoints != null && validateOffset((int) c)){
+                 return checkpoints[(int) c];
+            }
+            return null;
         }
 
         private boolean validateOffset(int offset) {
-            return (offset >= 0 && offset < chceckpoints.length);
+            return (offset >= 0 && offset < checkpoints.length);
         }
     }
 }
