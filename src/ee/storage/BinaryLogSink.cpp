@@ -32,6 +32,7 @@
 #include "storage/temptable.h"
 
 #include "catalog/database.h"
+#include "catalog/cluster.h"
 
 #include<boost/unordered_map.hpp>
 #include<boost/unordered_set.hpp>
@@ -50,11 +51,13 @@ const static int DR_LOG_ACTION_COLUMN_INDEX = 1;
 const static int DR_CONFLICT_COLUMN_INDEX = 2;
 const static int DR_CONFLICTS_ON_PK_COLUMN_INDEX = 3;
 const static int DR_ACTION_DECISION_COLUMN_INDEX = 4;
-const static int DR_CLUSTER_ID_COLUMN_INDEX = 5;
-const static int DR_TIMESTAMP_COLUMN_INDEX = 6;
+const static int DR_REMOTE_CLUSTER_ID_COLUMN_INDEX = 5;
+const static int DR_REMOTE_TIMESTAMP_COLUMN_INDEX = 6;
 const static int DR_DIVERGENCE_COLUMN_INDEX = 7;
 const static int DR_TABLE_NAME_COLUMN_INDEX = 8;
-const static int DR_TUPLE_COLUMN_INDEX = 9;
+const static int DR_CLUSTER_ID_GET_CONFLICT_COLUMN_INDEX = 9;
+const static int DR_CONFLICT_TIMESTAMP_COLUMN_INDEX = 10;
+const static int DR_TUPLE_COLUMN_INDEX = 11;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
@@ -206,17 +209,25 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
  */
 void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
         DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
-    TableTuple tempMetaTuple = outputMetaTable->tempTuple();
+    assert(ExecutorContext::getExecutorContext() != NULL);
+
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+    int32_t localClusterId = ExecutorContext::getExecutorContext()->drClusterId();
+    int64_t localTimestamp = ExecutorContext::getExecutorContext()->currentUniqueId() >> 14;
+    int64_t localTsCounter = UniqueId::tsCounterSinceUnixEpoch(localTimestamp & UniqueId::TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
+    TableTuple tempMetaTuple = outputMetaTable->tempTuple();
+
     tempMetaTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictRowTypeStr(rowType)));
     tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRRecordTypeStr(actionType)));
     tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictTypeStr(conflictType)));
     tempMetaTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
     tempMetaTuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDecisionStr(REJECT)));
-    tempMetaTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));
-    tempMetaTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));
+    tempMetaTuple.setNValue(DR_REMOTE_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));
+    tempMetaTuple.setNValue(DR_REMOTE_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));
     tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDivergenceStr(NOT_DIVERGE)));
     tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
+    tempMetaTuple.setNValue(DR_CLUSTER_ID_GET_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(localClusterId));
+    tempMetaTuple.setNValue(DR_CONFLICT_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(localTsCounter));
     tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getNullStringValue());
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
     outputMetaTable->insertTupleNonVirtualWithDeepCopy(tempMetaTuple, pool);
@@ -296,7 +307,6 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
             createConflictExportTuple(existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
                     drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
         }
-
     }
     if (expectedTuple) {
         expectedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));

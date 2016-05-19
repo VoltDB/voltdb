@@ -122,7 +122,7 @@ class ExecutorContext {
 
     static int64_t getDRTimestampFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return UniqueId::tsCounterSinceUnixEpoch(hiddenValue & ((1LL << 49) - 1LL));
+        return UniqueId::tsCounterSinceUnixEpoch(hiddenValue & UniqueId::TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
     }
 
     static int8_t getClusterIdFromHiddenNValue(const NValue &value) {
@@ -168,6 +168,11 @@ class ExecutorContext {
     /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
         return m_currentTxnTimestamp;
+    }
+
+    /** DR cluster id for the local cluster */
+    int32_t drClusterId() {
+        return m_drClusterId;
     }
 
     /** Last committed transaction known to this EE */

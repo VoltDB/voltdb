@@ -146,6 +146,8 @@ public class DDLCompiler {
     public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
     public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";
     public static String DR_TABLE_NAME_COLUMN_NAME = "TABLE_NAME";
+    public static String DR_CLUSTER_ID_GET_CONFLICT_COLUMN_NAME = "CLUSTER_ID_GET_CONFLICT";
+    public static String DR_CONFLICT_TIMESTAMP_COLUMN_NAME = "CONFLICT_TIMESTAMP";
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
@@ -159,6 +161,8 @@ public class DDLCompiler {
         {DR_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_DIVERGENCE_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024 BYTES)"},
+        {DR_CLUSTER_ID_GET_CONFLICT_COLUMN_NAME, "TINYINT NOT NULL"},
+        {DR_CONFLICT_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
 
