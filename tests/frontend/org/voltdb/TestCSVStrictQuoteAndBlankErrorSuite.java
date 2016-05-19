@@ -66,7 +66,7 @@ public class TestCSVStrictQuoteAndBlankErrorSuite extends TestCSVFormatterSuiteB
 
     static public junit.framework.Test suite() throws Exception {
         Properties formatConfig = new Properties();
-        formatConfig.setProperty("custom.null.string", "test");
+        formatConfig.setProperty("nullstring", "test");
         formatConfig.setProperty("separator", ",");
         formatConfig.setProperty("blank", "error");
         formatConfig.setProperty("escape", "\\");

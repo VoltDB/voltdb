@@ -22,8 +22,7 @@ import org.voltdb.importer.formatter.Formatter;
 
 public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
-    public static final String[]  SUPER_CVS_PROPS = {"surrounding.spaces.need.quotes","nowhitespace","blank",
-                "custom.null.string"};
+    public static final String[]  SUPER_CVS_PROPS = {"trimunquoted","nowhitespace","blank","nullstring"};
 
     @Override
     public Formatter<String> create() {
