@@ -69,6 +69,7 @@ bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
         return false;
     }
 
+    assert(m_currentBlock != NULL);
     /**
      * Now check where this is relative to the COWIterator.
      */
