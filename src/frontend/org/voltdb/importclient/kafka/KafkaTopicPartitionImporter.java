@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
@@ -117,13 +118,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                     }
                 } catch (Exception e) {
-                    rateLimitedLog(Level.ERROR, e, "Error in finding leader for " + m_topicAndPartition);
+                    rateLimitedLog(Level.WARN, e, "Error in finding leader for " + m_topicAndPartition);
                 } finally {
                     KafkaStreamImporterConfig.closeConsumer(consumer);
                 }
             }
         if (returnMetaData == null) {
-            rateLimitedLog(Level.ERROR, null, "Failed to find Leader for " + m_topicAndPartition);
+            rateLimitedLog(Level.WARN, null, "Failed to find Leader for " + m_topicAndPartition);
         }
         return returnMetaData;
     }
@@ -149,7 +150,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             }
         }
         //Unable to find return null for recheck.
-        rateLimitedLog(Level.ERROR, null, "Failed to find new leader for " + m_topicAndPartition);
+        rateLimitedLog(Level.WARN, null, "Failed to find new leader for " + m_topicAndPartition);
         return null;
     }
 
@@ -289,7 +290,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             fault = e;
         }
         if (fault != null) {
-            rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            rateLimitedLog(Level.WARN, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             rsp = null;
         }
         return rsp;
@@ -338,7 +339,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         HostAndPort leaderBroker = findNewLeader();
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
-            rateLimitedLog(Level.ERROR, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
+            rateLimitedLog(Level.WARN, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
             leaderBroker = m_config.getPartitionLeader();
         } else {
             if (!leaderBroker.equals(m_config.getPartitionLeader())) {
@@ -403,7 +404,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         continue;
                     }
                 } catch (Exception ex) {
-                    rateLimitedLog(Level.ERROR, ex, "Failed to fetch from " +  m_topicAndPartition);
+                    rateLimitedLog(Level.WARN, ex, "Failed to fetch from " +  m_topicAndPartition);
                     //See if its network error and find new leader for this partition.
                     if (ex instanceof IOException) {
                         resetLeader();
@@ -453,7 +454,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                                m_gapTracker.commit(currentOffset);
                          }
                      } catch (FormatException e){
-                        rateLimitedLog(Level.ERROR, e, "Failed to tranform data: %s" ,line);
+                        rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
                         messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);
                     }
@@ -657,7 +658,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         public void clientCallback(ClientResponse response) throws Exception {
 
             m_cbcnt.incrementAndGet();
-            if (!m_dontCommit.get()) {
+            if (!m_dontCommit.get() && response.getStatus() != ClientResponseImpl.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
         }

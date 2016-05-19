@@ -298,7 +298,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         if (consumer != null) try {
             consumer.close();
         } catch (Exception e) {
-            m_logger.error("Failed to close consumer connection.", e);
+            m_logger.warn("Failed to close consumer connection.", e);
         }
     }
 
