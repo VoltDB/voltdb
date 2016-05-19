@@ -1929,7 +1929,11 @@ public abstract class CatalogUtil {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
-        cluster.setHttpdportno(httpd.getPort());
+        int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
+        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+            defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
+        }
+        cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 

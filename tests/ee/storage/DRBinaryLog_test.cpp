@@ -1994,7 +1994,12 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
     ASSERT_TRUE(false);
 }
 
+// This test doesn't run in the memcheck build because the tuple block can only
+// hold one tuple at a time, so it will never trigger the optimized truncation
+// path. The normal truncation path will fail because we don't have a catalog
+// loaded.
 TEST_F(DRBinaryLogTest, TruncateTable) {
+#ifndef MEMCHECK
     createIndexes();
     const int total = 150;
     int spHandle = 1;
@@ -2016,6 +2021,7 @@ TEST_F(DRBinaryLogTest, TruncateTable) {
     flushAndApply(spHandle);
     EXPECT_EQ(0, m_table->activeTupleCount());
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
+#endif
 }
 
 TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {

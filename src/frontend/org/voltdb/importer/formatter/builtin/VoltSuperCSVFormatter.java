@@ -84,10 +84,10 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
         }
 
         m_strictquotes = "true".equalsIgnoreCase(prop.getProperty("strictquotes", ""));
-        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("surrounding.spaces.need.quotes", ""));
+        m_surroundingSpacesNeedQuotes = "true".equalsIgnoreCase(prop.getProperty("trimunquoted", ""));
         m_blank = prop.getProperty("blank", "").trim();
 
-        m_customNullString = prop.getProperty("custom.null.string", "").trim();
+        m_customNullString = prop.getProperty("nullstring", "").trim();
         if (!m_customNullString.isEmpty() && !"error".equals(m_blank)) {
             m_blank = "empty";
         }

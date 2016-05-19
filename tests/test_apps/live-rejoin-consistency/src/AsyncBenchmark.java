@@ -212,7 +212,7 @@ public class AsyncBenchmark {
                 int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                log.error(_F("Connection to %s:%d was lost.\n", hostname,
+                log.warn(_F("Connection to %s:%d was lost.\n", hostname,
                         port));
             }
         }
@@ -261,7 +261,7 @@ public class AsyncBenchmark {
         Signal.handle(new Signal("TERM"), new SignalHandler() {
             public void handle(Signal sig) {
 
-                log.error("Received SIGTERM signal. Will teardown.");
+                log.warn("Received SIGTERM signal. Will teardown.");
                 // stop run, it will clean up
                 runBenchmark = false;
                 timer.cancel();
@@ -271,7 +271,7 @@ public class AsyncBenchmark {
         Signal.handle(new Signal("INT"), new SignalHandler() {
             public void handle(Signal sig) {
 
-                log.error("Received SIGINT signal. Will teardown.");
+                log.warn("Received SIGINT signal. Will teardown.");
                 // stop run, it will clean up
                 runBenchmark = false;
                 timer.cancel();
@@ -580,7 +580,7 @@ public class AsyncBenchmark {
                     // this runs as a synchronous tx (for now)
                     log.info(_F("updateapplicationcatalog %d...\n", lastCatalog));
                     // create catalog
-                    String catPath = "/home/prosegay/branches/ENG-3884/voltdb/tests/test_apps/live-rejoin-consistency";
+                    String catPath = ".";
                     File catalog_files[] = { new File(catPath + "/LiveRejoinConsistency.jar"),
                             new File(catPath + "/LiveRejoinConsistency2.jar") };
                     File file2 = new File(catPath + "/deployment.xml");
@@ -697,12 +697,12 @@ public class AsyncBenchmark {
             }
             catch (InterruptedException e) {
                 logStackTrace(e);
-                log.error(_F("Caught InterrruptedException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
+                log.warn(_F("Caught InterrruptedException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
                 //throw new RuntimeException(e);
             }
             catch (IOException e) {
                 logStackTrace(e);
-                log.error(_F("Caught IOException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
+                log.warn(_F("Caught IOException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
                 //throw new RuntimeException(e);
             }
             catch (Exception e) {
