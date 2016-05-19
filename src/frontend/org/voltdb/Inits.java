@@ -46,6 +46,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -472,16 +473,22 @@ public class Inits {
 
             boolean success = false;
             int httpPort = httpPortStart;
+            HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
+                    m_deployment.getHttpd().getHttps() : null;
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
                             );
                     success = true;
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        if (httpsType != null && httpsType.isEnabled()) {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
+                        } else {
+                            hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
+                        }
                         System.exit(-1);
                     }
                 }
@@ -508,8 +515,14 @@ public class Inits {
             // by the deployment.xml configuration.
             int httpPort = -1;
             m_rvdb.m_jsonEnabled = false;
+            boolean httpsEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                httpPort = m_deployment.getHttpd().getPort();
+                if (m_deployment.getHttpd().getHttps()!=null && m_deployment.getHttpd().getHttps().isEnabled()) {
+                    httpsEnabled = true;
+                }
+                httpPort = (m_deployment.getHttpd().getPort()==null) ?
+                        (httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
+                        m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getJsonapi() != null) {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }
@@ -520,7 +533,7 @@ public class Inits {
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
-                httpPort = VoltDB.DEFAULT_HTTP_PORT;
+                httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
                 setupHttpServer("", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {

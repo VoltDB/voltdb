@@ -74,7 +74,7 @@
     	<p>Starting.......</p>
     </div>    
     <div id="startSuccess" class="databaseRg" style="display:none;">
-    <a id="vmcLink" class="btn">Go to Management Center</a>
+    <a id="vmcLink" class="btn"><span class="glyphicon glyphicon-new-window" style="padding-right:5px;tr"></span>Go to Management Center</a>
     <p>Database Running</p>
     </div>
     <div id="stallFailed" class="stalledState"  style="display:none;">
@@ -192,17 +192,17 @@
             <span class="clustHeadText">Database Configuration</span></div>
             <div class="rightSide">
               <form id="upload-file" method="post" enctype="multipart/form-data">
-                <div class="leftSide upDownBtn chooseFile">
+                <div class="leftSide upDownBtn chooseFile" style="display:none">
                  <input id="file" name="file" type="file">
                 </div>
-                <!--<div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration-->
-                  <!--<input type="file" multiple>-->
-                  <!--</span> </div>-->
-                <div id="upload-file-btn" class="leftSide upDownBtn"><span class="uploadIcon" ></span> Upload Configuration</div>
-               <div class="leftSide upDownBtn downloadConfig">
-                <a id="downloadConfigurations" href="#" download="deployment.xml">
-                  <span class="downloadIcon" ></span>Download Configuration</a>
-                 </div>
+                <div id="upload-file-btn-ok" class="leftSide upDownBtn" style="display:none"><span class="uploadOkBtn" ></span> Ok</div>
+                <div id="upload-file-btn-Cancel" class="leftSide upDownBtn uploadCancel"><span class="uploadOkBtn" ></span> Cancel</div>
+                <div id="upload-file-btn" class="leftSide upDownBtn" style="display:none"><span class="uploadIcon" ></span> Upload Configuration</div>
+                <div class="leftSide upDownBtn downloadConfig">
+                  <a id="downloadConfigurations" href="#" download="deployment.xml">
+                    <span class="downloadIcon" ></span>Download Configuration
+                  </a>
+                </div>
               </form>
             </div>
             <!--<form id="upload-file" method="post" enctype="multipart/form-data">-->
