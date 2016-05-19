@@ -17,6 +17,8 @@
 
 package org.voltdb.importer.formatter.builtin;
 
+import java.util.Properties;
+
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.Formatter;
 
@@ -24,18 +26,19 @@ public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
     public static final String[]  SUPER_CVS_PROPS = {"trimunquoted","nowhitespace","blank","nullstring"};
 
+
     @Override
-    public Formatter<String> create() {
-        if(useSuperCsv()){
-            return new VoltSuperCSVFormatter(m_formatName, m_formatProps);
+    public Formatter<String> create(String formatName, Properties props) {
+        if(useSuperCsv(props)){
+            return new VoltSuperCSVFormatter(formatName, props);
         }
-        return  new VoltCSVFormatter(m_formatName, m_formatProps);
+        return  new VoltCSVFormatter(formatName, props);
     }
 
-    private boolean useSuperCsv(){
+    private boolean useSuperCsv(Properties props){
 
         for(String prop : SUPER_CVS_PROPS){
-            if(m_formatProps.containsKey(prop)) return true;
+            if(props.containsKey(prop)) return true;
         }
 
         return false;
