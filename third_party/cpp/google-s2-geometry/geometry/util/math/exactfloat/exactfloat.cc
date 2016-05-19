@@ -11,7 +11,14 @@ using std::max;
 using std::swap;
 using std::reverse;
 
-#if __cplusplus >= 201103L
+#if __GNUC__ > 4
+
+#define VALUE_TO_STRING(x) #x
+#define VALUE(x) VALUE_TO_STRING(x)
+#define VAR_NAME_VALUE(var) #var "="  VALUE(var)
+#pragma message(VAR_NAME_VALUE(__cplusplus))
+#pragma message(VAR_NAME_VALUE(__GNUC__))
+
 using std::isinf;
 using std::isnan;
 #endif
