@@ -24,7 +24,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 /**
  * ImporterConfig for server socket importer.
@@ -34,15 +34,12 @@ public class ServerSocketImporterConfig implements ImporterConfig
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
     private final URI m_resourceID;
-    private final AbstractFormatterFactory m_formatterFactory;
+    private final FormatterBuilder m_formatterBuilder;
     private final String m_procedure;
     private final int m_port;
     private final ServerSocket m_serverSocket;
-    private final Properties m_formatProps;
-    private final String m_formatName;
 
-
-    public ServerSocketImporterConfig(Properties props, AbstractFormatterFactory formatterFactory, String formatName, Properties formatProps)
+    public ServerSocketImporterConfig(Properties props, FormatterBuilder formatterBuilder)
     {
         Properties propsCopy = (Properties) props.clone();
 
@@ -73,21 +70,13 @@ public class ServerSocketImporterConfig implements ImporterConfig
             throw new RuntimeException(e);
         }
 
-        m_formatterFactory = formatterFactory;
-        m_formatProps = formatProps;
-        m_formatName = formatName;
+        m_formatterBuilder = formatterBuilder;
     }
 
     @Override
     public URI getResourceID()
     {
         return m_resourceID;
-    }
-
-    @Override
-    public AbstractFormatterFactory getFormatterFactory()
-    {
-        return m_formatterFactory;
     }
 
     public String getProcedure()
@@ -106,13 +95,8 @@ public class ServerSocketImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Properties getFormatterProperties() {
-        return m_formatProps;
-    }
-
-
-    @Override
-    public String getFormatterName() {
-        return m_formatName;
+    public FormatterBuilder getFormatterBuilder()
+    {
+        return m_formatterBuilder;
     }
 }

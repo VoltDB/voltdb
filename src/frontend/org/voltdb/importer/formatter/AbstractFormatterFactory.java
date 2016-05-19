@@ -28,14 +28,6 @@ import org.osgi.framework.BundleContext;
  */
 public abstract class AbstractFormatterFactory implements BundleActivator {
 
-    protected String m_formatName;
-    protected Properties m_formatProps;
-
-    public final void configureFormatterFactory(String formatName, Properties formatProps) {
-        m_formatName = formatName;
-        m_formatProps = formatProps;
-    }
-
     /**
      * Registers this as an OSGi service. At startup, the server will look
      * for this factory service within the configured importer bundles.
@@ -57,12 +49,4 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      * @return formatter instance created with the importer id
      */
     public abstract Formatter<?> create(String  formatName, Properties props);
-
-    /**
-     * construct a formatter
-     * @return formatter instance created with the name and properties
-     */
-    public Formatter<?> create() {
-        return create(m_formatName, m_formatProps);
-    }
 }

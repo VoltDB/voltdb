@@ -148,7 +148,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void initialize(InitializationInput initInput) {
 
             m_shardId = initInput.getShardId();
-            m_formatter = ((Formatter<String>) m_config.getFormatterFactory().create(m_config.getFormatterName(), m_config.getFormatterProperties()));
+            m_formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
 
             String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
             if (NumberUtils.isDigits(seq)) {
@@ -189,6 +189,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 try {
                     data = new String(record.getData().array(), StandardCharsets.UTF_8);
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
+
                     StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);
                     if (!callProcedure(invocation, cb)) {
                         rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);

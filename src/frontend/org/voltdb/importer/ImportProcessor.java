@@ -37,7 +37,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -77,8 +77,8 @@ public class ImportProcessor implements ImportDataProcessor {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props, String formatName, Properties formatProp, AbstractFormatterFactory formatterFactory) {
-            m_importerTypeMgr.configure(props, formatName, formatProp, formatterFactory);
+        public void configure(Properties props, FormatterBuilder formatterBuilder) {
+            m_importerTypeMgr.configure(props, formatterBuilder);
         }
 
         public void stop() {
@@ -98,14 +98,13 @@ public class ImportProcessor implements ImportDataProcessor {
 
     public void addProcessorConfig(ImportConfiguration config) {
         Properties properties = config.getmoduleProperties();
-        Properties formatProp = config.getformatterProperties();
 
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
         String moduleType = attrs[0];
 
-        AbstractFormatterFactory formatterFactory = config.getFormatterFactory();
+        FormatterBuilder formatterBuilder = config.getFormatterBuilder();
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
             if (wrapper == null) {
@@ -141,7 +140,7 @@ public class ImportProcessor implements ImportDataProcessor {
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             }
-            wrapper.configure(properties, config.getFormatName(), formatProp, formatterFactory);
+            wrapper.configure(properties, formatterBuilder);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);

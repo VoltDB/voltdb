@@ -42,6 +42,7 @@ import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 import com.google_voltpatches.common.base.Function;
@@ -62,6 +63,7 @@ public class TestVoltCSVFormatter extends TestCase {
         }
     };
 
+    @Override
     @Before
     public void setUp() throws Exception {
         List<String> packages = ImmutableList.<String>builder()
@@ -102,8 +104,9 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12,10.05,test");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -117,8 +120,9 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        o.configureFormatterFactory("tsv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("tsv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12\t10.05\ttest");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -132,9 +136,10 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        o.configureFormatterFactory("badformat", prop);
+        FormatterBuilder builder = new FormatterBuilder("badformat", prop);
+        builder.setFormatterFactory(o);
         try {
-            o.create();
+            builder.create();
             fail();
         } catch (RuntimeException e) {
         }
@@ -146,8 +151,9 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform(null);
         assertNull(results);
     }
@@ -158,8 +164,9 @@ public class TestVoltCSVFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         try {
             formatter.transform(12345);
             fail();
@@ -174,8 +181,9 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("quotechar", "'");
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12,'10.05,test'");
         assertEquals(results.length, 2);
         assertEquals(results[0], "12");
@@ -189,8 +197,9 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("escape", "|");
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12,\"10.05,|\"test|\"\"");
         assertEquals(results.length, 2);
         assertEquals(results[0], "12");
@@ -204,8 +213,9 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("strictquotes", "true");
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("\"12\",\"10.05\",t\"es\"t");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -220,8 +230,9 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("ignoreleadingwhitespace", "false");
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12,10.05,  test");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -236,8 +247,9 @@ public class TestVoltCSVFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("separator", "の");
-        o.configureFormatterFactory("csv", prop);
-        Formatter formatter = o.create();
+        FormatterBuilder builder = new FormatterBuilder("csv", prop);
+        builder.setFormatterFactory(o);
+        Formatter formatter = builder.create();
         Object[] results = formatter.transform("12の10.05のtest");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -245,6 +257,7 @@ public class TestVoltCSVFormatter extends TestCase {
         assertEquals(results[2], "test");
     }
 
+    @Override
     @After
     public void tearDown() throws Exception {
         m_bundle.stop();

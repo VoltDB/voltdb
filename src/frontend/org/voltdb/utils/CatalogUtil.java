@@ -124,6 +124,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -1212,36 +1213,29 @@ public abstract class CatalogUtil {
     }
 
     public static class ImportConfiguration {
-        private final String m_formatName;
         private final Properties m_moduleProps;
-        private final Properties m_formatterProps;
-
-        private AbstractFormatterFactory m_formatterFactory = null;
+        private FormatterBuilder m_formatterBuilder;
 
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
-            m_formatName = formatName;
             m_moduleProps = moduleProps;
-            m_formatterProps = formatterProps;
+            m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
         }
 
-        public String getFormatName() {
-            return m_formatName;
-        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
         }
 
-        public Properties getformatterProperties() {
-            return m_formatterProps;
+        public Properties getformatterProperties(){
+            return m_formatterBuilder.getFormatterProperties();
         }
 
         public void setFormatterFactory(AbstractFormatterFactory formatterFactory) {
-            m_formatterFactory = formatterFactory;
+            m_formatterBuilder.setFormatterFactory(formatterFactory);
         }
 
-        public AbstractFormatterFactory getFormatterFactory() {
-            return m_formatterFactory;
+        public FormatterBuilder getFormatterBuilder() {
+            return m_formatterBuilder;
         }
     }
 

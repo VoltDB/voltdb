@@ -18,9 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.Properties;
-
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 
 /**
@@ -39,15 +37,5 @@ public interface ImporterConfig
      */
     public URI getResourceID();
 
-    public AbstractFormatterFactory getFormatterFactory();
-
-    /**
-     * @return  Return the properties of formatter's configuration
-     */
-    public Properties getFormatterProperties();
-
-    /**
-     * @return  Return the name of formatter for the importer configuration
-     */
-    public String getFormatterName();
+    public FormatterBuilder getFormatterBuilder();
 }

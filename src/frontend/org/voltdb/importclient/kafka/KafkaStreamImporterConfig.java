@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 import kafka.cluster.Broker;
 import kafka.javaapi.PartitionMetadata;
@@ -64,13 +64,11 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final String m_procedure;
     private final int m_partition;
     private HostAndPort m_partitionLeader;
-    private AbstractFormatterFactory m_formatterFactory;
-    private final Properties m_formatProps;
-    private final String m_formatName;
+    private final FormatterBuilder m_formatterBuilder;
 
     private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
             String groupId, int fetchSize, int soTimeout, String procedure,
-            AbstractFormatterFactory formatterFactory,final Properties formatProps, String formatName)
+            FormatterBuilder formatterBuilder)
     {
         m_uri = uri;
         m_brokers = brokers;
@@ -81,9 +79,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        m_formatterFactory = formatterFactory;
-        m_formatProps = formatProps;
-        m_formatName = formatName;
+        m_formatterBuilder = formatterBuilder;
     }
 
 
@@ -145,13 +141,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return m_uri;
     }
 
-    @Override
-    public AbstractFormatterFactory getFormatterFactory()
-    {
-        return m_formatterFactory;
-    }
-
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, String formatName, Properties formatProps, AbstractFormatterFactory formatterFactory)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props,  FormatterBuilder formatterBuilder)
     {
         String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
@@ -202,7 +192,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
-                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatterFactory, formatProps, formatName));
+                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatterBuilder));
             } catch(Exception e) {
                 m_logger.warn(String.format("Error trying to get partition information for topic [%s] on host [%s]", topic, hapList.get(0).getHost()), e);
             }
@@ -226,8 +216,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            final String topic, String groupId, String procedure, int soTimeout, int fetchSize,
-            AbstractFormatterFactory formatterFactory, final Properties formatProps, final String formatName)
+            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, FormatterBuilder formatterBuilder)
     {
         SimpleConsumer consumer = null;
         Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
@@ -269,7 +258,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                         }
                         KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
                                 part.partitionId(), new HostAndPort(leader.host(), leader.port()),
-                                groupId, fetchSize, soTimeout, procedure, formatterFactory, formatProps, formatName);
+                                groupId, fetchSize, soTimeout, procedure, formatterBuilder);
                         configs.put(uri, config);
                     }
                 }
@@ -392,13 +381,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Properties getFormatterProperties() {
-        return m_formatProps;
-    }
-
-
-    @Override
-    public String getFormatterName() {
-        return m_formatName;
+    public FormatterBuilder getFormatterBuilder()
+    {
+        return m_formatterBuilder;
     }
 }

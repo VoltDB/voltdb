@@ -206,7 +206,6 @@ public class ImportManager implements ChannelChangeCallback {
                         formatterFactory = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
                         m_formatterFactories.put(module, formatterFactory);
                     }
-                    formatterFactory.configureFormatterFactory(config.getFormatName(), prop);
                     config.setFormatterFactory(formatterFactory);
                 } catch(Throwable t) {
                     VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
