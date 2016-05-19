@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
-import org.voltdb.TestCSVFormatterSuiteBase.SocketDataPusher;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.compiler.VoltProjectBuilder;
