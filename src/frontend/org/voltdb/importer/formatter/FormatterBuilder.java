@@ -24,7 +24,7 @@ import java.util.Properties;
  * instantiate formatter. Every import configuration has its own instance of FormatterBuilder which
  * will ensure that formatter is not shared among import configurations.
  */
-public class FormatterBuilder {
+public class FormatterBuilder<T> {
 
     private final String m_formatterName;
     private final Properties m_formatterProps;
