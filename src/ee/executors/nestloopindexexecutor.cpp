@@ -54,6 +54,8 @@
 #include "executors/executorutil.h"
 #include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 

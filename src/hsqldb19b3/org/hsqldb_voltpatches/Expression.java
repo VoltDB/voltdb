@@ -68,7 +68,9 @@ package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -1462,7 +1464,7 @@ public class Expression {
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
         prototypes.put(OpTypes.COLUMN,        new VoltXMLElement("columnref")); // reference
-        prototypes.put(OpTypes.COALESCE,      new VoltXMLElement("columnref")); // for now, another reference form?
+        prototypes.put(OpTypes.COALESCE,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
         prototypes.put(OpTypes.DEFAULT,       new VoltXMLElement("columnref")); // uninteresting!? ExpressionColumn
         prototypes.put(OpTypes.SIMPLE_COLUMN, (new VoltXMLElement("simplecolumn")));
 
@@ -1727,9 +1729,11 @@ public class Expression {
             return exp;
 
         case OpTypes.COLUMN:
-        case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;
             return ec.voltAnnotateColumnXML(exp);
+
+        case OpTypes.COALESCE:
+            return convertUsingColumnrefToCoaleseExpression(session, exp, dataType);
 
         case OpTypes.SQL_FUNCTION:
             FunctionSQL fn = (FunctionSQL)this;
@@ -1987,6 +1991,91 @@ public class Expression {
             array_element.setAttributesAsColumn(column, false);
 
         }
+    }
+
+    // A VoltDB extension to convert columnref expression for a column that is part of the USING clause
+    // into a COALESCE expression
+    // columnref                    operation operator_case_when
+    //      columnref T1.C      ->      operation is_null
+    //      columnref T2.C                  columnref T1.C
+    //                                  operation operator_alternative
+    //                                      columnref T2.C
+    //                                      columnref T1.C
+    private VoltXMLElement convertUsingColumnrefToCoaleseExpression(Session session, VoltXMLElement exp, Type dataType)
+            throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
+        // Hsql has check dataType can not be null.
+        assert(dataType != null);
+        exp.attributes.put("valuetype", dataType.getNameString());
+
+        // Extract unique columnref
+        HashSet<String> tables = new HashSet<>();
+        ArrayDeque<VoltXMLElement> uniqueColumnrefs = new ArrayDeque<>();
+        for (VoltXMLElement columnref : exp.children) {
+            String table = columnref.attributes.get("table");
+            String tableAlias = columnref.attributes.get("tablealias");
+            assert (table != null);
+            String tableOrAlias = (tableAlias == null) ? table : tableAlias;
+            if (tables.contains(tableOrAlias)) {
+                continue;
+            }
+            tables.add(tableOrAlias);
+            uniqueColumnrefs.add(columnref);
+        }
+        // Delete original children
+        exp.children.clear();
+
+        // There should be at least 2 columnref expressions
+        assert(uniqueColumnrefs.size() > 1);
+        VoltXMLElement lastAlternativeExpr = null;
+        VoltXMLElement resultColaesceExpr = null;
+        while (true) {
+            VoltXMLElement next = uniqueColumnrefs.pop();
+            if (uniqueColumnrefs.isEmpty()) {
+                // Last columnref. Simply plug it in to the last THEN Expression
+                assert(lastAlternativeExpr != null);
+                // Add next as the first child
+                lastAlternativeExpr.children.add(0, next);
+                break;
+            }
+            // IS_NULL expression
+            VoltXMLElement isnull_expr = prototypes.get(OpTypes.IS_NULL);
+            if (isnull_expr == null) {
+                throwForUnsupportedExpression(OpTypes.IS_NULL);
+            }
+            isnull_expr = isnull_expr.duplicate();
+            isnull_expr.attributes.put("id", this.getUniqueId(session));
+            isnull_expr.children.add(next);
+            // Alternative expression
+            VoltXMLElement alt_expr = prototypes.get(OpTypes.ALTERNATIVE);
+            if (alt_expr == null) {
+                throwForUnsupportedExpression(OpTypes.ALTERNATIVE);
+            }
+            alt_expr = alt_expr.duplicate();
+            alt_expr.attributes.put("id", this.getUniqueId(session));
+            alt_expr.attributes.put("valuetype", dataType.getNameString());
+            // The next expression should be a second child
+            // but for now we keep it as the first one
+            alt_expr.children.add(next);
+
+            // COALESCE expression
+            VoltXMLElement coalesceExpr = exp.duplicate();
+            coalesceExpr.attributes.put("alias", next.attributes.get("alias"));
+            coalesceExpr.attributes.put("column", next.attributes.get("column"));
+
+            // Add IS NULL and ALTERNATIVE expressions to the coalesceExpr
+            coalesceExpr.children.add(isnull_expr);
+            coalesceExpr.children.add(alt_expr);
+            if (resultColaesceExpr == null) {
+                resultColaesceExpr = coalesceExpr;
+            } else {
+                assert(lastAlternativeExpr != null);
+                // Add coalesceExpr as the first child to the last alternative expression
+                lastAlternativeExpr.children.add(0, coalesceExpr);
+            }
+            lastAlternativeExpr = alt_expr;
+        }
+        assert(resultColaesceExpr != null);
+        return resultColaesceExpr;
     }
 
     /**

@@ -32,6 +32,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -870,22 +871,6 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /**
-     * Extract columnref elements from the input element.
-     * @param element
-     * @param cols - output collection containing the column references
-     */
-
-    static protected void extractColumnReferences(VoltXMLElement element, java.util.List<VoltXMLElement> cols) {
-        if ("columnref".equalsIgnoreCase(element.name)) {
-            cols.add(element);
-        } else {
-            for (VoltXMLElement child : element.children) {
-                extractColumnReferences(child, cols);
-            }
-        }
-    }
-
-    /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
@@ -1287,9 +1272,8 @@ public abstract class StatementDMQL extends Statement {
         // Columns from USING expression in join are not qualified.
         // if join is INNER then the column from USING expression can be from any table
         // participating in join. In case of OUTER join, it must be the outer column
-        java.util.List<VoltXMLElement> exprCols = new java.util.ArrayList<VoltXMLElement>();
-        extractColumnReferences(query, exprCols);
-        resolveUsingColumns(exprCols, select.rangeVariables);
+        List<VoltXMLElement> exprCols = query.extractSubElements("operation", "optype", "operator_case_when");
+        resolveUsingExpressions(exprCols, select.rangeVariables);
 
         return query;
     }
@@ -1298,37 +1282,35 @@ public abstract class StatementDMQL extends Statement {
      * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
      * we can pick the first table which contains the input column. In case of OUTER joins, we must
      * the OUTER table - if it's a null-able column the outer join must return them.
-     * @param columns list of columns to resolve
-     * @return rvs list of range variables
+     * In case of a FULL join, a USING column expression must be replaced with the
+     * COALESCE(leftTable.C, rightTable.C) expression.
+     * 
+     * @param elements list of expression columns to resolve
+     * @param rv list of range variables
      */
-    static protected void resolveUsingColumns(java.util.List<VoltXMLElement> columns, RangeVariable[] rvs)
+    static protected void resolveUsingExpressions(List<VoltXMLElement> elements, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {
 
-        // Only one OUTER join for a whole select is supported so far
-        for (VoltXMLElement columnElmt : columns) {
+        for (VoltXMLElement element : elements) {
             String table = null;
             String tableAlias = null;
-            if (columnElmt.attributes.get("table") == null) {
-                columnElmt.attributes.put("using", "true");
-                for (RangeVariable rv : rvs) {
-                    if (!rv.getTable().columnList.containsKey(columnElmt.attributes.get("column"))) {
-                        // The column is not from this table. Skip it
-                        continue;
-                    }
+            boolean isFullJoin = false;
+            assert(element.hasValue("optype", "operator_case_when"));
+            String column = element.attributes.get("column");
+            for (RangeVariable rv : rvs) {
+                if (!rv.getTable().columnList.containsKey(column)) {
+                    // The column is not from this table. Skip it
+                    continue;
+                }
 
-                    // If there is an OUTER join we need to pick the outer table
-                    if (rv.isRightJoin == true) {
-                        // this is the outer table. no need to search further.
-                        table = rv.getTable().getName().name;
-                        if (rv.tableAlias != null) {
-                            tableAlias = rv.tableAlias.name;
-                        } else {
-                            tableAlias = null;
-                        }
-                        break;
-                    } else if (rv.isLeftJoin == false) {
-                        // it's the inner join. we found the table but still need to iterate
-                        // just in case there is an outer table we haven't seen yet.
+                // If there is an OUTER join we need to pick the outer table
+                if (rv.isRightJoin == true) {
+                    if (rv.isLeftJoin == true) {
+                        // this is a full join. No need to do anything
+                        isFullJoin = true;
+                    } else {
+                        // this is the outer table. no need to search
+                        // further.
                         table = rv.getTable().getName().name;
                         if (rv.tableAlias != null) {
                             tableAlias = rv.tableAlias.name;
@@ -1336,13 +1318,41 @@ public abstract class StatementDMQL extends Statement {
                             tableAlias = null;
                         }
                     }
+                    break;
+                } else if (rv.isLeftJoin == false) {
+                    // it's the inner join. we found the table but still need to iterate
+                    // just in case there is an outer table we haven't seen yet.
+                    table = rv.getTable().getName().name;
+                    if (rv.tableAlias != null) {
+                        tableAlias = rv.tableAlias.name;
+                    } else {
+                        tableAlias = null;
+                    }
                 }
-                if (table != null) {
-                    columnElmt.attributes.put("table", table);
-                }
-                if (tableAlias != null) {
-                    columnElmt.attributes.put("tablealias", tableAlias);
-                }
+            }
+            if (isFullJoin) {
+                continue;
+            }
+            if (table != null) {
+                collapseCoalesceExpression(element, table, tableAlias);
+            }
+        }
+    }
+
+    static private void collapseCoalesceExpression(VoltXMLElement element, String table, String tableAlias) {
+        List<VoltXMLElement> exprCols = element.extractSubElements("columnref", null, null);
+
+        // Iterate over the columns looking for the first columnref expression that matches input table
+        // Once found, replace the input element 'in-place' with the matching columnref
+        for (VoltXMLElement columnref : exprCols) {
+            if (columnref.hasValue("tablealias", tableAlias) || columnref.hasValue("table", table)) {
+                element.children.clear();
+                element.attributes.clear();
+
+                element.name = "columnref";
+                element.children.addAll(columnref.children);
+                element.attributes.putAll(columnref.attributes);
+                break;
             }
         }
     }

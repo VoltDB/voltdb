@@ -234,7 +234,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
-        n = n.getChild(1);
+        n = n.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
         scan = (AbstractScanPlanNode) n;
         assertTrue(scan.getPredicate() != null);
@@ -313,11 +313,11 @@ public class TestPlansJoin extends PlannerTestCase {
                      ((NestLoopPlanNode)node).getJoinPredicate().getExpressionType());
         assertTrue(node.getChild(0) instanceof SeqScanPlanNode);
         seqScan = (SeqScanPlanNode)node.getChild(0);
-        assertTrue(seqScan.getPredicate() == null);
+        assertEquals(ExpressionType.CONJUNCTION_AND, seqScan.getPredicate().getExpressionType());
         node = node.getChild(1);
         assertTrue(node instanceof SeqScanPlanNode);
         seqScan = (SeqScanPlanNode)node;
-        assertEquals(ExpressionType.CONJUNCTION_AND, seqScan.getPredicate().getExpressionType());
+        assertTrue(seqScan.getPredicate() == null);
 
         apl = compileToFragments("select * FROM P1 LABEL LEFT JOIN R2 USING(A) WHERE A > 0");
         pn = apl.get(1);
@@ -1274,6 +1274,138 @@ public class TestPlansJoin extends PlannerTestCase {
        compile("SELECT R3.C, R1.C FROM R1 INNER JOIN R2 USING(C), R3;");
        compile("SELECT C, C FROM R1 GROUP BY C ORDER BY C;");
    }
+
+    public void testUsingColumns() {
+        // Test USING column
+        AbstractPlanNode pn = compile("SELECT MAX(R1.A), C FROM R1 FULL JOIN R2 USING (C) WHERE C > 0 GROUP BY C ORDER BY C");
+
+        // ORDER BY column
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        List<AbstractExpression> s = ((OrderByPlanNode)pn).getSortExpressions();
+        assertEquals(1, s.size());
+        assertEquals(ExpressionType.VALUE_TUPLE, s.get(0).getExpressionType());
+
+        // WHERE
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        AbstractExpression f = ((NestLoopPlanNode)pn).getWherePredicate();
+        assertNotNull(f);
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, f.getLeft().getExpressionType());
+
+        // GROUP BY
+        AbstractPlanNode aggr = pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE);
+        assertNotNull(aggr);
+        List<AbstractExpression> g = ((AggregatePlanNode) aggr).getGroupByExpressions();
+        assertEquals(1, g.size());
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, g.get(0).getExpressionType());
+
+        // Test three table full join
+        pn = compile("SELECT C FROM R1 FULL JOIN R2 USING (C) FULL JOIN R3 USING (C)");
+        pn = pn.getChild(0);
+        NodeSchema ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        SchemaColumn col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        AbstractExpression colExp = col.getExpression();
+        assertEquals(ExpressionType.OPERATOR_CASE_WHEN, colExp.getExpressionType());
+        List<AbstractExpression> caseWhenExpr = colExp.findAllSubexpressionsOfType(ExpressionType.OPERATOR_CASE_WHEN);
+        assertEquals(2, caseWhenExpr.size());
+
+        // Test three table INNER join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 JOIN R2 USING (C) JOIN R3 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+        // Test two table LEFT join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 LEFT JOIN R2 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+        // Test two table RIGHT join. USING C column should be resolved
+        pn = compile("SELECT C FROM R1 RIGHT JOIN R2 USING (C)");
+        pn = pn.getChild(0);
+        ns = pn.getOutputSchema();
+        assertEquals(1, ns.getColumns().size());
+        col = ns.getColumns().get(0);
+        assertEquals("C", col.getColumnAlias());
+        colExp = col.getExpression();
+        assertEquals(ExpressionType.VALUE_TUPLE, colExp.getExpressionType());
+
+    }
+
+    public void testJoiOrders() {
+        AbstractPlanNode pn, pn1, pn2;
+        AbstractScanPlanNode sn;
+        IndexScanPlanNode isn;
+
+        // R1 is an outer node - has one filter
+        pn = compile("SELECT * FROM R2 JOIN R1 USING (C) WHERE R1.A > 0");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // R2 is an outer node - R2.A = 3 filter is discounter more than R1.A > 0
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A > 0 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R2", sn.getTargetTableName());
+
+        // R2 is an outer node - R2.A = 3 filter is discounter more than two non-EQ filters
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A > 0 AND R1.A < 3 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R2", sn.getTargetTableName());
+
+        // R1 is an outer node - EQ + non-EQ overweight EQ
+        pn = compile("SELECT * FROM R1 JOIN R2 USING (C) WHERE R1.A = 0 AND R1.D < 3 AND R2.A = 3");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // Index Join (R3.A) still has a lower cost compare to a Loop Join
+        // despite the R3.C = 0 equality filter on the inner node
+        pn = compile("SELECT * FROM R1 JOIN R3 ON R3.A = R1.A WHERE R3.C = 0");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R1", sn.getTargetTableName());
+
+        // R3.A is an INDEX. Both children are IndexScans. With everything being equal,
+        // the Left table (L) has fewer filters and should be an inner node
+        pn = compile("SELECT L.A, R.A FROM R3 L JOIN R3 R ON L.A = R.A WHERE R.A > 3 AND R.C  = 3 and L.A > 2 ;");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        pn = pn.getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+        sn = (AbstractScanPlanNode) pn;
+        assertEquals("R", sn.getTargetTableAlias());
+
+        // NLIJ with inline inner IndexScan over R2 using its partial index is a winner
+        // over the NLJ with R2 on the outer side
+        pn = compile("SELECT * FROM R3 JOIN R2 ON R3.C = R2.C WHERE R2.C > 100;");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getPlanNodeType());
+        isn = (IndexScanPlanNode) pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals("PARTIAL_IND2", isn.getTargetIndexName());
+        sn = (AbstractScanPlanNode) pn.getChild(0);
+        assertEquals("R3", sn.getTargetTableName());
+
+    }
 
     @Override
     protected void setUp() throws Exception {

@@ -1070,9 +1070,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         nlpn = pn.getChild(0);
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
-        pn = nlpn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "SR4");
         pn = nlpn.getChild(1);
+        checkPrimaryKeyIndexScan(pn, "SR4");
+        pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1", "NUM");
         pn = pn.getChild(0);
         assertTrue(pn instanceof AggregatePlanNode);
@@ -1412,9 +1412,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         nlpn = pn.getChild(0);
         assertTrue(nlpn instanceof NestLoopPlanNode);
         assertEquals(JoinType.INNER, ((NestLoopPlanNode) nlpn).getJoinType());
-        pn = nlpn.getChild(0);
-        checkPrimaryKeyIndexScan(pn, "SR4");
         pn = nlpn.getChild(1);
+        checkPrimaryKeyIndexScan(pn, "SR4");
+        pn = nlpn.getChild(0);
         checkSeqScan(pn, "T1", "NUM");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
