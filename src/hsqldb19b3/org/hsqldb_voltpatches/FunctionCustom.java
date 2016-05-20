@@ -490,6 +490,11 @@ public class FunctionCustom extends FunctionSQL {
                 // End of VoltDB extension
                 break;
 
+            case FUNC_LOG10 :
+                name = Tokens.T_LOG10;
+                parseList = singleParamList;
+                break;
+
             case FUNC_RAND :
                 parseList = optionalIntegerParamList;
                 // A VoltDB extension to customize the SQL function set support
@@ -506,7 +511,6 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_DEGREES :
             case FUNC_SIN :
             case FUNC_TAN :
-            case FUNC_LOG10 :
             case FUNC_RADIANS :
             case FUNC_ROUNDMAGIC :
             case FUNC_SIGN :
@@ -980,7 +984,9 @@ public class FunctionCustom extends FunctionSQL {
                 }
 
                 double d = NumberType.toDouble(data[0]);
-
+                if (d <= 0) {
+                    throw Error.error(ErrorCode.X_2201E);
+                }
                 return Double.valueOf(java.lang.Math.log10(d));
             }
             case FUNC_RADIANS : {

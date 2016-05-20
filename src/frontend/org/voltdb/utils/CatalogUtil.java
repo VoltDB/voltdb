@@ -124,6 +124,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -163,6 +164,9 @@ public abstract class CatalogUtil {
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+
+    public static final String ROW_LENGTH_LIMIT = "row.length.limit";
+    public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
     private static boolean m_exportEnabled = false;
 
@@ -1203,40 +1207,35 @@ public abstract class CatalogUtil {
         }
 
         processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
+
+
         return processorProperties;
     }
 
     public static class ImportConfiguration {
-        private final String m_formatName;
         private final Properties m_moduleProps;
-        private final Properties m_formatterProps;
-
-        private AbstractFormatterFactory m_formatterFactory = null;
+        private FormatterBuilder m_formatterBuilder;
 
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
-            m_formatName = formatName;
             m_moduleProps = moduleProps;
-            m_formatterProps = formatterProps;
+            m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
         }
 
-        public String getFormatName() {
-            return m_formatName;
-        }
 
         public Properties getmoduleProperties() {
             return m_moduleProps;
         }
 
-        public Properties getformatterProperties() {
-            return m_formatterProps;
+        public Properties getformatterProperties(){
+            return m_formatterBuilder.getFormatterProperties();
         }
 
         public void setFormatterFactory(AbstractFormatterFactory formatterFactory) {
-            m_formatterFactory = formatterFactory;
+            m_formatterBuilder.setFormatterFactory(formatterFactory);
         }
 
-        public AbstractFormatterFactory getFormatterFactory() {
-            return m_formatterFactory;
+        public FormatterBuilder getFormatterBuilder() {
+            return m_formatterBuilder;
         }
     }
 
@@ -1307,6 +1306,9 @@ public abstract class CatalogUtil {
                 break;
             case KAFKA:
                 importBundleUrl = "kafkastream.jar";
+                break;
+            case KINESIS:
+                importBundleUrl = "kinesisstream.jar";
                 break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
@@ -1416,6 +1418,38 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
+
+            // checking rowLengthLimit
+            int rowLengthLimit = Integer.parseInt(processorProperties.getProperty(ROW_LENGTH_LIMIT,"0"));
+            if (rowLengthLimit > 0) {
+                for (ConnectorTableInfo catTableinfo : catconn.getTableinfo()) {
+                    Table tableref = catTableinfo.getTable();
+                    int rowLength = Boolean.parseBoolean(processorProperties.getProperty("skipinternals", "false")) ? 0 : EXPORT_INTERNAL_FIELD_Length;
+                    for (Column catColumn: tableref.getColumns()) {
+                        rowLength += catColumn.getSize();
+                    }
+                    if (rowLength > rowLengthLimit) {
+                        if (defaultConnector) {
+                            hostLog.error("Export configuration for the default export target has " +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        else {
+                            hostLog.error("Export configuration for export target " + targetName + " has" +
+                                    "configured to has row length limit " + rowLengthLimit +
+                                    ". But the export table " + tableref.getTypeName() +
+                                    " has estimated row length " + rowLength +
+                                    ".");
+                        }
+                        throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
+                                ", exceeding configurated limitation " + rowLengthLimit + ".");
+                    }
+                }
+            }
+
+
             for (String name: processorProperties.stringPropertyNames()) {
                 ConnectorProperty prop = catconn.getConfig().add(name);
                 prop.setName(name);
@@ -1510,15 +1544,11 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return processorConfig;
         }
-        List<String> streamList = new ArrayList<String>();
         int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (!streamList.contains(importConfiguration.getModule())) {
-                streamList.add(importConfiguration.getModule());
-            }
 
             ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
 
@@ -1889,7 +1919,11 @@ public abstract class CatalogUtil {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
-        cluster.setHttpdportno(httpd.getPort());
+        int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
+        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+            defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
+        }
+        cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 

@@ -1,0 +1,95 @@
+drop table t if exists;
+
+create table t ( c integer );
+
+insert into t values (0);
+insert into t values (1);
+insert into t values (2);
+
+select * from t;
+
+-- query with max allowable predicates in where clause
+select * FROM t WHERE 
+c = 1 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+
+-- query with lots of predicates in where clause - this will generate
+-- stackoverflowerror for the thread it's executing
+select * FROM t WHERE c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+ 
+ -- run a simple query
+select * from t;
+
+drop table t;

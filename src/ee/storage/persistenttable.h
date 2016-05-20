@@ -138,7 +138,6 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -247,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible = true);
 
     virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
@@ -887,19 +886,6 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     assert(m_table.m_schema != NULL);
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
-}
-
-inline void
-PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
-    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
-        if (m_table.m_partitionColumn == -1) {
-            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
-            }
-        } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
-        }
-    }
 }
 
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)

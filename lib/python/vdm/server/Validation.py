@@ -87,7 +87,7 @@ class ServerInputs(Inputs):
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
@@ -139,10 +139,11 @@ user_schema = {
                 "type": "integer",
             },
             "name": {
-                    "id": "name",
-                    "type": "string",
-                    "minLength": 1
-                },
+                "id": "name",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_.]+$"
+            },
             "password": {
                 "id": "password",
                 "type": "string",
@@ -150,7 +151,8 @@ user_schema = {
             },
             "roles": {
                 "id": "roles",
-                "type":"string"
+                "type":"string",
+                "pattern": "^[a-zA-Z0-9_.,-]+$"
             },
             "plaintext": {
                 "id": "plaintext",
@@ -403,7 +405,8 @@ schema = {
                                     "name": {
                                         "id": "name",
                                         "type": "string",
-                                        "minLength": 1
+                                        "minLength": 1,
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "password": {
                                         "id": "password",
@@ -413,6 +416,7 @@ schema = {
                                     "roles": {
                                         "id": "roles",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.,-]+$"
                                     },
                                     "plaintext": {
                                         "id": "plaintext",
@@ -456,8 +460,8 @@ schema = {
                                                         "value": {
                                                             "id": "value",
                                                             "type": "string"
-                                                        }
-                                                    }
+                                                        },
+                                                    },"additionalProperties": False,
                                                 }
                                             ]
                                         },
@@ -483,13 +487,14 @@ schema = {
                                     },
 
                                 },
-                             "required": ["stream", "type"]
+                                "required": ["stream", "type", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },
+            "additionalProperties": False
 
         },
         "import": {
@@ -520,7 +525,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         }
-                                                    }
+                                                    },"additionalProperties": False,
                                                 }
                                             ],
                                             "required": ["value"]
@@ -541,17 +546,18 @@ schema = {
                                     },
                                     "format": {
                                         "id": "format",
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
 
                                 },
-                                 "required": ["format"]
+                                 "required": ["format", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },"additionalProperties": False
 
         },
         "commandlog": {
@@ -566,12 +572,12 @@ schema = {
                             "id": "time",
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 5000
+                            "maximum": 1000
                         },
                         "transactions": {
                             "id": "transactions",
                             "type": "integer",
-                            "minimum": 0,
+                            "minimum": 1,
                             "maximum": 2147483647
                         }
                     },
@@ -589,7 +595,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 102400
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
@@ -680,7 +686,9 @@ schema = {
                                         "properties": {
                                             "name": {
                                                 "id": "name",
-                                                "type": "string"
+                                                "type": "string",
+                                                "enum": ["snapshots", "commandlog", "exportoverflow", "droverflow",
+                                                          "commandlogsnapshot"]
                                             },
                                             "size": {
                                                 "id": "size",
@@ -753,9 +761,11 @@ schema = {
                             "id": "source",
                             "type": "string",
                         }
-                    }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False

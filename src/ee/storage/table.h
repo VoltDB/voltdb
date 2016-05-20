@@ -126,7 +126,7 @@ class Table {
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can

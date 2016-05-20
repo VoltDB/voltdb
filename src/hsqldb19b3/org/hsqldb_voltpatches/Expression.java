@@ -1693,7 +1693,7 @@ public class Expression {
                 // Going forward, it seems to make more sense to leverage the surviving VoltDB code path by hard-wiring here:
                 // valueType="BIGINT", value="1"/"0".
                 throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                        "VoltDB does not support WHERE clauses containing only constants");
+                        "VoltDB does not support constant Boolean values, like TRUE or FALSE");
             }
 
             exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));

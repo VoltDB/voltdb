@@ -178,9 +178,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "6.2";
+    static final String m_defaultVersionString = "6.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -833,6 +833,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
+            }
+            else {
+                // set up empty stats for the DR Producer
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
+                        new DRProducerStatsBase.DRProducerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
+                        new DRProducerStatsBase.DRProducerPartitionStatsBase());
             }
             createDRConsumerIfNeeded();
 
@@ -1802,7 +1809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
-        String[] lines = pp.toLogLines().split("\n");
+        String[] lines = pp.toLogLines(getVersionString()).split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
         }
@@ -2581,6 +2588,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             consoleLog.info("Promoting replication role from replica to master.");
             hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
+            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
         }
         m_config.m_replicationRole = role;
         if (m_clientInterface != null) {
@@ -2783,6 +2796,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (!m_config.m_isEnterprise
                 || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
+            if (!m_config.m_isEnterprise || !m_catalogContext.cluster.getDrconsumerenabled()) {
+                // This is called multiple times but the new value will be ignored if a StatSource has been assigned
+                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                        new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                        new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
+            }
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
@@ -2794,6 +2814,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
             }
             try {
+                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                         int.class,
@@ -2810,6 +2832,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
             }
             return true;
+        }
+        else {
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
         }
         return false;
     }

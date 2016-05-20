@@ -288,17 +288,17 @@ class Deployment(unittest.TestCase):
                                "query": {"timeout": 10000},
                                "resourcemonitor": {"memorylimit": {"size": "1"},
                                                    "disklimit": {"feature": [
-                                                       {"name": "SNAPSHOTS", "size": "2"}
+                                                       {"name": "snapshots", "size": "2"}
                                                    ],
                                                        "size": "10"},
                                                    "frequency": 5}},
             "security": {"enabled": True, "provider": "HASH"},
             "export": {"configuration": [{"enabled": False,
                                           "type": "kafka", "exportconnectorclass": "test",
-                                          "stream": "test", "property": [{"name": "test",
+                                          "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "test", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
         }
 
         response = requests.put(url_dep,
@@ -368,7 +368,7 @@ class UpdateDatabaseDeployment(Deployment):
                                         self.assertEqual(supersubnode.attrib['size'], "1")
                                     if supersubnode.tag == "disklimit":
                                         for disklimit in supersubnode:
-                                            self.assertEqual(disklimit.attrib['name'], "SNAPSHOTS")
+                                            self.assertEqual(disklimit.attrib['name'], "snapshots")
                                             self.assertEqual(disklimit.attrib['size'], "2")
 
                     if child.tag == "admin-mode":

@@ -302,9 +302,24 @@
           <xs:attribute name="enabled" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
+      <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
     </xs:sequence>
-    <xs:attribute name="port" type="xs:int" default="8080"/>
+    <xs:attribute name="port" type="xs:int"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- configuration for HTTPS -->
+  <xs:complexType name="httpsType">
+    <xs:sequence>
+      <xs:element name="keyStore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="trustStore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <xs:complexType name="keyOrTrustStoreType">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+      <xs:attribute name="password" type="xs:string"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
@@ -386,6 +401,7 @@
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="kinesis"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>

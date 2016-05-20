@@ -64,7 +64,7 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
+void TempTable::deleteAllTuples(bool freeAllocatedStrings, bool) {
     deleteAllTuplesNonVirtual(freeAllocatedStrings);
 }
 

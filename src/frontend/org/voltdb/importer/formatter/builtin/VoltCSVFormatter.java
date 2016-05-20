@@ -30,6 +30,7 @@ public class VoltCSVFormatter implements Formatter<String> {
     final CSVParser m_parser;
 
     VoltCSVFormatter (String formatName, Properties prop) {
+
         if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
             throw new IllegalArgumentException("Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
         }

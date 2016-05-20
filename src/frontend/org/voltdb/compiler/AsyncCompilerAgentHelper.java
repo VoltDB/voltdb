@@ -244,32 +244,21 @@ public class AsyncCompilerAgentHelper
     private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts)
     throws IOException, VoltCompilerException
     {
-        VoltCompilerReader ddlReader = null;
-        try {
-            InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
+        InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
 
-            StringBuilder sb = new StringBuilder();
-            compilerLog.info("Applying the following DDL to cluster:");
-            for (String stmt : adhocDDLStmts) {
-                compilerLog.info("\t" + stmt);
-                sb.append(stmt);
-                sb.append(";\n");
-            }
-            String newDDL = sb.toString();
-            compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
+        StringBuilder sb = new StringBuilder();
+        compilerLog.info("Applying the following DDL to cluster:");
+        for (String stmt : adhocDDLStmts) {
+            compilerLog.info("\t" + stmt);
+            sb.append(stmt);
+            sb.append(";\n");
+        }
+        String newDDL = sb.toString();
+        compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
-            VoltCompiler compiler = new VoltCompiler();
-            compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
-            return jarfile.getFullJarBytes();
-        }
-        finally {
-            if (ddlReader != null) {
-                try {
-                    ddlReader.close();
-                }
-                catch (IOException ioe) {}
-            }
-        }
+        VoltCompiler compiler = new VoltCompiler();
+        compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
+        return jarfile.getFullJarBytes();
     }
 
     private byte[] modifyCatalogClasses(byte[] oldCatalogBytes, String deletePatterns,

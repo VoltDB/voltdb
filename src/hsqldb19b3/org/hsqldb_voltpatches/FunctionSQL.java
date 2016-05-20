@@ -1348,21 +1348,29 @@ public class FunctionSQL extends Expression {
                         || !nodes[1].dataType.isNumberType()) {
                     throw Error.error(ErrorCode.X_42565);
                 }
-                // A VoltDB extension
-                if (!nodes[0].dataType.isIntegralType() || !nodes[1].dataType.isIntegralType()) {
-                    throw new RuntimeException("unsupported non-integral type for SQL MOD function");
+                
+                if (!(nodes[0].dataType.isIntegralType() && nodes[1].dataType.isIntegralType())
+                        && !(((NumberType)nodes[0].dataType).typeCode == Types.SQL_DECIMAL && ((NumberType)nodes[1].dataType).typeCode == Types.SQL_DECIMAL)) {
+                    throw new RuntimeException("unsupported non-integral or non-decimal type for SQL MOD function");
                 }
-                // End of VoltDB extension
 
-                nodes[0].dataType =
-                    ((NumberType) nodes[0].dataType).getIntegralType();
-                nodes[1].dataType =
-                    ((NumberType) nodes[1].dataType).getIntegralType();
-                dataType = nodes[1].dataType;
-                // A VoltDB extension to customize the SQL function set support
-                parameterArg = 1;
-                // End of VoltDB extension
+                if (nodes[0].dataType.isIntegralType()) {
+                    nodes[0].dataType = ((NumberType)nodes[0].dataType).getIntegralType();
+                    nodes[1].dataType = ((NumberType)nodes[1].dataType).getIntegralType();
+                    dataType = nodes[1].dataType;
+                    // A VoltDB extension to customize the SQL function set support
+                    parameterArg = 1;
 
+                } else {
+
+                    nodes[0].dataType = new NumberType(Types.SQL_DECIMAL, ((NumberType)nodes[0].dataType).precision, ((NumberType)nodes[0].dataType).scale);
+                    nodes[1].dataType = new NumberType(Types.SQL_DECIMAL, ((NumberType)nodes[1].dataType).precision, ((NumberType)nodes[1].dataType).scale);
+                    dataType = nodes[1].dataType;
+                    // A VoltDB extension to customize the SQL function set support
+                    parameterArg = 1;
+                }
+
+                // End of VoltDB extension
                 break;
             }
             case FUNC_POWER : {

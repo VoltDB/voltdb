@@ -104,7 +104,7 @@ function QueryUI(queryString, userName) {
                     if (param.toLowerCase() === 'null') {
                         parameterBank.push(null);
                     } else {
-                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
+                        if (param.indexOf(QuotedStringNonceLiteral) > -1) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }

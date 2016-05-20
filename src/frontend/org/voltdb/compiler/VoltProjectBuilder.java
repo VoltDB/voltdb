@@ -56,8 +56,10 @@ import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
+import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -249,6 +251,11 @@ public class VoltProjectBuilder {
     // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
+    boolean m_httpsEnabled = false;
+    String m_keystore;
+    String m_keystorePassword;
+    String m_certstore;
+    String m_certstorePassword;
 
     BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
     PrintStream m_compilerDebugPrintStream = null;
@@ -560,6 +567,20 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
+    public void setHttpsEnabled(final boolean enabled) {
+        m_httpsEnabled = enabled;
+    }
+
+    public void setKeyStoreInfo(final String path, final String password) {
+        m_keystore = path;
+        m_keystorePassword = password;
+    }
+
+    public void setCertStoreInfo(final String path, final String password) {
+        m_certstore = path;
+        m_certstorePassword = password;
+    }
+
     public void setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
         m_securityEnabled = enabled;
         if (createAdminUser) {
@@ -596,6 +617,10 @@ public class VoltProjectBuilder {
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
+         addImport(enabled, importType, importFormat, importBundle, config, new Properties());
+    }
+
+    public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
         HashMap<String, Object> importConnector = new HashMap<String, Object>();
         importConnector.put("ilEnabled", enabled);
         importConnector.put("ilModule", importBundle);
@@ -603,6 +628,10 @@ public class VoltProjectBuilder {
         importConnector.put("ilConfig", config);
         if (importFormat != null) {
             importConnector.put("ilFormatter", importFormat);
+        }
+
+        if (formatConfig != null) {
+            importConnector.put("ilFormatterConfig", formatConfig);
         }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
@@ -1065,6 +1094,23 @@ public class VoltProjectBuilder {
         Jsonapi json = factory.createHttpdTypeJsonapi();
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
+        if (m_httpsEnabled) {
+            HttpsType httpsType = factory.createHttpsType();
+            httpsType.setEnabled(m_httpsEnabled);
+            if (m_keystore!=null) {
+                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+                store.setPath(m_keystore);
+                store.setPassword(m_keystorePassword);
+                httpsType.setKeyStore(store);
+            }
+            if (m_certstore!=null) {
+                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+                store.setPath(m_certstore);
+                store.setPassword(m_certstorePassword);
+                httpsType.setTrustStore(store);
+            }
+            httpd.setHttps(httpsType);
+        }
 
         // <export>
         ExportType export = factory.createExportType();
@@ -1129,6 +1175,21 @@ public class VoltProjectBuilder {
                     configProperties.add(prop);
                 }
             }
+
+            Properties formatConfig = (Properties) importConnector.get("ilFormatterConfig");
+            if ((formatConfig != null) && (formatConfig.size() > 0)) {
+                List<PropertyType> configProperties = importConfig.getFormatProperty();
+
+                for (Object nameObj : formatConfig.keySet()) {
+                    String name = String.class.cast(nameObj);
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(formatConfig.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+            }
+
             importt.getConfiguration().add(importConfig);
         }
 

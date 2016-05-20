@@ -35,7 +35,7 @@ import org.voltdb.utils.MiscUtils;
  * Make sure responses over network thread does not touch this class.
  */
 public class InternalConnectionHandler {
-    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_YOMAMA_!+";
+    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_InternalAdapter_!+";
 
     public final static long SUPPRESS_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("InternalConnectionHandler");
@@ -198,7 +198,7 @@ public class InternalConnectionHandler {
         int prev = m_backpressureIndication.get();
         int delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
         int next = prev + delta;
-        while (next >= 0 && next <= 7 && !m_backpressureIndication.compareAndSet(prev, next)) {
+        while (next >= 0 && next <= 8 && !m_backpressureIndication.compareAndSet(prev, next)) {
             prev = m_backpressureIndication.get();
             delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
             next = prev + delta;
@@ -209,9 +209,9 @@ public class InternalConnectionHandler {
     private void applyBackPressure() {
         final int count = m_backpressureIndication.get();
         if (count > 0) {
-            try { // increase sleep time exponentially to a max of 128ms
-                if (count > 7) {
-                    Thread.sleep(128);
+            try { // increase sleep time exponentially to a max of 256ms
+                if (count > 8) {
+                    Thread.sleep(256);
                 } else {
                     Thread.sleep(1<<count);
                 }
