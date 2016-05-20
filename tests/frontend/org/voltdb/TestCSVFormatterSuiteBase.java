@@ -27,20 +27,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
 import org.junit.Ignore;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.VoltFile;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 @Ignore public class TestCSVFormatterSuiteBase extends RegressionSuite {
 
@@ -130,39 +121,5 @@ import com.google_voltpatches.common.collect.ImmutableMap;
             } catch (IOException ex) {
             }
         }
-    }
-
-    static public MultiConfigSuiteBuilder buildEnv(Properties formatConfig, Class cluzz) throws Exception {
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(cluzz);
-        Map<String, String> additionalEnv = new HashMap<String, String>();
-        //Specify bundle location
-        String bundleLocation = System.getProperty("user.dir") + "/bundles";
-        System.out.println("Bundle location is: " + bundleLocation);
-        additionalEnv.put("voltdbbundlelocation", bundleLocation);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.setUseDDLSchema(true);
-        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
-        project.addPartitionInfo("importCSVTable", "clm_integer");
-
-        // configure socket importer
-        Properties props = new Properties();
-        props.putAll(ImmutableMap.<String, String> of("port", "7001", "decode", "true", "procedure",
-                "importCSVTable.insert"));
-
-        project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
-        project.addPartitionInfo("importCSVTable", "clm_integer");
-
-        /*
-         * compile the catalog all tests start with
-         */
-
-        LocalCluster config = new LocalCluster("import-ddl-cluster-rep.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
-                LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
-        config.setHasLocalServer(false);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
-        builder.addServerConfig(config);
-        return builder;
     }
 }

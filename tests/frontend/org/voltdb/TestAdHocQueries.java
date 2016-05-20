@@ -823,7 +823,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
+                assertTrue(pcex.getMessage().indexOf("does not support constant Boolean values, like TRUE or FALSE") > 0);
             }
             adHocQuery = "ROLLBACK;";
             try {

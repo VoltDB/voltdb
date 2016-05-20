@@ -79,7 +79,7 @@ public class PullSocketImporter extends AbstractImporter {
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
-        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
+        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         while (!m_eos.get()) {
             try {
                 reader = attemptBufferedReader();
