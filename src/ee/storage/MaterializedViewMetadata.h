@@ -18,81 +18,105 @@
 #ifndef MATERIALIZEDVIEWMETADATA_H_
 #define MATERIALIZEDVIEWMETADATA_H_
 
+#include "catalog/catalogmap.h"
+#include "catalog/materializedviewinfo.h"
+#include "common/tabletuple.h"
+
+#include "boost/foreach.hpp"
+#include "boost/shared_array.hpp"
+
+#include <string>
 #include <vector>
 
-#include "common/types.h"
-#include "common/tabletuple.h"
-#include "indexes/tableindex.h"
-#include "catalog/materializedviewinfo.h"
-#include "catalog/indexref.h"
+namespace catalog {
+class IndexRef;
+class Statement;
+}
 
 namespace voltdb {
 
 class AbstractExpression;
-class PersistentTable;
-class TableIndex;
 class ExecutorVector;
+class PersistentTable;
+class StreamedTable;
+class Table;
+class TableIndex;
 
 /**
- * Manage the inserts, deletes and updates for a materialized view table based on changes to
+ * Manage the inserts and updates for a materialized view table based on inserts to
  * a source table. An instance sits between the two tables translasting changes in one table
  * into changes in another table. It loads all this information from the catalog in its
  * constructor.
  */
-class MaterializedViewMetadata {
+class MaterializedViewInsertTrigger {
 public:
-
-    MaterializedViewMetadata(PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo);
-    ~MaterializedViewMetadata();
-
+    virtual ~MaterializedViewInsertTrigger();
     /**
      * Called when the source table is inserting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
     void processTupleInsert(const TableTuple &newTuple, bool fallible);
 
-    /**
-     * Called when the source table is deleting a tuple. This will update the materialized view
-     * destination table to reflect this change.
-     */
-    void processTupleDelete(const TableTuple &oldTuple, bool fallible);
-
-    void initializeTupleHavingNoGroupBy();
-
     PersistentTable * targetTable() const { return m_target; }
-    const std::vector<TableIndex *> & indexForMinMax() const { return m_indexForMinMax; }
 
-    void setTargetTable(PersistentTable * target);
-    void setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax);
-
-    catalog::MaterializedViewInfo* getMaterializedViewInfo() {
+    catalog::MaterializedViewInfo* getMaterializedViewInfo() const {
         return m_mvInfo;
     }
 
-    // Returns the fallback executor vectors
-    std::vector< boost::shared_ptr<ExecutorVector> > getFallbackExecutorVectors() {
-        return m_fallbackExecutorVectors;
-    }
-
-    void setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
-
-    // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
-    bool minMaxIndexIncludesAggCol(TableIndex * index)
+    virtual void updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
     {
-        if ( ! index ) { return false; }
-        return index->getColumnIndices().size() == m_groupByColumnCount + 1;
+        setTargetTable(destTable);
     }
-private:
 
-    void freeBackedTuples();
+    template<class MATVIEW> static void segregateMaterializedViews(
+        std::vector<MATVIEW*> &viewsIn,
+        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
+        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
+        std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
+        std::vector<MATVIEW*> &survivingViewsOut,
+        std::vector<MATVIEW*> &obsoleteViewsOut)
+    {
+        // iterate through all of the existing views
+        BOOST_FOREACH(MATVIEW* currView, viewsIn) {
+            std::string currentViewId = currView->targetTable()->name();
+
+            // iterate through all of the catalog views, looking for a match.
+            std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
+            bool viewfound = false;
+            for (viewIter = start; viewIter != end; ++viewIter) {
+                catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
+                if (currentViewId == catalogViewInfo->name()) {
+                    viewfound = true;
+                    //TODO: This MIGHT be a good place to identify the need for view re-definition.
+                    survivingInfosOut.push_back(catalogViewInfo);
+                    survivingViewsOut.push_back(currView);
+                    break;
+                }
+            }
+
+            // If the table has a view that the catalog doesn't,
+            // prepare to remove (or fail to migrate) the view.
+            if (!viewfound) {
+                obsoleteViewsOut.push_back(currView);
+            }
+        }
+    }
+
+
+protected:
+    MaterializedViewInsertTrigger(PersistentTable *destTable,
+                                  catalog::MaterializedViewInfo *mvInfo);
+    void setTargetTable(PersistentTable * target);
+
+    void initializeTupleHavingNoGroupBy();
+
     void allocateBackedTuples();
-    void allocateMinMaxSearchKeyTuple();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);
-
     std::size_t parseGroupBy(catalog::MaterializedViewInfo *mvInfo);
     std::size_t parseAggregation(catalog::MaterializedViewInfo *mvInfo);
+
     NValue getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple);
     NValue getAggInputFromSrcTuple(int aggIndex, const TableTuple& tuple);
 
@@ -101,6 +125,118 @@ private:
      * and use an index to find 0 or 1 rows in the view table
      */
     bool findExistingTuple(const TableTuple &oldTuple);
+
+    // the materialized view table
+    PersistentTable *m_target;
+
+    catalog::MaterializedViewInfo *m_mvInfo;
+
+    // the primary index on the view table whose columns
+    // are the same as the group by in the view query
+    TableIndex *m_index;
+
+    // space to store temp view tuples
+    TableTuple m_existingTuple;
+    TableTuple m_updatedTuple;
+    boost::shared_array<char> m_updatedTupleBackingStore;
+    TableTuple m_emptyTuple;
+    boost::shared_array<char> m_emptyTupleBackingStore;
+
+    // An optional predicate over source rows must pass for them to be included
+    // in the materialized view.
+    // This is a shared pointer to allow the views defined on the 'before' and
+    // 'after' versions of a truncated source table to share the predicate
+    // until the transaction ends, leaving only one of them.
+    boost::shared_ptr<AbstractExpression> m_filterPredicate;
+    inline bool failsPredicate(const TableTuple& tuple) const;
+    std::vector<AbstractExpression *> m_groupByExprs;
+    std::vector<int32_t> m_groupByColIndexes;
+    // How many columns (or expressions) is the view aggregated on?
+    // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
+    // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
+    std::size_t m_groupByColumnCount;
+    std::vector<NValue> m_searchKeyValue;
+    // space to hold the search key for the view table
+    TableTuple m_searchKeyTuple;
+    // storage to hold the value for the search key
+    boost::shared_array<char> m_searchKeyBackingStore;
+
+    // what are the indexes of columns in the src table for
+    // the columns in the view table
+    std::vector<AbstractExpression *> m_aggExprs;
+    std::vector<int32_t> m_aggColIndexes;
+    // what are the aggregates for each column in the view table
+    std::vector<ExpressionType> m_aggTypes;
+    // How many optional agg columns in the materialized view table?
+    // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
+    std::size_t m_aggColumnCount;
+
+    // vector of target table indexes to update.
+    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
+    // aggregated columns, but there might be some other mostly harmless ones in there that are based
+    // solely on the immutable primary key (GROUP BY columns).
+    std::vector<TableIndex*> m_updatableIndexList;
+};
+
+/**
+ * Manage the inserts and updates for a materialized view table based on inserts to a stream.
+ * An instance sits between two tables translasting inserts in one table into
+ * changes in the other table.
+ * The factory method, build, uses information parsed from the catalog to configure
+ * initializers for the private constructor.
+ */
+class MaterializedViewStreamInsertTrigger : public  MaterializedViewInsertTrigger {
+public:
+    static void build(StreamedTable *srcTable,
+                      PersistentTable *destTable,
+                      catalog::MaterializedViewInfo *mvInfo);
+private:
+ MaterializedViewStreamInsertTrigger(PersistentTable *destTable,
+                                     catalog::MaterializedViewInfo *mvInfo);
+};
+
+
+/**
+ * Manage the inserts, deletes and updates for a materialized view table based
+ * on inserts, deletes and updates to a source table. An instance sits between
+ * two tables translasting changes in one table into changes in the other table.
+ * The factory method, build, uses information parsed from the catalog to configure
+ * initializers for the private constructor.
+ */
+class MaterializedViewWriteTrigger : public MaterializedViewInsertTrigger {
+public:
+    static void build(PersistentTable *srcTable,
+                      PersistentTable *destTable,
+                      catalog::MaterializedViewInfo *mvInfo);
+    ~MaterializedViewWriteTrigger();
+
+    /**
+     * This updates the materialized view desitnation table to reflect
+     * write operations to the source table.
+     * Called when the source table is deleting a tuple,
+     * OR as a first step when the source table is updating a tuple
+     * -- followed by a compensating call to processTupleInsert.
+     */
+    void processTupleDelete(const TableTuple &oldTuple, bool fallible);
+
+    void updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
+    {
+        MaterializedViewInsertTrigger::updateDefinition(destTable, mvInfo);
+        setupMinMaxRecalculation(mvInfo->indexForMinMax(),
+                                 mvInfo->fallbackQueryStmts());
+    }
+
+
+private:
+
+    MaterializedViewWriteTrigger(PersistentTable *srcTable,
+                                 PersistentTable *destTable,
+                                 catalog::MaterializedViewInfo *mvInfo);
+
+    void setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
+                                  const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
+
+    void allocateMinMaxSearchKeyTuple();
 
     NValue findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
                                           const NValue &existingValue,
@@ -121,66 +257,16 @@ private:
                                       int minMaxAggIdx);
 
     // the source persistent table
-    PersistentTable *m_srcTable;
-    // the materialized view table
-    PersistentTable *m_target;
-
-    catalog::MaterializedViewInfo *m_mvInfo;
-
-    // the primary index on the view table whose columns
-    // are the same as the group by in the view query
-    TableIndex *m_index;
-
-    // the index on srcTable which can be used to maintain min/max
+    PersistentTable *m_srcPersistentTable;
+    TableTuple m_minMaxSearchKeyTuple;
+    boost::shared_array<char> m_minMaxSearchKeyBackingStore;
+    size_t m_minMaxSearchKeyBackingStoreSize;
+    // the index on srcTable which can be used to find each fallback min or max column.
     std::vector<TableIndex *> m_indexForMinMax;
     // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
-    std::vector< boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
-    std::vector< bool > m_usePlanForAgg;
+    std::vector<boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
+    std::vector<bool> m_usePlanForAgg;
 
-    // space to store temp view tuples
-    TableTuple m_existingTuple;
-    TableTuple m_updatedTuple;
-    char *m_updatedTupleBackingStore;
-    TableTuple m_emptyTuple;
-    char *m_emptyTupleBackingStore;
-
-    // predicate to include or exclude rows from being
-    // part of the aggregation in the materialized view
-    AbstractExpression *m_filterPredicate;
-
-    std::vector<AbstractExpression *> m_groupByExprs;
-    std::vector<int32_t> m_groupByColIndexes;
-    // How many columns (or expressions) is the view aggregated on?
-    // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
-    // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
-    std::size_t m_groupByColumnCount;
-    std::vector<NValue> m_searchKeyValue;
-    // space to hold the search key for the view table
-    TableTuple m_searchKeyTuple;
-    // storage to hold the value for the search key
-    char *m_searchKeyBackingStore;
-
-    TableTuple m_minMaxSearchKeyTuple;
-    char *m_minMaxSearchKeyBackingStore;
-    size_t m_minMaxSearchKeyBackingStoreSize;
-
-    // which columns in the source table
-
-    // what are the indexes of columns in the src table for
-    // the columns in the view table
-    std::vector<AbstractExpression *> m_aggExprs;
-    std::vector<int32_t> m_aggColIndexes;
-    // what are the aggregates for each column in the view table
-    std::vector<ExpressionType> m_aggTypes;
-    // How many optional agg columns in the materialized view table?
-    // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
-    std::size_t m_aggColumnCount;
-
-    // vector of target table indexes to update.
-    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
-    // aggregated columns, but there might be some other mostly harmless ones in there that are based
-    // solely on the immutable primary key (GROUP BY columns).
-    std::vector<TableIndex*> m_updatableIndexList;
 };
 
 } // namespace voltdb

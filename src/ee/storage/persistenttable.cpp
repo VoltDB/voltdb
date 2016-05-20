@@ -125,7 +125,8 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_noAvailableUniqueIndex(false),
     m_smallestUniqueIndex(NULL),
     m_smallestUniqueIndexCrc(0),
-    m_drTimestampColumnIndex(-1)
+    m_drTimestampColumnIndex(-1),
+    m_pkeyIndex(NULL)
 {
     // this happens here because m_data might not be initialized above
     m_iter.reset(m_data.begin());
@@ -180,7 +181,10 @@ PersistentTable::~PersistentTable()
         delete m_views[i];
     }
 
-    // Indexes are deleted in parent class Table destructor.
+    // clean up indexes
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        delete index;
+    }
 }
 
 // ------------------------------------------------------------------
@@ -291,9 +295,9 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         this->unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         // call decrement reference count on the newly constructed view table
@@ -326,9 +330,9 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         this->unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewMetadata *> views = originalTable->views();
+    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewMetadata * originalView, views) {
+    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         targetTable->decrementRefcount();
     }
@@ -371,7 +375,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         }
     }
     //For MAT view dont optimize needs more work.
-    if (isMaterialized()) {
+    if (m_isMaterialized) {
         return deleteAllTuples(true);
     }
 
@@ -379,12 +383,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     assert(tcd);
 
     catalog::Table *catalogTable = engine->getCatalogTable(m_name);
-    if (tcd->init(*engine->getDatabase(), *catalogTable) != 0) {
-        VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
-        return ;
-    }
+    tcd->init(*engine->getDatabase(), *catalogTable);
 
-    assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
     assert(emptyTable->views().size() == 0);
@@ -395,18 +395,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     // add matView
-    BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
+    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
-
-        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable) != 0) {
-            VOLT_ERROR("Failed to initialize table '%s' from catalog",targetTable->name().c_str());
-            return ;
-        }
+        targetTcd->init(*engine->getDatabase(), *catalogViewTable);
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
-        new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+        MaterializedViewWriteTrigger::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -859,7 +855,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     }
 }
 
-bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
+void PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -902,13 +898,12 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
             uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
-            return true;
+            return;
         }
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
     deleteTupleFinalize(target);
-    return true;
 }
 
 
@@ -1126,7 +1121,7 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void PersistentTable::addMaterializedView(MaterializedViewMetadata *view)
+void PersistentTable::addMaterializedView(MaterializedViewWriteTrigger* view)
 {
     m_views.push_back(view);
 }
@@ -1135,13 +1130,13 @@ void PersistentTable::addMaterializedView(MaterializedViewMetadata *view)
  * drop a view. the table is no longer feeding it.
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
  */
-void PersistentTable::dropMaterializedView(MaterializedViewMetadata *targetView)
+void PersistentTable::dropMaterializedView(MaterializedViewWriteTrigger* targetView)
 {
     assert( ! m_views.empty());
-    MaterializedViewMetadata *lastView = m_views.back();
+    MaterializedViewWriteTrigger* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewWriteTrigger*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
@@ -1151,86 +1146,35 @@ void PersistentTable::dropMaterializedView(MaterializedViewMetadata *targetView)
     delete targetView;
 }
 
-void
-PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
-                                            std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
-                                            std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
-                                            std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
-{
-    //////////////////////////////////////////////////////////
-    // find all of the materialized views to remove or keep
-    //////////////////////////////////////////////////////////
-
-    // iterate through all of the existing views
-    BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
-        std::string currentViewId = currView->targetTable()->name();
-
-        // iterate through all of the catalog views, looking for a match.
-        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
-        bool viewfound = false;
-        for (viewIter = start; viewIter != end; ++viewIter) {
-            catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
-            if (currentViewId == catalogViewInfo->name()) {
-                viewfound = true;
-                //TODO: This MIGHT be a good place to identify the need for view re-definition.
-                survivingInfosOut.push_back(catalogViewInfo);
-                survivingViewsOut.push_back(currView);
-                break;
-            }
-        }
-
-        // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
-        if (!viewfound) {
-            obsoleteViewsOut.push_back(currView);
-        }
-    }
-}
-
-void
-PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
-{
-    std::string targetName = target->name();
-    // find the materialized view that uses the table or its precursor (by the same name).
-    BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
-        PersistentTable* currTarget = currView->targetTable();
-
-        // found: target is alreafy set
-        if (currTarget == target) {
-            // The view is already up to date.
-            // but still need to update the index used for min/max
-            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            // Fallback executor vectors must be set after indexForMinMax
-            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
-            return;
-        }
-
-        // found: this is the table to set the
-        std::string currName = currTarget->name();
-        if (currName == targetName) {
-            // A match on name only indicates that the target table has been re-defined since
-            // the view was initialized, so re-initialize the view.
-            currView->setTargetTable(target);
-            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            // Fallback executor vectors must be set after indexForMinMax
-            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
-            return;
-        }
-    }
-
-    // The connection needs to be made using a new MaterializedViewMetadata
-    // This is not a leak -- the materialized view is self-installing into srcTable.
-    new MaterializedViewMetadata(this, target, targetMvInfo);
-}
-
 // ------------------------------------------------------------------
 // UTILITY
 // ------------------------------------------------------------------
-std::string PersistentTable::tableType() const {
-    return "PersistentTable";
+std::string PersistentTable::tableType() const { return "PersistentTable"; }
+
+bool PersistentTable::equals(PersistentTable* other)
+{
+    if ( ! Table::equals(other)) {
+        return false;
+    }
+    if (!(indexCount() == other->indexCount())) {
+        return false;
+    }
+
+    const std::vector<voltdb::TableIndex*>& indexes = allIndexes();
+    const std::vector<voltdb::TableIndex*>& otherIndexes = other->allIndexes();
+    if (!(indexes.size() == indexes.size())) {
+        return false;
+    }
+    for (std::size_t ii = 0; ii < indexes.size(); ii++) {
+        if (!(indexes[ii]->equals(otherIndexes[ii]))) {
+            return false;
+        }
+    }
+    return true;
 }
 
-std::string PersistentTable::debug() {
+std::string PersistentTable::debug()
+{
     std::ostringstream buffer;
     buffer << Table::debug();
     buffer << "\tINDEXES: " << m_indexes.size() << "\n";
@@ -1757,6 +1701,112 @@ void PersistentTable::computeSmallestUniqueIndex() {
                 m_smallestUniqueIndex->getColumnIndices().size() * sizeof(int));
         m_smallestUniqueIndexCrc = vdbcrc::crc32cFinish(m_smallestUniqueIndexCrc);
     }
+}
+
+std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
+    std::vector<uint64_t> blockAddresses;
+    blockAddresses.reserve(m_data.size());
+    for(TBMap::const_iterator i = m_data.begin(); i != m_data.end(); ++i) {
+            blockAddresses.push_back((uint64_t)i->second->address());
+    }
+    return blockAddresses;
+}
+#ifdef DEBUG
+static bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index)
+{
+    BOOST_FOREACH(TableIndex *i2, indexes) {
+        if (i2 == index) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+
+TableIndex* PersistentTable::index(std::string name)
+{
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (index->getName().compare(name) == 0) {
+            return index;
+        }
+    }
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << " among {";
+    const char* sep = "";
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        errorString << sep << index->getName();
+        sep = ", ";
+    }
+    errorString << "}";
+    throwFatalException("%s", errorString.str().c_str());
+}
+
+void PersistentTable::addIndex(TableIndex *index)
+{
+    assert(!isExistingTableIndex(m_indexes, index));
+
+    // fill the index with tuples... potentially the slow bit
+    TableTuple tuple(m_schema);
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
+        index->addEntry(&tuple, NULL);
+    }
+
+    // add the index to the table
+    if (index->isUniqueIndex()) {
+        m_uniqueIndexes.push_back(index);
+    }
+    m_indexes.push_back(index);
+    m_noAvailableUniqueIndex = false;
+    m_smallestUniqueIndex = NULL;
+    m_smallestUniqueIndexCrc = 0;
+}
+
+void PersistentTable::removeIndex(TableIndex *index)
+{
+    assert(isExistingTableIndex(m_indexes, index));
+
+    std::vector<TableIndex*>::iterator iter;
+    for (iter = m_indexes.begin(); iter != m_indexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_indexes.erase(iter);
+            break;
+        }
+    }
+    for (iter = m_uniqueIndexes.begin(); iter != m_uniqueIndexes.end(); iter++) {
+        if ((*iter) == index) {
+            m_uniqueIndexes.erase(iter);
+            break;
+        }
+    }
+    if (m_pkeyIndex == index) {
+        m_pkeyIndex = NULL;
+    }
+
+    // this should free any memory used by the index
+    delete index;
+    m_smallestUniqueIndex = NULL;
+    m_smallestUniqueIndexCrc = 0;
+}
+
+void PersistentTable::setPrimaryKeyIndex(TableIndex *index)
+{
+    // for now, no calling on non-empty tables
+    assert(activeTupleCount() == 0);
+    assert(isExistingTableIndex(m_indexes, index));
+
+    m_pkeyIndex = index;
+}
+
+void PersistentTable::configureIndexStats(CatalogId databaseId)
+{
+    // initialize stats for all the indexes for the table
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        index->getIndexStats()->configure(index->getName() + " stats",
+                                          name(),
+                                          databaseId);
+    }
+
 }
 
 } // namespace voltdb
