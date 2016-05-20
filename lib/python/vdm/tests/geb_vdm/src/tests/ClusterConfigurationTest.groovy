@@ -105,7 +105,7 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifySitePerHost() {
         println("Test: verifySitePerHost")
-       // String oldVariable = overview.sitePerHostField.value()
+        // String oldVariable = overview.sitePerHostField.value()
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
@@ -142,6 +142,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Site Per Host'
+        overview.sitePerHostField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.sitePerHostField.value("1")
         overview.sitePerHostText.click()
         and: 'Check Save Message'
@@ -207,6 +208,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for K-Safety'
+        overview.ksafetyField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.ksafetyField.value("1")
         overview.ksafetyText.click()
         and: 'Check Save Message'
@@ -619,6 +621,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for File Prefix Field in Auto Snapshot'
+        overview.filePrefixField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.filePrefixField.value("At_Least")
         overview.filePrefixText.click()
         and: 'Check Save Message'
@@ -633,6 +636,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Frequency in Auto Snapshot'
+        overview.frequencyField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.frequencyField.value("10")
         overview.frequencyText.click()
         and: 'Check Save Message'
@@ -647,6 +651,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Retained in Auto Snapshot'
+        overview.retainedField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.retainedField.value("10")
         overview.retainedText.click()
         and: 'Check Save Message'
@@ -779,6 +784,7 @@ class ClusterConfigurationTest extends TestBase {
 
         when: 'Provide Value for Log Frequency Time in Command Logging'
         overview.commandLoggingText.click()
+        overview.logFrequencyTimeField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logFrequencyTimeField.value("10")
         overview.logFrequencyTimeText.click()
         and: 'Check Save Message'
@@ -793,6 +799,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Log Frequency Transactions in Command Logging'
+        overview.logFrequencyTransactionsField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logFrequencyTransactionsField.value("10")
         overview.logFrequencyTransactionsText.click()
         and: 'Check Save Message'
@@ -807,6 +814,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Log Segment Size in Command Logging'
+        overview.logSegmentSizeField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.logSegmentSizeField.value("10")
         overview.logSegmentSizeText.click()
         and: 'Check Save Message'
@@ -1008,7 +1016,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Heartbeat Timeout in Advanced'
-        overview.heartbeatTimeoutField.value("0")
+        overview.heartbeatTimeoutField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
         and: 'Check Save Message'
@@ -1023,7 +1031,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Query Timeout in Advanced'
-        overview.queryTimeoutField.value("0")
+        overview.queryTimeoutField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
         and: 'Check Save Message'
@@ -1038,7 +1046,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Max Temp Table Memory in Advanced'
-        overview.maxTempTableMemoryField.value("0")
+        overview.maxTempTableMemoryField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
         and: 'Check Save Message'
@@ -1053,7 +1061,7 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Snapshot Priority in Advanced'
-        overview.snapshotPriorityField.value("0")
+        overview.snapshotPriorityField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.snapshotPriorityField.value("10")
         overview.snapshotPriorityText.click()
         and: 'Check Save Message'
@@ -1151,6 +1159,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Root in Directories'
+        directories.rootDestinationField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.rootDestinationField.value("new_value")
         directories.rootDestinationText.click()
         and: 'Check Save Message'
@@ -1232,6 +1241,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Snapshots in Directories'
+        directories.snapshotField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.snapshotField.value("new_value")
         directories.snapshotText.click()
         and: 'Check Save Message'
@@ -1313,6 +1323,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Export Overflow in Directories'
+        directories.exportOverflowField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.exportOverflowField.value("new_value")
         directories.exportOverflowText.click()
         and: 'Check Save Message'
@@ -1394,6 +1405,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Command Log Field in Directories'
+        directories.commandLogField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.commandLogField.value("new_value")
         directories.commandLogText.click()
         and: 'Check Save Message'
@@ -1475,6 +1487,7 @@ class ClusterConfigurationTest extends TestBase {
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Command Log Snapshots in Directories'
+        directories.commandLogSnapshotsField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         directories.commandLogSnapshotsField.value("new_value")
         directories.commandLogSnapshotsText.click()
         and: 'Check Save Message'
