@@ -201,7 +201,7 @@ TEST_F(TableTest, TupleInsert) {
         //
         // Make sure it is not deleted
         //
-        EXPECT_EQ(true, tuple.isActive());
+        EXPECT_TRUE(tuple.isActive());
     }
 
     //
@@ -211,14 +211,14 @@ TEST_F(TableTest, TupleInsert) {
     tableutil::setRandomTupleValues(m_table, &temp_tuple);
     m_table->deleteAllTuples(true);
     ASSERT_EQ(0, m_table->activeTupleCount());
-    ASSERT_EQ(true, m_table->insertTuple(temp_tuple));
+    ASSERT_TRUE(m_table->insertTuple(temp_tuple));
     ASSERT_EQ(1, m_table->activeTupleCount());
 
     //
     // Then check to make sure that it has the same value and type
     //
     iterator = m_table->iterator();
-    ASSERT_EQ(true, iterator.next(tuple));
+    ASSERT_TRUE(iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(col_ctr);
         EXPECT_EQ(COLUMN_TYPES[col_ctr], columnInfo->getVoltType());
@@ -265,7 +265,7 @@ TEST_F(TableTest, TupleUpdate) {
             }
         }
         if (update) {
-            EXPECT_EQ(true, temp_table->updateTuple(tuple, temp_tuple));
+            EXPECT_TRUE(temp_table->updateTuple(tuple, temp_tuple));
         }
     }
 
@@ -339,7 +339,7 @@ TEST_F(TableTest, TupleDelete) {
     TableTuple tuple(m_table.get());
     while (iterator.next(tuple)) {
         if (tuple.get(1).getBigInt() != 0) {
-            EXPECT_EQ(true, temp_table->deleteTuple(tuple));
+            temp_table->deleteTuple(tuple);
         }
     }
 
@@ -409,7 +409,7 @@ TEST_F(TableTest, TupleDelete) {
         if (update) {
             //printf("BEFORE?: %s\n", tuple->debug(m_table.get()).c_str());
             //persistent_table->setUndoLog(undos[xact_ctr]);
-            EXPECT_EQ(true, persistent_table->updateTuple(tuple, temp_tuple, true));
+            EXPECT_TRUE(persistent_table->updateTuple(tuple, temp_tuple, true));
             //printf("UNDO: %s\n", undos[xact_ctr]->debug().c_str());
         }
         //printf("AFTER: %s\n", temp_tuple->debug(m_table.get()).c_str());
@@ -470,7 +470,7 @@ TEST_F(TableTest, TupleDelete) {
         if (xact_ctr % 2 != 0) total += 1;//tuple->get(0).castAsBigInt();
         VOLT_DEBUG("total: %d", (int)total);
         //persistent_table->setUndoLog(undos[xact_ctr]);
-        EXPECT_EQ(true, persistent_table->deleteTuple(tuple));
+        persistent_table->deleteTuple(tuple);
     }
 
     //
@@ -479,7 +479,7 @@ TEST_F(TableTest, TupleDelete) {
     int64_t new_total = 0;
     iterator = m_table->iterator();
     while ((tuple = iterator.next()) != NULL) {
-        EXPECT_EQ(true, tuple->isActive());
+        EXPECT_TRUE(tuple->isActive());
         new_total += 1;//tuple->get(0).getBigInt();
         VOLT_DEBUG("total2: %d", (int)total);
     }

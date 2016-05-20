@@ -172,7 +172,7 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+void findConflictTuple(PersistentTable *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
@@ -231,7 +231,6 @@ void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool resolved,
         TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
         TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert) {
     assert(exportTable != NULL);
-    assert(exportTable->isExport());
     assert((existingMetaTableForDelete == NULL && existingTupleTableForDelete == NULL) ||
            (existingMetaTableForDelete != NULL && existingTupleTableForDelete != NULL));
     assert((expectedMetaTableForDelete == NULL && expectedTupleTableForDelete == NULL) ||

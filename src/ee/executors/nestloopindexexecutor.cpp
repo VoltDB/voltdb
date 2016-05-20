@@ -162,7 +162,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
     PersistentTable* inner_table = static_cast<PersistentTable*>(m_indexNode->getTargetTable());
 
-
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
     assert(index);
     IndexCursor indexCursor(index->getTupleSchema());
