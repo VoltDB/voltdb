@@ -174,7 +174,8 @@ void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
         TableIterator metaIter = metaTable->iterator();
         TableIterator tupleIter = tupleTable->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-            tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
+            tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX,
+                                    ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray(tupleTable->getColumnNames())));
             exportTable->insertTuple(tempMetaTuple);
         }
     }
@@ -186,7 +187,8 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple,
+                       const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
@@ -207,7 +209,8 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
                     // skip the conflict tuples that are already found
                     continue;
                 } else {
-                    conflictRows.push_back(std::make_pair(boost::shared_ptr<TableTuple>(new TableTuple(conflictTuple)), table->primaryKeyIndex() == index ? true : false));
+                    conflictRows.push_back(std::make_pair(boost::shared_ptr<TableTuple>(new TableTuple(conflictTuple)),
+                                                          table->primaryKeyIndex() == index ? true : false));
                     redundancyFilter.insert(conflictTuple.address());
                 }
             }
@@ -218,9 +221,9 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
 /**
  * create conflict export tuple from the conflict tuple
  */
-void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
-        DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType,
-        int64_t remoteUniqueId, int32_t remoteClusterId) {
+void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable,
+        Pool *pool, const TableTuple *tupleToBeWrote, DRConflictOnPK conflictOnPKType, DRRecordType actionType,
+        DRConflictType conflictType, DRConflictRowType rowType, int64_t remoteUniqueId, int32_t remoteClusterId) {
     assert(ExecutorContext::getExecutorContext() != NULL);
 
     int32_t localClusterId = ExecutorContext::getExecutorContext()->drClusterId();
@@ -304,8 +307,9 @@ void validateChecksum(uint32_t checksum, const char *start, const char *end) {
     }
 }
 
-bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
-        int64_t uniqueId, int32_t remoteClusterId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple,
+        const TableTuple *expectedTuple, TableTuple *newTuple, int64_t uniqueId, int32_t remoteClusterId,
+        DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
     if (!engine) {
         return false;
     }
