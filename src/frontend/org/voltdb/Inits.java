@@ -45,6 +45,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
+import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
@@ -70,6 +71,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
+    final StatusTracker m_statusTracker;
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
@@ -113,16 +115,13 @@ public class Inits {
         }
     }
 
-    Inits(RealVoltDB rvdb, int threadCount) {
+    Inits(StatusTracker statusTracker, RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
+        m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction.doesRejoin()) {
-            m_isRejoin = true;
-        } else {
-            m_isRejoin = false;
-        }
+        m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
@@ -570,6 +569,10 @@ public class Inits {
                 adminPort = m_config.m_adminPort;
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
+            //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
+            if (m_config.m_isPaused.get()) {
+                m_rvdb.setStartMode(OperationMode.PAUSED);
+            }
         }
     }
 
@@ -742,7 +745,9 @@ public class Inits {
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
-
+                if (catalog != null) {
+                    m_statusTracker.setNodeState(NodeState.RECOVERING);
+                }
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others
                 if (catalog != null) {

@@ -26,6 +26,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
@@ -35,6 +36,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,10 +49,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -87,12 +91,14 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
+import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
@@ -136,10 +142,12 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -153,14 +161,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * to allow test mocking.
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
-    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
+    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
         "<?xml version=\"1.0\"?>",
-        "<!-- IMPORTANT: This file is an auto-generated default deployment configuration.",
-        "                Changes to this file will be overwritten. Copy it elsewhere if you",
-        "                want to use it as a starting point for a custom configuration. -->",
+        "<!-- This file is an auto-generated default deployment configuration. -->",
         "<deployment>",
         "   <cluster hostcount=\"1\" />",
         "   <httpd enabled=\"true\">",
@@ -217,6 +223,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private ScheduledFuture<?> resMonitorWork;
 
 
+    private StatusTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -341,6 +348,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private LatencyHistogramStats m_latencyHistogramStats;
 
+    private File getConfigLogDirectory() {
+        return getConfigLogDirectory(m_config);
+    }
+
+    private File getConfigLogDirectory(Configuration config) {
+        return new VoltFile(config.m_voltdbRoot, VoltDB.CONFIG_DIR);
+    }
+
+    private File getConfigLogDeployment() {
+        return getConfigLogDeployment(m_config);
+    }
+
+    private File getConfigLogDeployment(Configuration config) {
+        return new VoltFile(getConfigLogDirectory(config), "deployment.xml");
+    }
+
     @Override
     public LicenseApi getLicenseApi() {
         return m_licenseApi;
@@ -363,9 +386,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private void managedPathsEmptyCheck() {
-        PathsType paths = m_catalogContext.getDeployment().getPaths();
+        List<String> nonEmptyPaths = managedPathsWithFiles(m_catalogContext.getDeployment());
+        if (!nonEmptyPaths.isEmpty()) {
+            StringBuilder crashMessage =
+                    new StringBuilder("Files from a previous database session exist in the managed directories:");
+            for (String nonEmptyPath : nonEmptyPaths) {
+                crashMessage.append("\n  - " + nonEmptyPath);
+            }
+            crashMessage.append("\nUse the recover command to restore the previous database or use create --force" +
+                " to start a new database session overwriting existing files.");
+            VoltDB.crashLocalVoltDB(crashMessage.toString());
+        }
+    }
+
+    private final List<String> managedPathsWithFiles(DeploymentType deployment) {
+        ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        PathsType paths = deployment.getPaths();
         String voltDbRoot = paths.getVoltdbroot().getPath();
-        List<String> nonEmptyPaths = new ArrayList<String>();
         String path;
         if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
             nonEmptyPaths.add(path);
@@ -377,22 +414,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             nonEmptyPaths.add(path);
         if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
             nonEmptyPaths.add(path);
-        if (!nonEmptyPaths.isEmpty()) {
-            StringBuilder crashMessage =
-                    new StringBuilder("Files from a previous database session exist in the managed directories:");
-            for (String nonEmptyPath : nonEmptyPaths)
-                crashMessage.append("\n  - " + nonEmptyPath);
-            crashMessage.append("\nUse the recover command to restore the previous database or use create --force" +
-                " to start a new database session overwriting existing files.");
-            VoltDB.crashLocalVoltDB(crashMessage.toString());
-        }
+        return nonEmptyPaths.build();
     }
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
+     * @param config configuration that gets passed in from commandline.
      */
     @Override
-    public void initialize(VoltDB.Configuration config) {
+    public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
@@ -400,17 +430,84 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
+
+            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+
+            // Replay command line args that we can see
+            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+            sb.append(System.getProperty("sun.java.command", "[not available]"));
+            hostLog.info(sb.toString());
+
+            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+            sb.delete(0, sb.length()).append("Command line JVM arguments:");
+            for (String iarg : iargs)
+                sb.append(" ").append(iarg);
+            if (iargs.size() > 0) hostLog.info(sb.toString());
+            else hostLog.info("No JVM command line args known.");
+
+            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
+            sb.append(System.getProperty("java.class.path", "[not available]"));
+            hostLog.info(sb.toString());
+
+            // config UUID is part of the status tracker that is slated to be an
+            // Information source for an http admun endpoint
+            m_statusTracker = new StatusTracker(
+                    config.m_configUUID,
+                    config.m_clusterName,
+                    m_buildString,
+                    m_versionString,
+                    config.m_isEnterprise
+                    );
+
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            if (config.m_startAction == StartAction.INITIALIZE) {
+                if (config.m_forceVoltdbCreate) {
+                    MiscUtils.deleteRecursively(config.m_voltdbRoot);
+                }
+            }
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
-                    config.m_pathToDeployment = setupDefaultDeployment(hostLog);
+                    config.m_pathToDeployment = setupDefaultDeployment(hostLog, config.m_voltdbRoot);
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
+                    return;
                 }
             }
+
+            ReadDeploymentResults readDepl = readPrimedDeployment(config);
+
+            if (config.m_startAction == StartAction.INITIALIZE) {
+                stageDeploymemtFileForInitialize(config, readDepl.deployment);
+                stageInitializedMarker(config);
+                hostLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
+                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+                VoltDB.exit(0);
+            }
+
+            if (config.m_startAction.isLegacy()) {
+                String rootFN = readDepl.deployment.getPaths().getVoltdbroot().getPath();
+                File inzFH = new VoltFile(rootFN, VoltDB.INITIALIZED_MARKER);
+                if (inzFH.exists()) {
+                    VoltDB.crashLocalVoltDB("cannot use legacy start action "
+                            + config.m_startAction + " on voltdbroot "
+                            + rootFN + " that was initialized with the init command");
+                    return;
+                }
+            }
+
+            UUID meshHash = new UUID(0L,0L);
+            UUID configHash = CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes);
+            DeploymentType deployment = readDepl.deployment;
+            if (config.m_startAction == StartAction.PROBE) {
+                meshHash = config.m_meshProvider.getMeshHash();
+            }
+            final int hostCount = deployment.getCluster().getHostcount();
+            final boolean bareAtStartup  = config.m_forceVoltdbCreate
+                    || managedPathsWithFiles(readDepl.deployment).isEmpty();
 
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
@@ -451,10 +548,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = false;
-            if (config.m_startAction.doesRejoin()) {
-                isRejoin = true;
-            }
+            boolean isRejoin = config.m_startAction.doesRejoin();
             m_rejoining = isRejoin;
             m_rejoinDataPending = isRejoin || config.m_startAction == StartAction.JOIN;
 
@@ -471,23 +565,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
-            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
-
-            // Replay command line args that we can see
-            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
-            sb.append(System.getProperty("sun.java.command", "[not available]"));
-            hostLog.info(sb.toString());
-
-            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
-                sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
-
-            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
-            sb.append(System.getProperty("java.class.path", "[not available]"));
-            hostLog.info(sb.toString());
 
             // use CLI overrides for testing hotfix version compatibility
             if (m_config.m_versionStringOverrideForTest != null) {
@@ -517,7 +594,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE && !config.m_forceVoltdbCreate) {
+            if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories() && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck();
             }
 
@@ -696,7 +773,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(this, 1);
+            Inits inits = new Inits(m_statusTracker, this, 1);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1136,17 +1213,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private class ConfigLogging implements Runnable {
+
         private void logConfigInfo() {
             hostLog.info("Logging config info");
 
-            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
-
-            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
-            File configInfoDir = new File(pathToConfigInfoDir);
+            File configInfoDir = getConfigLogDirectory();
             configInfoDir.mkdirs();
 
-            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
-            File configInfo = new File(pathToConfigInfo);
+            File configInfo = new File(configInfoDir, "config.json");
 
             byte jsonBytes[] = null;
             try {
@@ -1209,19 +1283,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
 
         private void logCatalogAndDeployment() {
-            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_catalogContext.getDeployment().getPaths());
-            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
-            new File(pathToConfigInfoDir).mkdirs();
+
+            File configInfoDir = getConfigLogDirectory();
+            configInfoDir.mkdirs();
 
             try {
-                m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
+                m_catalogContext.writeCatalogJarToFile(configInfoDir.getPath(), "catalog.jar");
             } catch (IOException e) {
-                hostLog.error("Failed to log catalog: " + e.getMessage());
+                hostLog.error("Failed to log catalog: " + e.getMessage(), e);
                 e.printStackTrace();
             }
+            logDeployment();
+        }
+
+        private void logDeployment() {
+            File configInfoDir = getConfigLogDirectory();
+            configInfoDir.mkdirs();
 
             try {
-                File deploymentFile = new File(pathToConfigInfoDir, "deployment.xml");
+                File deploymentFile = getConfigLogDeployment();
                 if (deploymentFile.exists()) {
                     deploymentFile.delete();
                 }
@@ -1229,7 +1309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 fileOutputStream.write(m_catalogContext.getDeploymentBytes());
                 fileOutputStream.close();
             } catch (Exception e) {
-                hostLog.error("Failed to log deployment file: " + e.getMessage());
+                hostLog.error("Failed to log deployment file: " + e.getMessage(), e);
                 e.printStackTrace();
             }
         }
@@ -1391,6 +1471,100 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
+
+        String deprootFN = dt.getPaths().getVoltdbroot().getPath();
+        File   deprootFH = new VoltFile(deprootFN);
+        File   cnfrootFH = config.m_voltdbRoot;
+
+        if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
+            VoltDB.crashLocalVoltDB("Unable to create the voltdbroot directory in " + cnfrootFH, false, null);
+        }
+        try {
+            File depcanoFH = null;
+            try {
+                depcanoFH = deprootFH.getCanonicalFile();
+            } catch (IOException e) {
+                depcanoFH = deprootFH;
+            }
+            File cnfcanoFH = cnfrootFH.getCanonicalFile();
+            if (!"voltdbroot".equals(deprootFN) && !cnfcanoFH.equals(depcanoFH)) {
+                VoltDB.crashLocalVoltDB(
+                        "voltdbroot specified in deployment file " + deprootFN
+                      + " does not match the one specified at command line " + config.m_voltdbRoot);
+                return;
+            }
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB(
+                    "Unable to resolve voltdbroot location: " + config.m_voltdbRoot,
+                    false, e);
+            return;
+        }
+
+        List<String> nonEmptyPaths = managedPathsWithFiles(dt);
+        if (!nonEmptyPaths.isEmpty()) {
+            StringBuilder crashMessage =
+                    new StringBuilder("Files from a previous database session exist in the managed directories:");
+            for (String nonEmptyPath : nonEmptyPaths) {
+                crashMessage.append("\n  - " + nonEmptyPath);
+            }
+            crashMessage.append("\nUse the start command to start the initialized database or use init --force" +
+                " to initialize a new database session overwriting existing files.");
+            VoltDB.crashLocalVoltDB(crashMessage.toString());
+            return;
+        }
+
+        File confDH = getConfigLogDirectory(config);
+        if (!confDH.exists() && !confDH.mkdirs()) {
+            VoltDB.crashLocalVoltDB("Unable to create the config directory " + confDH);
+            return;
+        }
+
+        if (!deprootFH.equals(cnfrootFH)) {
+            dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
+            File depFH = getConfigLogDeployment(config);
+            try (FileWriter fw = new FileWriter(depFH)) {
+                fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
+            } catch (IOException|RuntimeException e) {
+                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
+                return;
+            }
+        } else {
+            File optFH = new VoltFile(config.m_pathToDeployment);
+            File depFH = getConfigLogDeployment(config);
+            try {
+                if (!depFH.exists()) {
+                    new FileOutputStream(depFH).close();
+                }
+                if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
+                    Files.copy(optFH, depFH);
+                }
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unable to set up deployment configuration in " + depFH, false, e);
+                return;
+            }
+        }
+    }
+
+    private void stageInitializedMarker(Configuration config) {
+        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+        try (PrintWriter pw = new PrintWriter(new FileWriter(depFH), true)) {
+            pw.println(config.m_clusterName);
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage cluster name designtion", false, e);
+        }
+    }
+
+    private void stageClusterMembersFile(VoltDB.Configuration config) {
+        File meshFH = new VoltFile(config.m_voltdbRoot, VoltDB.STAGED_MESH);
+        Joiner commaJoiner = Joiner.on(",").skipNulls();
+        try (PrintWriter pw = new PrintWriter(new FileWriter(meshFH), true)) {
+            pw.println(commaJoiner.join(config.m_meshProvider.getMeshMembers()));
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage mesh members file", false, e);
+        }
+    }
+
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -1404,7 +1578,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             } catch (Exception ex) {
                 //Let us get bytes from ZK
             }
-
+            DeploymentType deployment = null;
             try {
                 if (deploymentBytes != null) {
                     CatalogUtil.writeCatalogToZK(zk,
@@ -1455,15 +1629,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("No such deployment file: "
                         + m_config.m_pathToDeployment, false, null);
             }
-            DeploymentType deployment =
-                CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+
+            if (deployment == null) {
+                deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            }
+
             // wasn't a valid xml deployment file
             if (deployment == null) {
                 hostLog.error("Not a valid XML deployment file at URL: " + m_config.m_pathToDeployment);
                 VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
                         + m_config.m_pathToDeployment, false, null);
             }
-
             /*
              * Check for invalid deployment file settings (enterprise-only) in the community edition.
              * Trick here is to print out all applicable problems and then stop, rather than stopping
@@ -1589,6 +1765,142 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             0);
 
             return deployment.getCluster().getHostcount();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static class ReadDeploymentResults {
+        final byte [] deploymentBytes;
+        final DeploymentType deployment;
+
+        ReadDeploymentResults(byte [] deploymentBytes, DeploymentType deployment) {
+            this.deploymentBytes = deploymentBytes;
+            this.deployment = deployment;
+        }
+    }
+
+    Optional<byte []> modifyIfNecessaryDeploymentHostCount(DeploymentType deployment, int hostCount) {
+        Optional<byte[]> deploymentBytes = Optional.empty();
+        if ((deployment.getCluster().getKfactor()+1) > hostCount) {
+            VoltDB.crashLocalVoltDB(
+                    "Number of cluster members " + hostCount + " must greater than ksafety "
+                  + deployment.getCluster().getKfactor(), false, null
+                  );
+            return Optional.empty();
+        }
+        if (deployment.getCluster().getHostcount() != hostCount) {
+            deployment.getCluster().setHostcount(hostCount);
+            String remarshalled = null;
+            try {
+                remarshalled = CatalogUtil.getDeployment(deployment, true /* pretty print indent */);
+            } catch (IOException|RuntimeException e) {
+                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
+                return Optional.empty();
+            }
+            deploymentBytes = Optional.of(remarshalled.getBytes(StandardCharsets.UTF_8));
+            try (FileWriter fw = new FileWriter(getConfigLogDeployment())) {
+                fw.write(remarshalled);
+            } catch (IOException|RuntimeException e) {
+                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration", false, e);
+                return Optional.empty();
+            }
+        }
+        return deploymentBytes;
+    }
+
+    ReadDeploymentResults readPrimedDeployment(VoltDB.Configuration config) {
+        /*
+         * Debate with the cluster what the deployment file should be
+         */
+        try {
+            byte deploymentBytes[] = null;
+
+            try {
+                deploymentBytes = org.voltcore.utils.CoreUtils.urlToBytes(config.m_pathToDeployment);
+            } catch (Exception ex) {
+                //Let us get bytes from ZK
+            }
+
+            if (deploymentBytes == null) {
+                hostLog.error("Deployment information could not be obtained from cluster node or locally");
+                VoltDB.crashLocalVoltDB("No such deployment file: "
+                        + config.m_pathToDeployment, false, null);
+            }
+            DeploymentType deployment =
+                CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            // wasn't a valid xml deployment file
+            if (deployment == null) {
+                hostLog.error("Not a valid XML deployment file at URL: " + config.m_pathToDeployment);
+                VoltDB.crashLocalVoltDB("Not a valid XML deployment file at URL: "
+                        + config.m_pathToDeployment, false, null);
+            }
+            // adjust deployment host count when the cluster members are given by mesh configuration
+            // providers
+            if (config.m_startAction == StartAction.PROBE) {
+                Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(
+                        deployment, config.m_meshProvider.getMeshMembers().size());
+                if (changed.isPresent()) {
+                    deploymentBytes = changed.get();
+                }
+            }
+
+            /*
+             * Check for invalid deployment file settings (enterprise-only) in the community edition.
+             * Trick here is to print out all applicable problems and then stop, rather than stopping
+             * after the first one is found.
+             */
+            if (!config.m_isEnterprise) {
+                boolean shutdownDeployment = false;
+                boolean shutdownAction = false;
+
+                // check license features for community version
+                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
+                    consoleLog.error("K-Safety is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
+                    consoleLog.error("Snapshots are not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())) {
+                    consoleLog.error("Command logging is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                if ((deployment.getExport() != null) && Boolean.TRUE.equals(deployment.getExport().isEnabled())) {
+                    consoleLog.error("Export is not supported " +
+                            "in the community edition of VoltDB.");
+                    shutdownDeployment = true;
+                }
+                // check the start action for the community edition
+                if (m_config.m_startAction != StartAction.CREATE) {
+                    consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
+                            "\" is not supported in the community edition of VoltDB.");
+                    shutdownAction = true;
+                }
+
+                // if the process needs to stop, try to be helpful
+                if (shutdownAction || shutdownDeployment) {
+                    String msg = "This process will exit. Please run VoltDB with ";
+                    if (shutdownDeployment) {
+                        msg += "a deployment file compatible with the community edition";
+                    }
+                    if (shutdownDeployment && shutdownAction) {
+                        msg += " and ";
+                    }
+
+                    if (shutdownAction && !shutdownDeployment) {
+                        msg += "the CREATE start action";
+                    }
+                    msg += ".";
+
+                    VoltDB.crashLocalVoltDB(msg, false, null);
+                }
+            }
+            return new ReadDeploymentResults(deploymentBytes, deployment);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -1753,6 +2065,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     "Please check your command line and start action and try again.", false, null);
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
+        if (isRejoin) {
+            m_statusTracker.setNodeState(NodeState.REJOINING);
+        }
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -1986,6 +2301,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
+                m_statusTracker.setNodeState(NodeState.REJOINING);
                 if (!m_joinCoordinator.startJoin(m_catalogContext.database)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
@@ -2190,158 +2506,160 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             byte[] deploymentBytes,
             byte[] deploymentHash)
     {
-        synchronized(m_catalogUpdateLock) {
-            // A site is catching up with catalog updates
-            if (currentTxnId <= m_catalogContext.m_transactionId && !m_txnIdToContextTracker.isEmpty()) {
-                ContextTracker contextTracker = m_txnIdToContextTracker.get(currentTxnId);
-                // This 'dispensed' concept is a little crazy fragile. Maybe it would be better
-                // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open
-                // to opinions here.
-                contextTracker.m_dispensedSites++;
-                int ttlsites = VoltDB.instance().getSiteTrackerForSnapshot().getSitesForHost(m_messenger.getHostId()).size();
-                if (contextTracker.m_dispensedSites == ttlsites) {
-                    m_txnIdToContextTracker.remove(currentTxnId);
+        try {
+            synchronized(m_catalogUpdateLock) {
+                m_statusTracker.setNodeState(NodeState.UPDATING);
+                // A site is catching up with catalog updates
+                if (currentTxnId <= m_catalogContext.m_transactionId && !m_txnIdToContextTracker.isEmpty()) {
+                    ContextTracker contextTracker = m_txnIdToContextTracker.get(currentTxnId);
+                    // This 'dispensed' concept is a little crazy fragile. Maybe it would be better
+                    // to keep a rolling N catalogs? Or perhaps to keep catalogs for N minutes? Open
+                    // to opinions here.
+                    contextTracker.m_dispensedSites++;
+                    int ttlsites = VoltDB.instance().getSiteTrackerForSnapshot().getSitesForHost(m_messenger.getHostId()).size();
+                    if (contextTracker.m_dispensedSites == ttlsites) {
+                        m_txnIdToContextTracker.remove(currentTxnId);
+                    }
+                    return Pair.of( contextTracker.m_context, contextTracker.m_csp);
                 }
-                return Pair.of( contextTracker.m_context, contextTracker.m_csp);
-            }
-            else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
-                hostLog.fatal("Failed catalog update." +
-                        " expectedCatalogVersion: " + expectedCatalogVersion +
-                        " currentTxnId: " + currentTxnId +
-                        " currentTxnUniqueId: " + currentTxnUniqueId +
-                        " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
+                else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
+                    hostLog.fatal("Failed catalog update." +
+                            " expectedCatalogVersion: " + expectedCatalogVersion +
+                            " currentTxnId: " + currentTxnId +
+                            " currentTxnUniqueId: " + currentTxnUniqueId +
+                            " m_catalogContext.catalogVersion " + m_catalogContext.catalogVersion);
 
-                throw new RuntimeException("Trying to update main catalog context with diff " +
-                        "commands generated for an out-of date catalog. Expected catalog version: " +
-                        expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
-            }
-
-            hostLog.info(String.format("Globally updating the current application catalog and deployment " +
-                        "(new hashes %s, %s).",
-                    Encoder.hexEncode(catalogBytesHash).substring(0, 10),
-                    Encoder.hexEncode(deploymentHash).substring(0, 10)));
-
-            // get old debugging info
-            SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
-            byte[] oldDeployHash = m_catalogContext.deploymentHash;
-
-            // 0. A new catalog! Update the global context and the context tracker
-            m_catalogContext =
-                m_catalogContext.update(
-                        currentTxnId,
-                        currentTxnUniqueId,
-                        newCatalogBytes,
-                        diffCommands,
-                        true,
-                        deploymentBytes);
-            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
-            m_txnIdToContextTracker.put(currentTxnId,
-                    new ContextTracker(
-                            m_catalogContext,
-                            csp));
-
-            // log the stuff that's changed in this new catalog update
-            SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
-            for (Entry<String, String> e : newDbgMap.entrySet()) {
-                // skip log lines that are unchanged
-                if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
-                    continue;
+                    throw new RuntimeException("Trying to update main catalog context with diff " +
+                            "commands generated for an out-of date catalog. Expected catalog version: " +
+                            expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
                 }
-                hostLog.info(e.getValue());
-            }
 
-            //Construct the list of partitions and sites because it simply doesn't exist anymore
-            SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
-            List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
+                hostLog.info(String.format("Globally updating the current application catalog and deployment " +
+                            "(new hashes %s, %s).",
+                        Encoder.hexEncode(catalogBytesHash).substring(0, 10),
+                        Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
-            List<Integer> partitions = new ArrayList<Integer>();
-            for (Long site : sites) {
-                Integer partition = siteTracker.getPartitionForSite(site);
-                partitions.add(partition);
-            }
-            // Update catalog for import processor this should be just/stop start and updat partitions.
-            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
+                // get old debugging info
+                SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+                byte[] oldDeployHash = m_catalogContext.deploymentHash;
 
-            // 1. update the export manager.
-            ExportManager.instance().updateCatalog(m_catalogContext, partitions);
+                // 0. A new catalog! Update the global context and the context tracker
+                m_catalogContext =
+                    m_catalogContext.update(
+                            currentTxnId,
+                            currentTxnUniqueId,
+                            newCatalogBytes,
+                            diffCommands,
+                            true,
+                            deploymentBytes);
+                final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
+                m_txnIdToContextTracker.put(currentTxnId,
+                        new ContextTracker(
+                                m_catalogContext,
+                                csp));
 
-            // 1.1 Update the elastic join throughput settings
-            if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
-
-            // 1.5 update the dead host timeout
-            if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
-                m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
-                m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
-            }
-
-            // 2. update client interface (asynchronously)
-            //    CI in turn updates the planner thread.
-            if (m_clientInterface != null) {
-                m_clientInterface.notifyOfCatalogUpdate();
-            }
-
-            // 3. update HTTPClientInterface (asynchronously)
-            // This purges cached connection state so that access with
-            // stale auth info is prevented.
-            if (m_adminListener != null)
-            {
-                m_adminListener.notifyOfCatalogUpdate();
-            }
-
-            // 4. Flush StatisticsAgent old catalog statistics.
-            // Otherwise, the stats agent will hold all old catalogs
-            // in memory.
-            getStatsAgent().notifyOfCatalogUpdate();
-
-            // 5. MPIs don't run fragments. Update them here. Do
-            // this after flushing the stats -- this will re-register
-            // the MPI statistics.
-            if (m_MPI != null) {
-                m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
-            }
-
-            // 6. Perform updates required by the DR subsystem
-
-            // 6.1. Create the DR consumer if we've just enabled active-active.
-            // Perform any actions that would have been taken during the ordinary
-            // initialization path
-            if (createDRConsumerIfNeeded()) {
-                for (int pid : m_cartographer.getPartitions()) {
-                    // Notify the consumer of leaders because it was disabled before
-                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
-                    callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
+                // log the stuff that's changed in this new catalog update
+                SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+                for (Entry<String, String> e : newDbgMap.entrySet()) {
+                    // skip log lines that are unchanged
+                    if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
+                        continue;
+                    }
+                    hostLog.info(e.getValue());
                 }
-                // If this is @UAC cl replay, don't initialize DR consumer until
-                // cluster recover finished.
-                if (m_mode != OperationMode.INITIALIZING) {
+
+                //Construct the list of partitions and sites because it simply doesn't exist anymore
+                SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
+                List<Long> sites = siteTracker.getSitesForHost(m_messenger.getHostId());
+
+                List<Integer> partitions = new ArrayList<Integer>();
+                for (Long site : sites) {
+                    Integer partition = siteTracker.getPartitionForSite(site);
+                    partitions.add(partition);
+                }
+                // Update catalog for import processor this should be just/stop start and updat partitions.
+                ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
+
+                // 1. update the export manager.
+                ExportManager.instance().updateCatalog(m_catalogContext, partitions);
+
+                // 1.1 Update the elastic join throughput settings
+                if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
+
+                // 1.5 update the dead host timeout
+                if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
+                    m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
+                    m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+                }
+
+                // 2. update client interface (asynchronously)
+                //    CI in turn updates the planner thread.
+                if (m_clientInterface != null) {
+                    m_clientInterface.notifyOfCatalogUpdate();
+                }
+
+                // 3. update HTTPClientInterface (asynchronously)
+                // This purges cached connection state so that access with
+                // stale auth info is prevented.
+                if (m_adminListener != null)
+                {
+                    m_adminListener.notifyOfCatalogUpdate();
+                }
+
+                // 4. Flush StatisticsAgent old catalog statistics.
+                // Otherwise, the stats agent will hold all old catalogs
+                // in memory.
+                getStatsAgent().notifyOfCatalogUpdate();
+
+                // 5. MPIs don't run fragments. Update them here. Do
+                // this after flushing the stats -- this will re-register
+                // the MPI statistics.
+                if (m_MPI != null) {
+                    m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+                }
+
+                // 6. Perform updates required by the DR subsystem
+
+                // 6.1. Create the DR consumer if we've just enabled active-active.
+                // Perform any actions that would have been taken during the ordinary
+                // initialization path
+                if (createDRConsumerIfNeeded()) {
+                    for (int pid : m_cartographer.getPartitions()) {
+                        // Notify the consumer of leaders because it was disabled before
+                        ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
+                        callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
+                    }
                     m_consumerDRGateway.initialize(false);
                 }
+                // 6.2. If we are a DR replica, we may care about a
+                // deployment update
+                if (m_consumerDRGateway != null) {
+                    m_consumerDRGateway.updateCatalog(m_catalogContext);
+                }
+                // 6.3. If we are a DR master, update the DR table signature hash
+                if (m_producerDRGateway != null) {
+                    m_producerDRGateway.updateCatalog(m_catalogContext,
+                            VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
+                }
+
+                new ConfigLogging().logCatalogAndDeployment();
+
+                // log system setting information if the deployment config has changed
+                if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
+                    logSystemSettingFromCatalogContext();
+                }
+
+                // restart resource usage monitoring task
+                startResourceUsageMonitor();
+
+                checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                        (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+
+                return Pair.of(m_catalogContext, csp);
             }
-            // 6.2. If we are a DR replica, we may care about a
-            // deployment update
-            if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.updateCatalog(m_catalogContext);
-            }
-            // 6.3. If we are a DR master, update the DR table signature hash
-            if (m_producerDRGateway != null) {
-                m_producerDRGateway.updateCatalog(m_catalogContext,
-                        VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
-            }
-
-            new ConfigLogging().logCatalogAndDeployment();
-
-            // log system setting information if the deployment config has changed
-            if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
-                logSystemSettingFromCatalogContext();
-            }
-
-            // restart resource usage monitoring task
-            startResourceUsageMonitor();
-
-            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
-                    (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
-
-            return Pair.of(m_catalogContext, csp);
+        } finally {
+            //Set state back to UP
+            m_statusTracker.setNodeState(NodeState.UP);
         }
     }
 
@@ -2540,6 +2858,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
+        m_statusTracker.setNodeState(NodeState.UP);
     }
 
     @Override
@@ -2560,10 +2879,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         {
             if (mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(true);
+                m_statusTracker.setNodeState(NodeState.PAUSED);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
+                m_config.m_isPaused.set(false);
+                m_statusTracker.setNodeState(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -2709,6 +3032,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+        m_statusTracker.setNodeState(NodeState.UP);
     }
 
     @Override
@@ -2928,24 +3252,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * @throws IOException
      */
     static String setupDefaultDeployment(VoltLogger logger) throws IOException {
+        return setupDefaultDeployment(logger, CatalogUtil.getVoltDbRoot(null));
+    }
 
-        // Since there's apparently no deployment to override the path to voltdbroot it should be
-        // safe to assume it's under the working directory.
-        // CatalogUtil.getVoltDbRoot() creates the voltdbroot directory as needed.
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(null);
-        String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
-        File deploymentXMLFile = new File(pathToDeployment);
+    /**
+     * Create default deployment.xml file in voltdbroot if the deployment path is null.
+     *
+     * @return pathto default deployment file
+     * @throws IOException
+     */
+   static String setupDefaultDeployment(VoltLogger logger, File voltdbroot) throws IOException {
+        File configInfoDir = new VoltFile(voltdbroot, VoltDB.CONFIG_DIR);
+        configInfoDir.mkdirs();
 
-        logger.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
-        BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
-        for (String line : defaultDeploymentXML) {
-            bw.write(line);
-            bw.newLine();
+        File depFH = new VoltFile(configInfoDir, "deployment.xml");
+        if (!depFH.exists()) {
+            logger.info("Generating default deployment file \"" + depFH.getAbsolutePath() + "\"");
+
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(depFH))) {
+                for (String line : defaultDeploymentXML) {
+                    bw.write(line);
+                    bw.newLine();
+                }
+            } finally {
+            }
         }
-        bw.flush();
-        bw.close();
 
-        return deploymentXMLFile.getAbsolutePath();
+        return depFH.getAbsolutePath();
     }
 
     /*

@@ -17,17 +17,33 @@
 
 package org.voltdb.utils;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.UUID;
 
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 
-public class Digester {
+public final class Digester {
+
+    private Digester() {
+    }
+
+    private final static BigInteger LSB_MASK = new BigInteger(new byte[] {
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255 });
 
     final public static byte [] sha1(final byte buf[]) {
-        Preconditions.checkArgument(buf !=null, "specified null buffer");
+        checkArgument(buf !=null, "specified null buffer");
         MessageDigest md = null;
         try {
             md = MessageDigest.getInstance("SHA-1");
@@ -37,11 +53,24 @@ public class Digester {
         md.reset();
         return md.digest(buf);
     }
+
     final public static byte [] sha256(final byte buf[]) {
-        Preconditions.checkArgument(buf !=null, "specified null buffer");
+        checkArgument(buf !=null, "specified null buffer");
         MessageDigest md = null;
         try {
             md = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            Throwables.propagate(e);
+        }
+        md.reset();
+        return md.digest(buf);
+    }
+
+    final public static byte [] md5(final byte buf[]) {
+        checkArgument(buf !=null, "specified null buffer");
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
             Throwables.propagate(e);
         }
@@ -54,8 +83,8 @@ public class Digester {
     }
 
     final public static String sha1AsBase64(final String str) {
-        Preconditions.checkArgument(str != null, "specified null string");
-        return sha1AsBase64(str.getBytes(Charsets.UTF_8));
+        checkArgument(str != null, "specified null string");
+        return sha1AsBase64(str.getBytes(StandardCharsets.UTF_8));
     }
 
     final public static String sha1AsHex(final byte buf []) {
@@ -66,7 +95,21 @@ public class Digester {
     }
 
     final public static String shaAsHex(final String str) {
-        Preconditions.checkArgument(str != null, "specified null string");
-        return (sha1AsHex(str.getBytes(Charsets.UTF_8)) + sha256AsHex(str.getBytes(Charsets.UTF_8)));
+        checkArgument(str != null, "specified null string");
+        return (sha1AsHex(str.getBytes(StandardCharsets.UTF_8)) + sha256AsHex(str.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    final public static BigInteger md5AsBigInt(final byte [] buf) {
+        return new BigInteger(1, md5(buf));
+    }
+
+    final public static UUID md5AsUUID(final byte [] buf) {
+        BigInteger bi = md5AsBigInt(buf);
+        return new UUID(bi.shiftRight(64).longValue(), bi.and(LSB_MASK).longValue());
+    }
+
+    final public static UUID md5AsUUID(String str) {
+        checkArgument(str != null, "specified null string");
+        return md5AsUUID(str.getBytes(StandardCharsets.UTF_8));
     }
 }

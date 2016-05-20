@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -43,6 +44,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
@@ -161,6 +164,9 @@ public abstract class CatalogUtil {
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+    public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
+    public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
+    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -958,18 +964,20 @@ public abstract class CatalogUtil {
     /**
      * Given the deployment object generate the XML
      * @param deployment
+     * @param indent
      * @return XML of deployment object.
      * @throws IOException
      */
-    public static String getDeployment(DeploymentType deployment) throws IOException {
+    public static String getDeployment(DeploymentType deployment, boolean indent) throws IOException {
         try {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
             Marshaller marshaller = m_jc.createMarshaller();
             marshaller.setSchema(m_schema);
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.valueOf(indent));
             StringWriter sw = new StringWriter();
-            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            marshaller.marshal(new JAXBElement<DeploymentType>(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -983,6 +991,35 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    /**
+     * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
+     * two longs) of a deployment file stripped of all comments and its hostcount
+     * attribute set to 0 ,and adminstartup set to false
+     *
+     * @param deploymentBytes
+     * @return MD5 digest for for configuration
+     */
+    public static UUID makeDeploymentHashForConfig(byte[] deploymentBytes) {
+        String normalized = new String(deploymentBytes, StandardCharsets.UTF_8);
+        Matcher matcher = XML_COMMENT_RE.matcher(normalized);
+        normalized = matcher.replaceAll("");
+        matcher = HOSTCOUNT_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("hostcount=\"0\"");
+        matcher = ADMINMODE_RE.matcher(normalized);
+        normalized = matcher.replaceFirst("adminstartup=\"false\"");
+        return Digester.md5AsUUID(normalized);
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     * @param deployment
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment) throws IOException {
+        return getDeployment(deployment, false);
     }
 
     /**
@@ -1093,7 +1130,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
-    private static void validateDirectory(String type, File path) {
+    public static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {

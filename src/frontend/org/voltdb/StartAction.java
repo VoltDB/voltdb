@@ -18,9 +18,10 @@
 package org.voltdb;
 
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 public enum StartAction {
 
@@ -29,12 +30,13 @@ public enum StartAction {
     SAFE_RECOVER("recover safemode", true, "Command Log Recovery"),
     REJOIN("rejoin", true, "K-Safety / Node Rejoin"),
     LIVE_REJOIN("live rejoin", true, "K-Safety / Node Rejoin"),
-    JOIN("add", true, "Elastic Cluster Sizing");
+    JOIN("add", true, "Elastic Cluster Sizing"),
+    INITIALIZE("initialize", false, "Layout and prime voltdbroot"),
+    PROBE("probe", false, "Determine start action");
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
-    final static Map<String, StartAction> verbMoniker =
-            new HashMap<String, StartAction>();
+    final static Map<String, StartAction> verbMoniker;
 
     final static EnumSet<StartAction> recoverSet =
             EnumSet.of(RECOVER,SAFE_RECOVER);
@@ -45,14 +47,22 @@ public enum StartAction {
     final static EnumSet<StartAction> joinSet =
             EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
 
+    final static EnumSet<StartAction> requireEmptyDirsSet =
+            EnumSet.of(CREATE);
+
+    final static EnumSet<StartAction> legacySet =
+            EnumSet.complementOf(EnumSet.of(INITIALIZE,PROBE));
+
     final String m_verb;
     final boolean m_enterpriseOnly;
     final String m_featureNameForErrorString;
 
     static {
+        ImmutableMap.Builder<String, StartAction> mb = ImmutableMap.builder();
         for (StartAction action: StartAction.values()) {
-            verbMoniker.put(action.m_verb, action);
+            mb.put(action.m_verb, action);
         }
+        verbMoniker = mb.build();
     }
 
     StartAction(String verb, boolean enterpriseOnly, String featureNameForErrorString) {
@@ -89,5 +99,13 @@ public enum StartAction {
 
     public boolean doesJoin() {
         return joinSet.contains(this);
+    }
+
+    public boolean isLegacy() {
+        return legacySet.contains(this);
+    }
+
+    public boolean doesRequireEmptyDirectories() {
+        return requireEmptyDirsSet.contains(this);
     }
 }

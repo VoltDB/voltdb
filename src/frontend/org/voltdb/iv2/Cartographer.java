@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -46,6 +47,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -54,6 +56,7 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -561,4 +564,78 @@ public class Cartographer extends StatsSource
         return true;
     }
 
+    /**
+     * Determines the counts of how many replicas each partition is missing from having a full k-factor
+     * safe coverage.
+     *
+     * @return a {@link NavigableMap&lt;Integer, Integer&gt;}  where the key is the partition id
+     * and the value is the count of how many replicas this partition is missing before is considered
+     * wholly k-factor safe
+     */
+    public NavigableMap<Integer, Integer> getReplicaMissingCountByPartition() {
+        List<String> partitionDirs = null;
+
+        ImmutableSortedMap.Builder<Integer, Integer> lackingReplication =
+                ImmutableSortedMap.naturalOrder();
+
+        try {
+            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
+        }
+
+        //Don't fetch the values serially do it asynchronously
+        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
+        for (String partitionDir : partitionDirs) {
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            try {
+                ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
+                m_zk.getData(dir, false, callback, null);
+                dataCallbacks.offer(callback);
+                ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
+                m_zk.getChildren(dir, false, childrenCallback, null);
+                childrenCallbacks.offer(childrenCallback);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+
+        for (String partitionDir : partitionDirs) {
+            int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
+
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            try {
+                // The data of the partition dir indicates whether the partition has finished
+                // initializing or not. If not, the replicas may still be in the process of
+                // adding themselves to the dir. So don't check for k-safety if that's the case.
+                byte[] partitionState = dataCallbacks.poll().getData();
+                boolean isInitializing = false;
+                if (partitionState != null && partitionState.length == 1) {
+                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
+                }
+
+                List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+                if (!isInitializing && replicas.isEmpty() && partitionNotOnHashRing) {
+                    continue;
+                }
+                if (!isInitializing && !partitionNotOnHashRing) {
+                    lackingReplication.put(pid, m_configuredReplicationFactor + 1 - replicas.size());
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+
+        return lackingReplication.build();
+    }
+
+    private static boolean partitionNotOnHashRing(int pid) {
+        return TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ?
+            false
+          : TheHashinator.getRanges(pid).isEmpty();
+    }
 }

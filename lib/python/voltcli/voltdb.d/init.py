@@ -15,21 +15,25 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 @VOLT.Command(
-    # Uses all default except last is safemode switch availability
-    bundles = VOLT.ServerBundle('recover',
+    bundles = VOLT.ServerBundle('initialize',
                                 needs_catalog=False,
                                 supports_live=False,
-                                default_host=True,
-                                safemode_available=True,
-                                supports_daemon=True,
-                                supports_multiple_daemons=True,
+                                default_host=False,
+                                safemode_available=False,
+                                supports_daemon=False,
+                                supports_multiple_daemons=False,
                                 check_environment_config=True,
-                                force_voltdb_create=False,
-                                supports_paused=True),
+                                force_voltdb_create=True,
+                                supports_paused=False,
+                                is_legacy_verb=False),
     options = (
-        VOLT.BooleanOption('-r', '--replica', 'replica', 'recover replica cluster', default = False),
+        VOLT.StringOption('-C', '--config', 'configfile',
+                         'specify the location of the deployment file',
+                          default = None)
     ),
-    description = 'Start the database and recover the previous state.'
+    description = 'Initializes a new, empty database.'
 )
-def recover(runner):
+def init(runner):
+    if runner.opts.configfile:
+        runner.args.extend(['deployment', runner.opts.configfile])
     runner.go()
