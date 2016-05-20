@@ -66,7 +66,7 @@ public class StatementSchemaDefinition extends StatementSchema {
 
     Result getResult(Session session) {
 
-        schemaName = statements[0].getSchemalName();
+        schemaName = statements[0].getSchemaName();
 
         if (this.isExplain) {
             return Result.newSingleColumnStringResult("OPERATION",
