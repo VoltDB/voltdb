@@ -31,6 +31,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -41,6 +42,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.InstanceId;
@@ -923,5 +926,29 @@ public class TestTheHashinator {
         }
 
         return dut;
+    }
+
+    private void checkConfigJSON(ImmutableSortedMap<Integer, Integer> tokens,
+                                    String JSON) throws JSONException {
+        final JSONObject jsonData = new JSONObject(JSON);
+        assertEquals(tokens.size(), jsonData.getInt(ElasticHashinator.JSON_TOKENCOUNT_KEY));
+        final JSONObject tokenPartition = jsonData.getJSONObject(ElasticHashinator.JSON_TOKENPARTITION_KEY);
+        for (Map.Entry<Integer, Integer> entry: tokens.entrySet()) {
+            assertEquals(entry.getValue().intValue(),
+                    tokenPartition.getInt(entry.getKey().toString()));
+        }
+    }
+    @Test
+    public void testJSONConfig() throws JSONException, IOException
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator dut = new ElasticHashinator(ElasticHashinator.getConfigureBytes(8, ElasticHashinator.DEFAULT_TOTAL_TOKENS), false);
+        ImmutableSortedMap<Integer, Integer> tokens = dut.getTokens();
+        // uncompressed
+        checkConfigJSON(tokens, dut.getConfigJSON());
+
+        // compressed
+        checkConfigJSON(tokens, ElasticHashinator.decompressJSONString(dut.getConfigJSONCompressed()));
     }
 }

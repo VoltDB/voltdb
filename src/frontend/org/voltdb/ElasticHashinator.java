@@ -17,7 +17,11 @@
 package org.voltdb;
 
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.Thread.State;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
@@ -27,11 +31,17 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CompressionService;
+
+import sun.misc.Cleaner;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
@@ -41,8 +51,6 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SortedMapDifference;
 import com.google_voltpatches.common.collect.UnmodifiableIterator;
-
-import sun.misc.Cleaner;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -55,6 +63,10 @@ public class ElasticHashinator extends TheHashinator {
 
     public static int DEFAULT_TOTAL_TOKENS =
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
+
+    // JSON KEYS FOR SERIALIZATION
+    public static final String JSON_TOKENCOUNT_KEY = "tokencount";
+    public static final String JSON_TOKENPARTITION_KEY = "tokenpartition";
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -91,6 +103,19 @@ public class ElasticHashinator extends TheHashinator {
         @Override
         public Long get() {
             return TheHashinator.computeConfigurationSignature(m_configBytes.get());
+        }
+    });
+
+    private final Supplier<String> m_configJSON = Suppliers.memoize(new Supplier<String>() {
+        @Override
+        public String get() {
+            return toJSONString();
+        }
+    });
+    private final Supplier<byte[]> m_configJSONCompressed = Suppliers.memoize(new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toJSONStringCompressed();
         }
     });
 
@@ -196,6 +221,71 @@ public class ElasticHashinator extends TheHashinator {
             buf.putInt(pid);
         }
         return buf.array();
+    }
+
+    /**
+     * Serializes the configuration into JSON, also updates the currently cached m_configJSON.
+     * @return The JSONString of the current configuration.
+     */
+
+    private String toJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+            js.object();
+            js.key(JSON_TOKENCOUNT_KEY).value(m_tokenCount);
+            js.key(JSON_TOKENPARTITION_KEY).object();
+            for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
+                js.key(entry.getKey().toString()).value(entry.getValue());
+            }
+            js.endObject().endObject();
+        }catch (JSONException e) {
+            throw new RuntimeException("Failed to serialized Hashinator Configuration to JSON.", e);
+        }
+        return js.toString();
+    }
+
+    /**
+     * Serializes the configuration into JSON, also updates the currently cached m_configJSON.
+     * @return The JSONString of the current configuration.
+     */
+
+    private byte[] toJSONStringCompressed() {
+        String str = m_configJSON.get();
+        if (str == null || str.length() == 0) {
+            return new byte[0] ;
+        }
+        byte[] outStr;
+        try {
+            outStr = compressJSONString(str);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialized Hashinator Configuration to Compressed JSON .", e);
+        }
+        return outStr;
+    }
+
+    public static byte[] compressJSONString(String data) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(data.length());
+        GZIPOutputStream gzip = new GZIPOutputStream(bos);
+        gzip.write(data.getBytes());
+        gzip.close();
+        byte[] compressed = bos.toByteArray();
+        bos.close();
+        return compressed;
+    }
+
+    public static String decompressJSONString(byte[] compressed) throws IOException {
+        ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+        GZIPInputStream gis = new GZIPInputStream(bis);
+        BufferedReader br = new BufferedReader(new InputStreamReader(gis, "UTF-8"));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while((line = br.readLine()) != null) {
+            sb.append(line);
+        }
+        br.close();
+        gis.close();
+        bis.close();
+        return sb.toString();
     }
 
     /**
@@ -415,6 +505,26 @@ public class ElasticHashinator extends TheHashinator {
     public byte[] getConfigBytes()
     {
         return m_configBytes.get();
+    }
+
+    /**
+     * Returns raw config JSONString.
+     * @return config JSONString
+     */
+    @Override
+    public String getConfigJSON()
+    {
+        return m_configJSON.get();
+    }
+
+    /**
+     * Returns compressed config JSONString.
+     * @return config compressed JSONString
+     */
+    @Override
+    public byte[] getConfigJSONCompressed()
+    {
+        return m_configJSONCompressed.get();
     }
 
     /**
