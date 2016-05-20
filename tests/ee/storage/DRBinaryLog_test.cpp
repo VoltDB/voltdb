@@ -1253,6 +1253,7 @@ TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
  * DB B reports: <DELETE missing row>
  * existingRow: <null>
  * expectedRow: <42, 5555, X>
+ * deletedRow:  <>
  *               <INSERT no conflict>
  * existingRow: <null>
  * newRow:      <null>
@@ -1306,7 +1307,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
-    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
 }
 
 /*
@@ -1321,6 +1322,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
  * DB B reports: <DELETE timestamp mismatch>
  * existingRow: <42, 1234, X>
  * expectedRow: <42, 5555, X>
+ * deletedRow:  <>
  *               <INSERT no conflict>
  * existingRow: <null>
  * newRow:      <null>
@@ -1380,7 +1382,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engineReplica->getExportTupleStream());
-    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
 }
 
 /*
