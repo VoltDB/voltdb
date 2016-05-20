@@ -723,7 +723,7 @@ public abstract class NonVoltDBBackend {
                 if (e.getMessage().contains("constraint")) {
                     sqlLog.l7dlog( Level.TRACE, LogKeys.sql_Backend_ConvertingHSQLExtoCFEx.name(), e);
                     final byte messageBytes[] = e.getMessage().getBytes();
-                    ByteBuffer b = ByteBuffer.allocate(25 + messageBytes.length);
+                    ByteBuffer b = ByteBuffer.allocate(100 + messageBytes.length);
                     b.putInt(messageBytes.length);
                     b.put(messageBytes);
                     b.put(e.getSQLState().getBytes());

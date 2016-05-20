@@ -930,6 +930,9 @@ class Schema:
         self.__col_by_type["geo"] = {}
         self.__col_by_type["numeric"] = {}
         self.__col_by_type["nonnumeric"] = {}
+        # This does not refer to a column type, but to columns that are part of
+        # the primary key, as specified by the "indexes" key, in the schema file
+        self.__col_by_type["id"] = {}
         for code, supertype in Schema.TYPE_NAMES.iteritems():
             self.__col_by_type[supertype] = {}
 
@@ -945,6 +948,12 @@ class Schema:
                     # It represents the last table that defined the column as
                     # listed in the schema, so it's usually just the last table in the schema.
                     self.__col_by_type[supertype][column_name] = table
+            indexes = tabledict["indexes"]
+            if isinstance(indexes, basestring):
+                self.__col_by_type["id"][indexes] = table
+            else:
+                for index in indexes:
+                    self.__col_by_type["id"][index] = table
 
     def __init_from_file(self, filename):
         fd = open(filename, "r")

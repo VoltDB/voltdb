@@ -147,6 +147,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // UPSERT INTO VALUES or an UPSERT INTO SELECT
     private static final String UPSERT_QUERY_START = "(?<upsert>UPSERT)\\s+INTO\\s+(?<table>\\w+)\\s+"
             + "(\\(\\s*(?<columns>\\w+\\s*(,\\s*\\w+\\s*)*)\\)\\s+)?";
+    // Used below (twice), for an UPSERT INTO SELECT statement
+    private static final String SORT_KEYWORDS = "GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET";
 
     // Captures the use of an UPSERT INTO VALUES statement, for example:
     //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
@@ -180,9 +182,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // of values must match the number of columns, when included, or else the
     // number of columns defined in table T1; and the types must also match.)
     private static final Pattern upsertSelectQuery = Pattern.compile(
-            UPSERT_QUERY_START + "SELECT\\s+(?<values>.+)"
-                    + "FROM\\s+(?<selecttables>\\w+(\\s+AS\\s+\\w+)?(\\s*(,|JOIN)\\s*\\w+(\\s+AS\\s+\\w+))*)\\s+"
-                    + "(?<wheresort>(WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET).+)?",
+            UPSERT_QUERY_START + "SELECT\\s+(?<values>[+\\-*\\/%|'\\s\\w]+(,\\s*[+\\-*\\/%|'\\s\\w]+)*)\\s+"
+                    + "FROM\\s+(?<selecttables>\\w+(\\s+AS\\s+\\w+)?((\\s*,\\s*|\\s+JOIN\\s+)\\w+(\\s+AS\\s+\\w+)?)*)\\s+"
+                    + "(?<where>WHERE\\s+((?!"+SORT_KEYWORDS+").)+)?"
+                    + "(?<sort>("+SORT_KEYWORDS+").+)?",
             Pattern.CASE_INSENSITIVE);
     // Modifies an UPSERT INTO VALUES statement, as described above, such as:
     //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
@@ -194,10 +197,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // assumes that the C1 column is the primary key.)
     private static final QueryTransformer upsertSelectQueryTransformer
             = new QueryTransformer(upsertSelectQuery)
-            .groups("upsert", "table", "columns", "values","selecttables", "wheresort")
+            .groups("upsert", "table", "columns", "values", "selecttables", "where", "sort")
             .groupReplacementText("INSERT", "{table} AS _TMP").useWholeMatch()
             .suffix(" ON CONFLICT ({columns:pk}) DO UPDATE SET ({columns:npk}) = "
-                    + "(SELECT {values:npk} FROM {selecttables} {wheresort:pk})");
+                    + "(SELECT {values:npk} FROM {selecttables} {where:pk} {sort})");
 
     // Captures the use of string concatenation using a plus sign (+), e.g.:
     //     'str' + VCHAR
@@ -240,7 +243,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // of that length), which it does support
     private static final QueryTransformer varcharBytesDdlTransformer
             = new QueryTransformer(varcharBytesDdl)
-            .prefix("VARCHAR(").suffix(")").multiplier(0.25).minimum(14)
+            .prefix("VARCHAR(").suffix(")").multiplier(0.50).minimum(14)
             .groups("numBytes");
 
     // Captures the use of VARBINARY(n); however, this does not capture the use
@@ -421,12 +424,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *                     column names or expressions, to which those columns
      *                     in {columns:npk} should be set
      *    {table}        : the main table, into which data should be "upserted"
-     *    {selecttables} : the table(s) in the SELECT statement
-     *    {wheresort:pk} : the WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, and
-     *                     OFFSET clauses (if any), at the end of the SELECT,
-     *                     to which an additional WHERE clause must be added,
-     *                     involving primary keys, in order to transform the
-     *                     query for PostgreSQL
+     *    {selecttables} : the table(s) in the SELECT clause
+     *    {where:pk}     : the WHERE clause in the SELECT, involving primary
+     *                     keys, which must replace any existing WHERE clause,
+     *                     in order to transform the query for PostgreSQL
+     *    {sort}         : the GROUP BY, HAVING, ORDER BY, LIMIT, and OFFSET
+     *                     clauses (if any), at the end of the SELECT
      *  The first 2 select from among the columns in the UPSERT (after the main
      *  table name), if they were specified; otherwise, they select from all
      *  the columns of the (main) table. The last 3 only apply to an UPSERT
@@ -442,7 +445,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 
         // If a table was specified & found, use that; otherwise, never mind
         // (Note: this table represents the main table in an UPSERT statement,
-        // e.g., T1, in: UPSERT INTO T1 ...)
+        // e.g., "T1", in: UPSERT INTO T1 ...)
         String table = null;
         int index = groupNames.indexOf("table");
         if (index > -1 && index < groupValues.size()) {
@@ -539,20 +542,22 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             }
         }
 
-        // If "wheresort" was included in the "groupNames" (which it would be
-        // for an UPSERT INTO SELECT statement), prepare a partial WHERE clause,
-        // setting primary keys equal to their equivalent values in the _TMP
-        // table, e.g., "id=_TMP.id AND foo=_TMP.blah AND bar=_TMP.yada"
+        // If "where" was included in the "groupNames" (which it would be for an
+        // UPSERT INTO SELECT statement), prepare a WHERE clause, setting primary
+        // keys equal to their equivalent values in the main (_TMP) table, e.g.:
+        //     "WHERE id=_TMP.id AND foo=_TMP.blah AND bar=_TMP.yada "
         String pkWhereClause = "EMPTY";
-        if (groupNames.indexOf("wheresort") > -1 && pkColumnValues.size() > 0
+        if (groupNames.indexOf("where") > -1 && pkColumnValues.size() > 0
                 && primaryKeyColumns.size() > 0) {
-            pkWhereClause = pkColumnValues.get(0)+"="+"_TMP."+primaryKeyColumns.get(0);
+            pkWhereClause = "WHERE " + pkColumnValues.get(0)+"=_TMP."+primaryKeyColumns.get(0)+" ";
             for (int i=1; i < pkColumnValues.size(); i++) {
-                pkWhereClause += " AND " + pkColumnValues.get(i)+"="+"_TMP."+primaryKeyColumns.get(i);
+                pkWhereClause += "AND " + pkColumnValues.get(i)+"=_TMP."+primaryKeyColumns.get(i)+" ";
             }
         }
 
-        // TODO
+        // Replace the groupName "variables" with their corresponding
+        // groupValues, processing special cases involving columnType
+        // "pk" or "npk", as needed
         StringBuffer modified_str = new StringBuffer();
         Matcher matcher = groupNameVariables.matcher(str);
         while (matcher.find()) {
@@ -562,21 +567,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             if ("pk".equalsIgnoreCase(columnType)) {
                 if ("columns".equalsIgnoreCase(groupName)) {
                     matcher.appendReplacement(modified_str, String.join(", ", primaryKeyColumns));
-                } else if ("wheresort".equalsIgnoreCase(groupName)) {
-                    index = groupNames.indexOf(groupName);
-                    if (index > -1 && index < groupValues.size() && groupValues.get(index) != null) {
-                        String whereAndSortClauses = groupValues.get(index);
-                        if (whereAndSortClauses.toUpperCase().startsWith("WHERE ")) {
-                            matcher.appendReplacement(modified_str, "WHERE " + pkWhereClause
-                                    + " AND " + whereAndSortClauses.substring(6));
-                        } else {
-                            matcher.appendReplacement(modified_str, "WHERE " + pkWhereClause
-                                    + " " + whereAndSortClauses);
-                        }
-                    } else {
-                        // No match: give up on this "variable"
-                        matcher.appendReplacement(modified_str, "{"+groupName+":pk}");
-                    }
+                } else if ("where".equalsIgnoreCase(groupName)) {
+                    matcher.appendReplacement(modified_str, pkWhereClause);
                 } else {
                     // No match: give up on this "variable"
                     matcher.appendReplacement(modified_str, "{"+groupName+":pk}");
