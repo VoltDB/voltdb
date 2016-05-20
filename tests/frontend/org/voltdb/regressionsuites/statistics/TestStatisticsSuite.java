@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import junit.framework.Test;
+
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
@@ -41,8 +43,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
-
-import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
@@ -362,9 +362,10 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema1[2] = new ColumnInfo("Leader", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
-        ColumnInfo[] expectedSchema2 = new ColumnInfo[2];
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[3];
         expectedSchema2[0] = new ColumnInfo("HASHTYPE", VoltType.STRING);
         expectedSchema2[1] = new ColumnInfo("HASHCONFIG", VoltType.VARBINARY);
+        expectedSchema2[2] = new ColumnInfo("HASHCONFIGJSONCompressed", VoltType.VARBINARY);
         VoltTable expectedTable2 = new VoltTable(expectedSchema2);
 
         VoltTable[] results = null;

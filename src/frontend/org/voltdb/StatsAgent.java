@@ -313,12 +313,10 @@ public class StatsAgent extends OpsAgent
                     new VoltTable(
                             new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
                             new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY),
-                            new VoltTable.ColumnInfo("HASHCONFIGJSON", VoltType.STRING),
                             new VoltTable.ColumnInfo("HASHCONFIGJSONCompressed", VoltType.VARBINARY));
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
             vt.addRow(hashConfig.type.toString(), hashConfig.configBytes,
-                    TheHashinator.getCurrentHashinator().getConfigJSON(),
                     TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
         }
         psr.aggregateTables = tables;

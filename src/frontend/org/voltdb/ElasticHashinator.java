@@ -65,8 +65,8 @@ public class ElasticHashinator extends TheHashinator {
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
     // JSON KEYS FOR SERIALIZATION
-    public static final String JSON_TOKENCOUNT_KEY = "tokencount";
-    public static final String JSON_TOKENPARTITION_KEY = "tokenpartition";
+    public static final String JSON_TOKENCOUNT_KEY = "count";
+    public static final String JSON_TOKENPARTITION_KEY = "map";
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
