@@ -110,6 +110,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        cl.m_isPaused = m_isPaused;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -205,6 +206,10 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine replicaMode(ReplicationRole replicaMode) {
         m_replicationRole = replicaMode;
         return this;
+    }
+
+    public void startPaused() {
+        this.m_isPaused.set(true);
     }
 
     public CommandLine leader(String leader)

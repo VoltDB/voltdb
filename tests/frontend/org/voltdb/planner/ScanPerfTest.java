@@ -153,7 +153,7 @@ public class ScanPerfTest extends TestCase {
         System.out.println("Starting cluster.");
         cluster.setHasLocalServer(false);
         cluster.overrideAnyRequestForValgrind();
-        cluster.startUp(true, ReplicationRole.NONE);
+        cluster.startUp(true, ReplicationRole.NONE, false);
 
         System.out.println("Getting client connected.");
         ClientConfig clientConfig = new ClientConfig();

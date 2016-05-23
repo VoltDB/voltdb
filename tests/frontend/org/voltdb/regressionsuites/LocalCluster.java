@@ -136,6 +136,7 @@ public class LocalCluster implements VoltServerConfig {
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
     private String m_prefix = null;
+    private boolean m_isPaused = false;
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -325,6 +326,9 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
+    public void startPaused() {
+       m_isPaused = true;
+    }
     /**
      * Override the Valgrind backend with a JNI backend.
      * Called after a constructor but before startup.
@@ -410,7 +414,11 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE, m_isPaused);
+    }
+
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
+        startUp(clearLocalDataDirectories, role, m_isPaused);
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -565,7 +573,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role, boolean paused) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -576,6 +584,10 @@ public class LocalCluster implements VoltServerConfig {
 
         // set 'replica' option -- known here for the first time.
         templateCmdLine.replicaMode(role);
+        if (paused) {
+            // Set paused mode
+            templateCmdLine.startPaused();
+        }
 
         // set to true to spew startup timing data
         boolean logtime = false;
