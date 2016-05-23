@@ -1537,7 +1537,8 @@ public class SnapshotUtil {
             try{
                 JSONObject jsObj = new JSONObject((String)params[0]);
                 String path = jsObj.getString(JSON_PATH);
-                if(path != null){
+                String dupPath = jsObj.getString(JSON_DUPLICATES_PATH);
+                if(path != null && dupPath == null){
                     jsObj.put(JSON_DUPLICATES_PATH, path)  ;
                 }
                 task.setParams( jsObj.toString() );
