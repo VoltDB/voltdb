@@ -271,7 +271,7 @@ public final class StatementManager {
         if (csid < 0) {
             csid = nextID();
 
-            int schemaid = cs.getSchemalName().hashCode();
+            int schemaid = cs.getSchemaName().hashCode();
             LongValueHashMap sqlMap =
                 (LongValueHashMap) schemaMap.get(schemaid);
 
@@ -335,7 +335,7 @@ public final class StatementManager {
                 Statement cs = (Statement) csidMap.remove(csid);
 
                 if (cs != null) {
-                    int schemaid = cs.getSchemalName().hashCode();
+                    int schemaid = cs.getSchemaName().hashCode();
                     LongValueHashMap sqlMap =
                         (LongValueHashMap) schemaMap.get(schemaid);
                     String sql = (String) sqlLookup.remove(csid);
@@ -382,7 +382,7 @@ public final class StatementManager {
                 Statement cs = (Statement) csidMap.remove(csid);
 
                 if (cs != null) {
-                    int schemaid = cs.getSchemalName().hashCode();
+                    int schemaid = cs.getSchemaName().hashCode();
                     LongValueHashMap sqlMap =
                         (LongValueHashMap) schemaMap.get(schemaid);
                     String sql = (String) sqlLookup.remove(csid);

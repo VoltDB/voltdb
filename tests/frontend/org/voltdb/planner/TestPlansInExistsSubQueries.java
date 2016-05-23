@@ -758,10 +758,10 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     public void testConstantExpressionInWhereClause() {
-        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support constant Boolean values, like TRUE or FALSE");
 
         failToCompile("select a from r1 where exists " +
-                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support constant Boolean values, like TRUE or FALSE");
     }
 
     // HSQL failed to parse  these statement

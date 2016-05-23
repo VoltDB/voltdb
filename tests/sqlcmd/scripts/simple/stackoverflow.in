@@ -1,14 +1,16 @@
 drop table t if exists;
-drop table t2 if exists;
 
-create table t ( c integer, d varchar(4) );
-create procedure p as
-    select * from t where d between ? and ?;
+create table t ( c integer );
 
--- procedure with max allowable predicates in where clause 
-create procedure max_predicates as 
-select count(*) FROM t WHERE 
-c > ? and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+insert into t values (0);
+insert into t values (1);
+insert into t values (2);
+
+select * from t;
+
+-- query with max allowable predicates in where clause
+select * FROM t WHERE 
+c = 1 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
@@ -38,9 +40,9 @@ c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
 
--- procedure with lots of predicates in where clause to cause stack overflow error 
-create procedure max_plus_predicates as 
-select count(*) FROM t WHERE c > ? and 
+-- query with lots of predicates in where clause - this will generate
+-- stackoverflowerror for the thread it's executing
+select * FROM t WHERE c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
@@ -86,82 +88,8 @@ c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
 c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
-
-create table t2 ( c integer, d varchar(4), e varchar(4) );
-
-exec T.insert 1,'a';
-execute T.insert 2 ab;
-exec T.insert 3 'abc';
-execute T.insert,4,abcd;
-
--- extra whitespace
- exec T.insert 11, 'a' ;
-  execute T.insert 12 ab;
-exec    T.insert 13 , 'abc' ;
-execute  T.insert  ,  14  ,  abcd;
-
--- tabs for fun
-	exec T.insert 21, 'a' ;
-  execute T.insert	22	ab;
-exec 	  T.insert 23	,	'abc'	;	
-execute		T.insert		,		24		,		abcd;
-
--- embedded whitespace and punctuation. Fixed recently in ENG-7927.
-exec    T.insert 31,  'a z' ;
-execute T.insert 32   ' ab';
-exec    T.insert 33 , 'abc ' ;
- exec   T.insert 41,  'a;z' ;
-execute T.insert 42   ';ab';
-EXEC    T.insert 43 , 'abc;' ;
-exec    T.insert 51,  'a,z' ;
-execute T.insert 52   ',ab';
-EXECUTE T.insert 53 , 'abc,' ;
-exec    T.insert 61,  ' ,;' ;
-execute T.insert 62   '; ,';
-EXECUTE T.insert 63 , ';,  ' ;
-
-EXECUTE T.insert 71 ,
- ';,  '
-  ;
-
--- try out some quoted quotes here.
-exec    T.insert 81,  'x''' ;
-exec    T.insert 82,  '''y' ;
-exec    T.insert 83,  '''z''' ;
-exec    T.insert 84,  ''' ''' ;
-exec    T.insert 85,  '" "' ;
-exec    T.insert 86,  ''' "' ;
-exec    T.insert 87,  ''' "' ;
-exec    T2.insert 88,  ''' '  ' ''' ;
-
--- try some quoted parens.
-exec    T.insert 91,  '( )' ;
-exec    T.insert 92,  ')' ;
-exec    T.insert 93,  '"(' ;
-exec    T.insert 94,  '''()' ;
-exec    T2.insert 95,  '('  ')' ;
--- exec with multiple strings
--- a recent branch regression on the way to fixing ENG-7927.
-exec p 'abc'    'abd' ;
-
--- try out quoted quotes here. too
-exec p 'abc'    'abd''' ;
-exec p ''' abc' 'abd ''' ;
-
--- more quoted parens
-exec p '((' '))';
-
--- error out on unquoted parens
-exec p ( );
-
-exec max_predicates 90;
  
-select * from t order by c;
-select * from t2 order by c;
-
-drop table t2;
-
-drop procedure max_predicates;
-drop procedure p;
+ -- run a simple query
+select * from t;
 
 drop table t;
