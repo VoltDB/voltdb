@@ -533,11 +533,12 @@ class ServerBundle(JavaBundle):
             final_args.extend(['externalinterface', runner.opts.externalinterface])
         if runner.opts.publicinterface:
             final_args.extend(['publicinterface', runner.opts.publicinterface])
+        if self.subcommand in ('create', 'recover'):
+            if runner.opts.paused:
+                final_args.extend(['paused'])
         if self.subcommand in ('create'):
             if runner.opts.force:
                 final_args.extend(['force'])
-            if runner.opts.paused:
-                final_args.extend(['paused'])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}
