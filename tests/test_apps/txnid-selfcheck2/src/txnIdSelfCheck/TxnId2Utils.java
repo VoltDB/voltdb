@@ -69,7 +69,7 @@ public enum TxnId2Utils {;
                     /* allow a generic timeout but only once so that we don't risk masking error conditions */
                     {timedOutOnce = true;}
                 else if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
-                    (ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
+                    (ss.matches("(?s).*AdHoc transaction [0-9]+ was planned against the past catalog version.*") ||
                      ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                      ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                      ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
