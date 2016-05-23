@@ -312,12 +312,19 @@ public class StatsAgent extends OpsAgent
             VoltTable vt =
                     new VoltTable(
                             new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
-                            new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY),
-                            new VoltTable.ColumnInfo("HASHCONFIGJSONCompressed", VoltType.VARBINARY));
+                            new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
-            vt.addRow(hashConfig.type.toString(), hashConfig.configBytes,
-                    TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
+            // hacky way to support two format of hashconfig
+            // if interval == true (delta-flag == 1), sent compressed json
+            // otherwise sent original binary format
+            boolean interval = psr.getInterval();
+            if (!interval) {
+                vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
+            } else {
+                vt.addRow(hashConfig.type.toString(), TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
+            }
+
         }
         psr.aggregateTables = tables;
 

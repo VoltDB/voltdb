@@ -26,6 +26,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -104,6 +105,14 @@ public abstract class OpsAgent
             this.c = c;
             this.clientData = clientData;
             this.request = request;
+        }
+
+        public boolean getInterval() {
+            try {
+                return request.getBoolean("interval");
+            } catch (JSONException e) {
+                return false;
+            }
         }
     }
 
