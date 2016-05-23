@@ -877,10 +877,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_messenger,
                         m_configuredNumberOfPartitions,
                         m_catalogContext.getDeployment().getCluster().getKfactor(),
-                        m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, kSafetyStats, expectSyncSnapshot);
+                        topo,
+                        m_MPI,
+                        kSafetyStats,
+                        expectSyncSnapshot
+                );
                 m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;

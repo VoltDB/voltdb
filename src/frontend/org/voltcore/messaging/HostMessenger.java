@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,9 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -63,9 +61,12 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -78,6 +79,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
     private static final VoltLogger m_hostLog = new VoltLogger("HOST");
+    private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
@@ -216,6 +218,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
+    private boolean m_partitionDetected = false;
 
     private final Object m_mapLock = new Object();
 
@@ -253,9 +256,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param catalogCRC
      * @param hostLog
      */
-    public HostMessenger(
-            Config config)
-    {
+    public HostMessenger(Config config) {
         m_config = config;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
@@ -286,10 +287,112 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     }
 
+    /**
+     * Given a set of the known host IDs before a fault, and the known host IDs in the
+     * post-fault cluster, determine whether or not we think a network partition may have happened.
+     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
+     * if we weren't a viable cluster.
+     * ALSO NOTE: not private so it may be unit-tested.
+     */
+    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts) {
+        // A strict, viable minority is always a partition.
+        if (currentHosts.size() * 2 < previousHosts.size()) {
+            // note that if PD is disabled, you will see this message, but not stop
+            m_tmLog.error("Partition detection triggered.");
+            m_tmLog.info("After a recent failure, this host is part of a cluster that has less than "
+                    + "half the node count of the previous cluster. It's possible multiple clusters "
+                    + "can continue in split-brain mode.");
+            m_tmLog.error("This minority survivor set may shut down to ensure against a split-brain.");
+            return true; // partition detection triggered
+        }
+
+        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
+        // If the blessed host is in the failure set, this set is not blessed.
+        if (currentHosts.size() * 2 == previousHosts.size()) {
+            m_tmLog.info("Partition detection notice: "
+                    + "The remaining cluster after failure is exactly half the node count "
+                    + "of the previous cluster state. In this situation, it's impossible to "
+                    + "know if there may be two clusters running in split brain mode. VoltDB "
+                    + "uses the membership of a \"blessed node\" to decide if this cluster "
+                    + "should continue running.");
+
+            // find the lowest hostId between the still-alive hosts and the
+            // failed hosts. Which set contains the lowest hostId?
+            // This should be all the pre-partition hosts IDs.  Any new host IDs
+            // (say, if this was triggered by rejoin), will be greater than any surviving
+            // host ID, so don't worry about including it in this search.
+            if (currentHosts.contains(Collections.min(previousHosts))) {
+                m_tmLog.warn("This survivor set contains the \"blessed node\" and will continue operation.");
+                return false; // partition detection not triggered
+            }
+            else {
+                // note that if PD is disabled, you will see this message, but not stop
+                m_tmLog.error("Partition detection triggered.");
+                m_tmLog.error("This survivor set does not contain the \"blessed node\" and may shut down.");
+                return true; // partition detection triggered
+            }
+        }
+
+        return false; // partition detection not triggered
+    }
+
+    private void doPartitionDetectionActivities(Set<Integer> failedHostIds)
+    {
+        // We should never re-enter here once we've decided we're partitioned and doomed
+        Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
+
+        // check whether partition detection is enabled
+        // This is a lousy hack: We're not support to call into VoltDB from VoltCore.
+        boolean isPartitionDetectionEnabled = false;
+        try {
+            isPartitionDetectionEnabled = VoltDB.instance().getCatalogContext().cluster.getNetworkpartition();
+        }
+        catch (Exception e) {
+            // this is needed for test code
+            m_tmLog.fatal("Couldn't load partititon detection configuration during a partition event.");
+        }
+
+        // figure out previous and current cluster memberships
+        Set<Integer> previousHosts = m_foreignHosts.keySet();
+        Set<Integer> currentHosts = new HashSet<>(previousHosts);
+        currentHosts.removeAll(failedHostIds);
+
+        // decide if we're partitioned
+        // this will print out errors if we are
+        boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
+
+        if (partitionDetected) {
+            if (isPartitionDetectionEnabled) {
+                // extra logging for now
+                m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
+                m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "
+                        + "voltdb root folder for this node and may be used for recovery if needed.");
+                m_partitionDetected = true;
+                VoltDB.crashGlobalVoltDB("This process will kill itself to ensure against split-brains. "
+                        + "There may be additional info in the full logs.",
+                            false, null);
+            }
+            else {
+                // tell the user about their brush with death
+                m_tmLog.error("PARTITION DETECTION: This process will continue running only because "
+                        + "Partition Detection has been disabled for this cluster. It is possible that "
+                        + "the previous cluster has split into multiple viable clusters with diverging "
+                        + "data. There may be additional info in the full logs.");
+            }
+        }
+    }
+
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
         @Override
         public void disconnect(Set<Integer> failedHostIds) {
             synchronized(HostMessenger.this) {
+
+                // Decide if the failures given could put the cluster in a split-brain
+                // Then decide if we should shut down to ensure that at a MAXIMUM, only
+                // one viable cluster is running.
+                // This feature is called "Partition Detection" in the docs.
+                doPartitionDetectionActivities(failedHostIds);
+
                 for (int hostId: failedHostIds) {
                     addFailedHost(hostId);
                     removeForeignHost(hostId);
@@ -1178,6 +1281,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         return m_network.getIOStats(interval, picoNetworks);
+    }
+
+    /**
+     * Cut the network connection between two hostids immediately
+     * Useful for simulating network partitions
+     */
+    public void cutLink(int hostIdA, int hostIdB) {
+        if (m_localHostId == hostIdA) {
+            ForeignHost fh = m_foreignHosts.get(hostIdB);
+            fh.cutLink();
+        }
+        if (m_localHostId == hostIdB) {
+            ForeignHost fh = m_foreignHosts.get(hostIdA);
+            fh.cutLink();
+        }
     }
 
 }

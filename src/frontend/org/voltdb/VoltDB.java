@@ -753,6 +753,11 @@ public class VoltDB {
             // slightly less important than death, this try/finally block protects code that
             // prints a message to stdout
             try {
+                // turn off client interface as fast as possible
+                // we don't expect this to ever fail, but if it does, skip to dying immediately
+                if (!instance().getClientInterface().ceaseAllPublicFacingTrafficImmediately()) {
+                    return; // this will jump to the finally block and die faster
+                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -868,6 +873,11 @@ public class VoltDB {
         // end test code
 
         try {
+            // turn off client interface as fast as possible
+            // we don't expect this to ever fail, but if it does, skip to dying immediately
+            if (!instance().getClientInterface().ceaseAllPublicFacingTrafficImmediately()) {
+                return; // this will jump to the finally block and die faster
+            }
             // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
             // give the pill a chance to make it through the network buffer
