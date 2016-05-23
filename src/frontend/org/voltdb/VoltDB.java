@@ -487,7 +487,10 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbCreate = true;
-                else {
+                else if (arg.equalsIgnoreCase("paused")) {
+                    //Start paused.
+                    m_isPaused.set(true);
+                } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
