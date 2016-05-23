@@ -109,7 +109,7 @@ private:
     uint32_t m_blockOffset;
     TBPtr m_currentBlock;
     // flag to track if the snapshot was activated when the table was empty
-    bool m_emptyTable;
+    bool m_tableEmpty;
 public:
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
