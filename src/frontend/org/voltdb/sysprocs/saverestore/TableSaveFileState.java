@@ -46,7 +46,7 @@ public abstract class TableSaveFileState
     }
 
     abstract public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st);
+    generateRestorePlan(Table catalogTable, SiteTracker st, boolean isRestore);
 
     String getTableName()
     {
