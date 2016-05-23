@@ -765,7 +765,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // materialized views (which use the parsed select statement but
         // don't go through the planner pass that does more involved
         // column index resolution).
-        col.index = m_displayColumns.size();
+        col.index = index;
 
         insertAggExpressionsToAggResultColumns(m_aggregationList, col);
         if (m_aggregationList.size() >= 1) {
@@ -988,9 +988,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_distinctGroupByColumns.add(pcol);
 
             // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
-            SchemaColumn schema_col = new SchemaColumn(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, tve, col.differentiator);
-            m_distinctProjectSchema.addColumn(schema_col);
+            m_distinctProjectSchema.addColumn(col.asSchemaColumn());
         }
 
         return groupbyElement;

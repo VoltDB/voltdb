@@ -71,7 +71,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         int i = 0;
         for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
             String colAlias = col.alias == null? col.columnName : col.alias;
-            SchemaColumn scol = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression, col.differentiator);
+            SchemaColumn scol = col.asSchemaColumn();
             m_outputColumnList.add(scol);
             m_outputColumnIndexMap.put(Pair.of(colAlias, col.differentiator), i);
             i++;
