@@ -1534,6 +1534,16 @@ public class SnapshotUtil {
     public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length == 1) {
+            try{
+                JSONObject jsObj = new JSONObject((String)params[0]);
+                String path = jsObj.getString(JSON_PATH);
+                if(path != null){
+                    jsObj.put(JSON_DUPLICATES_PATH, path)  ;
+                }
+                task.setParams( jsObj.toString() );
+            } catch (JSONException e){
+                //move on
+            }
             return null;
         } else if (params.length == 2) {
             if (params[0] == null) {
@@ -1566,6 +1576,7 @@ public class SnapshotUtil {
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
+                jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, params[0]);
             } catch (JSONException e) {
                 Throwables.propagate(e);
             }
