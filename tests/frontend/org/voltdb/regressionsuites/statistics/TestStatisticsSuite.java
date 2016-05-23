@@ -362,16 +362,15 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema1[2] = new ColumnInfo("Leader", VoltType.STRING);
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
-        ColumnInfo[] expectedSchema2 = new ColumnInfo[3];
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[2];
         expectedSchema2[0] = new ColumnInfo("HASHTYPE", VoltType.STRING);
         expectedSchema2[1] = new ColumnInfo("HASHCONFIG", VoltType.VARBINARY);
-        expectedSchema2[2] = new ColumnInfo("HASHCONFIGJSONCompressed", VoltType.VARBINARY);
         VoltTable expectedTable2 = new VoltTable(expectedSchema2);
 
         VoltTable[] results = null;
 
         //
-        // TOPO
+        // TOPO with interval set to 0, retrieving binary hash config
         //
         results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
         // two aggregate tables returned
@@ -385,6 +384,30 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         assertEquals(PARTITIONS + 1, results[0].getRowCount());
         // Make sure we can find the MPI, at least
         boolean found = false;
+        while (topo.advanceRow()) {
+            if ((int)topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
+                found = true;
+            }
+        }
+        assertTrue(found);
+        // and only one row in the second table
+        assertEquals(1, results[1].getRowCount());
+
+        //
+        // TOPO with interval set to 1, for retrieving compressed json hash config
+        //
+        results = client.callProcedure("@Statistics", "TOPO", 1).getResults();
+        // two aggregate tables returned
+        assertEquals(2, results.length);
+        System.out.println("Test TOPO table: " + results[0].toString());
+        System.out.println("Test TOPO table: " + results[1].toString());
+        validateSchema(results[0], expectedTable1);
+        validateSchema(results[1], expectedTable2);
+        topo = results[0];
+        // Should have partitions + 1 rows in the first table
+        assertEquals(PARTITIONS + 1, results[0].getRowCount());
+        // Make sure we can find the MPI, at least
+        found = false;
         while (topo.advanceRow()) {
             if ((int)topo.getLong("Partition") == MpInitiator.MP_INIT_PID) {
                 found = true;

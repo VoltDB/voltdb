@@ -107,7 +107,10 @@ public abstract class OpsAgent
             this.request = request;
         }
 
-        public boolean getInterval() {
+        // hacky way to support two format of hashconfig using interval value
+        // return true if interval == true (delta-flag == 1), indicate sent compressed json
+        // otherwise return false, indicate sent original binary format
+        public boolean getConfigType() {
             try {
                 return request.getBoolean("interval");
             } catch (JSONException e) {

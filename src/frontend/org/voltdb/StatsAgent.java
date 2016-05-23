@@ -315,11 +315,8 @@ public class StatsAgent extends OpsAgent
                             new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
-            // hacky way to support two format of hashconfig
-            // if interval == true (delta-flag == 1), sent compressed json
-            // otherwise sent original binary format
-            boolean interval = psr.getInterval();
-            if (!interval) {
+            boolean jsonConfig = psr.getConfigType();
+            if (!jsonConfig) {
                 vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
             } else {
                 vt.addRow(hashConfig.type.toString(), TheHashinator.getCurrentHashinator().getConfigJSONCompressed());
