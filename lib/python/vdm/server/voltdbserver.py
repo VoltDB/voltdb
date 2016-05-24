@@ -177,7 +177,7 @@ class VoltDatabase:
             print traceback.format_exc()
             return create_response(str(err), 500)
 
-    def check_and_start_local_server(self, sid, recover=False, is_blocking=-1):
+    def check_and_start_local_server(self, sid, database_id, recover=False, is_blocking=-1):
         """
         Checks if voltdb server is running locally and
         starts it if the server is not running.
@@ -186,7 +186,7 @@ class VoltDatabase:
         if sid == -1:
             return create_response('A VoltDB Server not started wrong configuration', 500)
 
-        if self.is_voltserver_running():
+        if self.is_voltserver_running(database_id):
             return create_response('A VoltDB Server process is already running', 500)
 
         retcode = self.start_local_server(sid, recover, is_blocking)
@@ -196,7 +196,7 @@ class VoltDatabase:
             return create_response('Error', 500)
             # return create_response('Error starting server', 500)
 
-    def is_voltserver_running(self):
+    def is_voltserver_running(self, database_id):
         """
         Checks the set of running processes to find out if voltdb server is running
         """
@@ -204,18 +204,19 @@ class VoltDatabase:
         process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
         for process_cmd in process_list:
-            if '-DVDMStarted=true' in process_cmd:
+            if '-DVDMStarted=true -DVDMDB=' + str(database_id) in process_cmd:
                 result = True
                 break
         return result
 
-    def Get_Voltdb_Process(self):
+    def Get_Voltdb_Process(self, database_id):
         VoltdbProcess.isProcessRunning = False
         VoltdbProcess.processId = -1
         process = subprocess.Popen("ps aux | grep 'java'", shell=True, stdout=subprocess.PIPE)
         process_list = process.communicate()[0].split('\n')
         for process_cmd in process_list:
-            if '-DVDMStarted=true' in process_cmd:
+
+            if '-DVDMStarted=true -DVDMDB=' + str(database_id) in process_cmd:
                 VoltdbProcess.isProcessRunning = True
                 VoltdbProcess.processId = process_cmd.split()[1]
                 break
@@ -281,7 +282,7 @@ class VoltDatabase:
 
         server_data_path = self.get_volt_server_data_folder(sid)
         HTTPListener.Global.VOLT_SERVER_PATH = server_data_path
-        voltserver = self.run_voltserver_process(voltdb_cmd, outfilename, server_data_path)
+        voltserver = self.run_voltserver_process(voltdb_cmd, outfilename, server_data_path, self.database_id)
 
         initialized = False
         rfile = open(outfilename, 'r')
@@ -330,7 +331,7 @@ class VoltDatabase:
             voltdb_cmd.append(cli_switch)
             voltdb_cmd.append(opt_val)
 
-    def run_voltserver_process(self, voltdb_cmd, outfilename, server_data_folder):
+    def run_voltserver_process(self, voltdb_cmd, outfilename, server_data_folder, database_id):
         """
         Utility method to start voltdb process given the cmd details
         and output file for console output
@@ -342,7 +343,7 @@ class VoltDatabase:
         os.chdir(server_data_folder)
         try:
             my_env = os.environ.copy()
-            my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
+            my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') + ' -DVDMStarted=true' + ' -DVDMDB=' + str(database_id)
             return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                           env=my_env, preexec_fn=ignore_signals, close_fds=True)
         finally:

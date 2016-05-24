@@ -1328,7 +1328,7 @@ class StartLocalServerAPI(MethodView):
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, is_blocking )
+            return server.check_and_start_local_server(sid, database_id, False, is_blocking)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1353,7 +1353,7 @@ class RecoverServerAPI(MethodView):
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, True)
+            response = server.check_and_start_local_server(sid, database_id, True)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1610,7 +1610,7 @@ class StatusDatabaseServerAPI(MethodView):
                     except:
                         pass
 
-                    if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                    if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
                                                                                               'details': error}})
                     else:
