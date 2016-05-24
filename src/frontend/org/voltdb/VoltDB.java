@@ -567,7 +567,7 @@ public class VoltDB {
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            if (m_isPaused.get() && (m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN) ) {
+            if (m_isPaused.get() && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
                 isValid = false;
                 hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
             }
