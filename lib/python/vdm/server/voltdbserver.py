@@ -148,7 +148,7 @@ class VoltDatabase:
             return make_response(jsonify({'status': 200, 'statusString': 'Start request sent successfully to servers: ' +
                                                                          json.dumps(server_status)}), 200)
 
-    def start_server(self, server_id, recover=False, is_blocking=-1):
+    def start_server(self, server_id, recover=False, is_blocking=-1, add_server=False):
         """
         Sends start request to the specified server
         """
@@ -168,6 +168,8 @@ class VoltDatabase:
         action = 'start'
         if recover:
             action = 'recover'
+        elif add_server:
+            action = 'add'
         try:
             url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u&blocking=%u') % \
                               (server['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id, is_blocking)
@@ -177,7 +179,7 @@ class VoltDatabase:
             print traceback.format_exc()
             return create_response(str(err), 500)
 
-    def check_and_start_local_server(self, sid, recover=False, is_blocking=-1):
+    def check_and_start_local_server(self, sid, recover=False, is_blocking=-1, add_server=False):
         """
         Checks if voltdb server is running locally and
         starts it if the server is not running.
@@ -189,7 +191,7 @@ class VoltDatabase:
         if self.is_voltserver_running():
             return create_response('A VoltDB Server process is already running', 500)
 
-        retcode = self.start_local_server(sid, recover, is_blocking)
+        retcode = self.start_local_server(sid, recover, is_blocking, add_server)
         if (retcode == 0):
             return create_response('Success', 200)
         else:
@@ -221,7 +223,7 @@ class VoltDatabase:
                 break
         return VoltdbProcess
 
-    def start_local_server(self, sid, recover=False, is_blocking=-1):
+    def start_local_server(self, sid, recover=False, is_blocking=-1, add_server=False):
         """
         start a local server process. recover if recover is true else create.
         """
@@ -260,11 +262,15 @@ class VoltDatabase:
 
         if recover:
             verb = 'recover'
+        elif add_server and server_ip != '':
+            verb = 'add'
         elif rejoin:
             verb = 'rejoin'
 
         if verb == 'create':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
+        elif verb == 'add':
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
         elif rejoin:
             if is_blocking == 1:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip]
@@ -527,7 +533,7 @@ class VoltDatabase:
         try:
             processId = self.Get_Voltdb_Process().processId
             if processId is not None and processId != -1:
-                os.kill(processId, signal.SIGKILL)
+                os.kill(int(processId), signal.SIGKILL)
                 return create_response('success', 200)
             else:
                 return create_response('process not found', 200)

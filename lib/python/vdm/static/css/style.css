@@ -593,7 +593,9 @@ table td.tdROle label.error {
 	float: right
 }
 .ContentServerBody {
-	overflow: auto;
+	overflow-x:auto;
+  overflow-y:auto;
+	height:274px;
 }
 .clusterConfig {
 	background: #e4e4e4;
@@ -702,7 +704,6 @@ ul.addServerList li:nth-child(1) {
 }
 .tblCluster tr td:nth-child(1) {
 	width: 80%;
-	position: relative;
 	padding-left: 20px;
 	font-weight: bold;
 }
@@ -1595,7 +1596,88 @@ select {
 }
 .startFail, .stalledState { padding:15px;}
 .startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0; width:100%;}
+
 /**************Button start/Stop ends******************/
+/**************Server List******************/
+
+.redDotDropDown span.glyphicon.glyphicon-one-fine-dot:before {
+    content: "\25cf";
+    font-size: 33px;
+    color: #c70000;
+}
+.glyphicon.glyphicon-one-fine-dot:before {
+    content: "\25cf";
+    font-size: 33px;
+    color: #68A81A;
+}
+
+
+.btnStartServer > div > .glyphicon.glyphicon-off:before, .btnStopServer > div > .glyphicon.glyphicon-off:before{
+    font-size: 1.3em;
+    color: #aa1f2f;
+    }
+.glyphicon.glyphicon-remove:before{
+    font-size: 1.5em;
+    color: #aa1f2f;
+    }
+
+.glyphicon.glyphicon-menu-hamburger:before{
+    font-size: 1.55em;
+
+    }
+
+ .btnStartServer > div > .glyphicon.glyphicon-play:before, .btnStopServer > div > .glyphicon.glyphicon-play:before{
+    font-size: 1.5em;
+color: #68A81A;
+    }
+
+.clsServerList, .clsServerListGreen { position:relative; top:-5px;}
+
+.serverListIcons {padding-right:2px;}
+
+.serverListRemove { font-size:1.2em}
+.deleteServerListTxt {
+    font-size: 12px;
+    position: relative;
+    top: -3px;
+
+    }
+ .tblCluster tr td.servListDD { padding-bottom:12px;}
+  .tblCluster tr td { padding-top:10px;}
+.serverListDropdown { display:inline-block; cursor:pointer; }
+.serverListDropdown .dropdown-menu {min-width:135px; font-size:13px;}
+.serverListDropdown ul.dropdown-menu { margin:0; padding:0;}
+.serverListDropdown ul.dropdown-menu li{ padding:0px 0 2px 0; line-height:20px; font-weight:normal;}
+.serverListDropdown ul.dropdown-menu li a {padding:3px 20px 3px 10px;}
+.serverListDropdown ul.dropdown-menu li a:hover { background-color:#E6E3E3; display:block;}
+.serverListDropdown ul.dropdown-menu li a span{ padding:0 10px 0 0px;}
+.iconDD {position:relative; top:-3px;}
+.modal.custom .updateServerlistWrap {
+    width: 10%;
+    left: 12%;
+    margin-top: 13%!important;
+}
+.serverListContainer {
+    background: #fff;
+    padding: 0px 0 0 0;
+}
+.redDot {
+    background: url(../images/red-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
+ .greenDot {
+    background: url(../images/green-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
+/**************Server List Ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
 .form-horizontal .control-label {
@@ -1773,3 +1855,4 @@ ul.drList {
   @media (width: 980px){
 	 .overlayWrapper { width:96.9%;}
  }
+

@@ -14,7 +14,6 @@
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/multi-select.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap-tokenfield.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/tokenfield-typeahead.css') }}">
-
 </head>
 <body>
 <div id="wrap">
@@ -176,6 +175,7 @@
                       <div class="ContentServerBody">
                         <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblCluster" id="serverList">
                         </table>
+
                       </div>
                     </div>
 
@@ -637,6 +637,26 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
 <!---overlay--->
 
 
+<!--Update Server List -->
+<div id="updateServerList" class="modal custom fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center updateServerlistWrap">
+    <!-- Modal content-->
+    <div class="modal-content">
+       <div class="modal-body">
+        <div class="col-md-12 serverListContainer">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblDatabase" id="tblDatabaseList1">
+          </table>
+      </div>
+
+
+      </div>
+      <div class="modal-footer">
+
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add Server List End -->
 
 
 <!-- Create Database -->
@@ -1232,7 +1252,24 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Disk Limit End-->
-
+<!-- Log View -->
+<div id="divServerLogPopup" class="errorLogPopup modal fadein  in" role="dialog" style="display: none;">
+	<div class="modal-dialog modal-dialog-center modal-add-user">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title" id="errorHeader">Log Details</h4>
+			</div>
+			<div class="modal-body">
+				<div class="errorWrapper" id="logMessage">
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button  type="button" class="btnPopup btn" data-dismiss="modal">OK</button>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- Log View End -->
 <div class="loader" ></div>
 </div>
 </body>

@@ -21,8 +21,9 @@ import os
 def get_most_recent_log():
     logdir = HTTPListener.Global.CONFIG_PATH
 
-    logfiles = sorted([ f for f in os.listdir(logdir) if f.startswith('voltserver.output')])
-
+    #logfiles = sorted([ f for f in os.listdir(logdir) if f.startswith('voltserver.output')])
+    logfiles = [ f for f in os.listdir(logdir) if f.startswith('voltserver.output')]
+    logfiles.sort(key=lambda s: os.path.getmtime(os.path.join(logdir, s)))
     return logfiles[-1]
 
 

@@ -1361,6 +1361,57 @@ class RecoverServerAPI(MethodView):
                                  500)
 
 
+class AddServerAPI(MethodView):
+    """Class to handle request to join the server to existing cluster."""
+
+    @staticmethod
+    def put(database_id, server_id):
+        """
+        Issues add cmd on this local server
+        Args:
+            database_id (int): The id of the database that should be started
+        Returns:
+            Status string indicating if the request was sent successfully
+        """
+        try:
+            server = voltdbserver.VoltDatabase(database_id)
+            response = server.start_server(server_id, False, -1, True)
+            resp_json = json.loads(response.data)
+            if response.status_code == 500:
+                return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
+            else:
+                return make_response(jsonify({'status': '200', 'statusString': resp_json['statusString']}), 200)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusString': str(err)}),
+                                 500)
+
+
+class AddLocalServerAPI(MethodView):
+    """Class to handle request to start local server for this database."""
+
+    @staticmethod
+    def put(database_id):
+        """
+        Starts VoltDB database server on this local machine
+        Args:
+            database_id (int): The id of the database that should be started
+        Returns:
+            Status string indicating if the server start request was sent successfully
+        """
+
+        try:
+            sid = -1
+            if 'id' in request.args:
+                sid = int(request.args.get('id'))
+            server = voltdbserver.VoltDatabase(database_id)
+            return server.check_and_start_local_server(sid, False, -1, True )
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'status': 500, 'statusString': str(err)}),
+                                 500)
+
+
 class VdmStatus(MethodView):
     """
     Class to get VDM status for peers to check.
@@ -1601,7 +1652,13 @@ class StatusDatabaseServerAPI(MethodView):
                     client = voltdbclient.FastSerializer(client_host, client_port)
                     proc = voltdbclient.VoltProcedure(client, "@Ping")
                     response = proc.call()
-                    return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running" } })
+                    success = ''
+                    try:
+                        success = Log.get_error_log_details()
+                    except:
+                        pass
+                    return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
+                                                                                          'details': success}})
                 except:
                     voltProcess = voltdbserver.VoltDatabase(database_id)
                     error = ''
@@ -1691,6 +1748,8 @@ def main(runner, amodule, config_dir, data_dir, server):
     STATUS_DATABASE_VIEW = StatusDatabaseAPI.as_view('status_database_api')
     STATUS_DATABASE_SERVER_VIEW = StatusDatabaseServerAPI.as_view('status_database_server_view')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
+    ADD_SERVER_VIEW = AddServerAPI.as_view('add_server_api')
+    ADD_LOCAL_SERVER_VIEW = AddLocalServerAPI.as_view('add_local_server_api')
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/', strict_slashes=False,
                      view_func=SERVER_VIEW, methods=['GET', 'POST'])
@@ -1712,7 +1771,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=STOP_DATABASE_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/recover', strict_slashes=False,
                      view_func=RECOVER_DATABASE_VIEW, methods=['PUT'])
-
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/add', strict_slashes=False,
+                     view_func=ADD_SERVER_VIEW, methods=['PUT'])
     # Internal API
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/start', strict_slashes=False,
                      view_func=START_LOCAL_SERVER_VIEW, methods=['PUT'])
@@ -1736,6 +1796,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                      methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/add', strict_slashes=False,
+                     view_func=ADD_LOCAL_SERVER_VIEW, methods=['PUT'])
 
     log_file = os.path.join(Global.DATA_PATH, 'voltdeploy.log')
     if os.path.exists(log_file):
