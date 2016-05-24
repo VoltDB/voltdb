@@ -53,13 +53,16 @@ size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                               std::string tableName,
                                               int partitionColumn,
                                               int64_t spHandle,
-                                              int64_t uniqueId) {
+                                              int64_t uniqueId)
+{
+    if (m_guarded) return INVALID_DR_MARK;
+
     size_t startingUso = m_uso;
+
+    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
 
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
-
-    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -112,16 +115,18 @@ size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                               TableTuple &tuple,
                                               DRRecordType type)
 {
-    size_t startingUso = m_uso;
+    if (m_guarded) return INVALID_DR_MARK;
 
-    //Drop the row, don't move the USO
-    if (!m_enabled) return INVALID_DR_MARK;
+    size_t startingUso = m_uso;
 
     size_t rowHeaderSz = 0;
     size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
 
     transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+
+    //Drop the row, don't move the USO
+    if (!m_enabled) return INVALID_DR_MARK;
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -167,11 +172,11 @@ size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle
                                                      int64_t spHandle,
                                                      int64_t uniqueId,
                                                      TableTuple &oldTuple,
-                                                     TableTuple &newTuple) {
-    size_t startingUso = m_uso;
+                                                     TableTuple &newTuple)
+{
+    if (m_guarded) return INVALID_DR_MARK;
 
-    //Drop the row, don't move the USO
-    if (!m_enabled) return INVALID_DR_MARK;
+    size_t startingUso = m_uso;
 
     size_t oldRowHeaderSz = 0;
     size_t oldRowMetadataSz = 0;
@@ -180,6 +185,9 @@ size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle
     size_t maxLength = TXN_RECORD_HEADER_SIZE;
 
     transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+
+    //Drop the row, don't move the USO
+    if (!m_enabled) return INVALID_DR_MARK;
 
     DRRecordType type = DR_RECORD_UPDATE;
     maxLength += computeOffsets(type, oldTuple, oldRowHeaderSz, oldRowMetadataSz);
@@ -222,7 +230,8 @@ size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle
     return startingUso;
 }
 
-void CompatibleDRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) {
+void CompatibleDRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
+{
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
@@ -232,9 +241,15 @@ void CompatibleDRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, i
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
     if (!m_opened) {
-        beginTransaction(m_openSequenceNumber, uniqueId);
+        ++m_openSequenceNumber;
+
+        if (m_enabled) {
+            beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
+        }
+        else {
+            openTransactionCommon(spHandle, uniqueId);
+        }
     }
     assert(m_opened);
 }
@@ -242,7 +257,8 @@ void CompatibleDRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, i
 void CompatibleDRTupleStream::writeRowTuple(TableTuple& tuple,
         size_t rowHeaderSz,
         size_t rowMetadataSz,
-        ExportSerializeOutput &io) {
+        ExportSerializeOutput &io)
+{
     size_t startPos = io.position();
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
@@ -265,7 +281,8 @@ void CompatibleDRTupleStream::writeRowTuple(TableTuple& tuple,
 size_t CompatibleDRTupleStream::computeOffsets(DRRecordType &type,
         TableTuple &tuple,
         size_t &rowHeaderSz,
-        size_t &rowMetadataSz) {
+        size_t &rowMetadataSz)
+{
     rowMetadataSz = sizeof(int32_t);
     int columnCount;
     switch (type) {
@@ -282,7 +299,8 @@ size_t CompatibleDRTupleStream::computeOffsets(DRRecordType &type,
     return rowHeaderSz + tuple.maxDRSerializationSize();
 }
 
-void CompatibleDRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+void CompatibleDRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
+{
     assert(!m_opened);
 
     if (!m_currBlock) {
@@ -324,11 +342,30 @@ void CompatibleDRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t u
 
      m_uso += io.position();
 
-     m_opened = true;
+     openTransactionCommon(spHandle, uniqueId);
 }
 
-void CompatibleDRTupleStream::endTransaction(int64_t uniqueId) {
+void CompatibleDRTupleStream::endTransaction(int64_t uniqueId)
+{
     if (!m_opened) {
+        return;
+    }
+
+    if (!m_enabled) {
+        if (m_openUniqueId != uniqueId) {
+            throwFatalException(
+                "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
+                " DR sequence number is out of sync with UniqueId",
+                (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+        }
+
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            m_lastCommittedMpUniqueId = uniqueId;
+        } else {
+            m_lastCommittedSpUniqueId = uniqueId;
+        }
+
+        commitTransactionCommon();
         return;
     }
 
@@ -386,7 +423,8 @@ void CompatibleDRTupleStream::endTransaction(int64_t uniqueId) {
 
     m_uso += io.position();
 
-    m_opened = false;
+    m_committedUso = m_uso;
+    commitTransactionCommon();
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -398,7 +436,8 @@ void CompatibleDRTupleStream::endTransaction(int64_t uniqueId) {
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
+{
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
@@ -423,8 +462,8 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
     std::vector<int32_t> partitionKeyValueList,
     std::vector<int32_t> flagList,
     long startSequenceNumber,
-    char *outBytes) {
-
+    char *outBytes)
+{
     CompatibleDRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
@@ -446,6 +485,7 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
     TableTuple tuple(tupleMemory, schema);
 
     int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
+    // Override start sequence number
     stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
         int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
@@ -475,9 +515,6 @@ int32_t CompatibleDRTupleStream::getTestDRBuffer(int32_t partitionId,
     }
 
     TupleSchema::freeTupleSchema(schema);
-
-    int64_t committedUID = lastUID;
-    stream.commit(committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
