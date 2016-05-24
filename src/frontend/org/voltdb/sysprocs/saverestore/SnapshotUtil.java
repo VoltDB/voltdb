@@ -1536,14 +1536,14 @@ public class SnapshotUtil {
         if (params.length == 1) {
             try{
                 JSONObject jsObj = new JSONObject((String)params[0]);
-                String path = jsObj.getString(JSON_PATH);
-                String dupPath = jsObj.getString(JSON_DUPLICATES_PATH);
-                if(path != null && dupPath == null){
-                    jsObj.put(JSON_DUPLICATES_PATH, path)  ;
+                String path = jsObj.optString(JSON_PATH);
+                String dupPath = jsObj.optString(JSON_DUPLICATES_PATH);
+                if(!path.isEmpty() && dupPath.isEmpty()){
+                    jsObj.put(JSON_DUPLICATES_PATH, path);
                 }
                 task.setParams( jsObj.toString() );
             } catch (JSONException e){
-                //move on
+                Throwables.propagate(e);
             }
             return null;
         } else if (params.length == 2) {
