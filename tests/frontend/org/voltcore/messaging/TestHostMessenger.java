@@ -24,11 +24,14 @@
 package org.voltcore.messaging;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
@@ -168,4 +171,55 @@ public class TestHostMessenger {
         hm3.waitForGroupJoin(2);
     }
 
+    @Test
+    public void testPartitionDetectionMinoritySet() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 5 hosts.
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        previous.add(4);
+        // this should trip partition detection
+        assertTrue(HostMessenger.makePPDDecision(previous, current));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(2);
+        current.add(3);
+        // the pre-fail cluster had 4 hosts and the lowest host ID
+        previous.addAll(current);
+        previous.add(0);
+        previous.add(1);
+        // this should trip partition detection
+        assertTrue(HostMessenger.makePPDDecision(previous, current));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillNonBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 4 hosts but not the lowest host ID
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        // this should not trip partition detection
+        assertFalse(HostMessenger.makePPDDecision(previous, current));
+    }
 }
