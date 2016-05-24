@@ -112,11 +112,17 @@ class VoltDatabase:
         if not members:
             return create_response('No servers configured for the database: %u' % self.database_id, 404)
 
+        result = self.check_other_database_status(self.database_id)
+
+        if not result:
+            return make_response(jsonify({'status': 200, 'statusString': 'Error'}), 200)
+
         # Check if there are valid servers configured for all ids
         for server_id in members:
             server = HTTPListener.Global.SERVERS.get(server_id)
             if not server:
                 return create_response('Server details not found for id: %u' % server_id, 404)
+
 
         # Now start each server
         failed = False
@@ -195,6 +201,43 @@ class VoltDatabase:
         else:
             return create_response('Error', 500)
             # return create_response('Error starting server', 500)
+
+    def check_other_database_status(self, current_database_id):
+        #Get members of current_database
+        result = True
+        database = HTTPListener.Global.DATABASES[current_database_id]
+
+        SERVERS = []
+        for id in database['members']:
+            SERVERS.append(HTTPListener.Global.SERVERS[id])
+
+        #Get database_id list other than current database
+        for key, value in HTTPListener.Global.DATABASES.iteritems():
+            if key != current_database_id:
+                #Check if database is running
+                url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
+                    (HTTPListener.__IP__, HTTPListener.__PORT__, key)
+                response = requests.get(url)
+                if response.json()['dbStatus']['status'] == 'running':
+                    for id in value['members']:
+                        if HTTPListener.Global.SERVERS[id]['hostname'] == SERVERS[0]['hostname']:
+                            #Check if same port is used
+                            if HTTPListener.Global.SERVERS[id]['client-listener'] == SERVERS[0]['client-listener']:
+                                return False
+                            elif HTTPListener.Global.SERVERS[id]['admin-listener'] == SERVERS[0]['admin-listener']:
+                                return False
+                            elif HTTPListener.Global.SERVERS[id]['zookeeper-listener'] == SERVERS[0]['zookeeper-listener']:
+                                return False
+                            elif HTTPListener.Global.SERVERS[id]['internal-listener'] == SERVERS[0]['internal-listener']:
+                                return False
+                            elif HTTPListener.Global.SERVERS[id]['http-listener'] == SERVERS[0]['http-listener']:
+                                return False
+                            elif HTTPListener.Global.SERVERS[id]['replication-listener'] == SERVERS[0]['replication-listener']:
+                                return False
+                else:
+                    result = True
+
+        return result
 
     def is_voltserver_running(self, database_id):
         """
