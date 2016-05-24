@@ -948,12 +948,13 @@ class Schema:
                     # It represents the last table that defined the column as
                     # listed in the schema, so it's usually just the last table in the schema.
                     self.__col_by_type[supertype][column_name] = table
-            indexes = tabledict["indexes"]
-            if isinstance(indexes, basestring):
-                self.__col_by_type["id"][indexes] = table
-            else:
-                for index in indexes:
-                    self.__col_by_type["id"][index] = table
+            indexes = tabledict.get("indexes", None)
+            if indexes:
+                if isinstance(indexes, basestring):
+                    self.__col_by_type["id"][indexes] = table
+                else:
+                    for index in indexes:
+                        self.__col_by_type["id"][index] = table
 
     def __init_from_file(self, filename):
         fd = open(filename, "r")
@@ -1176,7 +1177,8 @@ class SQLGenerator:
                 if self.__subversion_generation and re.match("(?i)\s*SELECT", i):
                     results += 1
                     yield 'SELECT * FROM (' + i + ') subquery'
-                if (i.upper().startswith('INSERT')):
+                upper_case_statement = i.upper().lstrip()
+                if (upper_case_statement.startswith('INSERT') or upper_case_statement.startswith('UPSERT')):
                     self.__num_insert_statements += 1
 
             if results == 0:

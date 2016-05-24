@@ -236,7 +236,7 @@ public abstract class NonVoltDBBackend {
         }
 
         /** Specifies one or more strings to replace each group, within the
-         *  whole match (e.g. "UPSERT", to replace "INSERT"); default is an
+         *  whole match (e.g. "INSERT", to replace "UPSERT"); default is an
          *  empty list, in which case it is ignored. */
         protected QueryTransformer groupReplacementText(String ... text) {
             this.m_groupReplacementTexts = new ArrayList<String>();
@@ -348,10 +348,10 @@ public abstract class NonVoltDBBackend {
             // Lower-case table and column names are required for PostgreSQL;
             // we might need to alter this if we use another comparison
             // database (besides HSQL) someday
-            String tableName = (tn == null) ? tn : tn.toLowerCase();
+            String tableName = (tn == null) ? tn : tn.trim().toLowerCase();
             try {
                 ResultSet rs = dbconn.getMetaData().getColumns(null, null,
-                        tableName, columnName.toLowerCase());
+                        tableName, columnName.trim().toLowerCase());
                 while (rs.next()) {
                     String columnType = getVoltColumnTypeName(rs.getString(6));
                     if (columnTypes.contains(columnType)) {
