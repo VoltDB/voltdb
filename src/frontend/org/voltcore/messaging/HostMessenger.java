@@ -35,6 +35,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -218,6 +219,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
+    private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(true); // default to true
     private boolean m_partitionDetected = false;
 
     private final Object m_mapLock = new Object();
@@ -287,6 +289,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     }
 
+    public void setPartitionDetectionEnabled(boolean enabled) {
+        m_partitionDetectionEnabled.set(enabled);
+    }
+
     /**
      * Given a set of the known host IDs before a fault, and the known host IDs in the
      * post-fault cluster, determine whether or not we think a network partition may have happened.
@@ -341,28 +347,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // We should never re-enter here once we've decided we're partitioned and doomed
         Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
 
-        // check whether partition detection is enabled
-        // This is a lousy hack: We're not support to call into VoltDB from VoltCore.
-        boolean isPartitionDetectionEnabled = false;
-        try {
-            isPartitionDetectionEnabled = VoltDB.instance().getCatalogContext().cluster.getNetworkpartition();
-        }
-        catch (Exception e) {
-            // this is needed for test code
-            m_tmLog.fatal("Couldn't load partititon detection configuration during a partition event.");
-        }
-
         // figure out previous and current cluster memberships
-        Set<Integer> previousHosts = m_foreignHosts.keySet();
+        Set<Integer> previousHosts = getLiveHostIds();
         Set<Integer> currentHosts = new HashSet<>(previousHosts);
         currentHosts.removeAll(failedHostIds);
+
+        // sanity!
+        Preconditions.checkState(previousHosts.contains(m_localHostId));
+        Preconditions.checkState(currentHosts.contains(m_localHostId));
 
         // decide if we're partitioned
         // this will print out errors if we are
         boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
 
         if (partitionDetected) {
-            if (isPartitionDetectionEnabled) {
+            if (m_partitionDetectionEnabled.get()) {
                 // extra logging for now
                 m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
                 m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "

@@ -98,6 +98,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
@@ -1529,6 +1530,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
             } else {
                 hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
+            }
+
+            PartitionDetectionType pt = deployment.getPartitionDetection();
+            if (pt != null) {
+                m_config.m_partitionDetectionEnabled = pt.isEnabled();
+                m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();

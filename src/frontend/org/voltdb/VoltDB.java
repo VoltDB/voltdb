@@ -167,6 +167,8 @@ public class VoltDB {
         public int m_deadHostTimeoutMS =
             org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
+        public boolean m_partitionDetectionEnabled = true;
+
         /** start up action */
         public StartAction m_startAction = null;
 
@@ -720,6 +722,23 @@ public class VoltDB {
     }
 
     /**
+     * turn off client interface as fast as possible
+     */
+    private static boolean turnOffClientInterface() {
+        // we don't expect this to ever fail, but if it does, skip to dying immediately
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance != null) {
+            ClientInterface ci = vdbInstance.getClientInterface();
+            if (ci != null) {
+                if (!ci.ceaseAllPublicFacingTrafficImmediately()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
@@ -755,7 +774,7 @@ public class VoltDB {
             try {
                 // turn off client interface as fast as possible
                 // we don't expect this to ever fail, but if it does, skip to dying immediately
-                if (!instance().getClientInterface().ceaseAllPublicFacingTrafficImmediately()) {
+                if (!turnOffClientInterface()) {
                     return; // this will jump to the finally block and die faster
                 }
 
@@ -875,7 +894,7 @@ public class VoltDB {
         try {
             // turn off client interface as fast as possible
             // we don't expect this to ever fail, but if it does, skip to dying immediately
-            if (!instance().getClientInterface().ceaseAllPublicFacingTrafficImmediately()) {
+            if (!turnOffClientInterface()) {
                 return; // this will jump to the finally block and die faster
             }
             // instruct the rest of the cluster to die
