@@ -108,18 +108,18 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st, boolean isRestore)
+    generateRestorePlan(Table catalogTable, SiteTracker st)
     {
         SynthesizedPlanFragment[] restore_plan = null;
         LOG.info("Total partitions for Table: " + getTableName() + ": " +
                  getTotalPartitions());
         if (!catalogTable.getIsreplicated())
         {
-            restore_plan = generatePartitionedToPartitionedPlan(st, isRestore);
+            restore_plan = generatePartitionedToPartitionedPlan(st);
         }
         else
         {
-            restore_plan = generatePartitionedToReplicatedPlan(st, isRestore);
+            restore_plan = generatePartitionedToReplicatedPlan(st);
         }
         return restore_plan;
     }
@@ -147,7 +147,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
     }
 
-    private SynthesizedPlanFragment[] generatePartitionedToReplicatedPlan(SiteTracker st, boolean isRestore) {
+    private SynthesizedPlanFragment[] generatePartitionedToReplicatedPlan(SiteTracker st) {
         ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
         Set<Integer> coveredPartitions = new HashSet<Integer>();
 
@@ -183,7 +183,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 // for each site of this host, generate one work fragment and let them execute in parallel
                 for(Long site : sitesAtHost) {
                     restorePlan.add(constructDistributePartitionedTableFragment(
-                            site, relevantPartitionIds, originalHosts, true, isRestore));
+                            site, relevantPartitionIds, originalHosts, true));
                 }
             }
         }
@@ -192,7 +192,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
-    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st, boolean isRestore) {
+    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
         LOG.info("Partition set: " + m_partitionsSeen);
         ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
         HashSet<Integer> coveredPartitions = new HashSet<Integer>();
@@ -293,7 +293,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
              */
             for (Long site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(
-                        site, uncoveredPartitionsAtHost, originalHostsArray, false, isRestore));
+                        site, uncoveredPartitionsAtHost, originalHostsArray, false));
             }
         }
         restorePlan
@@ -306,8 +306,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             long distributorSiteId,     // site which will execute this plan fragment
             int uncoveredPartitionsAtHost[],    // which partitions' data in the .vpt files will be extracted as TableSaveFile
             int originalHostsArray[],           // used to locate .vpt files
-            boolean asReplicated,
-            boolean isRestore)
+            boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -323,8 +322,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 getTableName(),
                 originalHostsArray,
                 uncoveredPartitionsAtHost,
-                result_dependency_id,
-                isRestore ? 1 : 0);
+                result_dependency_id);
         return plan_fragment;
     }
 

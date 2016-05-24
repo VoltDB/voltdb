@@ -62,7 +62,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st, boolean isRestore)
+    generateRestorePlan(Table catalogTable, SiteTracker st)
     {
         for (int hostId : m_hostsWithThisTable) {
             m_sitesWithThisTable.addAll(st.getSitesForHost(hostId));
@@ -71,11 +71,11 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         SynthesizedPlanFragment[] restore_plan = null;
         if (catalogTable.getIsreplicated())
         {
-            restore_plan = generateReplicatedToReplicatedPlan(st, isRestore);
+            restore_plan = generateReplicatedToReplicatedPlan(st);
         }
         else
         {
-            restore_plan = generateReplicatedToPartitionedPlan(st, isRestore);
+            restore_plan = generateReplicatedToPartitionedPlan(st);
         }
         return restore_plan;
     }
@@ -93,7 +93,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment[]
-    generateReplicatedToPartitionedPlan(SiteTracker st, boolean isRestore)
+    generateReplicatedToPartitionedPlan(SiteTracker st)
     {
         SynthesizedPlanFragment[] restore_plan = null;
 
@@ -104,7 +104,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         int restore_plan_index = 0;
         assert(st.getSitesForHost(host).size() > 0);
         long site = st.getSitesForHost(host).get(0);
-        restore_plan[restore_plan_index] = constructDistributeReplicatedTableAsPartitionedFragment(site, isRestore);
+        restore_plan[restore_plan_index] = constructDistributeReplicatedTableAsPartitionedFragment(site);
         ++restore_plan_index;
         restore_plan[restore_plan_index] = constructLoadReplicatedTableAggregatorFragment(true);
 
@@ -112,7 +112,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment
-    constructDistributeReplicatedTableAsPartitionedFragment(long siteId, boolean isRestore)
+    constructDistributeReplicatedTableAsPartitionedFragment(long siteId)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -125,13 +125,12 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                result_dependency_id,
-                isRestore ? 1: 0);
+                result_dependency_id);
         return plan_fragment;
     }
 
     private SynthesizedPlanFragment[]
-    generateReplicatedToReplicatedPlan(SiteTracker st, boolean isRestore)
+    generateReplicatedToReplicatedPlan(SiteTracker st)
     {
         SynthesizedPlanFragment[] restore_plan = null;
         Set<Long> execution_site_ids =
@@ -147,7 +146,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         for (Long site_id : m_sitesWithThisTable)
         {
             restore_plan[restore_plan_index] =
-                constructLoadReplicatedTableFragment(isRestore);
+                constructLoadReplicatedTableFragment();
             restore_plan[restore_plan_index].siteId = site_id;
             ++restore_plan_index;
         }
@@ -157,7 +156,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
                 m_sitesWithThisTable.iterator().next();
             restore_plan[restore_plan_index] =
                 constructDistributeReplicatedTableAsReplicatedFragment(source_site_id,
-                                                           site_id, isRestore);
+                                                           site_id);
             ++restore_plan_index;
         }
         assert(restore_plan_index == execution_site_ids.size());
@@ -180,7 +179,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment
-    constructLoadReplicatedTableFragment(boolean isRestore)
+    constructLoadReplicatedTableFragment()
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -192,15 +191,13 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         addPlanDependencyId(result_dependency_id);
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
-                result_dependency_id,
-                isRestore ? 1 : 0);
+                result_dependency_id);
         return plan_fragment;
     }
 
     private SynthesizedPlanFragment
     constructDistributeReplicatedTableAsReplicatedFragment(long sourceSiteId,
-                                                           long destinationSiteId,
-                                                           boolean isRestore)
+                                                           long destinationSiteId)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -214,8 +211,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
                 getTableName(),
                 destinationSiteId,
-                result_dependency_id,
-                isRestore ? 1 : 0);
+                result_dependency_id);
         return plan_fragment;
     }
 
