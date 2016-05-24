@@ -129,6 +129,8 @@ public class LocalCluster implements VoltServerConfig {
     private String[] m_versionCheckRegexOverrides = null;
     private String[] m_buildStringOverrides = null;
 
+    private String[] m_modeOverrides = null;
+
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
@@ -510,6 +512,11 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
+        if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+            assert(m_modeOverrides[hostId] != null);
+            cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+        }
+
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
 
@@ -794,6 +801,11 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+                assert(m_modeOverrides[hostId] != null);
+                cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
+            }
+
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -963,6 +975,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            //rejoin can hotfix
             if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
                 assert(m_versionOverrides[hostId] != null);
                 assert(m_versionCheckRegexOverrides[hostId] != null);
@@ -973,6 +986,7 @@ public class LocalCluster implements VoltServerConfig {
                     rejoinCmdLn.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
                 }
             }
+            //Rejoin does not do paused mode.
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
@@ -1385,6 +1399,12 @@ public class LocalCluster implements VoltServerConfig {
 
         m_versionOverrides = versions;
         m_versionCheckRegexOverrides = regexOverrides;
+    }
+
+    public void setOverridesForModes(String[] modes) {
+        assert(modes != null);
+
+        m_modeOverrides = modes;
     }
 
     @Override

@@ -500,10 +500,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
 
-            MeshResult mode = buildClusterMesh(isRejoin || m_joining);
-            if (!isRejoin && !m_joining) {
-                m_startMode = mode.m_mode;
-            }
+            buildClusterMesh(isRejoin || m_joining);
 
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -526,6 +523,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
+                if (m_messenger.isPaused()) {
+                    hostLog.info(String.format("Should Start in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
+                    m_config.m_isPaused.set(true);
+                }
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
@@ -1716,7 +1717,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    MeshResult buildClusterMesh(boolean isRejoin) {
+    void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
         HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
         String hostname = hostAndPort.getHostText();
@@ -1744,9 +1745,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
-        boolean paused = false;
         try {
-            paused = m_messenger.start();
+            m_messenger.start();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -1766,7 +1766,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     "Please check your command line and start action and try again.", false, null);
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
-        return (paused ? new MeshResult(OperationMode.PAUSED) : new MeshResult(OperationMode.RUNNING));
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -1900,7 +1899,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         try {
             if (operationModeFuture.getData() != null) {
                 String operationModeStr = new String(operationModeFuture.getData(), "UTF-8");
-                m_startMode = OperationMode.valueOf(operationModeStr);
+                //If socket joiner didnt tell me we are paused pick up from zk.
+                if (!m_config.m_isPaused.get()) {
+                    m_startMode = OperationMode.valueOf(operationModeStr);
+                }
             }
         } catch (KeeperException.NoNodeException e) {}
         catch (Exception e) {

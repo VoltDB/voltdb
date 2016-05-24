@@ -354,7 +354,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Start the host messenger and connect to the leader, or become the leader
      * if necessary. return true if any node indicates a paused start.
      */
-    public boolean start() throws Exception {
+    public void start() throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -436,7 +436,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
-        return m_joiner.isPaused();
     }
 
     //For test only
@@ -499,6 +498,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
+    }
+
+    @Override
+    public void notifyAsPaused() {
+        m_config.isPaused.set(true);
     }
 
     /*
@@ -807,6 +811,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         assert hostGroups.size() == expectedHosts;
         return hostGroups;
+    }
+
+    public boolean isPaused() {
+        return m_config.isPaused.get();
     }
 
     public int getHostId() {

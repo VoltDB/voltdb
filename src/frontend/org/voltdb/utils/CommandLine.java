@@ -663,8 +663,8 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
 
-        if (m_tag != null) {
-            cmdline.add("tag"); cmdline.add(m_tag);
+        if (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) {
+            cmdline.add("paused");
         }
 
         return cmdline;

@@ -82,6 +82,7 @@ public class SocketJoiner {
          */
         public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress ) throws Exception;
 
+        public void notifyAsPaused();
         /*
          * A connection has been made to all of the specified hosts. Invoked by
          * nodes connected to the cluster
@@ -337,7 +338,9 @@ public class SocketJoiner {
             JSONObject jsObj = readJSONObjFromWire(sc, remoteAddress);
             //If any connecting server told me paused I will set to start as paused.
             if (jsObj.optBoolean("paused", false)) {
+                hostLog.info("Received request to join as paused.");
                 m_paused.set(true);
+                m_joinHandler.notifyAsPaused();
             }
 
             LOG.info(jsObj.toString(2));
@@ -477,19 +480,11 @@ public class SocketJoiner {
             }
         }
         //Do this only after we think we are compatible.
-        boolean paused;
-        if (jsonVersionInfo.has("paused")) {
-            paused = jsonVersionInfo.getBoolean("paused");
-        } else {
-            paused = false;
-        }
         activeVersions.add(remoteVersionString);
+        boolean paused = jsonVersionInfo.optBoolean("paused", false);
         return paused;
     }
 
-    public boolean isPaused() {
-        return m_paused.get();
-    }
     /*
      * If this node failed to bind to the leader address
      * it must connect to the leader which will generate a host id and
@@ -573,6 +568,7 @@ public class SocketJoiner {
             if (paused) {
                 //Make my action paused.
                 m_paused.set(paused);
+                m_joinHandler.notifyAsPaused();
             }
 
             // read the json response sent by HostMessenger with HostID
