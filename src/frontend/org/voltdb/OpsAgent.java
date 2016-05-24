@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -105,17 +104,6 @@ public abstract class OpsAgent
             this.c = c;
             this.clientData = clientData;
             this.request = request;
-        }
-
-        // hacky way to support two format of hashconfig using interval value
-        // return true if interval == true (delta-flag == 1), indicate sent compressed json
-        // otherwise return false, indicate sent original binary format
-        public boolean getConfigType() {
-            try {
-                return request.getBoolean("interval");
-            } catch (JSONException e) {
-                return false;
-            }
         }
     }
 

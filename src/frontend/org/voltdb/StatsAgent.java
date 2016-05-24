@@ -220,7 +220,11 @@ public class StatsAgent extends OpsAgent
                     clientHandle,
                     System.currentTimeMillis(),
                     obj);
-            collectTopoStats(psr);
+            // hacky way to support two format of hashconfig using interval value
+            // return true if interval == true (delta-flag == 1), indicate sent compressed json
+            // otherwise return false, indicate sent original binary format
+            boolean jsonConfig = obj.getBoolean("interval");
+            collectTopoStats(psr,jsonConfig);
             return;
         }
         else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
@@ -302,7 +306,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private void collectTopoStats(PendingOpsRequest psr)
+    private void collectTopoStats(PendingOpsRequest psr, boolean jsonConfig)
     {
         VoltTable[] tables = null;
         VoltTable topoStats = getStatsAggregate(StatsSelector.TOPO, false, psr.startTime);
@@ -315,7 +319,6 @@ public class StatsAgent extends OpsAgent
                             new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
             tables[1] = vt;
             HashinatorConfig hashConfig = TheHashinator.getCurrentConfig();
-            boolean jsonConfig = psr.getConfigType();
             if (!jsonConfig) {
                 vt.addRow(hashConfig.type.toString(), hashConfig.configBytes);
             } else {

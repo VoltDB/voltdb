@@ -931,11 +931,10 @@ public class TestTheHashinator {
     private void checkConfigJSON(ImmutableSortedMap<Integer, Integer> tokens,
                                     String JSON) throws JSONException {
         final JSONObject jsonData = new JSONObject(JSON);
-        assertEquals(tokens.size(), jsonData.getInt(ElasticHashinator.JSON_TOKENCOUNT_KEY));
-        final JSONObject tokenPartition = jsonData.getJSONObject(ElasticHashinator.JSON_TOKENPARTITION_KEY);
+        assertEquals(tokens.size(), jsonData.length());
         for (Map.Entry<Integer, Integer> entry: tokens.entrySet()) {
             assertEquals(entry.getValue().intValue(),
-                    tokenPartition.getInt(entry.getKey().toString()));
+                    jsonData.getInt(entry.getKey().toString()));
         }
     }
     @Test
