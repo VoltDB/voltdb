@@ -61,7 +61,6 @@ import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -273,6 +272,8 @@ public class VoltProjectBuilder {
 
     private boolean m_ppdEnabled = false;
     private String m_ppdPrefix = "none";
+
+    private Integer m_heartbeatTimeout = null;
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -609,11 +610,12 @@ public class VoltProjectBuilder {
         m_snapshotPath = path;
     }
 
-    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
-    {
-        m_ppdEnabled = true;
-        m_snapshotPath = snapshotPath;
-        m_ppdPrefix = ppdPrefix;
+    public void setPartitionDetectionEnabled(boolean ppdEnabled) {
+        m_ppdEnabled = ppdEnabled;
+    }
+
+    public void setHeartbeatTimeoutSeconds(int seconds) {
+        m_heartbeatTimeout = seconds;
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
@@ -1042,9 +1044,14 @@ public class VoltProjectBuilder {
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
         deployment.setPartitionDetection(ppd);
         ppd.setEnabled(m_ppdEnabled);
-        Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
-        ppd.setSnapshot(ppdsnapshot);
-        ppdsnapshot.setPrefix(m_ppdPrefix);
+
+        // <heartbeat>
+        // don't include this element if not explicitly set
+        if (m_heartbeatTimeout != null) {
+            HeartbeatType hb = factory.createHeartbeatType();
+            deployment.setHeartbeat(hb);
+            hb.setTimeout((int) m_heartbeatTimeout);
+        }
 
         // <admin-mode>
         // can't be disabled, but only write out the non-default config if
