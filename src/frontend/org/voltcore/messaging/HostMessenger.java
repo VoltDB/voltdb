@@ -219,7 +219,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
-    private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(true); // default to true
+    // default to false for PD, so hopefully this gets set to true very quickly
+    private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(false);
     private boolean m_partitionDetected = false;
 
     private final Object m_mapLock = new Object();
