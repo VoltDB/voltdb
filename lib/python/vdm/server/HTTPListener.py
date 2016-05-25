@@ -1658,7 +1658,7 @@ class StatusDatabaseServerAPI(MethodView):
                     except:
                         pass
 
-                    isFreshStart = voltdbserver.check_snapshot_folder(database_id)
+                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
                     return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
                                                                                           'details': success,
                                                                                           'isInitialized': not isFreshStart
@@ -1670,7 +1670,7 @@ class StatusDatabaseServerAPI(MethodView):
                         error = Log.get_error_log_details()
                     except:
                         pass
-                    isFreshStart = voltdbserver.check_snapshot_folder(database_id)
+                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
                     if voltProcess.Get_Voltdb_Process().isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
                                                                                               'details': error,

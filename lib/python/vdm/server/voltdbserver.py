@@ -73,6 +73,25 @@ def check_snapshot_folder(database_id):
         return True
 
 
+def check_snapshot_folder_for_server(database_id, server_id):
+    deployment = HTTPListener.Global.DEPLOYMENT.get(database_id)
+    if deployment is not None:
+        if 'paths' in deployment and 'voltdbroot' in deployment['paths'] and 'snapshots' in deployment['paths']:
+            voltdb_root = deployment['paths']['voltdbroot']['path']
+            snapshot = deployment['paths']['snapshots']['path']
+            server_path =  VoltDatabase.get_volt_server_data_folder(VoltDatabase(database_id), server_id)
+            outfilename = os.path.join(server_path, str(voltdb_root), str(snapshot))
+            if os.path.isdir(outfilename):
+                freshStart = False
+            else:
+                freshStart = True
+            return freshStart
+        else:
+            return True
+    else:
+        return True
+
+
 def create_response(statusstr, statuscode):
     """
     Utility method to create response JSON
