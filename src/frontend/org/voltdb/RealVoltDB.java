@@ -1711,14 +1711,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
-    //Indicating Result of meshing.
-    private static class MeshResult {
-        public final OperationMode m_mode;
-        public MeshResult(OperationMode mode) {
-             m_mode = mode;
-        }
-    }
-
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -1908,10 +1900,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         try {
             if (operationModeFuture.getData() != null) {
                 String operationModeStr = new String(operationModeFuture.getData(), "UTF-8");
-                //If socket joiner didnt tell me we are paused pick up from zk.
-                if (!m_config.m_isPaused.get()) {
-                    m_startMode = OperationMode.valueOf(operationModeStr);
-                }
+                m_startMode = OperationMode.valueOf(operationModeStr);
             }
         } catch (KeeperException.NoNodeException e) {}
         catch (Exception e) {
