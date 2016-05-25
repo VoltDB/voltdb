@@ -61,7 +61,6 @@ def check_snapshot_folder(database_id):
         if 'paths' in deployment and 'voltdbroot' in deployment['paths'] and 'snapshots' in deployment['paths']:
             voltdb_root = deployment['paths']['voltdbroot']['path']
             snapshot = deployment['paths']['snapshots']['path']
-
             outfilename = os.path.join(HTTPListener.Global.VOLT_SERVER_PATH, str(voltdb_root), str(snapshot))
             if os.path.isdir(outfilename):
                 freshStart = False
@@ -270,7 +269,7 @@ class VoltDatabase:
         if verb == 'create':
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
         elif verb == 'add':
-            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
+            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '--host=' + server_ip]
         elif rejoin:
             if is_blocking == 1:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip]

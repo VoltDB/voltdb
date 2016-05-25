@@ -1626,9 +1626,14 @@ select {
 
     }
 
- .btnStartServer > div > .glyphicon.glyphicon-play:before, .btnStopServer > div > .glyphicon.glyphicon-play:before{
+ .startServerEnabled > div > .glyphicon.glyphicon-play:before, .btnStopServer > div > .glyphicon.glyphicon-play:before{
     font-size: 1.5em;
 color: #68A81A;
+    }
+
+ .startServerDisabled > div > .glyphicon.glyphicon-play:before{
+    font-size: 1.5em;
+color: grey;
     }
 
 .clsServerList, .clsServerListGreen { position:relative; top:-5px;}

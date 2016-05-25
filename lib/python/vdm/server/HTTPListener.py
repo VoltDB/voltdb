@@ -1657,8 +1657,12 @@ class StatusDatabaseServerAPI(MethodView):
                         success = Log.get_error_log_details()
                     except:
                         pass
+
+                    isFreshStart = voltdbserver.check_snapshot_folder(database_id)
                     return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
-                                                                                          'details': success}})
+                                                                                          'details': success,
+                                                                                          'isInitialized': not isFreshStart
+                                                                                          }})
                 except:
                     voltProcess = voltdbserver.VoltDatabase(database_id)
                     error = ''
@@ -1666,13 +1670,17 @@ class StatusDatabaseServerAPI(MethodView):
                         error = Log.get_error_log_details()
                     except:
                         pass
-
+                    isFreshStart = voltdbserver.check_snapshot_folder(database_id)
                     if voltProcess.Get_Voltdb_Process().isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
-                                                                                              'details': error}})
+                                                                                              'details': error,
+                                                                                              'isInitialized': not isFreshStart
+                                                                                              }})
                     else:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
-                                                                                               'details': error}})
+                                                                                              'details': error,
+                                                                                              'isInitialized': not isFreshStart
+                                                                                              }})
 
 
 def main(runner, amodule, config_dir, data_dir, server):
