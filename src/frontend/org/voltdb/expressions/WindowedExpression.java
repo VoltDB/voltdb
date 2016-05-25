@@ -119,15 +119,6 @@ public class WindowedExpression extends AbstractExpression {
         return hash;
     }
 
-    @Override
-    public Object clone() {
-        WindowedExpression clone = (WindowedExpression) super.clone();
-        clone.getOrderByDirections().addAll(m_orderByDirections);
-        clone.getOrderByExpressions().addAll(copyOrderByExpressions());
-        clone.getPartitionByExpressions().addAll(copyPartitionByExpressions());
-        return clone;
-    }
-
     private Collection<? extends AbstractExpression> copyPartitionByExpressions() {
         List<AbstractExpression> copy = new ArrayList<AbstractExpression>();
         for (AbstractExpression ae : m_partitionByExpressions) {

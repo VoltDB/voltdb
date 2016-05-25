@@ -102,7 +102,9 @@ public class TestPartitionByNode extends TestCase {
         JSONObject jobj = new JSONObject(new JSONTokener(json));
         PartitionByPlanNode pn2 = new PartitionByPlanNode();
         pn2.loadFromJSONObject(jobj, m_voltdb.getDatabase());
-        assertEquals(pn.numberSortExpressions(), pn2.numberSortExpressions());
+        int oldCount = pn.numberSortExpressions();
+        int newCount = pn2.numberSortExpressions();
+        assertEquals(oldCount, newCount);
         for (int idx = 0; idx < pn2.numberSortExpressions(); idx += 1) {
             AbstractExpression ae2 = pn2.getSortExpression(idx);
             AbstractExpression ae  = pn.getSortExpression(idx);

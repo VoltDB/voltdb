@@ -1536,6 +1536,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     @Override
+    /**
+     * Return true if this ParsedSelectStmt has order by columns
+     */
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }

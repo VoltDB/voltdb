@@ -541,6 +541,9 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * This simple analysis counts the number of partitioned tables in the join tree
+     * of a query, and initializes a guess for the count of independently partitioned tables.
+     *
      * @param tableCacheList
      * @throws PlanningErrorException
      */
