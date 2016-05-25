@@ -11,6 +11,12 @@ using std::max;
 using std::swap;
 using std::reverse;
 
+// When building on older platforms, isinf and isnan will be in global namespace.
+#if __GNUC__ > 4
+using std::isinf;
+using std::isnan;
+#endif
+
 #include <limits>
 using std::numeric_limits;
 

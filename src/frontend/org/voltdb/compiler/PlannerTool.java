@@ -289,7 +289,16 @@ public class PlannerTool {
             //////////////////////
             // OUTPUT THE RESULT
             //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogHash);
+            CorePlan core = null;
+            try {
+                core = new CorePlan(plan, m_catalogHash);
+            }
+            catch (StackOverflowError error) {
+                //
+                String msg = "Encountered stack overflow error. "
+                           + "Try reducing the number of predicate expressions in the query.";
+                throw new RuntimeException(msg);
+            }
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             // do not put wrong parameter explain query into cache

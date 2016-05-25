@@ -28,6 +28,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.voltcore.logging.Level;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importer.AbstractImporter;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
+
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
@@ -49,16 +59,6 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
-
-import org.voltcore.logging.Level;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -358,7 +358,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
-        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
+        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
             resetLeader();

@@ -1033,9 +1033,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId producer partition ID
      * @param partitionKeyValues list of partition key value that specifies the desired partition key value of each txn
      * @param flags list of DRTxnPartitionHashFlags that specifies the desired type of each txn
+     * @param startSequenceNumber the starting sequence number of DR buffers
      * @return payload bytes (only txns with no InvocationBuffer header)
      */
-    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[]);
+    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[],
+            long startSequenceNumber);
 
     /**
      * Start collecting statistics (starts timer).
