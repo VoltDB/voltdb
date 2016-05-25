@@ -56,6 +56,7 @@ class ClusterConfigurationDRTest extends TestBase {
                 deleteDatabase(create_DatabaseTest_File)
             }
         }
+        newDatabaseName = "name_src"
         then: 'Choose new database'
         //chooseDatabase(indexOfNewDatabase, "name_src")
         for (count = 0; count < numberOfTrials; count++) {
@@ -148,6 +149,7 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
         }
+        report "hello2"
 
         when: 'Open popup for DR'
         for(count=0; count<numberOfTrials; count++) {
@@ -231,6 +233,7 @@ class ClusterConfigurationDRTest extends TestBase {
         when: 'Choose the database with index 1'
         openDatabase()
         //chooseDatabase(indexOfLocal, "local")
+        newDatabaseName = "Database"
         for (count = 0; count < numberOfTrials; count++) {
             try {
                 for(countNext=0; countNext<numberOfTrials; countNext++) {
@@ -263,10 +266,11 @@ class ClusterConfigurationDRTest extends TestBase {
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+        report "hello3"
     }
 
 
-    /*def cleanup() { // called after each test
+    def cleanup() { // called after each test
         count = 0
         int countNext = 0
         while (count < numberOfTrials) {
@@ -297,7 +301,7 @@ class ClusterConfigurationDRTest extends TestBase {
             catch (geb.waiting.WaitTimeoutException exception) {
                 openDatabase()
             }
-
+            newDatabaseName = "Database"
             //chooseDatabase(indexOfLocal, "local")
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -348,5 +352,5 @@ class ClusterConfigurationDRTest extends TestBase {
             }
             println()
         }
-    }*/
+    }
 }
