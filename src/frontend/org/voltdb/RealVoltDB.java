@@ -2720,7 +2720,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_config.m_isPaused.set(false);
             m_mode = OperationMode.RUNNING;
         }
-        Object args[] = { m_mode.toString() };
+        String mstr = (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL";
+        Object args[] = { mstr };
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
 

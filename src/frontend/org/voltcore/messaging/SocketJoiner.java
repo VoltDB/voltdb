@@ -339,7 +339,6 @@ public class SocketJoiner {
             //If any connecting server told me paused I will set to start as paused.
             if (jsObj.optBoolean("paused", false)) {
                 hostLog.info("Received request to join as paused.");
-                m_paused.set(true);
                 m_joinHandler.notifyAsPaused();
             }
 
@@ -566,8 +565,7 @@ public class SocketJoiner {
             // read the json response from socketjoiner with version info and validate it
             boolean paused = processVersionJSONResponse(socket, remoteAddress, localVersionString, localBuildString, activeVersions);
             if (paused) {
-                //Make my action paused.
-                m_paused.set(paused);
+                //Notify paused.
                 m_joinHandler.notifyAsPaused();
             }
 
@@ -658,8 +656,8 @@ public class SocketJoiner {
                 // read the json response from socketjoiner with version info and validate it
                 paused = processVersionJSONResponse(hostSocket, remoteAddress, localVersionString, localBuildString, activeVersions);
                 if (paused) {
-                    //Make my action paused.
-                    m_paused.set(paused);
+                    //Notify paused to HM
+                    m_joinHandler.notifyAsPaused();
                 }
             }
 
