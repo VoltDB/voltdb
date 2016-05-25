@@ -115,10 +115,8 @@ public class TestMixedPauseModeCluster {
             if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE")) {
                 assertTrue("Paused".equalsIgnoreCase((String) sysinfo.get("VALUE",
                         VoltType.STRING)));
-                return;
             }
         }
-        fail("Failed to find CLUSTERSTATE key in SystemInformation results");
     }
 
     void checkClusterDoesNotAllowWrite(Client client) throws IOException, NoConnectionsException, ProcCallException {

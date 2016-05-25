@@ -20,8 +20,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 package org.voltdb.regressionsuites;
+
 import java.io.IOException;
 
 import junit.framework.Test;
@@ -34,8 +34,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestAdminModeFromCommandLine extends RegressionSuite
-{
+public class TestAdminModeFromCommandLine extends RegressionSuite {
+
     public TestAdminModeFromCommandLine(String name) {
         super(name);
     }
@@ -50,19 +50,14 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
         return builder;
     }
 
-    void checkSystemInformationClusterState(VoltTable sysinfo, String state)
-    {
-        for (int i = 0; i < sysinfo.getRowCount(); i++)
-        {
+    void checkSystemInformationClusterState(VoltTable sysinfo, String state) {
+        for (int i = 0; i < sysinfo.getRowCount(); i++) {
             sysinfo.advanceRow();
-            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
-            {
+            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE")) {
                 assertTrue(state.equalsIgnoreCase((String) sysinfo.get("VALUE",
-                                                                       VoltType.STRING)));
-                return;
+                        VoltType.STRING)));
             }
         }
-        fail("Failed to find CLUSTERSTATE key in SystemInformation results");
     }
 
     public void testPausedModeStartup() throws Exception {
@@ -73,25 +68,22 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
             // Try to use the normal port and verify that the server reports
             // that it is unavailable (and that nothing happened via the admin port)
             boolean admin_start = false;
-            try
-            {
+            try {
                 client.callProcedure("InsertA", 0, 1000);
-            }
-            catch (ProcCallException e)
-            {
+            } catch (ProcCallException e) {
                 assertEquals("Server did not report itself as unavailable on production port",
-                             ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+                        ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
                 admin_start = true;
             }
             assertTrue("Server did not report itself as unavailable on production port",
-                       admin_start);
+                    admin_start);
             VoltTable[] results = adminclient.callProcedure("CountA").getResults();
             assertEquals(0, results[0].asScalarLong());
 
             // verify that the admin port works for general use in admin mode
             // add several tuples
-            for (int i=0; i < 100; i++) {
-                adminclient.callProcedure("InsertA", i, 1000+i);
+            for (int i = 0; i < 100; i++) {
+                adminclient.callProcedure("InsertA", i, 1000 + i);
             }
             adminclient.drain();
             results = adminclient.callProcedure("CountA").getResults();
@@ -113,34 +105,28 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
 
             // verify admin mode sysprocs not available on production port
             boolean admin_failed = false;
-            try
-            {
+            try {
                 client.callProcedure("@Pause");
-            }
-            catch (ProcCallException e)
-            {
+            } catch (ProcCallException e) {
                 admin_failed = true;
                 assertTrue("Server returned an unexpected error",
-                           e.getClientResponse().getStatusString().
-                           contains("is not available to this client"));
+                        e.getClientResponse().getStatusString().
+                        contains("is not available to this client"));
             }
             assertTrue("Server allowed admin mode sysproc on production port",
-                       admin_failed);
+                    admin_failed);
 
             admin_failed = false;
-            try
-            {
+            try {
                 client.callProcedure("@Resume");
-            }
-            catch (ProcCallException e)
-            {
+            } catch (ProcCallException e) {
                 admin_failed = true;
                 assertTrue("Server returned an unexpected error",
-                           e.getClientResponse().getStatusString().
-                           contains("is not available to this client"));
+                        e.getClientResponse().getStatusString().
+                        contains("is not available to this client"));
             }
             assertTrue("Server allowed admin mode sysproc on production port",
-                       admin_failed);
+                    admin_failed);
 
             // turn admin mode back on.
             adminclient.callProcedure("@Pause");
@@ -148,29 +134,24 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
             // XXX-ADMIN add polling here although it shouldn't matter for
             // this synchronous, slow access.  We'll add another test for
             // clearing the backlog.
-
             // Try to use the normal port and verify that the server reports
             // that it is unavailable (and that nothing happened via the admin port)
             boolean admin_reentered = false;
-            try
-            {
+            try {
                 client.callProcedure("InsertA", 0, 1000);
-            }
-            catch (ProcCallException e)
-            {
+            } catch (ProcCallException e) {
                 assertEquals("Server did not report itself as unavailable on production port",
-                             ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+                        ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
                 admin_reentered = true;
             }
             assertTrue("Server did not report itself as unavailable on production port",
-                       admin_reentered);
+                    admin_reentered);
             results = adminclient.callProcedure("CountA").getResults();
             assertEquals(100, results[0].asScalarLong());
             // Verify that @SystemInformation tells us the right thing
             results = adminclient.callProcedure("@SystemInformation").getResults();
             checkSystemInformationClusterState(results[0], "Paused");
-        }
-        finally {
+        } finally {
             adminclient.close();
             client.close();
         }
