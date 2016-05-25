@@ -73,6 +73,9 @@ public class Constants
     public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "default";
 
     // Special HTTP port values to disable or trigger auto-scan.
-    public static final int HTTP_PORT_DISABLED = -1;
+    public static final int UNDEFINED = -1;
+    public static final int HTTP_PORT_DISABLED = UNDEFINED;
     public static final int HTTP_PORT_AUTO = 0;
+
+    public static final String DBROOT = "voltdbroot";
 }

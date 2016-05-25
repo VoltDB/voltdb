@@ -576,7 +576,7 @@ public class MiscUtils {
      */
     public static boolean isValidHttpHostSpec(String specifier) {
         return isValidHostSpec(specifier, DEFAULT_HTTP_PORT);
-      }
+    }
 
     /**
      * Checks whether or not the given host and port specifier is valid

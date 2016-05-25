@@ -27,9 +27,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -41,7 +43,7 @@ import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
-import org.voltdb.deploy.CommandLineMeshProvider;
+import org.voltdb.deploy.JoinerConfig;
 import org.voltdb.deploy.MemberNetConfig;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -51,6 +53,7 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
 
 /**
@@ -59,7 +62,8 @@ import com.google_voltpatches.common.net.HostAndPort;
 public class VoltDB {
 
     /** Global constants */
-    public static final int DISABLED_PORT = -1;
+    public static final int DISABLED_PORT = Constants.UNDEFINED;
+    public static final int UNDEFINED = Constants.UNDEFINED;
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
@@ -80,6 +84,7 @@ public class VoltDB {
     public static final String STAGED_MESH = "_MESH";
     public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
+    public static final String DBROOT = Constants.DBROOT;
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -267,15 +272,17 @@ public class VoltDB {
         public String m_clusterName = DEFAULT_CLUSTER_NAME;
 
         /** command line provided voltdbroot */
-        public File m_voltdbRoot = new VoltFile("voltdbroot");
+        public File m_voltdbRoot = new VoltFile(DBROOT);
 
         /** configuration UUID */
         public final UUID m_configUUID = UUID.randomUUID();
 
         /** holds a list of comma separated cluster members */
-        public String m_meshMembers = null;
+        public String m_meshBrokers = null;
 
-        public CommandLineMeshProvider m_meshProvider = null;
+        public NavigableSet<String> m_coordinators = ImmutableSortedSet.of();
+
+        public int m_hostCount = UNDEFINED;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -402,7 +409,9 @@ public class VoltDB {
                     if (i < args.length) {
                         sbld.append(args[i]);
                     }
-                    m_meshMembers = sbld.toString();
+                    m_meshBrokers = sbld.toString();
+                } else if (arg.equals("clustersize")) {
+                    m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {
@@ -546,15 +555,15 @@ public class VoltDB {
                     m_isPaused.set(true);
                 } else if (arg.equalsIgnoreCase("voltdbroot")) {
                     m_voltdbRoot = new VoltFile(args[++i]);
-                    if (!"voltdbroot".equals(m_voltdbRoot.getName())) {
-                        m_voltdbRoot = new VoltFile(m_voltdbRoot,"voltdbroot");
+                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
                         hostLog.fatal("Could not create directory \"" + m_voltdbRoot.getPath() + "\"");
                         referToDocAndExit();
                     }
                     try {
-                        CatalogUtil.validateDirectory("voltdbroot", m_voltdbRoot);
+                        CatalogUtil.validateDirectory(DBROOT, m_voltdbRoot);
                     } catch (RuntimeException e) {
                         hostLog.fatal(e.getMessage(),e);
                         referToDocAndExit();
@@ -591,7 +600,6 @@ public class VoltDB {
             if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
             }
-
 
             if (m_startAction == StartAction.PROBE) {
 
@@ -639,22 +647,19 @@ public class VoltDB {
                     m_clusterName = stagedName;
                 }
                 try {
-                    if (m_meshMembers == null || m_meshMembers.trim().isEmpty()) {
+                    if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
                         File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
                         if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
                             try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
-                                m_meshMembers = br.readLine();
+                                m_meshBrokers = br.readLine();
                             } catch (IOException e) {
                                 hostLog.fatal("Unable to read cluster name given at initialization from " + inzFH, e);
                                 referToDocAndExit();
                             }
-                        } else {
-                            m_meshMembers = "localhost";
                         }
                     }
-                    m_meshProvider = new CommandLineMeshProvider(getNetConfig(), m_meshMembers);
                 } catch (IllegalArgumentException e) {
-                    hostLog.fatal("Unable to validate mesh argument \"" + m_meshMembers + "\"", e);
+                    hostLog.fatal("Unable to validate mesh argument \"" + m_meshBrokers + "\"", e);
                     referToDocAndExit();
                 }
             } else if (m_startAction == StartAction.INITIALIZE) {
@@ -665,6 +670,19 @@ public class VoltDB {
                             + " to initialize a new database overwriting existing files.");
                     referToDocAndExit();
                 }
+            } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                if (m_leader != null && !m_leader.trim().isEmpty()) {
+                    m_meshBrokers = m_leader;
+                }
+            }
+            if (m_meshBrokers != null && !m_meshBrokers.trim().isEmpty()) {
+                m_coordinators = JoinerConfig.hosts(m_meshBrokers);
+                if (m_leader == null || m_leader.trim().isEmpty()) {
+                    m_leader = m_coordinators.first();
+                }
+            }
+            if (m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
+                m_hostCount = m_coordinators.size();
             }
         }
 
@@ -720,21 +738,26 @@ public class VoltDB {
                 msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
                 hostLog.fatal(msg);
             }
-
+            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE));
             // require deployment file location
-            if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
-                    && m_startAction != StartAction.JOIN && m_startAction != StartAction.INITIALIZE) {
+            if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
-                if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
+                if (m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
                     isValid = false;
                     hostLog.fatal("The deployment file location is empty.");
                 }
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            if (m_isPaused.get() && (m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN) ) {
+            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
+            if (m_isPaused.get() && pauseNotAllowed.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+            }
+            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+                isValid = false;
+                hostLog.fatal("seed hosts are missing");
             }
             return isValid;
         }

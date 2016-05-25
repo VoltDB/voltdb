@@ -16,140 +16,42 @@
  */
 package org.voltdb;
 
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.voltdb.common.NodeState;
 
-/**
- *
- */
 public class StatusTracker {
-    private volatile NodeState nodeState;
-    private final UUID startUuid;
-    private final String clusterName;
-    private final String buildInfo;
-    private final String versionInfo;
-    private final boolean enterprise;
 
-    public StatusTracker(NodeState nodeState, UUID startUuid,
-            String clusterName, String buildInfo, String versionInfo,
-            boolean enterprise) {
-        this.nodeState = nodeState;
-        this.startUuid = startUuid;
-        this.clusterName = clusterName;
-        this.buildInfo = buildInfo;
-        this.versionInfo = versionInfo;
-        this.enterprise = enterprise;
-    }
-
-    public StatusTracker(UUID startUuid, String clusterName,
-            String buildInfo, String versionInfo,
-            boolean enterprise) {
-        this(NodeState.INITIALIZING, startUuid, clusterName, buildInfo, versionInfo, enterprise);
-    }
+    private final AtomicReference<NodeState> nodeState = new AtomicReference<>(NodeState.INITIALIZING);
 
     public StatusTracker() {
-       this(NodeState.INITIALIZING,new UUID(0L,0L),null,null,null,false);
+    }
+
+    static class NodeStateSupplier implements Supplier<NodeState> {
+        private final AtomicReference<NodeState> ref;
+        private NodeStateSupplier(AtomicReference<NodeState> ref) {
+            this.ref = ref;
+        }
+        @Override
+        public NodeState get() {
+            return ref.get();
+        }
+    }
+
+    public Supplier<NodeState> getNodeStateSupplier() {
+        return new NodeStateSupplier(nodeState);
+    }
+
+    public boolean setNodeState(NodeState update) {
+        return compareAndSetNodeState(nodeState.get(), update);
+    }
+
+    public boolean compareAndSetNodeState(NodeState expect, NodeState update) {
+        return nodeState.compareAndSet(expect, update);
     }
 
     public NodeState getNodeState() {
-        return nodeState;
-    }
-
-    public void setNodeState(NodeState nodeState) {
-        this.nodeState = nodeState;
-    }
-
-    public UUID getStartUuid() {
-        return startUuid;
-    }
-
-    public String getClusterName() {
-        return clusterName;
-    }
-
-    public String getBuildInfo() {
-        return buildInfo;
-    }
-
-    public String getVersionInfo() {
-        return versionInfo;
-    }
-
-    public boolean isEnterprise() {
-        return enterprise;
-    }
-
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result
-                + ((buildInfo == null) ? 0 : buildInfo.hashCode());
-        result = prime * result
-                + ((clusterName == null) ? 0 : clusterName.hashCode());
-        result = prime * result + (enterprise ? 1231 : 1237);
-        result = prime * result
-                + ((nodeState == null) ? 0 : nodeState.hashCode());
-        result = prime * result
-                + ((startUuid == null) ? 0 : startUuid.hashCode());
-        result = prime * result
-                + ((versionInfo == null) ? 0 : versionInfo.hashCode());
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        StatusTracker other = (StatusTracker) obj;
-        if (buildInfo == null) {
-            if (other.buildInfo != null)
-                return false;
-        } else if (!buildInfo.equals(other.buildInfo))
-            return false;
-        if (clusterName == null) {
-            if (other.clusterName != null)
-                return false;
-        } else if (!clusterName.equals(other.clusterName))
-            return false;
-        if (enterprise != other.enterprise)
-            return false;
-        if (nodeState != other.nodeState)
-            return false;
-        if (startUuid == null) {
-            if (other.startUuid != null)
-                return false;
-        } else if (!startUuid.equals(other.startUuid))
-            return false;
-        if (versionInfo == null) {
-            if (other.versionInfo != null)
-                return false;
-        } else if (!versionInfo.equals(other.versionInfo))
-            return false;
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("StatusTracker [nodeState=");
-        builder.append(nodeState);
-        builder.append(", startUuid=");
-        builder.append(startUuid);
-        builder.append(", buildInfo=");
-        builder.append(buildInfo);
-        builder.append(", versionInfo=");
-        builder.append(versionInfo);
-        builder.append(", isEnterprise=");
-        builder.append(enterprise);
-        builder.append(", clusterName=");
-        builder.append(clusterName);
-        builder.append("]");
-        return builder.toString();
+        return nodeState.get();
     }
 }
