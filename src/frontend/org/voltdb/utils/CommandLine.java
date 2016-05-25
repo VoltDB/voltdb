@@ -663,7 +663,7 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
 
-        if (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) {
+        if (this.m_isPaused.get() || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
         }
 

@@ -35,7 +35,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -918,6 +917,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public boolean isPaused() {
         return m_config.isPaused.get();
+    }
+
+    public void resetPaused() {
+        m_config.isPaused.set(false);
+    }
+
+    //Set Paused so socketjoiner will communicate correct status during mesh building.
+    public void pause() {
+        m_config.isPaused.set(true);
     }
 
     public int getHostId() {

@@ -328,7 +328,7 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
-    public void startPaused() {
+    public void setToStartPaused() {
        m_isPaused = true;
     }
     /**
@@ -511,7 +511,6 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
             }
         }
-
         if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
             assert(m_modeOverrides[hostId] != null);
             cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];

@@ -61,6 +61,7 @@ public class Resume extends VoltSystemProcedure
                 VoltDB.instance().getHostMessenger().getZK().setData(
                         VoltZK.operationMode,
                         OperationMode.RUNNING.getBytes(), -1);
+                VoltDB.instance().getHostMessenger().pause();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

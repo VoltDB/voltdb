@@ -65,10 +65,7 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
         fail("Failed to find CLUSTERSTATE key in SystemInformation results");
     }
 
-    // Check that we can start in admin mode, access the DB only from the admin
-    // port, then switch out of admin mode and access the DB from both ports,
-    // then back in again
-    public void testBasicAdminFunction() throws Exception {
+    public void testPausedModeStartup() throws Exception {
         final Client client = getClient();
         final Client adminclient = getAdminClient();
 
@@ -192,9 +189,8 @@ public class TestAdminModeFromCommandLine extends RegressionSuite
         project.setUseDDLSchema(true);
 
         boolean success;
-        LocalCluster config =
-                new LocalCluster("admin-mode1.jar", 6, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        config.startPaused();
+        LocalCluster config = new LocalCluster("admin-mode1.jar", 6, 2, 0, BackendTarget.NATIVE_EE_JNI);
+        config.setToStartPaused();
 
         // Start in admin mode
         success = config.compile(project);
