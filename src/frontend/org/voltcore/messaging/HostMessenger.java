@@ -384,16 +384,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
         @Override
-        public void disconnect(Set<Integer> failedHostIds) {
+        public void disconnect(Set<Integer> failedKnownHostIds, Set<Integer> failedUnknownHostIds) {
             synchronized(HostMessenger.this) {
 
                 // Decide if the failures given could put the cluster in a split-brain
                 // Then decide if we should shut down to ensure that at a MAXIMUM, only
                 // one viable cluster is running.
                 // This feature is called "Partition Detection" in the docs.
-                doPartitionDetectionActivities(failedHostIds);
+                doPartitionDetectionActivities(failedKnownHostIds);
 
-                for (int hostId: failedHostIds) {
+                for (int hostId: failedKnownHostIds) {
                     addFailedHost(hostId);
                     removeForeignHost(hostId);
                     if (!m_shuttingDown) {

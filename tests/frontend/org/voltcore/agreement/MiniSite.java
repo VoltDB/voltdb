@@ -185,10 +185,11 @@ class MiniSite extends Thread implements MeshAide
         for (long HSId : results.keySet()) {
             failedHosts.add(CoreUtils.getHostIdFromHSId(HSId));
         }
+        ImmutableSet.Builder<Integer> unknownFailedHosts = ImmutableSet.builder();
         for (long hsId : unknownFaultedSites) {
-            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
+            unknownFailedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
-        m_failedHosts.disconnect(failedHosts.build());
+        m_failedHosts.disconnect(failedHosts.build(), unknownFailedHosts.build());
         // need to "disconnect" these failed guys somehow?
     }
 }
