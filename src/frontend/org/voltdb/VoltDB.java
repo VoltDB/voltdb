@@ -185,6 +185,8 @@ public class VoltDB {
         public int m_deadHostTimeoutMS =
             org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
+        public boolean m_partitionDetectionEnabled = true;
+
         /** start up action */
         public StartAction m_startAction = null;
 
@@ -893,6 +895,23 @@ public class VoltDB {
     }
 
     /**
+     * turn off client interface as fast as possible
+     */
+    private static boolean turnOffClientInterface() {
+        // we don't expect this to ever fail, but if it does, skip to dying immediately
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance != null) {
+            ClientInterface ci = vdbInstance.getClientInterface();
+            if (ci != null) {
+                if (!ci.ceaseAllPublicFacingTrafficImmediately()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
@@ -926,6 +945,11 @@ public class VoltDB {
             // slightly less important than death, this try/finally block protects code that
             // prints a message to stdout
             try {
+                // turn off client interface as fast as possible
+                // we don't expect this to ever fail, but if it does, skip to dying immediately
+                if (!turnOffClientInterface()) {
+                    return; // this will jump to the finally block and die faster
+                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -1041,6 +1065,11 @@ public class VoltDB {
         // end test code
 
         try {
+            // turn off client interface as fast as possible
+            // we don't expect this to ever fail, but if it does, skip to dying immediately
+            if (!turnOffClientInterface()) {
+                return; // this will jump to the finally block and die faster
+            }
             // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
             // give the pill a chance to make it through the network buffer
