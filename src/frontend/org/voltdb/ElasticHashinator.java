@@ -35,7 +35,7 @@ import java.util.zip.GZIPOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CompressionService;
@@ -218,11 +218,13 @@ public class ElasticHashinator extends TheHashinator {
      */
 
     private String toJSONString() {
-        JSONObject js = new JSONObject();
+        JSONStringer js = new JSONStringer();
         try {
+            js.object();
             for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
-                js.put(entry.getKey().toString(),entry.getValue());
+                js.key(entry.getKey().toString()).value(entry.getValue());
             }
+            js.endObject();
         } catch (JSONException e) {
             throw new RuntimeException("Failed to serialize Hashinator Configuration to JSON.", e);
         }
@@ -250,25 +252,26 @@ public class ElasticHashinator extends TheHashinator {
 
     public static byte[] compressJSONString(String data) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream(data.length());
-        GZIPOutputStream gzip = new GZIPOutputStream(bos);
-        gzip.write(data.getBytes(StandardCharsets.UTF_8));
-        gzip.close();
-        byte[] compressed = bos.toByteArray();
-        bos.close();
-        return compressed;
+        try (GZIPOutputStream gzip = new GZIPOutputStream(bos)) {
+            gzip.write(data.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw e;
+        }
+        return bos.toByteArray();
     }
 
     public static String decompressJSONString(byte[] compressed) throws IOException {
-        ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
-        GZIPInputStream gis = new GZIPInputStream(bis);
         ByteArrayOutputStream result = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = gis.read(buffer)) != -1) {
-            result.write(buffer, 0, length);
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+                GZIPInputStream gis = new GZIPInputStream(bis)) {
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = gis.read(buffer)) != -1) {
+                result.write(buffer, 0, length);
+            }
+        } catch (IOException e) {
+            throw e;
         }
-        gis.close();
-        bis.close();
         return result.toString("UTF-8");
     }
 
