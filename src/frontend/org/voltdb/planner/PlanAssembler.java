@@ -2106,7 +2106,7 @@ public class PlanAssembler {
     }
 
     /**
-     * Create nodes for windowed operations.  We
+     * Create nodes for windowed operations.
      *
      * @param root
      * @return
