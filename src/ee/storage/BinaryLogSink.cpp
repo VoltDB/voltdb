@@ -175,7 +175,7 @@ void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
         TableIterator tupleIter = tupleTable->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX,
-                                    ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray(tupleTable->getColumnNames())));
+                                    ValueFactory::getTempStringValue(tempTupleTuple.toJsonString(tupleTable->getColumnNames())));
             exportTable->insertTuple(tempMetaTuple);
         }
     }
@@ -227,8 +227,7 @@ void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupl
     assert(ExecutorContext::getExecutorContext() != NULL);
 
     int32_t localClusterId = ExecutorContext::getExecutorContext()->drClusterId();
-    int64_t localTimestamp = ExecutorContext::getExecutorContext()->currentUniqueId() >> 14;
-    int64_t localTsCounter = UniqueId::tsCounterSinceUnixEpoch(localTimestamp & UniqueId::TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
+    int64_t localTsCounter = UniqueId::timestampSinceUnixEpoch(ExecutorContext::getExecutorContext()->currentUniqueId());
 
     TableTuple tempMetaTuple = outputMetaTable->tempTuple();
 
@@ -348,8 +347,8 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
         // Since in delete record we only has the before image of the deleted row, needs more information to tell
         // when was the deletion happen.
-        deletedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, DELETED_TABLE, conflictExportTable, NULL));
         if (actionType == DR_RECORD_DELETE) {
+            deletedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, DELETED_TABLE, conflictExportTable, NULL));
             createConflictExportTuple(deletedMetaTableForDelete.get(), NULL,
                     drTable, pool, NULL, NOT_CONFLICT_ON_PK, actionType,
                     deleteConflict, DELETED_ROW, uniqueId, remoteClusterId);

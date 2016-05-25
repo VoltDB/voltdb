@@ -386,16 +386,12 @@ public:
         return std::string(retval, 0, retval.length() - 1);
     }
 
-    std::string toJsonArray(const std::vector<std::string>& columnNames) const {
-        int totalColumns = sizeInValues();
-        Json::Value array(Json::arrayValue);
-
-        array.resize(totalColumns);
-        for (int i = 0; i < totalColumns; i++) {
-            array[i] = columnNames[i] + ":" + getNValue(i).toString();
+    std::string toJsonString(const std::vector<std::string>& columnNames) const {
+        Json::Value object;
+        for (int i = 0; i < sizeInValues(); i++) {
+            object[columnNames[i]] = getNValue(i).toString();
         }
-
-        std::string retval = Json::FastWriter().write(array);
+        std::string retval = Json::FastWriter().write(object);
         // The FastWritter always writes a newline at the end, ignore it
         return std::string(retval, 0, retval.length() - 1);
     }
