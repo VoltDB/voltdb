@@ -61,7 +61,7 @@ public class Pause extends VoltSystemProcedure
                 VoltDB.instance().getHostMessenger().getZK().setData(
                         VoltZK.operationMode,
                         OperationMode.PAUSED.getBytes(), -1);
-                VoltDB.instance().getHostMessenger();
+                VoltDB.instance().getHostMessenger().pause();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

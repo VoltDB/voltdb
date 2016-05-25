@@ -525,9 +525,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
-            if (m_messenger.isPaused()) {
+            if (m_messenger.isPaused() || m_config.m_isPaused.get()) {
                 hostLog.info(String.format("Should Start in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
                 m_config.m_isPaused.set(true);
+                setStartMode(OperationMode.PAUSED);
             }
 
             // Create the thread pool here. It's needed by buildClusterMesh()

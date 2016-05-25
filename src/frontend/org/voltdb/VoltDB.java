@@ -218,8 +218,6 @@ public class VoltDB {
         public String m_versionCompatibilityRegexOverrideForTest = null;
         public String m_buildStringOverrideForTest = null;
 
-        public String m_modeOverrideForTest = null;
-
         /** Placement group */
         public String m_placementGroup = null;
         public AtomicBoolean m_isPaused = new AtomicBoolean(false);

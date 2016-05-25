@@ -50,6 +50,8 @@ public class CommandLine extends VoltDB.Configuration
      */
     private String m_vemTag = null;
 
+    public String m_modeOverrideForTest = null;
+
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
     public CommandLine(StartAction start_action)
