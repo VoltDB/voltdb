@@ -137,6 +137,7 @@ class VoltDatabase:
                 response = requests.put(url)
                 if response.status_code != requests.codes.ok:
                     failed = True
+
                 server_status[curr['hostname']] = json.loads(response.text)['statusString']
             except Exception, err:
                 failed = True
@@ -219,22 +220,23 @@ class VoltDatabase:
                     url = ('http://%s:%u/api/1.0/databases/%u/status/') % \
                           (HTTPListener.__IP__, HTTPListener.__PORT__, key)
                     response = requests.get(url)
-                    if response.json()['dbStatus']['status'] == 'running':
-                        for id in value['members']:
-                            if HTTPListener.Global.SERVERS[id]['hostname'] == server['hostname']:
-                                # Check if same port is used
-                                if HTTPListener.Global.SERVERS[id]['client-listener'] == server['client-listener'] \
-                                        or HTTPListener.Global.SERVERS[id]['admin-listener'] == server['admin-listener'] \
-                                        or HTTPListener.Global.SERVERS[id]['zookeeper-listener'] == server[
-                                            'zookeeper-listener'] \
-                                        or HTTPListener.Global.SERVERS[id]['http-listener'] == server['http-listener'] \
-                                        or HTTPListener.Global.SERVERS[id]['internal-listener'] == server[
-                                            'internal-listener'] \
-                                        or HTTPListener.Global.SERVERS[id]['replication-listener'] == server[
-                                            'replication-listener']:
-                                    return False
-                    else:
-                        result = True
+                    if response.json()['status'] != 404:
+                        if response.json()['dbStatus']['status'] == 'running':
+                            for id in value['members']:
+                                if HTTPListener.Global.SERVERS[id]['hostname'] == server['hostname']:
+                                    # Check if same port is used
+                                    if HTTPListener.Global.SERVERS[id]['client-listener'] == server['client-listener'] \
+                                            or HTTPListener.Global.SERVERS[id]['admin-listener'] == server['admin-listener'] \
+                                            or HTTPListener.Global.SERVERS[id]['zookeeper-listener'] == server[
+                                                'zookeeper-listener'] \
+                                            or HTTPListener.Global.SERVERS[id]['http-listener'] == server['http-listener'] \
+                                            or HTTPListener.Global.SERVERS[id]['internal-listener'] == server[
+                                                'internal-listener'] \
+                                            or HTTPListener.Global.SERVERS[id]['replication-listener'] == server[
+                                                'replication-listener']:
+                                        return False
+                        else:
+                            result = True
 
         return result
 
