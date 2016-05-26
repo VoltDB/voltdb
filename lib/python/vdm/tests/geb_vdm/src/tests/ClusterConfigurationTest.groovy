@@ -84,7 +84,8 @@ class ClusterConfigurationTest extends TestBase {
     int indexOfNewDatabase = 0
     int countNext = 0
     int indexOfLocal = 1
-    int nextCount =0
+    int indexOfFailure = 0
+
     String new_string = ""
 
     def setup() { // called before each test
@@ -725,34 +726,53 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifyAutoSnapshots() {
         println("Test: verifyAutoSnapshots")
-        String oldVariableFilePrefix    = overview.filePrefixField.value()
-        String oldVariableFrequency     = overview.frequencyField.value()
-        String oldVariableRetained      = overview.retainedField.value()
-        String initialStatus            = overview.autoSnapshotsStatus.text()
-        println("Initially " + initialStatus)
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
             try {
                 if(overview.autoSnapshotsText.text() == autoSnapshots ) {
                     println("Test Pass: The text and field are displayed")
+                    statusOfTest = true
                     break
                 }
                 else if(overview.autoSnapshotsText.text() != autoSnapshots) {
-                    println("Test Fail: The text is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 1
                 }
                 else {
-                    println("Test Fail: Unknown error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 0
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element Exception - Retrying")
             }
         }
-        then: 'Provide message'
-        overview.autoSnapshotsText.click()
+        then: 'Display the message regarding the text display failure if it exists'
+        if(statusOfTest==true) {
+
+        }
+        else if(statusOfTest==false && indexOfFailure==0) {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==1) {
+            println("Test Fail: The text is not displayed")
+            assert false
+        }
+        else {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+
+        when: 'Reset values'
+        statusOfTest = false
+        indexOfFailure = 0
+        then: 'Display message regarding reset values'
+        println("The values statusOfTest and indexOfFailure have been reset")
+
+        when: 'Open and check the texts of expanded Auto Snapshots'
         for(count=0; count<numberOfTrials; count++) {
+            overview.autoSnapshotsText.click()
             try {
                 if(overview.filePrefixText.text() == filePrefix &&
                         overview.frequencyText.text() == frequency &&
@@ -762,40 +782,83 @@ class ClusterConfigurationTest extends TestBase {
                         overview.retainedField.isDisplayed()
                 ) {
                     println("Test Pass: The contents are present")
+                    statusOfTest = true
                     break
                 }
                 else if(overview.filePrefixText.text() != filePrefix) {
-                    println("Test Fail: The file prefix text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 1
                 }
                 else if(overview.frequencyText.text() != frequency) {
-                    println("Test Fail: The frequency text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 2
                 }
                 else if(overview.retainedText.text() != retained) {
-                    println("Test Fail: The retained text has error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 3
                 }
                 else if(!overview.filePrefixField.isDisplayed()) {
-                    println("Test Fail: The file prefix field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 4
                 }
                 else if(!overview.frequencyField.isDisplayed()) {
-                    println("Test Fail: The frequency field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 5
                 }
                 else if(!overview.retainedField.isDisplayed()) {
-                    println("Test Fail: The retained field is not displayed")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 6
                 }
                 else {
-                    println("Test Fail: Unknown Error")
-                    assert false
+                    statusOfTest = false
+                    indexOfFailure = 0
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
                 println("Stale Element Exception - Retrying")
             }
         }
+        then: 'Display the message regarding the text display failure if it exists'
+        if(statusOfTest==true) {
+
+        }
+        else if(statusOfTest==false && indexOfFailure==0) {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==1) {
+            println("Test Fail: The file prefix text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==2) {
+            println("Test Fail: The frequency text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==3) {
+            println("Test Fail: The retained text has error")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==4) {
+            println("Test Fail: The file prefix field is not displayed")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==5) {
+            println("Test Fail: The frequency field is not displayed")
+            assert false
+        }
+        else if(statusOfTest==false && indexOfFailure==6) {
+            println("Test Fail: The retained field is not displayed")
+            assert false
+        }
+        else {
+            println("Test Fail: Unknown error")
+            assert false
+        }
+
+        when: 'Reset values'
+        statusOfTest = false
+        indexOfFailure = 0
+        then: 'Display message regarding reset values'
+        println("The values statusOfTest and indexOfFailure have been reset")
 
         when: 'Create new database'
         for(count=0; count<numberOfTrials; count++) {
