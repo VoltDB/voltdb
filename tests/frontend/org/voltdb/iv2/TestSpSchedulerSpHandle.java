@@ -26,7 +26,11 @@ package org.voltdb.iv2;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,10 +51,9 @@ import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class TestSpSchedulerSpHandle extends TestCase
 {
@@ -86,7 +89,7 @@ public class TestSpSchedulerSpHandle extends TestCase
         snapMonitor = mock(SnapshotCompletionMonitor.class);
 
         // make fake MapCache of iv2masters
-        HashMap<String,JSONObject> fakecache = new HashMap<String, JSONObject>();
+        HashMap<String,JSONObject> fakecache = new HashMap<>();
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
@@ -116,26 +119,22 @@ public class TestSpSchedulerSpHandle extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        List<Long> replicas = new ArrayList<Long>();
+        List<Long> replicas = new ArrayList<>();
         replicas.add(2l);
         dut.updateReplicas(replicas, null);
         int msgcount = 0;
         for (int i = 0; i < 4000; i++) {
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             dut.deliver(msg);
-            // only non-reads should do checks, all others just keep moving
             // Capture the InitiateTaskMessage that gets sent to the replica so we can test it,
             // use it for response construction, etc.
-            if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage)
-            {
-                currentHandle = currentHandle.makeNext();
-                msgcount++;
-                ArgumentCaptor<TransactionInfoBaseMessage> replmsg =
-                    ArgumentCaptor.forClass(TransactionInfoBaseMessage.class);
-                verify(mbox, times(msgcount)).send(eq(new long[] {2l}), replmsg.capture());
-                assertEquals("Failed on msg: " + replmsg.getValue(),
-                        currentHandle.getTxnId(), replmsg.getValue().getSpHandle());
-            }
+            currentHandle = currentHandle.makeNext();
+            msgcount++;
+            ArgumentCaptor<TransactionInfoBaseMessage> replmsg =
+                ArgumentCaptor.forClass(TransactionInfoBaseMessage.class);
+            verify(mbox, times(msgcount)).send(eq(new long[] {2l}), replmsg.capture());
+            assertEquals("Failed on msg: " + replmsg.getValue(),
+                    currentHandle.getTxnId(), replmsg.getValue().getSpHandle());
         }
     }
 }

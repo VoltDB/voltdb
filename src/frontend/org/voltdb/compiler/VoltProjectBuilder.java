@@ -39,6 +39,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
@@ -46,6 +47,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
+import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
@@ -266,6 +268,10 @@ public class VoltProjectBuilder {
 
     private boolean m_ppdEnabled = false;
     private String m_ppdPrefix = "none";
+
+    private Integer m_heartbeatTimeout = null;
+
+    private Consistency.ReadLevel m_consistencyReadLevel = null;
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -612,6 +618,14 @@ public class VoltProjectBuilder {
         }
 
         m_ilImportConnectors.add(importConnector);
+    }
+
+    public void setHeartbeatTimeoutSeconds(int seconds) {
+        m_heartbeatTimeout = seconds;
+    }
+
+    public void setDefaultConsistencyReadLevel(Consistency.ReadLevel level) {
+        m_consistencyReadLevel = level;
     }
 
     public void addExport(boolean enabled, String exportTarget, Properties config) {
@@ -1016,6 +1030,22 @@ public class VoltProjectBuilder {
         Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
         ppd.setSnapshot(ppdsnapshot);
         ppdsnapshot.setPrefix(m_ppdPrefix);
+
+        // <heartbeat>
+        // don't include this element if not explicitly set
+        if (m_heartbeatTimeout != null) {
+            HeartbeatType hb = factory.createHeartbeatType();
+            deployment.setHeartbeat(hb);
+            hb.setTimeout(m_heartbeatTimeout);
+        }
+
+        // <consistency>
+        // don't include this element if not explicitly set
+        if (m_consistencyReadLevel != null) {
+            ConsistencyType ct = factory.createConsistencyType();
+            deployment.setConsistency(ct);
+            ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
+        }
 
         // <admin-mode>
         // can't be disabled, but only write out the non-default config if
