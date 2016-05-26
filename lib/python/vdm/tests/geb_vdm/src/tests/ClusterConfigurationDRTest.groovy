@@ -45,6 +45,7 @@ class ClusterConfigurationDRTest extends TestBase {
     def createAndDelete() {
         int countNext = 0
         int indexOfNewDatabase = 0
+        String newDatabaseName = ""
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -271,8 +272,9 @@ class ClusterConfigurationDRTest extends TestBase {
 
 
     def cleanup() { // called after each test
-        count = 0
+        /*count = 0
         int countNext = 0
+        String newDatabaseName = ""
         while (count < numberOfTrials) {
             count++
             try {
@@ -351,6 +353,11 @@ class ClusterConfigurationDRTest extends TestBase {
                 }
             }
             println()
-        }
+        }*/
+        to ClusterSettingsPage
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }

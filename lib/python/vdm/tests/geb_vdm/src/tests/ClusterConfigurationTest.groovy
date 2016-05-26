@@ -2309,7 +2309,7 @@ class ClusterConfigurationTest extends TestBase {
     }
 
     def cleanup() { // called after each test
-        count = 0
+        /*count = 0
 
         while (count < numberOfTrials) {
             count++
@@ -2390,6 +2390,11 @@ class ClusterConfigurationTest extends TestBase {
                 }
             }
             println()
-        }
+        }*/
+        to ClusterSettingsPage
+        int indexToDelete = 2
+        indexOfNewDatabase = 1
+        chooseDatabase(indexOfNewDatabase, "Database")
+        deleteNewDatabase(indexToDelete, "name_src")
     }
 }
