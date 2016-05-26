@@ -50,6 +50,8 @@ public class CommandLine extends VoltDB.Configuration
      */
     private String m_vemTag = null;
 
+    public String m_modeOverrideForTest = null;
+
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
     public CommandLine(StartAction start_action)
@@ -110,6 +112,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        cl.m_isPaused = m_isPaused;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -205,6 +208,10 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine replicaMode(ReplicationRole replicaMode) {
         m_replicationRole = replicaMode;
         return this;
+    }
+
+    public void startPaused() {
+        m_isPaused = true;
     }
 
     public CommandLine leader(String leader)
@@ -658,8 +665,8 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
 
-        if (m_tag != null) {
-            cmdline.add("tag"); cmdline.add(m_tag);
+        if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
+            cmdline.add("paused");
         }
 
         return cmdline;
