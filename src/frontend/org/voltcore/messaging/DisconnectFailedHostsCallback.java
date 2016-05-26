@@ -20,5 +20,5 @@ package org.voltcore.messaging;
 import java.util.Set;
 
 public interface DisconnectFailedHostsCallback {
-    public void disconnect(Set<Integer> failedHostIds);
+    public void disconnect(Set<Integer> failedKnownHostIds, Set<Integer> failedUnknownHostIds);
 }

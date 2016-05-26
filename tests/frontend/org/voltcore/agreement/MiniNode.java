@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.agreement.FakeMesh.Message;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
@@ -230,9 +231,9 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
     }
 
     @Override
-    public void disconnect(Set<Integer> failedHostIds) {
+    public void disconnect(Set<Integer> failedKnownHostIds, Set<Integer> failedUnknownHostIds) {
         synchronized(this) {
-            for (int hostId : failedHostIds) {
+            for (int hostId : Sets.union(failedKnownHostIds, failedUnknownHostIds)) {
                 long HSId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.AGREEMENT_SITE_ID);
                 m_HSIds.remove(HSId);
                 m_deadTracker.stopTracking(HSId);

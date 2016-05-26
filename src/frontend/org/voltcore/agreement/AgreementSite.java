@@ -611,15 +611,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     true,
                     null);
         }
-        Set<Long> unknownFaultedHosts = new TreeSet<>();
+        Set<Long> unknownFaultedSites = new TreeSet<>();
 
         // This one line is a biggie. Gets agreement on what the post-fault cluster will be.
-        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage, unknownFaultedHosts);
+        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage, unknownFaultedSites);
 
         ImmutableSet<Long> failedSites = ImmutableSet.copyOf(initiatorSafeInitPoint.keySet());
 
         // check if nothing actually happened
-        if (initiatorSafeInitPoint.isEmpty() && unknownFaultedHosts.isEmpty()) {
+        if (initiatorSafeInitPoint.isEmpty() && unknownFaultedSites.isEmpty()) {
             return;
         }
 
@@ -627,12 +627,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         for (long hsId: failedSites) {
             failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
-        // Remove any hosts associated with failed sites that we don't know
-        // about, as could be the case with a failure early in a rejoin
-        for (long hsId : unknownFaultedHosts) {
-            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
+        ImmutableSet.Builder<Integer> unknownFaultedHosts = ImmutableSet.builder();
+        for (long hsId : unknownFaultedSites) {
+            unknownFaultedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
-        m_failedHostsCallback.disconnect(failedHosts.build());
+        m_failedHostsCallback.disconnect(failedHosts.build(), unknownFaultedHosts.build());
 
         // Handle the failed sites after the failedHostsCallback to ensure
         // that partition detection is run first -- as this might release
