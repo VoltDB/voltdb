@@ -79,7 +79,7 @@ public class TestZK extends ZKTestBase {
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
         config.coordinatorIp = new InetSocketAddress( recoverPort );
-        HostMessenger hm = new HostMessenger(config);
+        HostMessenger hm = new HostMessenger(config, null);
         hm.start();
         m_messengers.set(site, hm);
     }

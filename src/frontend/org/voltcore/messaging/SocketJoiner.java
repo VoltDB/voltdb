@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
@@ -179,9 +180,25 @@ public class SocketJoiner {
             /*
              * Not a leader, need to connect to the primary to join the cluster.
              * Once connectToPrimary is finishes this node will be physically connected
-             * to all nodes with a working agreement site
+             * to all nodes with a working agreement site.
+             *
+             * The request to join the cluster may be rejected, e.g. multiple hosts
+             * rejoining at the same time. In this case, the code will retry.
              */
-            connectToPrimary();
+            long retryInterval = 10;
+            final Random salt = new Random();
+            while (true) {
+                try {
+                    connectToPrimary();
+                    break;
+                } catch (CoreUtils.RetryException e) {
+                    LOG.warn(String.format("Request to join cluster mesh is rejected, retrying in %d seconds. %s",
+                                           retryInterval, e.getMessage()));
+                    try { Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval)); } catch (InterruptedException e1) {}
+                    // exponential back off with a salt to avoid collision. Max is 5 minutes.
+                    retryInterval = Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) + salt.nextInt(30);
+                }
+            }
         }
 
         /*
@@ -489,7 +506,7 @@ public class SocketJoiner {
      * it must connect to the leader which will generate a host id and
      * advertise the rest of the cluster so that connectToPrimary can connect to it
      */
-    private void connectToPrimary() {
+    private void connectToPrimary() throws CoreUtils.RetryException {
         // collect clock skews from all nodes
         List<Long> skews = new ArrayList<Long>();
 
@@ -571,6 +588,12 @@ public class SocketJoiner {
 
             // read the json response sent by HostMessenger with HostID
             JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
+
+            // check if the membership request is accepted
+            if (!jsonObj.getBoolean("accepted")) {
+                socket.close();
+                throw new CoreUtils.RetryException(jsonObj.getString("reason"));
+            }
 
             /*
              * Get the generated host id, and the interface we connected on

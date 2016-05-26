@@ -85,6 +85,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
     /**
+     * Callback for making decision on whether a new node can join the cluster.
+     */
+    public interface MembershipAcceptor {
+        /**
+         * @param hostId     The new host trying to join the mesh
+         * @param errMsg     Error message to send to the new host
+         * @return true if the new host can join the mesh, false otherwise.
+         */
+        public boolean shouldAccept(int hostId, StringBuilder errMsg);
+    }
+
+    /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
      * not the internal interface or port. Nodes that fail to become the leader will
      * connect to the leader using any interface, and will then advertise using the specified
@@ -224,6 +236,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(false);
     private boolean m_partitionDetected = false;
 
+    private final MembershipAcceptor m_membershipAcceptor;
+
     private final Object m_mapLock = new Object();
 
     /*
@@ -259,9 +273,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param expectedHosts
      * @param catalogCRC
      * @param hostLog
+     * @param membershipAcceptor
      */
-    public HostMessenger(Config config) {
+    public HostMessenger(Config config, MembershipAcceptor membershipAcceptor) {
         m_config = config;
+        m_membershipAcceptor = membershipAcceptor;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
@@ -298,8 +314,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Given a set of the known host IDs before a fault, and the known host IDs in the
      * post-fault cluster, determine whether or not we think a network partition may have happened.
-     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
-     * if we weren't a viable cluster.
      * ALSO NOTE: not private so it may be unit-tested.
      */
     public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts) {
@@ -544,11 +558,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         zkInitBarrier.countDown();
     }
 
-    //For test only
-    protected HostMessenger() {
-        this(new Config());
-    }
-
     /*
      * The network is only available after start() finishes
      */
@@ -670,10 +679,22 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             try {
+                final boolean shouldAcceptMember;
+                final StringBuilder errMsg = new StringBuilder();
+                if (m_membershipAcceptor != null) {
+                    shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, errMsg);
+                } else {
+                    shouldAcceptMember = false;
+                }
+
                 /*
                  * Write the response that advertises the cluster topology
                  */
-                writeRequestJoinResponse( hostId, socket);
+                writeRequestJoinResponse(hostId, shouldAcceptMember, errMsg.toString(), socket);
+                if (!shouldAcceptMember) {
+                    socket.close();
+                    return;
+                }
 
                 /*
                  * Wait for the a response from the joining node saying that it connected
@@ -735,43 +756,49 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Advertise to a newly connecting node the topology of the cluster so that it can connect to
      * the rest of the nodes
      */
-    private void writeRequestJoinResponse(int hostId, SocketChannel socket) throws Exception {
+    private void writeRequestJoinResponse(int hostId, boolean shouldAccept, String errMsg, SocketChannel socket) throws Exception {
         JSONObject jsObj = new JSONObject();
 
-        /*
-         * Tell the new node what its host id is
-         */
-        jsObj.put("newHostId", hostId);
+        jsObj.put("accepted", shouldAccept);
+        if (shouldAccept) {
+            /*
+             * Tell the new node what its host id is
+             */
+            jsObj.put("newHostId", hostId);
 
-        /*
-         * Echo back the address that the node connected from
-         */
-        jsObj.put("reportedAddress",
-                ((InetSocketAddress)socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
+            /*
+             * Echo back the address that the node connected from
+             */
+            jsObj.put("reportedAddress",
+                      ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
 
-        /*
-         * Create an array containing an ad for every node including this one
-         * even though the connection has already been made
-         */
-        JSONArray jsArray = new JSONArray();
-        JSONObject hostObj = new JSONObject();
-        hostObj.put("hostId", getHostId());
-        hostObj.put("address",
-                m_config.internalInterface.isEmpty() ?
+            /*
+             * Create an array containing an ad for every node including this one
+             * even though the connection has already been made
+             */
+            JSONArray jsArray = new JSONArray();
+            JSONObject hostObj = new JSONObject();
+            hostObj.put("hostId", getHostId());
+            hostObj.put("address",
+                        m_config.internalInterface.isEmpty() ?
                         socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
-        hostObj.put("port", m_config.internalPort);
-        jsArray.put(hostObj);
-        for (Map.Entry<Integer, ForeignHost>  entry : m_foreignHosts.entrySet()) {
-            if (entry.getValue() == null) continue;
-            int hsId = entry.getKey();
-            ForeignHost fh = entry.getValue();
-            hostObj = new JSONObject();
-            hostObj.put("hostId", hsId);
-            hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
-            hostObj.put("port", fh.m_listeningAddress.getPort());
+            hostObj.put("port", m_config.internalPort);
             jsArray.put(hostObj);
+            for (Map.Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
+                if (entry.getValue() == null) continue;
+                int hsId = entry.getKey();
+                ForeignHost fh = entry.getValue();
+                hostObj = new JSONObject();
+                hostObj.put("hostId", hsId);
+                hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
+                hostObj.put("port", fh.m_listeningAddress.getPort());
+                jsArray.put(hostObj);
+            }
+            jsObj.put("hosts", jsArray);
+        } else {
+            jsObj.put("reason", errMsg);
         }
-        jsObj.put("hosts", jsArray);
+
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");
         ByteBuffer message = ByteBuffer.allocate(4 + messageBytes.length);
         message.putInt(messageBytes.length);

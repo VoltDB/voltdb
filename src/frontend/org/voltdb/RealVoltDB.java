@@ -154,7 +154,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.MembershipAcceptor {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -1038,6 +1038,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    @Override
+    public boolean shouldAccept(int hostId, StringBuilder errMsg)
+    {
+        Preconditions.checkNotNull(m_messenger);
+
+        final List<String> children;
+        try {
+            children = m_messenger.getZK().getChildren(VoltZK.rejoinNodesBlocker, false);
+        } catch (Exception e) {
+            hostLog.error("Failed to check if there are hosts rejoining the cluster", e);
+            return false;
+        }
+
+        if (children.isEmpty()) {
+            return true;
+        } else {
+            errMsg.append("Only one host can rejoin at a time. Host ")
+                  .append(VoltZK.getHostIDFromChildName(children.get(0)))
+                  .append(" is still rejoining.");
+            return false;
+        }
+    }
+
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
@@ -1758,7 +1781,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.isPaused.set(m_config.m_isPaused);
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 

@@ -64,7 +64,7 @@ public class TestHostMessenger {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        HostMessenger hm = new HostMessenger(config);
+        HostMessenger hm = new HostMessenger(config, null);
         createdMessengers.add(hm);
         if (start) {
             hm.start();
