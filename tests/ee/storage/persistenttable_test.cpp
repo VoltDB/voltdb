@@ -28,6 +28,7 @@
 
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
+#include "test_utils/SimpleTimer.hpp"
 
 #include "common/tabletuple.h"
 #include "common/types.h"
@@ -39,11 +40,16 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 
+using voltdb::AbstractExpression;
+using voltdb::BALANCED_TREE_INDEX;
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
 using voltdb::Table;
 using voltdb::TableFactory;
+using voltdb::TableIndex;
+using voltdb::TableIndexFactory;
+using voltdb::TableIndexScheme;
 using voltdb::TableIterator;
 using voltdb::TableTuple;
 using voltdb::TupleSchemaBuilder;
@@ -53,6 +59,7 @@ using voltdb::ValueFactory;
 using voltdb::VoltDBEngine;
 using voltdb::tableutil;
 
+
 class PersistentTableTest : public Test {
 public:
     PersistentTableTest()
@@ -60,6 +67,8 @@ public:
         , m_undoToken(0)
         , m_uniqueId(0)
     {
+        std::srand(888);
+
         m_engine->initialize(1,     // clusterIndex
                              1,     // siteId
                              0,     // partitionId
@@ -164,6 +173,46 @@ protected:
             "set $PREV foreignkeytable null\n"
             "");
         return payload;
+    }
+
+    const std::vector<int32_t>& OBJECT_SIZES() {
+        const static std::vector<int32_t> sizes{4069, 8192, 10240};
+        return sizes;
+    }
+
+    std::unique_ptr<PersistentTable> getTableWithManyObjects() {
+        TupleSchemaBuilder builder(4);
+        builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
+        builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, OBJECT_SIZES()[0]);
+        builder.setColumnAtIndex(2, VALUE_TYPE_VARCHAR, OBJECT_SIZES()[1]);
+        builder.setColumnAtIndex(3, VALUE_TYPE_VARCHAR, OBJECT_SIZES()[2]);
+        voltdb::TupleSchema *schema = builder.build();
+        std::vector<std::string> columnNames{"id", "str1", "str2", "str3"};
+        char signature[20];
+        voltdb::CatalogId databaseId = 1000;
+        std::unique_ptr<PersistentTable> table(
+            static_cast<PersistentTable*>(TableFactory::getPersistentTable(databaseId,
+                                                                           "test_table",
+                                                                           schema,
+                                                                           columnNames,
+                                                                           signature)));
+        std::vector<int32_t> columnIndices;
+        columnIndices.push_back(0);
+        std::vector<AbstractExpression*> exprs;
+        TableIndexScheme scheme("pk",
+                                BALANCED_TREE_INDEX,
+                                columnIndices,
+                                exprs,
+                                NULL,  // predicate
+                                true, // unique
+                                false, // countable
+                                "",    // expression as text
+                                "",    // predicate as text
+                                schema);
+        TableIndex* pkIndex = TableIndexFactory::getInstance(scheme);
+        table->addIndex(pkIndex);
+        table->setPrimaryKeyIndex(pkIndex);
+        return table;
     }
 
 private:
@@ -304,12 +353,62 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     assert(tableutil::addRandomTuples(table, tuplesToInsert));
     table->truncateTable(engine);
     commit();
-
-    // refresh table pointer by fetching the table from catalog as in truncate old table
+        // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
+}
+
+TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
+
+    std::unique_ptr<PersistentTable> table = getTableWithManyObjects();
+    const int NUMROWS = 100000;
+
+    std::cout << "\n           Loading table...";
+
+    SimpleTimer timer;
+
+    // Insert lots of rows.
+    TableTuple tempTuple = table->tempTuple();
+    for (int i = 0; i < NUMROWS; ++i) {
+        char fillChar = (i % 26) + 'A';
+
+        tempTuple.setNValue(0, ValueFactory::getIntegerValue(i));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+
+        table->insertTuple(tempTuple);
+    }
+
+    commit();
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    // std::cout << "           Updating tuples...";
+
+    // timer.reset();
+    // for (int i = 0; i < NUMROWS; ++i) {
+    //     char fillChar = (i % 26) + 'a';
+
+    //     int64_t whichRow = std::rand() % NUMROWS;
+    //     tempTuple.setNValue(0, ValueFactory::getIntegerValue(whichRow));
+    //     tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
+    //     tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
+    //     tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+    //     TableTuple tupleToUpdate = table->lookupTupleByValues(tempTuple);
+    //     ASSERT_FALSE(tupleToUpdate.isNullTuple());
+
+    //     table->updateTuple(tupleToUpdate, tempTuple);
+    //     commit();
+    // }
+    // std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           Destroying table...";
+    timer.reset();
+    table.reset(nullptr);
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+    std::cout << "           ";
 }
 
 int main() {
