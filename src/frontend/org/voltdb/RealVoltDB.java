@@ -96,6 +96,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
@@ -1536,6 +1537,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (pt != null) {
                 m_config.m_partitionDetectionEnabled = pt.isEnabled();
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
+            }
+
+            // get any consistency settings into config
+            ConsistencyType consistencyType = deployment.getConsistency();
+            if (consistencyType != null) {
+                m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();

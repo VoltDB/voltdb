@@ -93,7 +93,7 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                /*tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
                 String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
@@ -102,7 +102,7 @@ public class DuplicateCounter
                         hash, m_responseHash,
                         m_lastResponse.toString(), message.toString());
                 tmLog.error(msg);
-                return MISMATCH;
+                return MISMATCH;*/
             }
             /*
              * Replicas will return a response to a write with no result tables
@@ -134,6 +134,7 @@ public class DuplicateCounter
 
         m_expectedHSIds.remove(message.m_sourceHSId);
         if (m_expectedHSIds.size() == 0) {
+            tmLog.info("satisfied");
             return DONE;
         }
         else {
