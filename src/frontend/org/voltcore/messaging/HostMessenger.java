@@ -318,7 +318,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_tmLog.warn("Partition detection notice: "
                     + "The remaining cluster after failure is exactly half the node count "
                     + "of the previous cluster state. In this situation, it's impossible to "
-                    + "know if there may be two clusters running in split brain mode. VoltDB "
+                    + "know if there may be two clusters running in split-brain mode. VoltDB "
                     + "uses the membership of a \"blessed node\" to decide if this cluster "
                     + "should continue running.");
 
@@ -380,7 +380,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
             else {
-                m_tmLog.info("This node and it's cluster have met the partition detection requirements "
+                m_tmLog.info("This node and its cluster have met the partition detection requirements "
                         + "to continue.");
             }
         }
