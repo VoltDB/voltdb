@@ -305,18 +305,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // A strict, viable minority is always a partition.
         if (currentHosts.size() * 2 < previousHosts.size()) {
             // note that if PD is disabled, you will see this message, but not stop
-            m_tmLog.error("Partition detection triggered.");
-            m_tmLog.info("After a recent failure, this host is part of a cluster that has less than "
+            m_tmLog.warn("Partition detection triggered.");
+            m_tmLog.warn("After a recent failure, this host is part of a cluster that has less than "
                     + "half the node count of the previous cluster. It's possible multiple clusters "
                     + "can continue in split-brain mode.");
-            m_tmLog.error("This minority survivor set may shut down to ensure against a split-brain.");
             return true; // partition detection triggered
         }
 
         // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
         // If the blessed host is in the failure set, this set is not blessed.
         if (currentHosts.size() * 2 == previousHosts.size()) {
-            m_tmLog.info("Partition detection notice: "
+            m_tmLog.warn("Partition detection notice: "
                     + "The remaining cluster after failure is exactly half the node count "
                     + "of the previous cluster state. In this situation, it's impossible to "
                     + "know if there may be two clusters running in split brain mode. VoltDB "
@@ -329,13 +328,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             // (say, if this was triggered by rejoin), will be greater than any surviving
             // host ID, so don't worry about including it in this search.
             if (currentHosts.contains(Collections.min(previousHosts))) {
-                m_tmLog.warn("This survivor set contains the \"blessed node\" and will continue operation.");
+                m_tmLog.warn("This survivor set contains the \"blessed node\".");
                 return false; // partition detection not triggered
             }
             else {
                 // note that if PD is disabled, you will see this message, but not stop
-                m_tmLog.error("Partition detection triggered.");
-                m_tmLog.error("This survivor set does not contain the \"blessed node\" and may shut down.");
+                m_tmLog.warn("Partition detection triggered.");
+                m_tmLog.warn("This survivor set does not contain the \"blessed node\".");
                 return true; // partition detection triggered
             }
         }
@@ -357,27 +356,32 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Preconditions.checkState(previousHosts.contains(m_localHostId));
         Preconditions.checkState(currentHosts.contains(m_localHostId));
 
-        // decide if we're partitioned
-        // this will print out errors if we are
-        boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
+        if (!m_shuttingDown) {
+            // decide if we're partitioned
+            // this will print out warnings if we are
+            boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
 
-        if (partitionDetected) {
-            if (m_partitionDetectionEnabled.get()) {
-                // extra logging for now
-                m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
-                m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "
-                        + "voltdb root folder for this node and may be used for recovery if needed.");
-                m_partitionDetected = true;
-                VoltDB.crashGlobalVoltDB("This process will kill itself to ensure against split-brains. "
-                        + "There may be additional info in the full logs.",
-                            false, null);
+            if (partitionDetected) {
+                if (m_partitionDetectionEnabled.get()) {
+                    // record here so we can ensure this only happens once for this node
+                    m_partitionDetected = true;
+                    VoltDB.crashGlobalVoltDB("PARTITION DETECTION: This process will kill itself to ensure "
+                            + "against split-brains. There may be additional info in the full logs. If command "
+                            + "logging or periodic snapshots are enabled, the will be in the voltdb root "
+                            + "folder for this node and may be used for recovery if needed.",
+                                false, null);
+                }
+                else {
+                    // tell the user about their brush with death
+                    m_tmLog.warn("PARTITION DETECTION: This process will continue running only because "
+                            + "Partition Detection has been disabled for this cluster. It is possible that "
+                            + "the previous cluster has split into multiple viable clusters with diverging "
+                            + "data. There may be additional info in the full logs.");
+                }
             }
             else {
-                // tell the user about their brush with death
-                m_tmLog.error("PARTITION DETECTION: This process will continue running only because "
-                        + "Partition Detection has been disabled for this cluster. It is possible that "
-                        + "the previous cluster has split into multiple viable clusters with diverging "
-                        + "data. There may be additional info in the full logs.");
+                m_tmLog.info("This node and it's cluster have met the partition detection requirements "
+                        + "to continue.");
             }
         }
     }

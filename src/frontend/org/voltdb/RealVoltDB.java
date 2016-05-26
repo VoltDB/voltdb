@@ -1536,6 +1536,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (pt != null) {
                 m_config.m_partitionDetectionEnabled = pt.isEnabled();
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
+
+                // check for user using deprecated settings
+                PartitionDetectionType.Snapshot snapshot = pt.getSnapshot();
+                if (snapshot != null) {
+                    String prefix = snapshot.getPrefix();
+                    if ((prefix != null) && ("partition_detection".equalsIgnoreCase(prefix) == false)) {
+                        hostLog.warn(String.format("Partition Detection snapshots are "
+                                + "no longer supported. Prefix value \"%s\" will be ignored.", prefix));
+                    }
+                }
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();

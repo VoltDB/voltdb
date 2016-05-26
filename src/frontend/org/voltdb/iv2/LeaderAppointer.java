@@ -138,13 +138,13 @@ public class LeaderAppointer implements Promotable
             // compute previously unseen HSId set in the callback list
             Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
             newHSIds.removeAll(m_replicas);
-            tmLog.info("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
+            tmLog.debug("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
             // compute previously seen but now vanished from the callback list HSId set
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
-            tmLog.info("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
+            tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
 
-            tmLog.info("Handling babysitter callback for partition " + m_partitionId + ": children: " +
+            tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
                     CoreUtils.hsIdCollectionToString(updatedHSIds));
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
