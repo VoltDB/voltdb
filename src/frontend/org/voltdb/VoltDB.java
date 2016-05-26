@@ -35,7 +35,6 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -44,15 +43,12 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
 import org.voltdb.deploy.JoinerConfig;
-import org.voltdb.deploy.MemberNetConfig;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -166,7 +162,6 @@ public class VoltDB {
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
-        public String m_internalPortInterface = DEFAULT_INTERNAL_INTERFACE;
 
         /** interface to listen to clients on (default: any) */
         public String m_externalInterface = DEFAULT_EXTERNAL_INTERFACE;
@@ -243,7 +238,7 @@ public class VoltDB {
         /** Placement group */
         public String m_placementGroup = null;
 
-        public AtomicBoolean m_isPaused = new AtomicBoolean(false);
+        public boolean m_isPaused = false;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -369,7 +364,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
-                        m_internalPortInterface = hap.getHostText();
+                        m_internalInterface = hap.getHostText();
                         m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
@@ -552,7 +547,7 @@ public class VoltDB {
                     m_forceVoltdbCreate = true;
                 } else if (arg.equalsIgnoreCase("paused")) {
                     //Start paused.
-                    m_isPaused.set(true);
+                    m_isPaused = true;
                 } else if (arg.equalsIgnoreCase("voltdbroot")) {
                     m_voltdbRoot = new VoltFile(args[++i]);
                     if (!DBROOT.equals(m_voltdbRoot.getName())) {
@@ -599,6 +594,8 @@ public class VoltDB {
              */
             if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
+            } else if (m_leader != null && m_leader.trim().isEmpty()) {
+                m_leader = "0.0.0.0";
             }
 
             if (m_startAction == StartAction.PROBE) {
@@ -686,32 +683,6 @@ public class VoltDB {
             }
         }
 
-        Supplier<MemberNetConfig> m_netConfigSupplier =
-                Suppliers.memoize(new Supplier<MemberNetConfig>() {
-            @Override
-            public MemberNetConfig get() {
-                return new MemberNetConfig(
-                        m_clusterName,
-                        m_internalInterface,
-                        m_externalInterface,
-                        m_publicInterface,
-                        m_zkInterface,
-                        m_drInterface,
-                        m_httpPortInterface,
-                        m_internalPort,
-                        m_port,
-                        m_adminPort,
-                        m_drAgentPortStart,
-                        m_httpPort,
-                        m_isPaused.get());
-            }
-        });
-
-        /** derive the network configuration options */
-        public MemberNetConfig getNetConfig() {
-            return m_netConfigSupplier.get();
-        }
-
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
@@ -751,7 +722,7 @@ public class VoltDB {
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
-            if (m_isPaused.get() && pauseNotAllowed.contains(m_startAction)) {
+            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
             }

@@ -46,7 +46,6 @@ public class JoinerConfig {
         return sbld.build();
     }
 
-    protected final MemberNetConfig m_own;
     protected final ImmutableSortedSet<String> m_coordinators;
     protected final String m_buildInfo;
     protected final String m_versionInfo;
@@ -60,13 +59,11 @@ public class JoinerConfig {
     protected final boolean m_adminMode;
     protected final Supplier<NodeState> m_nodeStateSupplier;
 
-    public JoinerConfig(MemberNetConfig own, String coordinators,
-            String buildInfo, String versionInfo, boolean enterprise,
-            StartAction startAction, boolean bare, UUID configHash,
-            int hostCount, int kFactor, boolean adminMode,
+    public JoinerConfig(NavigableSet<String> coordinators, String buildInfo, String versionInfo,
+            boolean enterprise, StartAction startAction, boolean bare,
+            UUID configHash,int hostCount, int kFactor, boolean adminMode,
             Supplier<NodeState> nodeStateSupplier) {
 
-        checkArgument(own != null, "own member config is null");
         checkArgument(buildInfo != null && !buildInfo.trim().isEmpty(), "buildInfo is null, empty, or blank");
         checkArgument(versionInfo != null && !versionInfo.trim().isEmpty(), "versionInfo is null, empty, or blank");
         checkArgument(configHash != null, "config hash is null");
@@ -74,9 +71,11 @@ public class JoinerConfig {
         checkArgument(nodeStateSupplier != null, "nodeStateSupplier is null");
         checkArgument(hostCount > 1, "invalid host count value: %s",hostCount);
         checkArgument(kFactor >= 0, "invalid kFactor value: %s", kFactor);
+        checkArgument(coordinators != null &&
+                coordinators.stream().allMatch(h->MiscUtils.isValidHostSpec(h, DEFAULT_INTERNAL_PORT)),
+                "coordinators is null or contains invalid host/interface specs %s", coordinators);
 
-        this.m_own = own;
-        this.m_coordinators = hosts(coordinators);
+        this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_buildInfo = buildInfo;
         this.m_versionInfo = versionInfo;
         this.m_enterprise = enterprise;
@@ -89,10 +88,6 @@ public class JoinerConfig {
         this.m_nodeStateSupplier = nodeStateSupplier;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCount + '|' + this.m_coordinators.toString());
-    }
-
-    public MemberNetConfig getNetConfig() {
-        return m_own;
     }
 
     public UUID getMeshHash() {
@@ -163,7 +158,6 @@ public class JoinerConfig {
         result = prime * result + ((m_coordinators == null) ? 0 : m_coordinators.hashCode());
         result = prime * result
                 + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
-        result = prime * result + ((m_own == null) ? 0 : m_own.hashCode());
         result = prime * result
                 + ((m_startAction == null) ? 0 : m_startAction.hashCode());
         result = prime * result
@@ -210,11 +204,6 @@ public class JoinerConfig {
                 return false;
         } else if (!m_meshHash.equals(other.m_meshHash))
             return false;
-        if (m_own == null) {
-            if (other.m_own != null)
-                return false;
-        } else if (!m_own.equals(other.m_own))
-            return false;
         if (m_startAction != other.m_startAction)
             return false;
         if (m_versionInfo == null) {
@@ -227,7 +216,7 @@ public class JoinerConfig {
 
     @Override
     public String toString() {
-        return "JoinerConfig [own=" + m_own + ", coordinators=" + m_coordinators
+        return "JoinerConfig [coordinators=" + m_coordinators
                 + ", buildInfo=" + m_buildInfo + ", versionInfo=" + m_versionInfo
                 + ", enterprise=" + m_enterprise + ", startAction=" + m_startAction
                 + ", bare=" + m_bare + ", configHash=" + m_configHash

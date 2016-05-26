@@ -568,8 +568,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     || managedPathsWithFiles(readDepl.deployment).isEmpty();
 
             JoinerConfig joinerConfig = new JoinerConfig(
-                    m_config.getNetConfig(),
-                    m_config.m_meshBrokers,
+                    m_config.m_coordinators,
                     m_buildString,
                     m_versionString,
                     m_config.m_isEnterprise,
@@ -578,7 +577,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes),
                     m_config.m_hostCount,
                     readDepl.deployment.getCluster().getKfactor(),
-                    m_config.m_isPaused.get(),
+                    m_config.m_isPaused,
                     m_statusTracker.getNodeStateSupplier()
                     );
 
@@ -2097,11 +2096,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             hmconfig.group = m_config.m_placementGroup;
         }
         hmconfig.internalPort = m_config.m_internalPort;
-        if (m_config.m_internalPortInterface != null && m_config.m_internalPortInterface.trim().length() > 0) {
-            hmconfig.internalInterface = m_config.m_internalPortInterface.trim();
-        } else {
-            hmconfig.internalInterface = m_config.m_internalInterface;
-        }
+        hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
@@ -2943,13 +2938,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         {
             if (mode == OperationMode.PAUSED)
             {
-                m_config.m_isPaused.set(true);
+                m_config.m_isPaused = true;
                 m_statusTracker.setNodeState(NodeState.PAUSED);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
-                m_config.m_isPaused.set(false);
+                m_config.m_isPaused = false;
                 m_statusTracker.setNodeState(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
