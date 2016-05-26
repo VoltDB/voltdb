@@ -47,6 +47,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartitionByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -59,11 +60,12 @@ public class TestWindowingFunctions extends PlannerTestCase {
         // We also do some santity checking on the PartitionPlan node.
         assertTrue(node instanceof SendPlanNode);
         AbstractPlanNode abstractPBPlanNode = node.getChild(0);
+        assertTrue(abstractPBPlanNode instanceof ProjectionPlanNode);
+        abstractPBPlanNode = abstractPBPlanNode.getChild(0);
         assertTrue(abstractPBPlanNode instanceof PartitionByPlanNode);
         PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)abstractPBPlanNode;
         NodeSchema  schema = pbPlanNode.getOutputSchema();
-        assertEquals(2, schema.getColumns().size());
-        SchemaColumn column = schema.getColumns().get(1);
+        SchemaColumn column = schema.getColumns().get(0);
         assertTrue(column.getExpression() instanceof WindowedExpression);
         assertEquals("ARANK", column.getColumnAlias());
         AbstractPlanNode OBNode = abstractPBPlanNode.getChild(0);
@@ -76,11 +78,12 @@ public class TestWindowingFunctions extends PlannerTestCase {
         AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
         assertTrue(node instanceof SendPlanNode);
         AbstractPlanNode abstractPBPlanNode = node.getChild(0);
+        assertTrue(abstractPBPlanNode instanceof ProjectionPlanNode);
+        abstractPBPlanNode = abstractPBPlanNode.getChild(0);
         assertTrue(abstractPBPlanNode instanceof PartitionByPlanNode);
         PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)abstractPBPlanNode;
         NodeSchema  schema = pbPlanNode.getOutputSchema();
-        assertEquals(2, schema.getColumns().size());
-        SchemaColumn column = schema.getColumns().get(1);
+        SchemaColumn column = schema.getColumns().get(0);
         assertTrue(column.getExpression() instanceof WindowedExpression);
         assertEquals("ARANK", column.getColumnAlias());
         AbstractPlanNode OBNode = abstractPBPlanNode.getChild(0);

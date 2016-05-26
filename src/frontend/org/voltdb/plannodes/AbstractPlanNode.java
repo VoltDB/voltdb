@@ -1134,4 +1134,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         return false;
     }
+
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
 }

@@ -83,9 +83,9 @@ public class TestPartitionByNode extends TestCase {
     }
 
     public void testJSON() throws Exception {
-        PartitionByPlanNode pn = new PartitionByPlanNode();
         WindowedExpression we = makeWindowedExpression();
         SchemaColumn col = new SchemaColumn("TMP", "TMP", "TC", "TC", we);
+        PartitionByPlanNode pn = new PartitionByPlanNode(col);
         pn.setWindowedColumn(col);
         JSONStringer stringer = new JSONStringer();
         stringer.object();
@@ -100,7 +100,7 @@ public class TestPartitionByNode extends TestCase {
         // Enable this to debug the JSON.
         System.out.printf("JSON: %s\n", json);
         JSONObject jobj = new JSONObject(new JSONTokener(json));
-        PartitionByPlanNode pn2 = new PartitionByPlanNode();
+        PartitionByPlanNode pn2 = new PartitionByPlanNode(null);
         pn2.loadFromJSONObject(jobj, m_voltdb.getDatabase());
         int oldCount = pn.numberSortExpressions();
         int newCount = pn2.numberSortExpressions();

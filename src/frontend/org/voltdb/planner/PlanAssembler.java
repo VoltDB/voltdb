@@ -1054,6 +1054,12 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
+        // If we have a windowed expression in the display list we want to
+        // add a PartitionByPlanNode here.
+        if (m_parsedSelect.hasWindowedExpression()) {
+            root = handleWindowedOperators(root);
+        }
+
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
@@ -1087,12 +1093,6 @@ public class PlanAssembler {
                     root = child;
                 }
             }
-        }
-
-        // If we have a windowed expression in the display list we want to
-        // add a PartitionByPlanNode here.
-        if (m_parsedSelect.hasWindowedExpression()) {
-            root = handleWindowedOperators(root);
         }
 
         // Add a project node if we need one.  Some types of nodes can have their
@@ -1134,8 +1134,7 @@ public class PlanAssembler {
      * @return true if a project node is required
      */
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( root instanceof AggregatePlanNode ||
-             root.getPlanNodeType() == PlanNodeType.PROJECTION) {
+        if ( false == root.planNodeClassNeedsProjectionNode()) {
             return false;
         }
         // If there is a complexGroupby at his point, it means that
@@ -2112,28 +2111,28 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
-        PartitionByPlanNode pnode = new PartitionByPlanNode();
-        OrderByPlanNode onode = new OrderByPlanNode();
-        NodeSchema schema = new NodeSchema();
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
         SchemaColumn windowedSchemaColumn = null;
         for (ParsedColInfo colInfo : m_parsedSelect.m_displayColumns) {
             AbstractExpression colExpr = colInfo.expression;
-            SchemaColumn schemaCol = new SchemaColumn(colInfo.tableName,
-                                                      colInfo.tableAlias,
-                                                      colInfo.columnName,
-                                                      colInfo.alias,
-                                                      colExpr);
             if (colExpr instanceof WindowedExpression) {
-                windowedSchemaColumn = schemaCol;
+                windowedSchemaColumn = new SchemaColumn(colInfo.tableName,
+                                                        colInfo.tableAlias,
+                                                        colInfo.columnName,
+                                                        colInfo.alias,
+                                                        colExpr);
+                break;
             }
-            schema.addColumn(schemaCol);
         }
         // If we haven't set this it's probably bad news.
         assert(windowedSchemaColumn != null);
+        // This will set the output schema to contain the
+        // windowed schema column only.  In generateOutputSchema
+        // we will add the input columns.
+        PartitionByPlanNode pnode = new PartitionByPlanNode(windowedSchemaColumn);
+        OrderByPlanNode onode = new OrderByPlanNode();
         pnode.setWindowedColumn(windowedSchemaColumn);
-        pnode.setOutputSchema(schema);
         // We need to extract more information from the windowed expression.
         // to construct the output schema.
         WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
@@ -2151,7 +2150,6 @@ public class PlanAssembler {
                 onode.addSort(orderByExpr, orderByDir);
             }
         }
-        pnode.setOutputSchema(schema);
         onode.addAndLinkChild(root);
         pnode.addAndLinkChild(onode);
         return pnode;

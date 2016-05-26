@@ -623,4 +623,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
         destination.setOutputSchema(origin.getOutputSchema());
         return destination;
     }
+
+    @Override
+    /**
+     * AggregatePlanNodes don't need projection nodes.
+     */
+    public boolean planNodeClassNeedsProjectionNode() {
+        return false;
+    }
 }

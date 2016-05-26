@@ -45,27 +45,77 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
         super.resolveColumnIndexes();
     }
 
+    public PartitionByPlanNode() {
+        this(null);
+    }
+
+    public PartitionByPlanNode(SchemaColumn winAggregateColumn) {
+        m_outputSchema = new NodeSchema();
+        if (winAggregateColumn != null) {
+            m_outputSchema.addColumn(winAggregateColumn.clone());
+            m_hasSignificantOutputSchema = true;
+            m_windowedSchemaColumn = winAggregateColumn;
+        }
+    }
+
+    /**
+     * Generate the output schema.  This node will already have
+     * an output schema with one column, which is a windowed aggregate
+     * expression.  But we need to add the output schema of the one
+     * child node.
+     */
+    @Override
+    public void generateOutputSchema(Database db) {
+        assert(getChildCount() == 1);
+        super.generateOutputSchema(db);
+        NodeSchema outputSchema = getOutputSchema();
+        // The output schema must have one column, which
+        // is an windowed expression.
+        assert(outputSchema != null);
+        assert(outputSchema.getColumns().size() == 1);
+        assert(outputSchema.getColumns().get(0).getExpression() instanceof WindowedExpression);
+        NodeSchema inputSchema = getChild(0).getOutputSchema();
+        assert(inputSchema != null);
+        for (SchemaColumn schemaCol : inputSchema.getColumns()) {
+            // We have to clone this because we will be
+            // horsing around with the indices of TVEs.  However,
+            // we don't need to resolve anything here, because
+            // the default column index algorithm will work quite
+            // nicely for us.
+            SchemaColumn newCol = schemaCol.clone();
+            outputSchema.addColumn(newCol);
+        }
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        StringBuilder sb = new StringBuilder(" PARTITION BY PLAN: " + super.explainPlanForNode(indent) + "\n");
-        sb.append("  PARTITION BY:\n");
-        WindowedExpression we = getWindowedExpression();
-        for (int idx = 0; idx < numberPartitionByExpressions(); idx += 1) {
+        String newIndent = "  " + indent;
+        StringBuilder sb = new StringBuilder(indent + "PARTITION BY PLAN: " + super.explainPlanForNode(newIndent) + "\n");
+        sb.append(newIndent + "PARTITION BY:\n");
+        int numExprs = numberPartitionByExpressions();
+        for (int idx = 0; idx < numExprs; idx += 1) {
+            AbstractExpression ae = getPartitionByExpression(idx);
+            // Apparently ae.toString() adds a trailing newline.  That's
+            // unfortunate, but it works out ok here.
             sb.append("  ")
+              .append(newIndent)
               .append(idx).append(": ")
-              .append(we.getPartitionByExpressions().get(idx).toString())
-              .append("\n");
+              .append(ae.toString());
         }
-        sb.append(indent).append(" SORT BY: \n");
-        for (int idx = 0; idx < numberSortExpressions(); idx += 1) {
+        String sep = "";
+        sb.append(newIndent).append("SORT BY:\n");
+        numExprs = numberSortExpressions();
+        for (int idx = 0; idx < numExprs; idx += 1) {
             AbstractExpression ae = getSortExpression(idx);
             SortDirectionType dir = getSortDirection(idx);
-            sb.append(indent)
-               .append(ae.explain(optionalTableName))
-               .append(": ")
-               .append(dir.name())
-               .append("\n");
+            sb.append(sep).append("  ")
+              .append(newIndent)
+              .append(idx).append(":")
+              .append(ae.explain(optionalTableName))
+              .append(" ")
+              .append(dir.name());
+            sep = "\n";
         }
         return sb.toString();
     }
@@ -129,5 +179,15 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     public void setWindowedColumn(SchemaColumn col) {
         m_windowedSchemaColumn = col;
     }
-    SchemaColumn       m_windowedSchemaColumn;
+
+    @Override
+    /**
+     * This is an AggregatePlanNode.  Normally these don't need projection
+     * nodes, but this one does.
+     */
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
+
+    SchemaColumn       m_windowedSchemaColumn = null;
 }
