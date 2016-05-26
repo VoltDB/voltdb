@@ -259,8 +259,7 @@ public class LoadTableLoader extends BenchmarkThread {
                 log.info("CopyAndDeleteTask row count: " + m_copyDeleteDoneCount);
             } catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("CopyAndDeleteDataTask failed a procedure call for table " + m_tableName
-                        + " and the thread will now stop.", e);
+                Benchmark.hardStop(e);
             }
         }
     }
@@ -278,6 +277,10 @@ public class LoadTableLoader extends BenchmarkThread {
         List<Long> cidList = new ArrayList<Long>(batchSize);
         List<Long> timeList = new ArrayList<Long>(batchSize);
         try {
+            // pick up where we left off
+            ClientResponse cr = TxnId2Utils.doAdHoc(client, "select nvl(max(cid),0) from " + m_tableName + ";");
+            p = cr.getResults()[0].asScalarLong();
+
             while (m_shouldContinue.get()) {
                 //1 in 3 gets copied and then deleted after leaving some data
                 byte shouldCopy = (byte) (m_random.nextInt(3) == 0 ? 1 : 0);
@@ -318,7 +321,7 @@ public class LoadTableLoader extends BenchmarkThread {
                             success = client.callProcedure(new InsertCallback(latch, p, shouldCopy), m_procName, m_tableName, upsertMode, m_table);
                         }
                     }
-                    //Ad if successfully queued but remove if proc fails.
+                    //Add if successfully queued but remove if proc fails.
                     if (success) {
                         if (shouldCopy != 0) {
                             lcpDelQueue.add(p);
@@ -381,8 +384,7 @@ public class LoadTableLoader extends BenchmarkThread {
         }
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
-            log.error("LoadTableLoader failed a procedure call for table " + m_tableName
-                    + " and the thread will now stop.", e);
+            Benchmark.hardStop(e);
         } finally {
             cdtask.shutdown();
             try {
