@@ -362,23 +362,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
 
         if (partitionDetected) {
-            if (m_partitionDetectionEnabled.get()) {
-                // extra logging for now
-                m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
-                m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "
-                        + "voltdb root folder for this node and may be used for recovery if needed.");
-                m_partitionDetected = true;
-                VoltDB.crashGlobalVoltDB("This process will kill itself to ensure against split-brains. "
-                        + "There may be additional info in the full logs.",
-                            false, null);
-            }
-            else {
-                // tell the user about their brush with death
-                m_tmLog.error("PARTITION DETECTION: This process will continue running only because "
-                        + "Partition Detection has been disabled for this cluster. It is possible that "
-                        + "the previous cluster has split into multiple viable clusters with diverging "
-                        + "data. There may be additional info in the full logs.");
-            }
+            // extra logging for now
+            m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
+            m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "
+                         + "voltdb root folder for this node and may be used for recovery if needed.");
+            m_partitionDetected = true;
+            VoltDB.crashGlobalVoltDB("This process will kill itself to ensure against split-brains. "
+                                     + "There may be additional info in the full logs.",
+                                     false, null);
+        }
+        else {
+            // tell the user about their brush with death
+            m_tmLog.error("PARTITION DETECTION: This process will continue running only because "
+                          + "Partition Detection has been disabled for this cluster. It is possible that "
+                          + "the previous cluster has split into multiple viable clusters with diverging "
+                          + "data. There may be additional info in the full logs.");
         }
     }
 
@@ -391,7 +389,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 // Then decide if we should shut down to ensure that at a MAXIMUM, only
                 // one viable cluster is running.
                 // This feature is called "Partition Detection" in the docs.
-                doPartitionDetectionActivities(failedKnownHostIds);
+                if (m_partitionDetectionEnabled.get()) {
+                    doPartitionDetectionActivities(failedKnownHostIds);
+                }
 
                 for (int hostId: failedKnownHostIds) {
                     addFailedHost(hostId);
