@@ -95,9 +95,9 @@ public class TruncateTableLoader extends BenchmarkThread {
                 hardStop("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
-                // log what happened
-                log.error("TruncateTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // log what happened, we'll retry the op so loglevel warn is ok
+                log.warn("TruncateTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 Benchmark.txnCount.incrementAndGet();

@@ -40,7 +40,6 @@ usage for a verb, including its options and arguments.
     usage = '%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
     options = (
         cli.BooleanOption(None, '--debug', 'debug', None),
-        cli.BooleanOption(None, '--cli-pause', 'cli_pause', None),
         cli.BooleanOption('-v', '--verbose', 'verbose',
                           'display verbose messages and external commands'),
     )

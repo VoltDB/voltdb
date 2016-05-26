@@ -35,7 +35,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -69,6 +68,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -104,6 +104,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
+        public AtomicBoolean isPaused = new AtomicBoolean(false);
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -265,7 +266,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
-                m_config.internalPort,
+                m_config.internalPort, m_config.isPaused,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
@@ -453,7 +454,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary.
+     * if necessary. return true if any node indicates a paused start.
      */
     public void start() throws Exception {
         /*
@@ -599,6 +600,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
+    }
+
+    @Override
+    public void notifyAsPaused() {
+        m_config.isPaused.set(true);
     }
 
     /*
@@ -907,6 +913,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         assert hostGroups.size() == expectedHosts;
         return hostGroups;
+    }
+
+    public boolean isPaused() {
+        return m_config.isPaused.get();
+    }
+
+    public void resetPaused() {
+        m_config.isPaused.set(false);
+    }
+
+    //Set Paused so socketjoiner will communicate correct status during mesh building.
+    public void pause() {
+        m_config.isPaused.set(true);
     }
 
     public int getHostId() {
