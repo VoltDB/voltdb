@@ -75,6 +75,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
@@ -156,6 +157,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
+
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -1027,6 +1031,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        if (cihm == null) {
+            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+                    + "This is likely due to VoltDB ceasing client communication as it "
+                    + "shuts down.");
+            return false;
+        }
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
@@ -1036,7 +1046,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * if there is, send it to the replica as a short circuit read
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly) {
+            if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
                 initiatorHSId = m_localReplicas.get(partition);
             }
             if (initiatorHSId != null) {
@@ -1176,6 +1186,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+
+        // try to get the global default setting for read consistency, but fall back to SAFE
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
@@ -1861,13 +1874,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         buf.capacity(),
                         nowNanos);
         if (!success) {
+            // COMMENT 1:
             // HACK: this return is for the DR agent so that it
             // will move along on duplicate replicated transactions
             // reported by the slave cluster.  We report "SUCCESS"
             // to keep the agent from choking.  ENG-2334
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+
+            // COMMENT 2: ENG-10389-backport
+            // when VoltDB.crash... is called, we close off the client interface
+            // and it might not be possible to create new transactions.
+            // Return an error.
+            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0],
-                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                            + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                            + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
         }
         return null;
@@ -2829,4 +2850,43 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return clientResponse;
     }
 
+    /**
+     * This is not designed to be a safe shutdown.
+     * This is designed to stop sending messages to clients as fast as possible.
+     * It is currently called from VoltDB.crash...
+     *
+     * Note: this really needs to work. We CAN'T respond back to the client anything
+     * after we've decided to crash or it might break some of our contracts.
+     *
+     * @return false if we can't be assured this safely worked
+     */
+    public boolean ceaseAllPublicFacingTrafficImmediately() {
+        try {
+            if (m_acceptor != null) {
+                // This call seems to block until the shutdown is done
+                // which is good becasue we assume there will be no new
+                // connections afterward
+                m_acceptor.shutdown();
+            }
+            if (m_adminAcceptor != null) {
+                m_adminAcceptor.shutdown();
+            }
+        }
+        catch (InterruptedException e) {
+            // this whole method is really a best effort kind of thing...
+            log.error(e);
+            // if we didn't succeed, let the caller know and take action
+            return false;
+        }
+        finally {
+            // this feels like an unclean thing to do... but should work
+            // for the purposes of cutting all responses right before we deliberatly
+            // end the process
+            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // care if it's empty... so... this.
+            m_cihm.clear();
+        }
+
+        return true;
+    }
 }

@@ -48,6 +48,7 @@
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
                   type="systemSettingsType" />
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
+      <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
     </xs:all>
   </xs:complexType>
 
@@ -65,6 +66,18 @@
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="catalog"/>
+  </xs:complexType>
+  
+  <xs:simpleType name="readlevelType"> 
+    <xs:restriction base="xs:string"> 
+      <xs:enumeration value="fast"/>
+      <xs:enumeration value="safe"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <!-- <consistency> -->
+  <xs:complexType name="consistencyType">
+    <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
   </xs:complexType>
 
   <!-- <paths> -->

@@ -93,6 +93,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
+import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
@@ -109,7 +110,6 @@ import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
-import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
@@ -1401,6 +1401,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
             } else {
                 hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
+            }
+
+            // get any consistency settings into config
+            ConsistencyType consistencyType = m_deployment.getConsistency();
+            if (consistencyType != null) {
+                m_config.m_consistencyReadLevel = Consistency.ReadLevel.fromReadLevelType(consistencyType.getReadlevel());
             }
 
             final String elasticSetting = m_deployment.getCluster().getElastic().trim().toUpperCase();

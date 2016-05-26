@@ -139,6 +139,9 @@ public class VoltDB {
         public int m_adminPort = -1;
         public String m_adminInterface = "";
 
+        /** consistency level for reads */
+        public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
+
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
         public String m_internalPortInterface = DEFAULT_INTERNAL_INTERFACE;
@@ -603,6 +606,15 @@ public class VoltDB {
             return testObj.getAbsolutePath() + File.separator + jarname;
         }
 
+        public static Consistency.ReadLevel getDefaultReadConsistencyLevel() {
+            // try to get the global default setting for read consistency, but fall back to SAFE
+            if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
+                return VoltDB.instance().getConfig().m_consistencyReadLevel;
+            }
+            else {
+                return Consistency.ReadLevel.SAFE;
+            }
+        }
     }
 
     /* helper functions to access current configuration values */
@@ -693,6 +705,23 @@ public class VoltDB {
         }
     }
 
+    /**
+     * turn off client interface as fast as possible
+     */
+    private static boolean turnOffClientInterface() {
+        // we don't expect this to ever fail, but if it does, skip to dying immediately
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance != null) {
+            ClientInterface ci = vdbInstance.getClientInterface();
+            if (ci != null) {
+                if (!ci.ceaseAllPublicFacingTrafficImmediately()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     public static void crashLocalVoltDB(String errMsg) {
         crashLocalVoltDB(errMsg, false, null);
     }
@@ -731,6 +760,11 @@ public class VoltDB {
             // slightly less important than death, this try/finally block protects code that
             // prints a message to stdout
             try {
+                // turn off client interface as fast as possible
+                // we don't expect this to ever fail, but if it does, skip to dying immediately
+                if (!turnOffClientInterface()) {
+                    return; // this will jump to the finally block and die faster
+                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -846,6 +880,12 @@ public class VoltDB {
         // end test code
 
         try {
+            // turn off client interface as fast as possible
+            // we don't expect this to ever fail, but if it does, skip to dying immediately
+            if (!turnOffClientInterface()) {
+                return; // this will jump to the finally block and die faster
+            }
+
             // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
             // give the pill a chance to make it through the network buffer

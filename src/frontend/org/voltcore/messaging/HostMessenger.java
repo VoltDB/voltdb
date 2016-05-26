@@ -1133,4 +1133,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_network.getIOStats(interval, picoNetworks);
     }
 
+    /**
+     * Cut the network connection between two hostids immediately
+     * Useful for simulating network partitions
+     */
+    public void cutLink(int hostIdA, int hostIdB) {
+        if (m_localHostId == hostIdA) {
+            ForeignHost fh = m_foreignHosts.get(hostIdB);
+            fh.cutLink();
+        }
+        if (m_localHostId == hostIdB) {
+            ForeignHost fh = m_foreignHosts.get(hostIdA);
+            fh.cutLink();
+        }
+    }
 }

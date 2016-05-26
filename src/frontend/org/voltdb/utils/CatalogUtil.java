@@ -31,6 +31,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -109,7 +110,6 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.util.HashSet;
 
 /**
  *
@@ -1612,14 +1612,8 @@ public abstract class CatalogUtil {
      * @return true if proc is durable for non sys procs return true (durable)
      */
     public static boolean isDurableProc(String procName) {
-        //For sysprocs look at sysproc catalog.
-        if (procName.charAt(0) == '@') {
-            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
-            if (sysProc != null) {
-                return sysProc.isDurable();
-            }
-        }
-        return true;
+        SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+        return sysProc == null || sysProc.isDurable();
     }
 
     /**
