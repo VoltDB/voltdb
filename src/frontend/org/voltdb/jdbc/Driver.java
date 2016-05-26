@@ -133,6 +133,7 @@ public class Driver implements java.sql.Driver
                 String password = "";
                 boolean heavyweight = false;
                 int maxoutstandingtxns = 0;
+                boolean reconnectOnConnectionLoss = true;
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
                     String key = (String) e.nextElement();
@@ -146,13 +147,17 @@ public class Driver implements java.sql.Driver
                                 value.toLowerCase().equals("1"));
                     else if (key.toLowerCase().equals("maxoutstandingtxns"))
                         maxoutstandingtxns = Integer.parseInt(value);
+                    else if ("autoreconnect".equals(key)){
+                        reconnectOnConnectionLoss = ("true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value) || "1".equals(value));
+                    }
                     // else - unknown; ignore
                 }
 
                 // Return JDBC connection wrapper for the client
-                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
-                            heavyweight, maxoutstandingtxns),
+                return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
+                            heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss),
                         info);
+
             } catch (Exception x) {
                 throw SQLError.get(x, SQLError.CONNECTION_UNSUCCESSFUL);
             }
@@ -190,6 +195,7 @@ public class Driver implements java.sql.Driver
         return false;
     }
 
+    @Override
     public Logger getParentLogger() throws SQLFeatureNotSupportedException {
         throw new SQLFeatureNotSupportedException();
     }

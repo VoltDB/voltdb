@@ -52,7 +52,7 @@ public class ClientConfig {
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
     Subject m_subject = null;
-    boolean m_reconnectOnConnectionLoss;
+    boolean m_reconnectOnConnectionLoss = true;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
 
@@ -325,7 +325,7 @@ public class ClientConfig {
     /**
      * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
      *
-     * @param on Enable or disable the reconnection feature. Default is off.
+     * @param on Enable or disable the reconnection feature. Default is on.
      */
     public void setReconnectOnConnectionLoss(boolean on) {
         this.m_reconnectOnConnectionLoss = on;
