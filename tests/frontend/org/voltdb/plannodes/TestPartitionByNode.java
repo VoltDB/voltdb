@@ -98,7 +98,7 @@ public class TestPartitionByNode extends TestCase {
         }
         String json = stringer.toString();
         // Enable this to debug the JSON.
-        System.out.printf("JSON: %s\n", json);
+        // System.out.printf("JSON: %s\n", json);
         JSONObject jobj = new JSONObject(new JSONTokener(json));
         PartitionByPlanNode pn2 = new PartitionByPlanNode(null);
         pn2.loadFromJSONObject(jobj, m_voltdb.getDatabase());
