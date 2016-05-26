@@ -416,11 +416,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        startUp(clearLocalDataDirectories, ReplicationRole.NONE, m_isPaused);
-    }
-
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
-        startUp(clearLocalDataDirectories, role, m_isPaused);
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -579,7 +575,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role, boolean paused) {
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -590,7 +586,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // set 'replica' option -- known here for the first time.
         templateCmdLine.replicaMode(role);
-        if (paused) {
+        if (m_isPaused) {
             // Set paused mode
             templateCmdLine.startPaused();
         }
