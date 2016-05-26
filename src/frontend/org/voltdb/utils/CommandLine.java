@@ -653,6 +653,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("ipc");
         }
 
+        if (m_tag != null) {
+            cmdline.add("tag"); cmdline.add(m_tag);
+        }
+
         // handle overrides for testing hotfix version compatibility
         if (m_versionStringOverrideForTest != null) {
             assert(m_versionCompatibilityRegexOverrideForTest != null);
@@ -664,7 +668,6 @@ public class CommandLine extends VoltDB.Configuration
                 cmdline.add(m_buildStringOverrideForTest);
             }
         }
-
         if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
         }
