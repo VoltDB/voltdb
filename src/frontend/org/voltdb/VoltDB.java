@@ -41,7 +41,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
 import com.google_voltpatches.common.net.HostAndPort;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -220,7 +219,7 @@ public class VoltDB {
 
         /** Placement group */
         public String m_placementGroup = null;
-        public AtomicBoolean m_isPaused = new AtomicBoolean(false);
+        public boolean m_isPaused = false;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -491,7 +490,7 @@ public class VoltDB {
                     m_forceVoltdbCreate = true;
                 else if (arg.equalsIgnoreCase("paused")) {
                     //Start paused.
-                    m_isPaused.set(true);
+                    m_isPaused = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -569,7 +568,7 @@ public class VoltDB {
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            if (m_isPaused.get() && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
+            if (m_isPaused && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
                 isValid = false;
                 hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
             }

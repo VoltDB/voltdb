@@ -525,9 +525,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
-            if (m_messenger.isPaused() || m_config.m_isPaused.get()) {
-                hostLog.info(String.format("Should Start in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
-                m_config.m_isPaused.set(true);
+            if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
 
@@ -1741,7 +1739,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
-        hmconfig.isPaused.set(m_config.m_isPaused.get());
+        hmconfig.isPaused.set(m_config.m_isPaused);
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -2718,7 +2716,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = m_startMode;
         } else {
             // Shouldn't be here, but to be safe
-            m_config.m_isPaused.set(false);
             m_mode = OperationMode.RUNNING;
         }
         String mstr = (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL";

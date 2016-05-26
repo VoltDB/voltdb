@@ -211,7 +211,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     public void startPaused() {
-        this.m_isPaused.set(true);
+        m_isPaused = true;
     }
 
     public CommandLine leader(String leader)
@@ -665,7 +665,7 @@ public class CommandLine extends VoltDB.Configuration
             }
         }
 
-        if (this.m_isPaused.get() || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
+        if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
             cmdline.add("paused");
         }
 
