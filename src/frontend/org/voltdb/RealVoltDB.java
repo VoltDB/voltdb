@@ -504,6 +504,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             buildClusterMesh(isRejoin || m_joining);
 
+            // Create rejoin guard immediately after joining the mesh to prevent simultaneous rejoins
+            if (isRejoin) {
+                final String node = VoltZK.rejoinNodesBlockerHost+m_messenger.getHostId();
+                VoltZK.createRejoinNodeIndicator(m_messenger.getZK(),node);
+            }
+
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
 

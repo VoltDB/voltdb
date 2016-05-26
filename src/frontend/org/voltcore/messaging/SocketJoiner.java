@@ -707,7 +707,7 @@ public class SocketJoiner {
 
             /*
              * Notify the leader that we connected to the entire cluster, it will then go
-             * and queue a txn for our agreement site to join the lcuster
+             * and queue a txn for our agreement site to join the cluster
              */
             ByteBuffer joinCompleteBuffer = ByteBuffer.allocate(1);
             while (joinCompleteBuffer.hasRemaining()) {
