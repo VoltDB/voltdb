@@ -149,7 +149,7 @@ class PointValueGenerator:
     """This generates (random) point (GEOGRAPHY_POINT) values.
     """
     # It's annoying to have random numbers with 12 digits, so we limit it to
-    # 2 beyond the decimal point
+    # a small number beyond the decimal point
     DIGITS_BEYOND_DECIMAL_POINT = 2
 
     def __init__(self):
@@ -189,8 +189,9 @@ class PolygonValueGenerator:
     """This generates (random) polygon (GEOGRAPHY) values.
     """
     # It's annoying to have random numbers with 12 digits, so we limit it to
-    # 2 beyond the decimal point
-    DIGITS_BEYOND_DECIMAL_POINT = 2
+    # a reasonable number beyond the decimal point, but not too small since
+    # too much rounding can cause invalid polygons
+    DIGITS_BEYOND_DECIMAL_POINT = 6
 
     def __init__(self):
         decimal.getcontext().prec = PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT
@@ -227,11 +228,14 @@ class PolygonValueGenerator:
     def generate_vertex(self, longmin, longmax, latmin, latmax):
         """Generates a point that can be used as the vertex of a polygon, at a
            random location in between the specified minimum and maximum longitude
-           and latitude values.
+           and latitude values, with a small buffer so that it is not right up
+           against the edge.
         """
-        longitude = round(longmin + ((longmax - longmin) * random.random()),
+        delta = longmax - longmin
+        longitude = round(longmin + (0.1 * delta) + (0.8 * delta * random.random()),
                           PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
-        latitude  = round(latmin  + (( latmax -  latmin) * random.random()),
+        delta = latmax - latmin
+        latitude  = round(latmin  + (0.1 * delta) + (0.8 * delta * random.random()),
                           PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
         return str(longitude)+" "+str(latitude)
 
@@ -250,6 +254,9 @@ class PolygonValueGenerator:
         # lower left space again. In the corner spaces, you always choose a random
         # vertex; but the "middle" spaces are optional: you randomly decide (50-50)
         # whether to specify a vertex there or not.
+
+        # The first octant, [0, 0], is omitted here because it is dealt with
+        # specially, being both the first and last vertex
         octants = [[1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]]
         if clockwise:
             octants.reverse()
@@ -274,10 +281,10 @@ class PolygonValueGenerator:
            rings, i.e., holes. Holes are specified as being within one of 4
            quadrants of the middle "space" (see generate_loop above) of the
            exterior ring. More than 4 holes is not recommended, as they will
-           likely start to overlap, causing an invalid polygon.
+           start to overlap, causing an invalid polygon.
         """
         quadrants = [[0, 0], [1, 0], [1, 1], [0, 1]]
-        for i in xrange(count):
+        for n in xrange(count):
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:

@@ -76,8 +76,6 @@ def generate_table_str(res, key):
 def generate_modified_query(cmpdb, sql, modified_sql):
     result = ''
     mod_sql = modified_sql.get(sql, None)
-    # print 'DEBUG generate_modified_query:', sql
-    # print 'DEBUG mod_sql                :', mod_sql
     if mod_sql:
         result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
     return result
@@ -347,6 +345,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
             statement["jni"] = jni
             statement["cmp"] = cdb
+
             if notFound:
                 crashed.append(statement)
             elif is_different(statement, cntonly):
@@ -371,8 +370,6 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                 try:
                     orig_sql = modified_sql_file.readline().rstrip('\n').replace('original SQL: ', '')
                     mod_sql  = modified_sql_file.readline().rstrip('\n').replace('modified SQL: ', '')
-                    # print 'DEBUG orig_sql:', orig_sql
-                    # print 'DEBUG mod_sql :', mod_sql
                     if orig_sql and mod_sql:
                         modified_sql[cgi.escape(orig_sql).encode('ascii', 'xmlcharrefreplace')] \
                                     = cgi.escape(mod_sql).encode('ascii', 'xmlcharrefreplace')
@@ -384,11 +381,6 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
         except Exception as e:
             traceback.print_exc()
             raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
-
-    # print '\nDEBUG modified_sql dictionary:\n'
-    # for key in modified_sql:
-        # print 'DEBUG   key:', key
-        # print 'DEBUG   val:', modified_sql[key], '\n'
 
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
