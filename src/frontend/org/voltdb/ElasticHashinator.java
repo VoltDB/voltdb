@@ -262,9 +262,9 @@ public class ElasticHashinator extends TheHashinator {
 
     public static String decompressJSONString(byte[] compressed) throws IOException {
         ByteArrayOutputStream result = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
         try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
                 GZIPInputStream gis = new GZIPInputStream(bis)) {
-            byte[] buffer = new byte[1024];
             int length;
             while ((length = gis.read(buffer)) != -1) {
                 result.write(buffer, 0, length);
