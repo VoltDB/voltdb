@@ -55,7 +55,34 @@ class ClusterSettingsTest extends TestBase {
             }
         }
         then: 'Choose new database'
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Get the count for next server'
         count = 1
@@ -223,7 +250,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when:
         count=1
@@ -330,7 +383,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when:
         count=1
@@ -429,7 +508,33 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Set the id for new server'
         String serverId = getCssPathOfServer(1)
@@ -558,7 +663,34 @@ class ClusterSettingsTest extends TestBase {
         }
         then: 'Choose new database'
         println("The index of database " + indexOfNewDatabase)
-        chooseDatabase(indexOfNewDatabase, "name_src")
+//        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        int countNext = 0
+//        for (count = 0; count < numberOfTrials; count++) {
+        try {
+            for(countNext=0; countNext<numberOfTrials; countNext++) {
+                try {
+                    waitFor { buttonAddDatabase.isDisplayed() }
+//                        break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+                    currentDatabase.click()
+                }
+            }
+            $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+            waitFor { currentDatabase.text().equals("name_src") }
+        } catch (geb.waiting.WaitTimeoutException exception) {
+            println("Waiting - Retrying")
+        } catch (org.openqa.selenium.StaleElementReferenceException e) {
+            println("Stale Element exception - Retrying")
+        } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+            try {
+                waitFor { currentDatabase.text().equals("name_src") }
+
+            } catch (geb.waiting.WaitTimeoutException exc) {
+                println("Waiting - Retrying")
+            }
+        }
+//        }
 
         when: 'Set the id for new server'
         String serverId = getCssPathOfServer(1)
