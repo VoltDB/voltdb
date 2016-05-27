@@ -264,7 +264,7 @@ class VoltDatabase:
             verb = 'rejoin'
 
         if verb == 'create':
-            if pause == 'True':
+            if pause.lower() == 'true':
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '--force', '-d', filename, '-H', primary]
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
@@ -274,7 +274,7 @@ class VoltDatabase:
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
         elif verb == "recover":
-            if pause == 'True':
+            if pause.lower() == 'true':
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-d', filename, '-H', primary]
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary]
