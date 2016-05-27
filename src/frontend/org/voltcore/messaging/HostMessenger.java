@@ -486,7 +486,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Start the host messenger and connect to the leader, or become the leader
      * if necessary.
-     * @param request    The requested action to send to other nodes when joining the mesh.
+     *
+     * @param request The requested action to send to other nodes when joining
+     * the mesh. This is opaque to the HostMessenger, it can be any
+     * string. HostMessenger will encode this in the request to join mesh to the
+     * live hosts. The live hosts can use this request string to make further
+     * decision on whether or not to accept the request.
      */
     public void start(String request) throws Exception {
         /*
@@ -679,9 +684,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    /*
+    /**
      * Any node can serve a request to join. The coordination of generating a new host id
      * is done via ZK
+     *
+     * @param request The requested action from the rejoining host. This is
+     * opaque to the HostMessenger, it can be any string. The request string can
+     * be used to make further decision on whether or not to accept the request
+     * in the MembershipAcceptor.
      */
     @Override
     public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception {
