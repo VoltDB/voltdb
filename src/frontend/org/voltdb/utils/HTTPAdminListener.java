@@ -999,14 +999,14 @@ public class HTTPAdminListener {
     private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
         throws IOException {
         SslContextFactory sslContextFactory = new SslContextFactory();
-        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeyStore(), "path", true);
+        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
         sslContextFactory.setKeyStorePath(value);
-        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeyStore(), "password", true));
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTrustStore(), "path", false);
+        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeystore(), "password", true));
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTruststore(), "path", false);
         if (value!=null) {
             sslContextFactory.setTrustStorePath(value);
         }
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTrustStore(), "password", false);
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTruststore(), "password", false);
         if (value!=null) {
             sslContextFactory.setTrustStorePassword(value);
         }
