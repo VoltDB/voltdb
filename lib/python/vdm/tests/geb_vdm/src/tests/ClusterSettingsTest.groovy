@@ -94,7 +94,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -296,7 +296,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { page.btnAddServerOption.click() }
-                waitFor { page.buttonAddServer.click() }
+                //waitFor { page.buttonAddServer.click() }
                 waitFor { page.popupAddServer.isDisplayed() }
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
@@ -429,7 +429,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 waitFor { page.btnAddServerOption.click() }
-                waitFor { page.buttonAddServer.click() }
+                //waitFor { page.buttonAddServer.click() }
                 waitFor { page.popupAddServer.isDisplayed() }
                 break
             } catch (geb.waiting.WaitTimeoutException e) {
@@ -542,7 +542,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -598,7 +598,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                //page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -699,7 +699,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
@@ -755,7 +755,7 @@ class ClusterSettingsTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 page.btnAddServerOption.click()
-                page.buttonAddServer.click()
+                // page.buttonAddServer.click()
                 waitFor { page.popupAddServer.isDisplayed() }
                 println("Add Server popup found")
                 break
