@@ -1192,6 +1192,32 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     ASSERT_FALSE(tuple.isDirty());
 }
 
+// Simple test that performs snapshot activation on empty table, inserts tuples and calls stream more tuples
+TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
+    initTable(1, 0);
+    int tupleCount = 4;
+
+    // Empty table has an assigned allocated tuple storage
+    ASSERT_EQ(1, m_table->allocatedBlockCount());
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+    // activate snapshot
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    // insert tuples
+    addRandomUniqueTuples(m_table, tupleCount);
+    // do work - start taking snapshot of the table
+    char serializationBuffer[BUFFER_SIZE];
+    TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+    std::vector<int> retPositions;
+    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+    // no work done by snapshot as the table was empty
+    ASSERT_EQ(0, remaining);
+    ASSERT_EQ(outputStreams.size(), retPositions.size());
+    // check the # tuple insertion count is reflected correctly
+    ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
+}
+
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
