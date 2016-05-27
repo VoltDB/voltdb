@@ -80,8 +80,10 @@ public abstract class StmtTableScan {
     abstract public void processTVE(TupleValueExpression expr, String columnName);
 
     public void resolveTVE(TupleValueExpression expr) {
+        processTVE(expr, expr.getColumnName());
+       // The original column name may be changed by the processTVE in case of
+       // this TVE was originated in a subquery that was optimized out
         String columnName = expr.getColumnName();
-        processTVE(expr, columnName);
         expr.setOrigStmtId(m_stmtId);
 
         Pair<String, Integer> setItem = Pair.of(columnName, expr.getDifferentiator());
