@@ -260,8 +260,12 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     @Override
-    public String getColumnName(int m_columnIndex) {
-        return m_outputColumnList.get(m_columnIndex).getColumnName();
+    public String getColumnName(int columnIndex) {
+        return m_outputColumnList.get(columnIndex).getColumnName();
+    }
+
+    public Integer getColumnIndex(String columnAlias) {
+        return m_outputColumnIndexMap.get(columnAlias);
     }
 
     @Override

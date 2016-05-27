@@ -1027,8 +1027,8 @@ public class TestOrderBySuite extends RegressionSuite {
         validateTableOfLongs(vt, expected);
 
         // Select from an ordered subquery with LIMIT. The subquery MERGERECEIVE node is preserved to guarantee
-        // its determinism
-        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1) P_T limit 4;";
+        // its determinism. Subquery LIMIT is required to disable the subquery optimization
+        sql = "select PT_D1 from (select P_D1 as PT_D1 from P where P.P_D1 > 0 order by P_D1 limit 4) P_T limit 4;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {1}, {4}, {6}};
         validateTableOfLongs(vt, expected);

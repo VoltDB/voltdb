@@ -2466,10 +2466,17 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test MatView.
         String ddl;
+        final VoltCompiler compiler = new VoltCompiler();
 
+        // Subquery is replaced with a simple select
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t) subt group by num; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
@@ -2486,7 +2493,7 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
-                "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
+                "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2 limit 2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +

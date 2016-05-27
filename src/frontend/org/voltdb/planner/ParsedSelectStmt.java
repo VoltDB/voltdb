@@ -729,13 +729,25 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = expr;
         }
 
+        col.alias = child.attributes.get("alias");
         if (child.name.equals("columnref")) {
             col.expression = colExpr;
-            col.columnName = child.attributes.get("column");
-            col.tableName = child.attributes.get("table");
-            col.tableAlias = child.attributes.get("tablealias");
-            if (col.tableAlias == null) {
-                col.tableAlias = col.tableName;
+            if (colExpr instanceof TupleValueExpression) {
+                // Set the column data from the TVE itself rather than from the VoltXML.
+                // For example, the original select SELECT TA.CA FROM (SELECT C CA FROM T) TA;
+                // could be simplified to be as simple as SELECT TA.C CA FROM T TA;
+                // The TVE will reflect this change while the VoltXML won't
+                // At the moment, this optimization is only allowed if all display columns from
+                // the subquery are TVEs
+                TupleValueExpression tvexpr = (TupleValueExpression) colExpr;
+                col.columnName = tvexpr.getColumnName();
+                col.tableName = tvexpr.getTableName();
+                col.tableAlias = tvexpr.getTableAlias();
+                col.alias = tvexpr.getColumnAlias();
+            } else {
+                col.columnName = child.attributes.get("column");
+                col.tableName = child.attributes.get("table");
+                col.tableAlias = child.attributes.get("tablealias");
             }
         }
         else if (child.name.equals("tablesubquery")) {
@@ -755,7 +767,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableAlias = "VOLT_TEMP_TABLE";
             col.columnName = "";
         }
-        col.alias = child.attributes.get("alias");
+        // Default aliases to names if they are not set
+        if (col.tableAlias == null) {
+            col.tableAlias = col.tableName;
+        }
         if (col.alias == null) {
             col.alias = col.columnName;
         }

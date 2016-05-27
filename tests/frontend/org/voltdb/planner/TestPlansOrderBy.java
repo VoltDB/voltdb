@@ -494,8 +494,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // from this subquery without the MERGE-RECEIVE optimization.
             // Removing the subquery MERGERECEIVE node together with its inline ORDER BY noe
             // would result in the invalid plan
+            // The subquery LIMIT clause is required to suppress the optimization that replaces the suquery
+            // with a simple select
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select PT_D1 from (select P_D1 as PT_D1 from P order by P_D1) P_T limit 4;");
+                    "select PT_D1 from (select P_D1 as PT_D1 from P order by P_D1 LIMIT 30) P_T limit 4;");
 
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0);
@@ -503,7 +505,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals("P_T", ((SeqScanPlanNode) pn).getTargetTableAlias());
             // Subquery
             pn = pn.getChild(0).getChild(0);
-            validateMergeReceive(pn, false, new int[] {0});
+            validateMergeReceive(pn, true, new int[] {0});
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             assertEquals("P", ((IndexScanPlanNode) pn).getTargetTableAlias());
@@ -513,8 +515,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // resulting in the multi-partitioned join that gets rejected.
             // In this case, the subquery MERGERECEIVE node is technically redundant but at the moment,
             // the subquery post-processing still keeps it.
+            // The subquery LIMIT clause is required to suppress the optimization that replaces the suquery
+            // with a simple select
             failToCompile(
-                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;",
+                    "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1 limit 10) P_T, P where P.P_D0 = P_T.PT_D0;",
                     "This query is not plannable.  It has a subquery which needs cross-partition access.");
 
         }

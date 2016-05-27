@@ -36,6 +36,10 @@ public class StmtTargetTableScan extends StmtTableScan {
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
+    // An original subquery scan that was optimized out and replaced by this table scan
+    // It's required for the column indexes resolution
+    private StmtSubqueryScan m_origSubqueryScan = null;
+
     public StmtTargetTableScan(Table table, String tableAlias, int stmtId) {
         super(tableAlias, stmtId);
         assert (table != null);
@@ -116,8 +120,22 @@ public class StmtTargetTableScan extends StmtTableScan {
 
     @Override
     public void processTVE(TupleValueExpression expr, String columnName) {
+        if (m_origSubqueryScan != null) {
+            // SELECT TA1.CA CA1 FROM (SELECT T.C CA FROM T TA) TA1;
+            // The TA1(TA1).(CA)CA1 TVE needs to be adjusted to be T(TA1).C(CA) since the original
+            // SELECT T.C CA FROM T TA subquery was optimized out
+            // Table name TA1 to be replace with the original table name T
+            // Column name CA to be replace wit the original column name C
+            expr.setTableName(getTableName());
+            Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName);
+            assert(columnIndex != null);
+            String origColumnName = m_origSubqueryScan.getColumnName(columnIndex);
+            expr.setColumnName(origColumnName);
+        }
         expr.resolveForTable(m_table);
     }
 
-
+    public void setOriginalSubqueryScan(StmtSubqueryScan origSubqueryScan) {
+        m_origSubqueryScan = origSubqueryScan;
+    }
 }
