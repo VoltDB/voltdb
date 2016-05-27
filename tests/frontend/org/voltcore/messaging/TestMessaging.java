@@ -158,7 +158,7 @@ public class TestMessaging extends TestCase {
                         @Override
                         public void run() {
                             try {
-                                messenger.start();
+                                messenger.start(null);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
@@ -303,9 +303,9 @@ public class TestMessaging extends TestCase {
 
     public void testSimple() throws Exception {
         HostMessenger msg1 = new HostMessenger(getConfig(), null);
-        msg1.start();
+        msg1.start(null);
         HostMessenger msg2 = new HostMessenger(getConfig(), null);
-        msg2.start();
+        msg2.start(null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
@@ -361,11 +361,11 @@ public class TestMessaging extends TestCase {
 
     public void testMultiMailbox() throws Exception {
         HostMessenger msg1 = new HostMessenger(getConfig(), null);
-        msg1.start();
+        msg1.start(null);
         HostMessenger msg2 = new HostMessenger(getConfig(), null);
-        msg2.start();
+        msg2.start(null);
         HostMessenger msg3 = new HostMessenger(getConfig(), null);
-        msg3.start();
+        msg3.start(null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(3);
@@ -496,7 +496,7 @@ public class TestMessaging extends TestCase {
             try {
                 HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
                 HostMessenger msg = new HostMessenger(config, null);
-                msg.start();
+                msg.start(null);
                 m_ready.set(true);
                 msg.waitForGroupJoin(2);
             } catch (Exception e) {
@@ -515,9 +515,9 @@ public class TestMessaging extends TestCase {
         }
 
         HostMessenger msg1 = new HostMessenger(getConfig(), null);
-        msg1.start();
+        msg1.start(null);
         HostMessenger msg2 = new HostMessenger(getConfig(), null);
-        msg2.start();
+        msg2.start(null);
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg1");

@@ -154,7 +154,7 @@ public class TestStateMachine extends ZKTestBase {
         config.networkThreads = 1;
         config.coordinatorIp = new InetSocketAddress( recoverPort );
         HostMessenger hm = new HostMessenger(config, null);
-        hm.start();
+        hm.start(null);
         m_messengers.set(site, hm);
         addStateMachinesFor(site);
     }

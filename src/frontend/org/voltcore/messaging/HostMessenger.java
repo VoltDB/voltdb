@@ -90,10 +90,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public interface MembershipAcceptor {
         /**
          * @param hostId     The new host trying to join the mesh
+         * @param request    The requested action from the node joining the mesh
          * @param errMsg     Error message to send to the new host
          * @return true if the new host can join the mesh, false otherwise.
          */
-        public boolean shouldAccept(int hostId, StringBuilder errMsg);
+        boolean shouldAccept(int hostId, String request, StringBuilder errMsg);
     }
 
     /**
@@ -472,9 +473,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary. return true if any node indicates a paused start.
+     * if necessary.
+     * @param request    The requested action to send to other nodes when joining the mesh.
      */
-    public void start() throws Exception {
+    public void start(String request) throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -485,7 +487,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * If start returns true then this node is the leader, it bound to the coordinator address
          * It needs to bootstrap its agreement site so that other nodes can join
          */
-        if(m_joiner.start(zkInitBarrier)) {
+        if(m_joiner.start(zkInitBarrier, request)) {
             m_network.start();
 
             /*
@@ -670,7 +672,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * is done via ZK
      */
     @Override
-    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress) throws Exception {
+    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -682,7 +684,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 final boolean shouldAcceptMember;
                 final StringBuilder errMsg = new StringBuilder();
                 if (m_membershipAcceptor != null) {
-                    shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, errMsg);
+                    shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, request, errMsg);
                 } else {
                     shouldAcceptMember = false;
                 }

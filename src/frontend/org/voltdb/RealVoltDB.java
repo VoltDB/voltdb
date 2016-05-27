@@ -504,12 +504,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             buildClusterMesh(isRejoin || m_joining);
 
-            // Create rejoin guard immediately after joining the mesh to prevent simultaneous rejoins
-            if (isRejoin) {
-                final String node = VoltZK.rejoinNodesBlockerHost+m_messenger.getHostId();
-                VoltZK.createRejoinNodeIndicator(m_messenger.getZK(),node);
-            }
-
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
 
@@ -1045,26 +1039,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public boolean shouldAccept(int hostId, StringBuilder errMsg)
+    public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
     {
         Preconditions.checkNotNull(m_messenger);
 
-        final List<String> children;
+        StartAction action = null;
         try {
-            children = m_messenger.getZK().getChildren(VoltZK.rejoinNodesBlocker, false);
-        } catch (Exception e) {
-            hostLog.error("Failed to check if there are hosts rejoining the cluster", e);
-            return false;
+            action = StartAction.valueOf(request);
+        } catch (IllegalArgumentException e) {}
+
+        if (action != null && action.doesRejoin()) {
+            final int rejoiningHost = VoltZK.createRejoinNodeIndicator(m_messenger.getZK(), hostId);
+
+            if (rejoiningHost == -1) {
+                return true;
+            } else {
+                errMsg.append("Only one host can rejoin at a time. Host ")
+                      .append(rejoiningHost)
+                      .append(" is still rejoining.");
+                return false;
+            }
         }
 
-        if (children.isEmpty()) {
-            return true;
-        } else {
-            errMsg.append("Only one host can rejoin at a time. Host ")
-                  .append(VoltZK.getHostIDFromChildName(children.get(0)))
-                  .append(" is still rejoining.");
-            return false;
-        }
+        return true;
     }
 
     class DailyLogTask implements Runnable {
@@ -1792,7 +1789,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
         try {
-            m_messenger.start();
+            m_messenger.start(m_config.m_startAction.name());
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -2591,8 +2588,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
                 if (m_rejoining) {
-                    final String node = VoltZK.rejoinNodesBlockerHost + String.valueOf(m_myHostId);
-                    VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(), node);
+                    VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                     m_rejoining = false;
                 }
 
@@ -2790,8 +2786,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 // remove the rejoin blocker
-                final String node = VoltZK.rejoinNodesBlockerHost+String.valueOf(m_myHostId);
-                VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(),node);
+                VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;

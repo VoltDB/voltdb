@@ -482,7 +482,7 @@ public class Cartographer extends StatsSource
                     }
                     // check if any node still in rejoin status
                     try {
-                        List<String> children = m_zk.getChildren(VoltZK.rejoinNodesBlocker, false);
+                        List<String> children = m_zk.getChildren(VoltZK.rejoinNodeBlocker, false);
                         if (!children.isEmpty())
                             return false;
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen

@@ -67,7 +67,7 @@ public class TestHostMessenger {
         HostMessenger hm = new HostMessenger(config, null);
         createdMessengers.add(hm);
         if (start) {
-            hm.start();
+            hm.start(null);
         }
         return hm;
     }
@@ -105,7 +105,7 @@ public class TestHostMessenger {
             @Override
             public void run() {
                 try {
-                    hm2.start();
+                    hm2.start(null);
                 } catch (Exception e) {
                     e.printStackTrace();
                     exception.set(e);
@@ -116,7 +116,7 @@ public class TestHostMessenger {
             @Override
             public void run() {
                 try {
-                    hm3.start();
+                    hm3.start(null);
                 } catch (Exception e) {
                     e.printStackTrace();
                     exception.set(e);

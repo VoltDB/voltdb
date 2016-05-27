@@ -59,7 +59,7 @@ public class ZKTestBase {
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
             HostMessenger hm = new HostMessenger(config, null);
-            hm.start();
+            hm.start(null);
             m_messengers.add(hm);
         }
     }

@@ -122,7 +122,7 @@ public class MockVoltDB implements VoltDBInterface
             assert(cluster != null);
 
             try {
-                m_hostMessenger.start();
+                m_hostMessenger.start(null);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

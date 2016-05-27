@@ -81,7 +81,7 @@ public class SocketJoiner {
         /*
          * A node wants to join the socket mesh
          */
-        public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress ) throws Exception;
+        public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception;
 
         public void notifyAsPaused();
         /*
@@ -116,7 +116,7 @@ public class SocketJoiner {
      */
     String m_reportedInternalInterface;
 
-    public boolean start(final CountDownLatch externalInitBarrier) {
+    public boolean start(final CountDownLatch externalInitBarrier, String request) {
         boolean retval = false;
 
         // Try to become leader regardless of configuration.
@@ -189,7 +189,7 @@ public class SocketJoiner {
             final Random salt = new Random();
             while (true) {
                 try {
-                    connectToPrimary();
+                    connectToPrimary(request);
                     break;
                 } catch (CoreUtils.RetryException e) {
                     LOG.warn(String.format("Request to join cluster mesh is rejected, retrying in %d seconds. %s",
@@ -409,7 +409,7 @@ public class SocketJoiner {
 
             hostLog.info("Received request type " + type);
             if (type.equals("REQUEST_HOSTID")) {
-                m_joinHandler.requestJoin( sc, listeningAddress);
+                m_joinHandler.requestJoin( sc, listeningAddress, jsObj.optString("request"));
             } else if (type.equals("PUBLISH_HOSTID")){
                 m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress);
             } else {
@@ -509,7 +509,7 @@ public class SocketJoiner {
      * it must connect to the leader which will generate a host id and
      * advertise the rest of the cluster so that connectToPrimary can connect to it
      */
-    private void connectToPrimary() throws Exception
+    private void connectToPrimary(String request) throws Exception
     {
         // collect clock skews from all nodes
         List<Long> skews = new ArrayList<Long>();
@@ -556,6 +556,7 @@ public class SocketJoiner {
 
             JSONObject jsObj = new JSONObject();
             jsObj.put("type", "REQUEST_HOSTID");
+            jsObj.put("request", request);
 
             // put the version compatibility status in the json
             jsObj.put("versionString", localVersionString);
