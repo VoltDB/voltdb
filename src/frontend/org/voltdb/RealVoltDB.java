@@ -154,7 +154,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.MembershipAcceptor {
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.MembershipAcceptor, HostMessenger.HostWatcher {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -1064,6 +1064,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return true;
     }
 
+    @Override
+    public void hostsFailed(Set<Integer> failedHosts)
+    {
+        // Cleanup the rejoin blocker in case the rejoining node failed.
+        for (int hostId : failedHosts) {
+            VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+        }
+    }
+
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
@@ -1784,7 +1793,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.isPaused.set(m_config.m_isPaused);
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, this);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 

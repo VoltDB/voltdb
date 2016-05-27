@@ -59,7 +59,6 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
@@ -95,6 +94,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * @return true if the new host can join the mesh, false otherwise.
          */
         boolean shouldAccept(int hostId, String request, StringBuilder errMsg);
+    }
+
+    /**
+     * Callback for watching for host failures.
+     */
+    public interface HostWatcher {
+        /**
+         * Called when host failures are detected.
+         * @param failedHosts    List of failed hosts, including hosts currently unknown to this host.
+         */
+        void hostsFailed(Set<Integer> failedHosts);
     }
 
     /**
@@ -136,10 +146,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             this(null, 3021);
             zkInterface = "127.0.0.1:" + ports.next();
             internalPort = ports.next();
-        }
-
-        public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
         private void initNetworkThreads() {
@@ -238,6 +244,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private boolean m_partitionDetected = false;
 
     private final MembershipAcceptor m_membershipAcceptor;
+    private final HostWatcher m_hostWatcher;
 
     private final Object m_mapLock = new Object();
 
@@ -268,17 +275,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     /**
-     *
      * @param network
      * @param coordinatorIp
      * @param expectedHosts
      * @param catalogCRC
      * @param hostLog
      * @param membershipAcceptor
+     * @param m_hostWatcher
      */
-    public HostMessenger(Config config, MembershipAcceptor membershipAcceptor) {
+    public HostMessenger(Config config, MembershipAcceptor membershipAcceptor, HostWatcher hostWatcher) {
         m_config = config;
         m_membershipAcceptor = membershipAcceptor;
+        m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
@@ -421,6 +429,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         // reportForeignHostFailed should print on the console once
                         m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
+                }
+
+                if (m_hostWatcher != null) {
+                    m_hostWatcher.hostsFailed(failedHostIds);
                 }
             }
         }
