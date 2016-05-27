@@ -494,8 +494,10 @@ class ClusterSettingsTest extends TestBase {
         println()
     }
 
+
     def verifyDuplicateNameAndPortNotCreated() {
         int count
+        println("Print name" + testingName)
         when: 'Create database'
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -648,6 +650,7 @@ class ClusterSettingsTest extends TestBase {
             assert false
         }
     }
+
 
     def verifyDuplicateNameButDifferentPortCreated() {
         int count
