@@ -748,7 +748,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     "into a value of some other type.");
         }
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
-        if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
+        if (isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
             AbstractExpression expr = new OperatorExpression();;
             expr.setExpressionType(ExpressionType.OPERATOR_CAST);
             VoltType voltType = colExpr.getValueType();
@@ -767,10 +767,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             colExpr = expr;
         }
 
-        calculateColumnNames(child, col, colExpr);
-
         // Remember the column expression.
         col.expression = colExpr;
+
+        calculateColumnNames(child, col, colExpr);
+
+        // This index calculation is only used for sanity checking
+        // materialized views (which use the parsed select statement but
+        // don't go through the planner pass that does more involved
+        // column index resolution).
+        col.index = index;
 
         insertAggExpressionsToAggResultColumns(m_aggregationList, col);
         if (m_aggregationList.size() >= 1) {

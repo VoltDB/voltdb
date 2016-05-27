@@ -770,7 +770,7 @@ public abstract class AbstractParsedStmt {
             if (++tableCount > 1) {
                 return false;
             }
-            // Only TRAGET TABLE
+            // Only allow one TARGET TABLE, not a nested subquery.
             if (!(entry.getValue() instanceof StmtTargetTableScan)) {
                 return false;
             }
@@ -789,27 +789,18 @@ public abstract class AbstractParsedStmt {
      * has already passed all the checks from the canSimplifySubquery method.
      * Subquery ORDER BY clause is ignored if such exists.
      *
-     * @param subquery Parsed subquery statement
      * @param subqueryScan subquery scan to simplify
      * @param tableAlias
      * @return StmtTargetTableScan
      */
-    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(AbstractParsedStmt subquery, StmtSubqueryScan subqueryScan, String tableAlias) {
+    private StmtTargetTableScan addSimplifiedSubqueryToStmtCache(StmtSubqueryScan subqueryScan, String tableAlias) {
         assert(tableAlias != null);
         // It is guaranteed by the canSimplifySubquery that there is one and only one TABLE in the
         // whole subquery FROM clause. There could be VOLT_TEMP_TABLEs though that we need to skip
         // The VOLT_TEMP_TABLE_* are scans for subquery expressions
-        StmtTableScan origScan = null;
-        for (Map.Entry<String, StmtTableScan> entry : subquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
-                // This is an artificial table for a subquery expression
-                continue;
-            }
-            origScan = entry.getValue();
-            break;
-        }
-        assert(origScan instanceof StmtTargetTableScan);
-        StmtTargetTableScan origTableScan = (StmtTargetTableScan) origScan;
+        List<StmtTargetTableScan> targetTablesList = subqueryScan.getAllTargetTables();
+        assert(targetTablesList.size() == 1);
+        StmtTargetTableScan origTableScan = targetTablesList.get(0);
         StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
         newTableScan.setOriginalSubqueryScan(subqueryScan);
         // Replace the subquery scan with the table scan
@@ -1268,9 +1259,10 @@ public abstract class AbstractParsedStmt {
             tableScan = addTableToStmtCache(table, tableAlias);
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
-            tableScan = addSubqueryToStmtCache(subquery, tableAlias);
+            StmtSubqueryScan subqueryScan = addSubqueryToStmtCache(subquery, tableAlias);
+            tableScan = subqueryScan;
             if (canSimplifySubquery(subquery)) {
-                tableScan = addSimplifiedSubqueryToStmtCache(subquery, (StmtSubqueryScan) tableScan, tableAlias);
+                tableScan = addSimplifiedSubqueryToStmtCache(subqueryScan, tableAlias);
                 table = ((StmtTargetTableScan) tableScan).getTargetTable();
                 m_tableList.add(table);
                 // Extract subquery's filters
