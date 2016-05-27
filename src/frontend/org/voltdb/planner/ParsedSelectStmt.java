@@ -824,7 +824,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col) {
         // Calculate the names.
         if (child.name.equals("columnref")) {
-            col.expression = colExpr;
             setParsedColumnNamesAndAliases(col, child);
         }
         else if (child.name.equals("tablesubquery")) {

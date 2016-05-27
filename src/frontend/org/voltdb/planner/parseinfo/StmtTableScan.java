@@ -81,19 +81,19 @@ public abstract class StmtTableScan {
 
     abstract public AbstractExpression processTVE(TupleValueExpression expr, String columnName);
 
-    public AbstractExpression resolveTVE(TupleValueExpression expr) {
-        AbstractExpression resolvedExpr = processTVE(expr, expr.getColumnName());
+    public AbstractExpression resolveTVE(TupleValueExpression tve) {
+        AbstractExpression resolvedExpr = processTVE(tve, tve.getColumnName());
 
         List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(resolvedExpr);
-        for (TupleValueExpression tve : tves) {
+        for (TupleValueExpression subqTve : tves) {
             // The original column name may be changed by the processTVE in case of
             // this TVE was originated in a subquery that was optimized out
-            String columnName = tve.getColumnName();
+            String columnName = subqTve.getColumnName();
             tve.setOrigStmtId(m_stmtId);
             Pair<String, Integer> setItem = Pair.of(columnName, tve.getDifferentiator());
             if ( ! m_scanColumnNameSet.contains(setItem)) {
                 SchemaColumn scol = new SchemaColumn(getTableName(), m_tableAlias,
-                        columnName, columnName, (TupleValueExpression) tve.clone());
+                        columnName, columnName, tve.clone());
                 m_scanColumnNameSet.add(setItem);
                 m_scanColumnsList.add(scol);
             }
