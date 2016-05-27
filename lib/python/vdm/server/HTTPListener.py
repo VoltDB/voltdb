@@ -1155,8 +1155,14 @@ class StartDatabaseAPI(MethodView):
         """
 
         try:
+
+            if 'pause' in request.args:
+                is_pause = request.args.get('pause').lower()
+            else:
+                is_pause = "false"
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database()
+            response = database.start_database(is_pause)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1178,8 +1184,11 @@ class RecoverDatabaseAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(True)
+            response = database.start_database(True, pause)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1321,6 +1330,9 @@ class StartLocalServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             if 'blocking' in request.args:
@@ -1328,7 +1340,7 @@ class StartLocalServerAPI(MethodView):
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, is_blocking )
+            return server.check_and_start_local_server(sid, pause, False, is_blocking)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1350,10 +1362,13 @@ class RecoverServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, True)
+            response = server.check_and_start_local_server(sid, pause, True)
             return response
         except Exception, err:
             print traceback.format_exc()

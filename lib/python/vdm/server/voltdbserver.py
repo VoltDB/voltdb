@@ -95,7 +95,7 @@ class VoltDatabase:
         """
         self.database_id = database_id
 
-    def start_database(self, recover=False):
+    def start_database(self, is_pause, recover=False):
         """
         Starts voltdb servers on all nodes configured for this database.
         Returns reponse with HTTP status code and error details json.
@@ -128,8 +128,8 @@ class VoltDatabase:
             server = HTTPListener.Global.SERVERS.get(server_id)
             curr = server
             try:
-                url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u') % \
-                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id)
+                url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u&pause=%s') % \
+                                  (curr['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id, is_pause)
                 response = requests.put(url)
                 if response.status_code != requests.codes.ok:
                     failed = True
@@ -177,7 +177,7 @@ class VoltDatabase:
             print traceback.format_exc()
             return create_response(str(err), 500)
 
-    def check_and_start_local_server(self, sid, recover=False, is_blocking=-1):
+    def check_and_start_local_server(self, sid, pause, recover=False, is_blocking=-1):
         """
         Checks if voltdb server is running locally and
         starts it if the server is not running.
@@ -189,7 +189,7 @@ class VoltDatabase:
         if self.is_voltserver_running():
             return create_response('A VoltDB Server process is already running', 500)
 
-        retcode = self.start_local_server(sid, recover, is_blocking)
+        retcode = self.start_local_server(sid, pause,  recover, is_blocking)
         if (retcode == 0):
             return create_response('Success', 200)
         else:
@@ -221,7 +221,7 @@ class VoltDatabase:
                 break
         return VoltdbProcess
 
-    def start_local_server(self, sid, recover=False, is_blocking=-1):
+    def start_local_server(self, sid, pause,  recover=False, is_blocking=-1):
         """
         start a local server process. recover if recover is true else create.
         """
@@ -264,12 +264,20 @@ class VoltDatabase:
             verb = 'rejoin'
 
         if verb == 'create':
-            voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
+            if pause == 'True':
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '--force', '-d', filename, '-H', primary]
+            else:
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--force', '-d', filename, '-H', primary]
         elif rejoin:
             if is_blocking == 1:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--blocking' ,'--host=' + server_ip]
             else:
                 voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary, '--host=' + server_ip]
+        elif verb == "recover":
+            if pause == 'True':
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '--pause', '-d', filename, '-H', primary]
+            else:
+                voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary]
         else:
             voltdb_cmd = ['nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary]
 
