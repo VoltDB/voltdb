@@ -133,10 +133,10 @@ public class LoadTableLoader extends BenchmarkThread {
             //Connection loss node failure will come down here along with user aborts from procedure.
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("LoadTableLoader ungracefully failed to insert into table " + m_tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
-                m_shouldContinue.set(false);
+                //m_shouldContinue.set(false);
             }
             Benchmark.txnCount.incrementAndGet();
         }
@@ -161,10 +161,10 @@ public class LoadTableLoader extends BenchmarkThread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("LoadTableLoader ungracefully failed to copy from table " + m_tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
-                m_shouldContinue.set(false);
+                //m_shouldContinue.set(false);
             }
             Benchmark.txnCount.incrementAndGet();
         }
@@ -190,19 +190,19 @@ public class LoadTableLoader extends BenchmarkThread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("LoadTableLoader ungracefully failed to delete from table " + m_tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("LoadTableLoader ungracefully failed to delete from table " + m_tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 // stop the loader
-                m_shouldContinue.set(false);
+                //m_shouldContinue.set(false);
             }
             Benchmark.txnCount.incrementAndGet();
             if (status == ClientResponse.SUCCESS) {
                 long cnt = clientResponse.getResults()[0].asScalarLong();
                 if (cnt != expected_delete) {
-                    log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
-                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    log.warn("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt + " Expected: " + expected_delete);
+                    log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                     // stop the loader
-                    m_shouldContinue.set(false);
+                    //m_shouldContinue.set(false);
                 }
             }
         }
