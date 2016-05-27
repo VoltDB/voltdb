@@ -1507,6 +1507,12 @@ public final class InvocationDispatcher {
     {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        if (cihm == null) {
+            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+                    + "This is likely due VoltDB ceasing client communication as it "
+                    + "shuts down.");
+            return false;
+        }
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
