@@ -1067,10 +1067,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
-        // Cleanup the rejoin blocker in case the rejoining node failed.
-        for (int hostId : failedHosts) {
-            VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
-        }
+        scheduleWork(new Runnable() {
+            @Override
+            public void run()
+            {
+                // Cleanup the rejoin blocker in case the rejoining node failed.
+                // This has to run on a separate thread because the callback is
+                // invoked on the ZooKeeper server thread.
+                for (int hostId : failedHosts) {
+                    VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                }
+            }
+        }, 0, 0, TimeUnit.MILLISECONDS);
     }
 
     class DailyLogTask implements Runnable {
