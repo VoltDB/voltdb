@@ -525,6 +525,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
+            if (m_messenger.isPaused() || m_config.m_isPaused) {
+                setStartMode(OperationMode.PAUSED);
+            }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
             m_periodicWorkThread =
@@ -1536,6 +1539,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (pt != null) {
                 m_config.m_partitionDetectionEnabled = pt.isEnabled();
                 m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
+
+                // check for user using deprecated settings
+                PartitionDetectionType.Snapshot snapshot = pt.getSnapshot();
+                if (snapshot != null) {
+                    String prefix = snapshot.getPrefix();
+                    if ((prefix != null) && ("partition_detection".equalsIgnoreCase(prefix) == false)) {
+                        hostLog.warn(String.format("Partition Detection snapshots are "
+                                + "no longer supported. Prefix value \"%s\" will be ignored.", prefix));
+                    }
+                }
             }
 
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
@@ -1736,6 +1749,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+        hmconfig.isPaused.set(m_config.m_isPaused);
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -2714,7 +2728,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
