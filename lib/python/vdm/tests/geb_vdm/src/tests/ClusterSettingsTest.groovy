@@ -30,7 +30,7 @@ class ClusterSettingsTest extends TestBase {
                 expect: 'to be on Cluster Settings page'
                 at ClusterSettingsPage
 
-                // browser.driver.executeScript("VdmUI.isTestServer = true;",1)
+                browser.driver.executeScript("VdmUI.isTestServer = true;",1)
 
                 break
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
