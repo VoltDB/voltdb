@@ -708,7 +708,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 if (m_membershipAcceptor != null) {
                     shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, request, errMsg);
                 } else {
-                    shouldAcceptMember = false;
+                    shouldAcceptMember = true;
                 }
 
                 /*
