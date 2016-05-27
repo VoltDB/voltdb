@@ -710,6 +710,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     int read = socket.read(finishedJoining);
                     if (read == -1) {
                         m_networkLog.info("New connection was unable to establish mesh");
+                        socket.close();
                         return;
                     } else if (read < 1) {
                         Thread.sleep(5);
@@ -726,6 +727,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
                 removeForeignHost(hostId);
+                socket.close();
                 return;
             }
 
