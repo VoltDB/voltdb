@@ -219,6 +219,7 @@ public class VoltDB {
 
         /** Placement group */
         public String m_placementGroup = null;
+        public boolean m_isPaused = false;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -487,7 +488,10 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbCreate = true;
-                else {
+                else if (arg.equalsIgnoreCase("paused")) {
+                    //Start paused.
+                    m_isPaused = true;
+                } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
@@ -563,6 +567,11 @@ public class VoltDB {
                 }
             }
 
+            //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
+            if (m_isPaused && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
+                isValid = false;
+                hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+            }
             return isValid;
         }
 
