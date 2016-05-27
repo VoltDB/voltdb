@@ -988,7 +988,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_distinctGroupByColumns.add(pcol);
 
             // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
-            m_distinctProjectSchema.addColumn(col.asSchemaColumn());
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, tve, col.differentiator);
+            m_distinctProjectSchema.addColumn(schema_col);
         }
 
         return groupbyElement;
