@@ -24,6 +24,7 @@
 package genqa;
 
 import genqa.ExportOnServerVerifier.ValidationErr;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,11 +41,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
+
 import org.I0Itec.zkclient.ZkClient;
 import org.voltdb.iv2.TxnEgo;
 
@@ -64,6 +68,7 @@ public class ExportKafkaOnServerVerifier {
     private long expectedRows = 0;
     private final AtomicLong consumedRows = new AtomicLong(0);
     private final AtomicLong verifiedRows = new AtomicLong(0);
+    private final AtomicBoolean testGood = new AtomicBoolean(true);
 
     private static class VoltKafkaConsumerConfig {
         final String m_zkhost;
@@ -324,6 +329,7 @@ public class ExportKafkaOnServerVerifier {
         System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows);
         if (consumedRows.get() < expectedRows) {
             System.out.println("ERROR: Exported row count does not match consumed rows.");
+            testGood.set(false);
         }
         //For shutdown hook to not stop twice.
         m_kafkaConfig = null;
@@ -350,7 +356,7 @@ public class ExportKafkaOnServerVerifier {
                     new Thread() {
                         @Override
                         public void run() {
-                            System.out.println("Shuttind Down...");
+                            System.out.println("Shutting Down...");
                             verifier.stopConsumer();
                         }
                     });
@@ -371,7 +377,10 @@ public class ExportKafkaOnServerVerifier {
             System.err.println("Validation error: " + e.toString());
             System.exit(-1);
         }
-        System.exit(0);
+        if (verifier.testGood.get())
+            System.exit(0);
+        else
+            System.exit(-1);
     }
 
 }

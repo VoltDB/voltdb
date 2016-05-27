@@ -342,7 +342,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
+    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
                                                                                       remoteClusterId,
                                                                                       UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
@@ -401,28 +401,28 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
     }
 
     if (existingMetaTableForDelete.get()) {
-        existingMetaTableForDelete.get()->deleteAllTuples(true);
+        existingMetaTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (existingTupleTableForDelete.get()) {
-        existingTupleTableForDelete.get()->deleteAllTuples(true);
+        existingTupleTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (expectedMetaTableForDelete.get()) {
-        expectedMetaTableForDelete.get()->deleteAllTuples(true);
+        expectedMetaTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (expectedTupleTableForDelete.get()) {
-        expectedTupleTableForDelete.get()->deleteAllTuples(true);
+        expectedTupleTableForDelete.get()->deleteAllTuples(true, false);
     }
     if (existingMetaTableForInsert.get()) {
-        existingMetaTableForInsert.get()->deleteAllTuples(true);
+        existingMetaTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (existingTupleTableForInsert.get()) {
-        existingTupleTableForInsert.get()->deleteAllTuples(true);
+        existingTupleTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (newMetaTableForInsert.get()) {
-        newMetaTableForInsert.get()->deleteAllTuples(true);
+        newMetaTableForInsert.get()->deleteAllTuples(true, false);
     }
     if (newTupleTableForInsert.get()) {
-        newTupleTableForInsert.get()->deleteAllTuples(true);
+        newTupleTableForInsert.get()->deleteAllTuples(true, false);
     }
 
     return true;

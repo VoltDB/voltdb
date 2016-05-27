@@ -49,6 +49,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -150,7 +151,7 @@ public class VoltCompiler {
     private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
-    String[] m_importLines = null;
+    Set<String> m_importLines = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -666,11 +667,12 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
+            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
@@ -699,7 +701,8 @@ public class VoltCompiler {
                 fw.close();
                 m_reportPath = file.getAbsolutePath();
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return null;
         }
@@ -1283,7 +1286,7 @@ public class VoltCompiler {
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         // Also, grab the IMPORT CLASS lines so we can add them to the
         // generated DDL
-        m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
+        m_importLines = ImmutableSet.copyOf(voltDdlTracker.m_importLines);
         addExtraClasses(jarOutput);
 
         compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
@@ -2277,10 +2280,16 @@ public class VoltCompiler {
             m_classLoader = originalClassLoader;
 
             if (canonicalDDLReader != null) {
-                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    canonicalDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
             if (newDDLReader != null) {
-                try { newDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    newDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
         }
     }

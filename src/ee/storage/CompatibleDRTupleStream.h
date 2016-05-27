@@ -47,7 +47,6 @@ public:
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &tuple,
@@ -60,7 +59,6 @@ public:
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
                        TableTuple &oldTuple,
@@ -70,7 +68,6 @@ public:
                        char *tableHandle,
                        std::string tableName,
                        int partitionColumn,
-                       int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
 
@@ -84,12 +81,19 @@ public:
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
+
+    virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
+                                 int64_t uniqueId, ByteArray payloads) {
+        // This method is not supported in compatible stream
+    }
+
     static int32_t getTestDRBuffer(int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
                                    std::vector<int32_t> flagList,
+                                   long startSequenceNumber,
                                    char *out);
 private:
-    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
     void writeRowTuple(TableTuple& tuple,
             size_t rowHeaderSz,

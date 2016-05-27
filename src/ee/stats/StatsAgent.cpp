@@ -107,7 +107,7 @@ Table* StatsAgent::getStats(StatisticsSelectorType sst,
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
-    statsTable->deleteAllTuples(false);
+    statsTable->deleteAllTuples(false, false);
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
         multimap<CatalogId, StatsSource*>::const_iterator iter;

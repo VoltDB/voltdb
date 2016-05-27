@@ -44,6 +44,7 @@ public enum LogKeys {
     host_VoltDB_ErrorStartAcceptingConnections,
     host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
+    host_VoltDB_ServerOpMode,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
     host_VoltDB_ProfileLevelIs,

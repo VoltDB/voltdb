@@ -31,14 +31,30 @@ import org.voltdb.types.VoltDecimalHelper;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
-
 /**
- * Represents a type in a VoltDB Stored Procedure or {@link VoltTable VoltTable}.
+ * Represents a type for a {@link VoltTable VoltTable} column or a SQLStmt
+ * parameter.
  * Note that types in the database don't map 1-1 with types in the
- * Stored Procedure API. Varchars, Chars and Char Arrays in the DB
- * map to Strings in the API.
+ * Java Stored Procedure API. For example,
+ *   VARBINARY has no equivalent java class -- just byte[].
+ *   TIMESTAMP corresponds "best" to VoltDB.TimeStampType but
+ *   also, conveniently, to java.sql.Types.TIMESTAMP.
  */
 public enum VoltType {
+    // This implementation tries to take an 80/20 approach to modeling the
+    // behavior of all the specific types. That is, the VoltType class
+    // typically provides not-too-complex method implementations that suit
+    // the majority of the current and anticipated future types
+    // (VoltType enum instances). Yet, specific instances, ideally as few
+    // as possible for any given method, will use the java 7 "smart enum"
+    // feature to override default method implementations. The intent is that
+    // adding new instances will have a minimal and localized impact --
+    // requiring few default method implementations to be changed or to be
+    // overridden by the new instance.
+    // Secondarily, the need for overrides on existing types, especially
+    // jdbc-invisible types, numeric types, and variable length types is
+    // minimized by making many of the default method implementations
+    // sensitive to these general type categories.
 
     /**
      * Used for uninitialized types in some places. Not a valid value
@@ -108,6 +124,41 @@ public enum VoltType {
             "java.lang.Long"), // getObject return type
 
     /**
+     * Special purpose internal type to describe expectations for parameters to
+     * statements that contain syntax like " integer_expr IN ? ".
+     * This type most commonly occurs as an expected parameter type for
+     * such statements.
+     * It is not expected to ever be used as a VoltTable column type.
+     */
+    INLIST_OF_BIGINT ((byte)7, // enum value
+            "INLIST OF BIGINT", // unused SQL name
+            -1, // variable length
+            // Normally, only compatible NON-ARRAY types are listed,
+            // but long array is included here as the special case
+            // most suitable representation.
+            new Class[] {long[].class},
+            long[][].class, // unused vector type
+            'B', // take-off on 'b' for bigint/long
+            java.sql.Types.OTHER, // unused JDBC getObject result type
+            java.sql.DatabaseMetaData.typePredNone, // basic where-clauses supported
+            "org.voltdb.types.Long[]") // unused JDBC getObject return type
+    {
+        private final Class<?> COMPATIBLE_ARRAYS[] =
+                new Class<?>[] {long[].class, Long[].class, int[].class, Integer[].class,
+                short[].class, Short[].class, byte[].class, Byte[].class,};
+
+        @Override
+        public boolean acceptsArray(Class<?> arrayArgClass) {
+            for (Class<?> allowedArray : COMPATIBLE_ARRAYS) {
+                if (allowedArray == arrayArgClass) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    },
+
+    /**
      * 8-bytes in IEEE 754 "double format".
      * Some NaN values may represent NULL in the database (TBD).
      */
@@ -133,6 +184,11 @@ public enum VoltType {
             "java.lang.String") // getObject return type
     {
         @Override
+        public boolean acceptsArray(Class<?> arrayArgClass) {
+            return byte[].class == arrayArgClass;
+        }
+
+        @Override
         public boolean isCaseSensitive() { return true; }
 
         @Override
@@ -146,6 +202,32 @@ public enum VoltType {
         public boolean isIndexable() { return true; }
         @Override
         public boolean isUniqueIndexable() { return true; }
+    },
+
+    /**
+     * Special purpose internal type to describe expectations for parameters to
+     * statements that contain syntax like " varchar_expr IN ? ".
+     * This type most commonly occurs as an expected parameter type for
+     * such statements.
+     * It is not expected to ever be used as a VoltTable column type.
+     */
+    INLIST_OF_STRING ((byte)10, // enum value
+            "INLIST OF STRING", // unused SQL name
+            -1, // variable length
+            // Normally, only compatible NON-ARRAY types are listed,
+            // but String array is included here as the special case
+            // most suitable representation.
+            new Class[] {String[].class},
+            String[][].class, // unused vector type
+            'V', // take-off on 'v' for varchar/STRING
+            java.sql.Types.OTHER, // unused JDBC getObject result type
+            java.sql.DatabaseMetaData.typePredNone, // basic where-clauses supported
+            "org.voltdb.types.String[]")  // unused getObject return type
+    {
+        @Override
+        public boolean acceptsArray(Class<?> arrayArgClass) {
+            return String[].class == arrayArgClass;
+        }
     },
 
     /**
@@ -224,9 +306,9 @@ public enum VoltType {
      * Array of bytes of variable length
      */
     VARBINARY ((byte)25, "varbinary", new LengthRange("max_length"),
-            // Normally, only NON-ARRAY compatible types are listed,
-            // but byte array is included here because it is also the default
-            // TARGET class for conversion FROM VARBINARY.
+            // Normally, only compatible NON-ARRAY types are listed,
+            // but byte array is included here as the special case
+            // most suitable representation of VARBINARY.
             new Class[] {byte[].class, },
             byte[][].class,
             'l',
@@ -234,6 +316,14 @@ public enum VoltType {
             java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
             "java.lang.Byte[]")  // getObject return type
     {
+
+        // Streamlined implementation avoids any copying.
+        @Override
+        public Object bytesToValue(byte[] value) {
+            assert(value != null);
+            return value;
+        }
+
         @Override
         public boolean acceptsArray(Class<?> arrayArgClass) {
             return byte[].class == arrayArgClass ||
@@ -967,7 +1057,7 @@ public enum VoltType {
      * -128, which is the constant NULL_TINYINT in VoltDB.
      * @return A new final instance with value equal to null for a given
      * type. */
-    public Object getNullValueForTest() {
+    public Object getNullValue() {
         switch (this) {
         case TINYINT:
             return NULL_TINYINT;
@@ -1077,9 +1167,6 @@ public enum VoltType {
         if ((this == NULL)) {
             return null;
         }
-        if (this == VARBINARY) {
-            return value;
-        }
 
         ByteBuffer buf = ByteBuffer.wrap(value);
         buf.order(ByteOrder.LITTLE_ENDIAN);
@@ -1116,11 +1203,17 @@ public enum VoltType {
     /** Null value for <code>FLOAT</code>. */
     public static final double NULL_FLOAT = -1.7E+308;
 
+    /** Max value for a <code>TINYINT</code> index component. */
     private static final Byte MAX_TINYINT = new Byte(Byte.MAX_VALUE);
+    /** Max value for a <code>SMALLINT</code> index component. */
     private static final Short MAX_SMALLINT = new Short(Short.MAX_VALUE);
+    /** Max value for a <code>INTEGER</code> index component.  */
     private static final Integer MAX_INTEGER = new Integer(Integer.MAX_VALUE);
+    /** Max value for a <code>BIGINT</code> index component. */
     private static final Long MAX_BIGINT = new Long(Long.MAX_VALUE);
+    /** Max value for a <code>TIMESTAMP</code> index component. */
     private static final Long MAX_TIMESTAMP = new Long(Long.MAX_VALUE);
+    /** Max value for a <code>FLOAT</code> index component.ß */
     private static final Float MAX_FLOAT = new Float(Float.MAX_VALUE);
 
     // for consistency at the API level, provide symbolic nulls for these types, too

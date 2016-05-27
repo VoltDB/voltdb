@@ -1,0 +1,6 @@
+# Expected Streams: (when running the default GEB VMC
+# test server; see ../../server/run_voltdb_server.sh)
+EXPORT_DONE_TABLE
+EXPORT_PARTITIONED_TABLE
+EXPORT_REPLICATED_TABLE
+EXPORT_SKINNY_PARTITIONED_TABLE

@@ -426,6 +426,27 @@ public class RegressionSuite extends TestCase {
         validateTableOfScalarLongs(vt, expected);
     }
 
+    static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
+        int len = expected.length;
+        for (int i=0; i < len; i++) {
+            assertTrue(vt.advanceRow());
+            String message = "at column 0,";
+
+            BigDecimal actual = new BigDecimal(-10000000);
+            try {
+                actual = vt.getDecimalAsBigDecimal(i);
+            } catch (IllegalArgumentException ex) {
+                ex.printStackTrace();
+                fail(message);
+            }
+            assertEquals(message, expected[i], actual);
+        }
+    }
+
     private static void dumpExpectedLongs(long[][] expected) {
         System.out.println("row count:" + expected.length);
         for (long[] row : expected) {
@@ -502,7 +523,7 @@ public class RegressionSuite extends TestCase {
             }
             else {
                 VoltType type = vt.getColumnType(i);
-                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValueForTest().toString()), actual);
+                assertEquals(message + "expected null: ", Long.parseLong(type.getNullValue().toString()), actual);
             }
         }
     }

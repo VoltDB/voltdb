@@ -98,6 +98,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
@@ -178,9 +179,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "6.3";
+    static final String m_defaultVersionString = "6.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.3\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -524,6 +525,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             }
+            if (m_messenger.isPaused() || m_config.m_isPaused) {
+                setStartMode(OperationMode.PAUSED);
+            }
 
             // Create the thread pool here. It's needed by buildClusterMesh()
             m_periodicWorkThread =
@@ -834,6 +838,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
             }
+            else {
+                // set up empty stats for the DR Producer
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
+                        new DRProducerStatsBase.DRProducerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
+                        new DRProducerStatsBase.DRProducerPartitionStatsBase());
+            }
             createDRConsumerIfNeeded();
 
             /*
@@ -870,10 +881,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         m_messenger,
                         m_configuredNumberOfPartitions,
                         m_catalogContext.getDeployment().getCluster().getKfactor(),
-                        m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, kSafetyStats, expectSyncSnapshot);
+                        topo,
+                        m_MPI,
+                        kSafetyStats,
+                        expectSyncSnapshot
+                );
                 m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;
@@ -1522,6 +1535,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
             }
 
+            PartitionDetectionType pt = deployment.getPartitionDetection();
+            if (pt != null) {
+                m_config.m_partitionDetectionEnabled = pt.isEnabled();
+                m_messenger.setPartitionDetectionEnabled(m_config.m_partitionDetectionEnabled);
+
+                // check for user using deprecated settings
+                PartitionDetectionType.Snapshot snapshot = pt.getSnapshot();
+                if (snapshot != null) {
+                    String prefix = snapshot.getPrefix();
+                    if ((prefix != null) && ("partition_detection".equalsIgnoreCase(prefix) == false)) {
+                        hostLog.warn(String.format("Partition Detection snapshots are "
+                                + "no longer supported. Prefix value \"%s\" will be ignored.", prefix));
+                    }
+                }
+            }
+
             final String elasticSetting = deployment.getCluster().getElastic().trim().toUpperCase();
             if (elasticSetting.equals("ENABLED")) {
                 TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
@@ -1720,6 +1749,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
+        hmconfig.isPaused.set(m_config.m_isPaused);
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -1802,7 +1832,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
-        String[] lines = pp.toLogLines().split("\n");
+        String[] lines = pp.toLogLines(getVersionString()).split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
         }
@@ -2698,7 +2728,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
+        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);

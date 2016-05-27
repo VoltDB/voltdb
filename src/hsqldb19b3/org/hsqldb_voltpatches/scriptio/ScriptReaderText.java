@@ -103,7 +103,7 @@ public class ScriptReaderText extends ScriptReaderBase {
                         ValuePool.emptyObjectArray);
 
                 if (cs.getType() == StatementTypes.CREATE_SCHEMA) {
-                    HsqlName name = cs.getSchemalName();
+                    HsqlName name = cs.getSchemaName();
 
                     session.setSchema(name.name);
                 }

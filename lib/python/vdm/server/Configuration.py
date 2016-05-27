@@ -18,6 +18,7 @@ import os
 from collections import defaultdict
 import json
 import traceback
+from sets import Set
 from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 from flask import jsonify
@@ -103,7 +104,7 @@ def validate_and_convert_xml_to_json(config_path):
     Method to get the json content from xml file
     :param config_path (string): path of xml file
     """
-    log_file = os.path.join(os.environ["JAVA_HOME"], HTTPListener.Global.DATA_PATH, 'voltdeploy.log')
+    log_file = os.path.join(HTTPListener.Global.DATA_PATH, 'voltdeploy.log')
 
     handler = RotatingFileHandler(log_file)
     handler.setFormatter(logging.Formatter(
@@ -124,7 +125,9 @@ def validate_and_convert_xml_to_json(config_path):
 
         populate_database(D2[k]['databases']['database'], log)
 
-        populate_server(D2[k]['members']['member'], D2[k]['databases']['database'], log)
+        if 'members' in D2[k] and 'member' in D2[k]['members'] and D2[k]['members']['member']:
+            if type(D2[k]['members']['member']) is dict:
+                populate_server(D2[k]['members']['member'], D2[k]['databases']['database'], log)
 
         populate_deployment(D2[k]['deployments']['deployment'], log)
 
@@ -135,8 +138,8 @@ def validate_and_convert_xml_to_json(config_path):
 def populate_database(databases, log):
     success = True
     if type(databases) is dict:
-        db_json = get_field_from_xml(databases,
-                                     'dict', 'database')
+        db_json = get_database_from_xml(databases,
+                                     'dict', log, 'database')
         req = HTTPListener.DictClass()
         req.json = {}
         req.json = db_json[0]
@@ -149,8 +152,8 @@ def populate_database(databases, log):
         if success is True:
             HTTPListener.Global.DATABASES = {db_json[0]['id']: db_json[0]}
     else:
-        db_json = get_field_from_xml(databases,
-                                     'list', 'database')
+        db_json = get_database_from_xml(databases,
+                                     'list', log, 'database')
         success = True
         result = check_duplicate_database(db_json)
         if result != "":
@@ -247,84 +250,90 @@ def populate_deployment(deployments, log):
             for deployment in deployment_json:
                 HTTPListener.Global.DEPLOYMENT[deployment['databaseid']] = deployment
     success = True
-    if 'users' in deployments and deployments['users'] is not None \
-            and 'user' in deployments['users']:
-        if type(deployments) is dict:
-            user_json = get_users_from_xml(deployments,
-                                           'dict')
-            if type(user_json) is dict:
-                req = HTTPListener.DictClass()
-                req.json = {}
-                user_json['plaintext'] = bool(user_json['plaintext'])
-                req.json = user_json
-                inputs = UserInputs(req)
-                if not inputs.validate():
-                    success = False
-                    sys.stdout.write(str(inputs.errors))
-                    log.error("Error while reloading configuration: %s", str(inputs.errors))
-
-                if success is True:
-                    HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
-
-            elif type(user_json) is list:
-                for user in user_json:
+    if type(deployments) is list:
+        users = []
+        for deployment in deployments:
+            if 'users' in deployment and deployment['users'] is not None \
+                    and 'user' in deployment['users']:
+                user_json = get_users_from_xml(deployment,
+                                               'dict')
+                if type(user_json) is dict:
                     req = HTTPListener.DictClass()
                     req.json = {}
-                    user['plaintext'] = bool(user['plaintext'])
-                    req.json = user
+                    user_json['plaintext'] = bool(user_json['plaintext'])
+                    req.json = user_json
                     inputs = UserInputs(req)
                     if not inputs.validate():
                         success = False
                         sys.stdout.write(str(inputs.errors))
                         log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-                if len(user_json)> 1:
-                    result = check_duplicate_user(user_json)
-                    if result != "":
-                        success = False
-                        log.error("Error while reloading configuration: %s", result)
+                    if success is True:
+                        users.append(user_json)
 
-                if success is True:
-                    HTTPListener.Global.DEPLOYMENT_USERS = {}
+                elif type(user_json) is list:
                     for user in user_json:
-                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
-        else:
-            user_json = get_users_from_xml(deployments,
-                                           'list')
-            if type(user_json) is dict:
+                        req = HTTPListener.DictClass()
+                        req.json = {}
+                        user['plaintext'] = bool(user['plaintext'])
+                        req.json = user
+                        inputs = UserInputs(req)
+                        if not inputs.validate():
+                            success = False
+                            sys.stdout.write(str(inputs.errors))
+                            log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+                    if len(user_json)> 1:
+                        result = check_duplicate_user(user_json)
+                        if result != "":
+                            success = False
+                            log.error("Error while reloading configuration: %s", result)
+
+                    if success is True:
+                        for user in user_json:
+                            users.append(user)
+        if len(users) > 0:
+            HTTPListener.Global.DEPLOYMENT_USERS = {}
+            for user in users:
+                HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
+    else:
+        user_json = get_users_from_xml(deployments,
+                                       'dict')
+        if type(user_json) is dict:
+            req = HTTPListener.DictClass()
+            req.json = {}
+            user_json['plaintext'] = bool(user_json['plaintext'])
+            req.json = user_json
+            inputs = UserInputs(req)
+            if not inputs.validate():
+                success = False
+                sys.stdout.write(str(inputs.errors))
+                log.error("Error while reloading configuration: %s", str(inputs.errors))
+
+            if success is True:
+                HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
+        elif type(user_json) is list:
+            for user in user_json:
                 req = HTTPListener.DictClass()
                 req.json = {}
-                user_json['plaintext'] = bool(user_json['plaintext'])
-                req.json = user_json
+                user['plaintext'] = bool(user['plaintext'])
+                req.json = user
                 inputs = UserInputs(req)
                 if not inputs.validate():
                     success = False
                     sys.stdout.write(str(inputs.errors))
                     log.error("Error while reloading configuration: %s", str(inputs.errors))
 
-                if success is True:
-                    HTTPListener.Global.DEPLOYMENT_USERS = {int(user_json['userid']): user_json}
-            elif type(user_json) is list:
-                for user in user_json:
-                    req = HTTPListener.DictClass()
-                    req.json = {}
-                    user['plaintext'] = bool(user['plaintext'])
-                    req.json = user
-                    inputs = UserInputs(req)
-                    if not inputs.validate():
-                        success = False
-                        sys.stdout.write(str(inputs.errors))
-                        log.error("Error while reloading configuration: %s", str(inputs.errors))
-
+            if len(user_json)> 1:
                 result = check_duplicate_user(user_json)
                 if result != "":
                     success = False
                     log.error("Error while reloading configuration: %s", result)
 
-                if success is True:
-                    HTTPListener.Global.DEPLOYMENT_USERS = {}
-                    for user in user_json:
-                        HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
+            if success is True:
+                HTTPListener.Global.DEPLOYMENT_USERS = {}
+                for user in user_json:
+                    HTTPListener.Global.DEPLOYMENT_USERS[int(user['userid'])] = user
 
 
 def validate_server_ports_dict(member, databases, isDict):
@@ -367,30 +376,18 @@ def validate_server_ports_list(members, databases, isDict):
                 if option != port_key and value is not None and specified_port_values[port_key] == value:
                     return "Duplicate port"
 
-    database_members = []
     if type(databases) is dict:
-        memberIds = ast.literal_eval(databases['members'])
-        if len(members) > 1:
-            for id in memberIds:
-                member = [item for item in members if item['id'] == id]
-                database_members.append(member[0])
-            for option in arr:
-                result = check_port_valid(option, database_members)
-                if result is not None:
-                    return result
+        for option in arr:
+            result = check_port_valid(option, databases['members']['member'])
+            if result is not None:
+                return result
 
     elif type(databases) is list:
         for database in databases:
-            database_members = []
-            memberIds = ast.literal_eval(database['members'])
-            if len(members) > 1:
-                for id in memberIds:
-                    member = [item for item in members if item['id'] == id]
-                    database_members.append(member[0])
-                for option in arr:
-                    result = check_port_valid(option, database_members)
-                    if result is not None:
-                        return result
+            for option in arr:
+                result = check_port_valid(option, database['members']['member'])
+                if result is not None:
+                    return result
 
 
 def check_port_valid(port_option, servers):
@@ -811,6 +808,23 @@ def get_field_from_xml(xml_content, is_list, type_content=''):
     return final_property
 
 
+def get_database_from_xml(xml_content, is_list, log, type_content=''):
+    """
+    Gets the deployment attribute value in required format
+    :param content: deployment attribute value in raw format
+    :param is_list: check if it is a list or dict
+    :param type_content: attribute type
+    :return: deployment attribute object
+    """
+    final_property = []
+    if is_list is 'list':
+        for content in xml_content:
+            final_property.append(get_database_fields(content, type_content, log))
+    else:
+        final_property.append(get_database_fields(xml_content, type_content, log))
+    return final_property
+
+
 def get_fields(content, type_content):
     """
     Converts the deployment attribute value in required format
@@ -844,6 +858,39 @@ def get_fields(content, type_content):
     return new_property
 
 
+def get_database_fields(content, type_content, log):
+    """
+    Converts the deployment attribute value in required format
+    :param content: deployment attribute value in raw format
+    :param type_content: attribute type
+    :return: deployment attribute object
+    """
+    new_property = {}
+    for field in content:
+        if field == 'plaintext' and type_content == 'user':
+            new_property[field] = parse_bool_string(content[field])
+        elif field == 'property' and type_content == 'export':
+            if type(content['property']) is list:
+                new_property['property'] = get_field_from_xml(content['property'],
+                                                              'list', 'export')
+            else:
+                new_property['property'] = get_field_from_xml(content['property'],
+                                                              'dict', 'export')
+        elif field == 'enabled' and type_content == 'export':
+            new_property[field] = parse_bool_string(content[field])
+        elif field == 'members':
+            members = []
+            if type(content[field]) is dict:
+                members = populate_server(content[field]['member'], content, log)
+            # To get the database members in case of old members[] (for backward compatible)
+            elif type(content[field]) is str:
+                members = convert_field_required_format(content, field)
+            new_property[field] = members
+        else:
+            new_property[field] = convert_field_required_format(content, field)
+    return new_property
+
+
 def set_members_field(content):
     members = []
     if content and 'member' in content and content['member']:
@@ -858,6 +905,52 @@ def set_members_field(content):
             members.append(mem['id'])
     return members
 
+
+def populate_server(servers, databases, log):
+    members = []
+    success = True
+    if type(servers) is dict:
+        member_json = get_field_from_xml(servers, 'dict')
+        req = HTTPListener.DictClass()
+        req.json = {}
+        req.json = member_json[0]
+        inputs = ServerInputs(req)
+        if not inputs.validate():
+            success = False
+            sys.stdout.write(str(inputs.errors))
+            log.error("Error while reloading configuration: %s", str(inputs.errors))
+        else:
+            result = validate_server_ports_dict(member_json[0], databases, True)
+            if result is not None:
+                success = False
+                log.error("Error while reloading configuration: %s", result)
+
+        if success is True:
+            HTTPListener.Global.SERVERS = {member_json[0]['id']: member_json[0]}
+    else:
+        member_json = get_field_from_xml(servers, 'list')
+        for member in member_json:
+            req = HTTPListener.DictClass()
+            req.json = {}
+            req.json = member
+            inputs = ServerInputs(req)
+            if not inputs.validate():
+                success = False
+                sys.stdout.write(str(inputs.errors))
+                log.error("Error while reloading configuration: %s", str(inputs.errors))
+            result = validate_server_ports_list(member_json, databases, False)
+            if result is not None:
+                success = False
+                log.error("Error while reloading configuration: %s", result)
+
+        if success is True:
+            HTTPListener.Global.SERVERS = {}
+            for member in member_json:
+                HTTPListener.Global.SERVERS[member['id']] = member
+
+    for mem in member_json:
+            members.append(mem['id'])
+    return members
 
 def get_users_from_xml(deployment_xml, is_list):
     """
@@ -1113,6 +1206,14 @@ def set_deployment_for_upload(database_id, request):
                 if 'status' in result and result['status'] == 'error':
                     return {'status': 'failure', 'error': result['error']}
 
+                is_duplicate_user = check_duplicate_users(req)
+                if not is_duplicate_user:
+                    return {'status': 'failure', 'error': 'Duplicate users not allowed.'}
+
+                is_invalid_roles = check_invalid_roles(req)
+                if not is_invalid_roles:
+                    return {'status': 'failure', 'error': 'Invalid user roles.'}
+
                 HTTPListener.map_deployment(req, database_id)
 
                 deployment_user = [v if type(v) is list else [v] for v in HTTPListener.Global.DEPLOYMENT_USERS.values()]
@@ -1126,15 +1227,16 @@ def set_deployment_for_upload(database_id, request):
                             user_id = 1
                         else:
                             user_id = HTTPListener.Global.DEPLOYMENT_USERS.keys()[-1] + 1
+                        user_roles = ','.join(Set(user['roles'].split(',')))
+
                         HTTPListener.Global.DEPLOYMENT_USERS[user_id] = {
                                 'name': user['name'],
-                                'roles': user['roles'],
+                                'roles': user_roles,
                                 'password': user['password'],
                                 'plaintext': user['plaintext'],
                                 'databaseid': database_id,
                                 'userid': user_id
                             }
-
                 HTTPListener.sync_configuration()
                 write_configuration_file()
 
@@ -1148,6 +1250,26 @@ def set_deployment_for_upload(database_id, request):
     return {'status': 'success'}
 
 
+def check_duplicate_users(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        user_name_list = []
+        for user in req.json['users']['user']:
+            if user['name'] in user_name_list:
+                return False
+            user_name_list.append(user['name'])
+    return True
+
+
+def check_invalid_roles(req):
+    if 'users' in req.json and 'user' in req.json['users']:
+        for user in req.json['users']['user']:
+            roles = str(user['roles']).split(',')
+            for role in roles:
+                if role.strip() == '':
+                    return False
+    return True
+
+
 def check_validation_deployment(req):
     if 'systemsettings' in req.json and 'resourcemonitor' in req.json['systemsettings']:
         if 'memorylimit' in req.json['systemsettings']['resourcemonitor'] and \
@@ -1156,20 +1278,22 @@ def check_validation_deployment(req):
             response = json.loads(HTTPListener.check_size_value(size, 'memorylimit').data)
             if 'error' in response:
                 return {'status': 'error', 'error': response['error']}
-            disk_limit_arr = []
-            if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
-                            'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
-                for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                    size = feature['size']
-                    if feature['name'] in disk_limit_arr:
-                        return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
-                    disk_limit_arr.append(feature['name'])
-                    response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
-                    if 'error' in response:
-                        return {'status': 'error', 'error': response['error']}
+        disk_limit_arr = []
+        if 'disklimit' in req.json['systemsettings']['resourcemonitor'] and \
+           'feature' in req.json['systemsettings']['resourcemonitor']['disklimit']:
+            for feature in req.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                size = feature['size']
+                if feature['name'] in disk_limit_arr:
+                    return {'status': 'error', 'error': 'Duplicate items are not allowed.'}
+                disk_limit_arr.append(feature['name'])
+                response = json.loads(HTTPListener.check_size_value(size, 'disklimit').data)
+                if 'error' in response:
+                    return {'status': 'error', 'error': response['error']}
         if 'snapshot' in req.json and 'frequency' in req.json['snapshot']:
             frequency_unit = ['h', 'm', 's']
             frequency = str(req.json['snapshot']['frequency'])
+            if ' ' in frequency:
+                return {'status': 'error', 'error': 'Snapshot: White spaces not allowed in frequency.'}
             last_char = frequency[len(frequency) - 1]
             if last_char not in frequency_unit:
                 return {'status': 'error', 'error': 'Snapshot: Invalid frequency value.'}
@@ -1178,4 +1302,53 @@ def check_validation_deployment(req):
                 int_frequency = int(frequency)
             except Exception, exp:
                 return {'status': 'error', 'error': 'Snapshot: ' + str(exp)}
+    if 'export' in req.json and 'configuration' in req.json['export']:
+        for configuration in req.json['export']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Export: ' + result['error']}
+
+    if 'import' in req.json and 'configuration' in req.json['import']:
+        for configuration in req.json['import']['configuration']:
+            result = check_export_property(configuration['type'], configuration['property'])
+            if 'status' in result and result['status'] == 'error':
+                return {'status': 'error', 'error': 'Import: ' + result['error']}
+
+    return {'status': 'success'}
+
+
+def check_export_property(type, properties):
+    property_list = []
+    for property in properties:
+        if 'name' in property and 'value' in property:
+            if str(property['name']).strip() == '' or str(property['value']).strip() == '':
+                return {'status': 'error', 'error': 'Invalid property.'}
+            if property['name'] in property_list:
+                return {'status': 'error', 'error': 'Duplicate properties are not allowed.'}
+            property_list.append(property['name'])
+        else:
+            return {'status': 'error', 'error': 'Invalid property.'}
+
+    if str(type).lower() == 'kafka':
+        if 'metadata.broker.list' not in property_list:
+            return {'status': 'error', 'error': 'Default property(metadata.broker.list) of kafka not present.'}
+    if str(type).lower() == 'elasticsearch':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of elasticsearch not present.'}
+    if str(type).lower() == 'file':
+        if 'type' not in property_list or 'nonce' not in property_list \
+                or 'outdir' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(type, nonce, outdir) of file not present.'}
+    if str(type).lower() == 'http':
+        if 'endpoint' not in property_list:
+            return {'status': 'error', 'error': 'Default property(endpoint) of  http not present.'}
+    if str(type).lower() == 'jdbc':
+        if 'jdbcdriver' not in property_list or 'jdbcurl' not in property_list:
+            return {'status': 'error', 'error': 'Default properties(jdbcdriver, jdbcurl) of jdbc not present.'}
+    if str(type).lower() == 'rabbitmq':
+        if 'broker.host' not in property_list and 'amqp.uri' not in property_list:
+            return {'status': 'error', 'error': 'Default property(either amqp.uri or broker.host) of '
+                                                'rabbitmq not present.'}
+        elif 'broker.host' in property_list and 'amqp.uri' in property_list:
+            return {'status': 'error', 'error': 'Both broker.host and amqp.uri cannot be included as rabbibmq property.'}
     return {'status': 'success'}

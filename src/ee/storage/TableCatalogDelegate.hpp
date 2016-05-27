@@ -73,10 +73,6 @@ class TableCatalogDelegate {
                              catalog::Table const &catalogTable,
                              std::map<std::string, TableCatalogDelegate*> const &tablesByName);
 
-    static void migrateChangedTuples(catalog::Table const &catalogTable,
-                                     voltdb::PersistentTable* existingTable,
-                                     voltdb::PersistentTable* newTable);
-
     static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
                                           catalog::Table const &catalogTable);
 

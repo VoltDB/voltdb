@@ -109,7 +109,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //Most of the transaction id info and unique id info supplied to commit
     //is nonsense since it isn't currently supplied with a transaction id
     //but it is fine since export isn't currently using the info
-    commit(lastCommittedSpHandle, spHandle, spHandle, uniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
