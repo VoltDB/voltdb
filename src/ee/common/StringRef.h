@@ -67,6 +67,8 @@ public:
 
     const char* getObject(int32_t* lengthOut) const;
 
+    static bool compareForEfficientDelete(const char *a, const char *b);
+
 private:
     // Signature used internally for persistent strings
     StringRef(int32_t size);
@@ -80,6 +82,11 @@ private:
 
     char* m_stringPtr;
 };
+
+inline bool StringRef::compareForEfficientDelete(const char *a, const char *b) {
+    return (a > b);
+}
+
 
 } // namespace voltdb
 

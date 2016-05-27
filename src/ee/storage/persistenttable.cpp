@@ -169,10 +169,15 @@ PersistentTable::~PersistentTable()
     // delete all tuples to free strings
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
+    std::vector<char*> objects(m_schema->getUninlinedObjectColumnCount() *
+                               m_tupleCount);
     while (ti.next(tuple)) {
-        tuple.freeObjectColumns();
+        tuple.collectObjects(&objects);
         tuple.setActiveFalse();
     }
+
+    // Free all non-inlined objects
+    NValue::freeObjectsFromTupleStorageOptimally(objects);
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
