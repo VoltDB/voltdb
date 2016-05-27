@@ -793,31 +793,48 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_displayColumns.add(col);
     }
 
-    private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col, AbstractExpression colExpr) {
+    private void calculateColumnNames(VoltXMLElement child, ParsedColInfo col) {
         // Calculate the names.
         if (child.name.equals("columnref")) {
-            col.columnName = child.attributes.get("column");
-            col.tableName = child.attributes.get("table");
-            col.tableAlias = child.attributes.get("tablealias");
-            if (col.tableAlias == null) {
-                col.tableAlias = col.tableName;
+            if (colExpr instanceof TupleValueExpression) {
+                // Set the column data from the TVE itself rather than from the VoltXML.
+                // For example, the original select SELECT TA.CA FROM (SELECT C CA FROM T) TA;
+                // could be simplified to be as simple as SELECT TA.C CA FROM T TA;
+                // The TVE will reflect this change while the VoltXML won't
+                // At the moment, this optimization is only allowed if all display columns from
+                // the subquery are TVEs
+                TupleValueExpression tvexpr = (TupleValueExpression)col.expression;
+                col.columnName = tvexpr.getColumnName();
+                col.tableName = tvexpr.getTableName();
+                col.tableAlias = tvexpr.getTableAlias();
+                col.alias = tvexpr.getColumnAlias();
+            }
+            else {
+                col.columnName = child.attributes.get("column");
+                col.tableName = child.attributes.get("table");
+                col.tableAlias = child.attributes.get("tablealias");
+                col.alias = child.attributes.get("alias");
             }
         }
         else if (child.name.equals("tablesubquery")) {
             // Scalar subquery like 'select c, (select count(*) from t1) from t2;'
-            ScalarValueExpression sve = (ScalarValueExpression)colExpr;
-
+            ScalarValueExpression sve = (ScalarValueExpression)col.expression;
             col.columnName = child.attributes.get("alias");
             col.tableName = sve.getSubqueryScan().getTableName();
             col.tableAlias = sve.getSubqueryScan().getTableAlias();
+            col.alias = child.attributes.get("alias");
         }
         else {
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = TEMP_TABLE_NAME;
             col.tableAlias = TEMP_TABLE_NAME;
             col.columnName = "";
+            col.alias = "";
         }
-        col.alias = child.attributes.get("alias");
+        // Default aliases to names if they are not set
+        if (col.tableAlias == null) {
+            col.tableAlias = col.tableName;
+        }
         if (col.alias == null) {
             col.alias = col.columnName;
         }
