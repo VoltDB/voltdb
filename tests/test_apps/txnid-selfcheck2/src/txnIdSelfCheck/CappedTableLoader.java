@@ -92,8 +92,8 @@ public class CappedTableLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // This case is what happens when the table fails to delete enough rows to make room for the next insert.
                 // log.info("CappedTableLoader acceptably failed to insert into " + tableName + ". ");
-            } else if (status == ClientResponse.USER_ABORT) {
-                hardStop("CappedTableLoader User abort while attempting to insert into table "+ tableName );
+            } else if ( status == ClientResponse.USER_ABORT) {
+                log.error("User abort while attempting to insert into table "+ tableName );
             } else
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
