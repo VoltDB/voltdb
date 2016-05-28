@@ -137,7 +137,7 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
                 if (m_nowhitespace && (lineValues[i].charAt(0) == ' '
                         || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
                     throw new FormatException("Whitespace detected--nowhitespace is used");
-                } else {
+                } else if(m_surroundingSpacesNeedQuotes){
                     lineValues[i] = lineValues[i].trim();
                 }
 
