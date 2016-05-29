@@ -1124,13 +1124,13 @@ public class VoltProjectBuilder {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_keystore);
                 store.setPassword(m_keystorePassword);
-                httpsType.setKeyStore(store);
+                httpsType.setKeystore(store);
             }
             if (m_certstore!=null) {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_certstore);
                 store.setPassword(m_certstorePassword);
-                httpsType.setTrustStore(store);
+                httpsType.setTruststore(store);
             }
             httpd.setHttps(httpsType);
         }

@@ -15,12 +15,13 @@
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
+{@insertcols = "ID, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, RATIO"}
 {@insertvals = "_id, _value[string null20], _value[string null20], _value[string null20], _value[float]"}
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
 --{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
-{@plus10 = "+ 10"}  -- Addition here is interpreted as concatenation
+{@plus10 = "+ '10'"}  -- Addition here is interpreted as concatenation
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "VCHAR"}

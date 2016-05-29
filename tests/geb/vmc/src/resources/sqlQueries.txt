@@ -580,9 +580,20 @@
                        "type_null_varchar1024":["\t x"],"type_not_null_varchar1024":["y z"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
                        "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
              "status":"SUCCESS"}}
-# Note: after VMC-268 is fixed, try removing the single quotes around 'can''t' and/or 'doin''':
 {"testName":"CrudRoundTripEmbeddedQuotes",
    "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '''', '''b''', 'can''t', 'doin''', '''\"''', '''''''',\n  __stored_proc_geo_values;\n
+             exec PARTITIONED_TABLE.select 1",
+ "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
+                       "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],
+                       "type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],
+                       "type_null_float":["13.3"],"type_not_null_float":["14.4"],"type_null_decimal":["15.500000000000"],"type_not_null_decimal":["16.600000000000"],
+                       "type_null_varchar25":["'"],"type_not_null_varchar25":["'b'"],"type_null_varchar128":["can't"],"type_not_null_varchar128":["doin'"],
+                       "type_null_varchar1024":["'\"'"],"type_not_null_varchar1024":["'''"],"type_null_point":["POINT (-23.0 23.0)"],"type_not_null_point":["POINT (24.0 -24.0)"],
+                       "type_null_polygon":["POLYGON ((25.0 22.0, 25.0 21.0, 26.0 22.0, 25.0 22.0))"],"type_not_null_polygon":["POLYGON ((26.0 22.0, 25.0 23.0, 25.0 22.0, 26.0 22.0))"]},
+             "status":"SUCCESS"}}
+# See VMC-268, now fixed: no single quotes around can''t and doin''
+{"testName":"CrudRoundTripEmbeddedQuotesWithoutEnclosingQuotes",
+   "sqlCmd":"exec PARTITIONED_TABLE.insert __standard_num_values '''', '''b''', can''t, doin'', '''\"''', '''''''',\n  __stored_proc_geo_values;\n
              exec PARTITIONED_TABLE.select 1",
  "response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],
                        "type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],

@@ -324,8 +324,8 @@
   <!-- configuration for HTTPS -->
   <xs:complexType name="httpsType">
     <xs:sequence>
-      <xs:element name="keyStore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
-      <xs:element name="trustStore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
   </xs:complexType>
