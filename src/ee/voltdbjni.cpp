@@ -1424,7 +1424,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * Signature: (ZI[I[I)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionId, jintArray partitionKeyValues, jintArray flags) {
+  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionId, jintArray partitionKeyValues, jintArray flags,
+          jlong startSequenceNumber) {
     try {
         jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
         int32_t *partitionKeyValuesPtr = reinterpret_cast<int32_t *>(partitionKeyValuesJPtr);
@@ -1442,9 +1443,11 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         char *output = new char[1024 * 256];
         int32_t length;
         if (compatible) {
-            length = CompatibleDRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList, output);
+            length = CompatibleDRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
         } else {
-            length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList, output);
+            length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
         }
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);

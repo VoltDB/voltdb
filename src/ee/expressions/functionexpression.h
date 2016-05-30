@@ -256,6 +256,9 @@ static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
 static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
 static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
 
+static const int FUNC_VOLT_ROUND                       = 20042;
+static const int FUNC_VOLT_STR                         = 20043;
+
 // Geospatial functions
 static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
 static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;

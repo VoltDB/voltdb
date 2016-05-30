@@ -19,6 +19,7 @@ package org.voltdb.importer;
 
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.InternalConnectionContext;
@@ -116,9 +117,9 @@ public abstract class AbstractImporter
     {
         int count = m_backPressureCount.get();
         if (count > 0) {
-            try { // increase sleep time exponentially to a max of 128ms
-                if (count > 7) {
-                    Thread.sleep(128);
+            try { // increase sleep time exponentially to a max of 256ms
+                if (count > 8) {
+                    Thread.sleep(256);
                 } else {
                     Thread.sleep(1<<count);
                 }

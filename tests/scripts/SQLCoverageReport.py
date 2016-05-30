@@ -24,10 +24,12 @@
 
 import sys
 import cgi
-import os
+import codecs
 import cPickle
 import decimal
 import datetime
+import os
+import traceback
 from distutils.util import strtobool
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
@@ -300,7 +302,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     cmpdb_file = open(cmpdb_path, "rb")
     jni_file = open(jni_path, "rb")
     if modified_sql_path:
-        modified_sql_file = open(modified_sql_path, "rb")
+        modified_sql_file = codecs.open(modified_sql_path, encoding='utf-8')
     else:
         modified_sql_file = None
     modified_sql = {}
@@ -343,6 +345,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
             statement["jni"] = jni
             statement["cmp"] = cdb
+
             if notFound:
                 crashed.append(statement)
             elif is_different(statement, cntonly):
@@ -368,12 +371,15 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                     orig_sql = modified_sql_file.readline().rstrip('\n').replace('original SQL: ', '')
                     mod_sql  = modified_sql_file.readline().rstrip('\n').replace('modified SQL: ', '')
                     if orig_sql and mod_sql:
-                        modified_sql[orig_sql] = mod_sql
+                        modified_sql[cgi.escape(orig_sql).encode('ascii', 'xmlcharrefreplace')] \
+                                    = cgi.escape(mod_sql).encode('ascii', 'xmlcharrefreplace')
                     else:
                         break
                 except EOFError as e:
                     break
-        except Error as e:
+            modified_sql_file.close()
+        except Exception as e:
+            traceback.print_exc()
             raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
 
     topLines = getTopSummaryLines(cmpdb, False)

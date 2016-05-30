@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 public class CopyLoadPartitionedBase extends VoltProcedure {
 
     public VoltTable[] doWork(SQLStmt select, SQLStmt insert, long cid) {
-        if (select != null) { // use select
+        if (select != null) { // use select / insert
             // Get row for cid and copy to new table.
             voltQueueSQL(select, cid);
             VoltTable[] results = voltExecuteSQL();

@@ -71,9 +71,14 @@ public class ReadThread extends BenchmarkThread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
+            byte status = clientResponse.getStatus();
+            if (status == ClientResponse.GRACEFUL_FAILURE) {
+                // log what happened
+                hardStop("Non success in ProcCallback for ReadThread", clientResponse);
+            }
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                log.error("Non success in ProcCallback for ReadThread");
-                log.error(((ClientResponseImpl)clientResponse).toJSONString());
+                log.warn("ReadThread ungracefully failed");
+                log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
                 return;
             }
@@ -130,7 +135,7 @@ public class ReadThread extends BenchmarkThread {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
             catch (NoConnectionsException e) {
-                log.error("ReadThread got NoConnectionsException on proc call. Will sleep.");
+                log.warn("ReadThread got NoConnectionsException on proc call. Will sleep.");
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
