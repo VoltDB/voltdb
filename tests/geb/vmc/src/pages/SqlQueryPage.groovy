@@ -40,8 +40,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         tabArea     { $('#tabMain') }
         tabControls { tabArea.find('.tabs') }
         tablesTab   { tabControls.find("a[href='#tab1']") }
-        viewsTab    { tabControls.find("a[href='#tab2']") }
-        storedProcsTab  { tabControls.find("a[href='#tab3']") }
+        viewsTab    { tabControls.find("a[href='#tab3']") }
+        storedProcsTab  { tabControls.find("a[href='#tab4']") }
         listsArea   { tabArea.find('#tabScroller') }
         tablesNames { listsArea.find('#accordionTable').find('h3') }
         viewsNames  { listsArea.find('#accordionViews').find('h3') }
