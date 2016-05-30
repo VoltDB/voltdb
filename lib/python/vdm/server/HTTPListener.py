@@ -1298,12 +1298,17 @@ class StartServerAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+            else:
+                pause = "false"
+
             if 'blocking' in request.args:
                 is_blocking = int(request.args.get('blocking'))
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, False, is_blocking)
+            response = server.start_server(server_id, pause, False, is_blocking)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)

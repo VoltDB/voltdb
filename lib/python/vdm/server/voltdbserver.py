@@ -148,7 +148,7 @@ class VoltDatabase:
             return make_response(jsonify({'status': 200, 'statusString': 'Start request sent successfully to servers: ' +
                                                                          json.dumps(server_status)}), 200)
 
-    def start_server(self, server_id, recover=False, is_blocking=-1):
+    def start_server(self, server_id, pause,  recover=False, is_blocking=-1):
         """
         Sends start request to the specified server
         """
@@ -169,8 +169,8 @@ class VoltDatabase:
         if recover:
             action = 'recover'
         try:
-            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u&blocking=%u') % \
-                              (server['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id, is_blocking)
+            url = ('http://%s:%u/api/1.0/databases/%u/servers/%s?id=%u&blocking=%u&pause=%s') % \
+                              (server['hostname'], HTTPListener.__PORT__, self.database_id, action, server_id, is_blocking, pause)
             response = requests.put(url)
             return create_response(json.loads(response.text)['statusString'], response.status_code)
         except Exception, err:
