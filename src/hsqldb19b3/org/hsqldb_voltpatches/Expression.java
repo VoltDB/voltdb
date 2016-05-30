@@ -1597,9 +1597,6 @@ public class Expression {
                     throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                             "VoltDB does not support this complex query currently.");
                 }
-                // convert the SIMPLE_COLUMN into a COLUMN
-                opType = OpTypes.COLUMN;
-                exprOp = OpTypes.COLUMN;
             } else {
                 // find the substitue from displayCols list
                 for (int ii=startKey+1; ii < displayCols.size(); ++ii)
@@ -1619,8 +1616,11 @@ public class Expression {
                         return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
                     }
                 }
-                assert(false);
             }
+            // ENG-10429 moved the following two lines here. See fix note https://issues.voltdb.com/browse/ENG-10429.
+            // convert the SIMPLE_COLUMN into a COLUMN
+            opType = OpTypes.COLUMN;
+            exprOp = OpTypes.COLUMN;
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct

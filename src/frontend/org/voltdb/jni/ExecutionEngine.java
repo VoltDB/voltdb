@@ -51,6 +51,7 @@ import org.voltdb.utils.VoltTableUtil;
  * one using JNI and one using IPC. ExecutionEngine provides a consistent interface
  * for these implementations to the ExecutionSite.
  */
+
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
     static VoltLogger log = new VoltLogger("HOST");

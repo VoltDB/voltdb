@@ -100,8 +100,8 @@ public class BigTableLoader extends BenchmarkThread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("BigTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("BigTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 Benchmark.txnCount.incrementAndGet();

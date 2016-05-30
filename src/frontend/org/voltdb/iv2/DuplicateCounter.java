@@ -77,7 +77,6 @@ public class DuplicateCounter
     int updateReplicas(List<Long> replicas) {
         Set<Long> newSet = new HashSet<Long>(replicas);
         m_expectedHSIds.retainAll(newSet);
-        tmLog.info(String.format("*** RELEASING TXN %d", m_txnId));
         if (m_expectedHSIds.size() == 0) {
             return DONE;
         }
