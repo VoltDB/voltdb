@@ -120,7 +120,7 @@ public interface ErrorCode {
     int M_SERVER_SECURE_VERIFY_2         = 137;           // Server certificate has empty Common Name
     int M_SERVER_SECURE_VERIFY_3         = 139;           // Certificate Common Name[$$] does not match host name[$$]
 
-    //                                                       
+    //
     int INVALID_LIMIT = 153;                              // ; in LIMIT, OFFSET or FETCH
 
     //
@@ -496,7 +496,7 @@ public interface ErrorCode {
     int X_42512 = 5512;                                   // invalid property value
     int X_42513 = 5513;                                   // property cannot be changed
 
-    // constraint defintition issues
+    // constraint definition issues
     int X_42520 = 5520;                                   // SET NULL requires nullable column
     int X_42521 = 5521;                                   // SET DEFAULT requires column default expression for
     int X_42522 = 5522;                                   // a UNIQUE constraint already exists on the set of columns

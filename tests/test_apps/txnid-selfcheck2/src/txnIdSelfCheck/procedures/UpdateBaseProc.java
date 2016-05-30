@@ -45,10 +45,10 @@ public class UpdateBaseProc extends VoltProcedure {
             "SELECT * FROM adhocp ORDER BY ts DESC, id LIMIT 1");
 
     public final SQLStmt p_insert = new SQLStmt(
-            "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO partitioned (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt p_export = new SQLStmt(
-            "INSERT INTO partitioned_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO partitioned_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt p_getViewData = new SQLStmt(
             "SELECT * FROM partview WHERE cid=? ORDER BY cid DESC;");
@@ -224,7 +224,7 @@ public class UpdateBaseProc extends VoltProcedure {
                     " for cid " + cid);
         }
 
-        voltQueueSQLExperimental("INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+        voltQueueSQLExperimental("INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
         voltQueueSQLExperimental("DELETE FROM replicated WHERE cid = ? and cnt < ?;", cid, cnt - 10);
         voltQueueSQLExperimental("SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;", cid);

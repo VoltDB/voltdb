@@ -92,13 +92,13 @@ public class CappedTableLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE) {
                 // This case is what happens when the table fails to delete enough rows to make room for the next insert.
                 // log.info("CappedTableLoader acceptably failed to insert into " + tableName + ". ");
-            } else if ( status == ClientResponse.USER_ABORT) {
-                log.error("User abort while attempting to insert into table "+ tableName );
+            } else if (status == ClientResponse.USER_ABORT) {
+                hardStop("CappedTableLoader User abort while attempting to insert into table "+ tableName );
             } else
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("CappedTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("CappedTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 Benchmark.txnCount.incrementAndGet();
@@ -152,7 +152,7 @@ public class CappedTableLoader extends BenchmarkThread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
+                log.warn("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
         }

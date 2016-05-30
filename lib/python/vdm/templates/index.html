@@ -59,12 +59,8 @@
       <a href="javaScript:void(0);" id="btnStartCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
       <!--<a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>-->
       
-       <div class="form-group startSelect">
-        <select id="startOption" class="form-control">
-        <option value="1">Create new</option>
-        <option value="2">Recover existing</option>
-       
-        </select>
+       <div class="startSelect" >
+        <input type="checkbox" id="startOption"> <label for="startOption">Overwrite data from previous sessions</label>
         </div>
     <div class="clear"></div>
       </div>
@@ -74,7 +70,7 @@
     	<p>Starting.......</p>
     </div>    
     <div id="startSuccess" class="databaseRg" style="display:none;">
-    <a id="vmcLink" class="btn">Go to Management Center</a>
+    <a id="vmcLink" class="btn"><span class="glyphicon glyphicon-new-window" style="padding-right:5px;tr"></span>Go to Management Center</a>
     <p>Database Running</p>
     </div>
     <div id="stallFailed" class="stalledState"  style="display:none;">
@@ -192,17 +188,17 @@
             <span class="clustHeadText">Database Configuration</span></div>
             <div class="rightSide">
               <form id="upload-file" method="post" enctype="multipart/form-data">
-                <div class="leftSide upDownBtn chooseFile">
+                <div class="leftSide upDownBtn chooseFile" style="display:none">
                  <input id="file" name="file" type="file">
                 </div>
-                <!--<div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration-->
-                  <!--<input type="file" multiple>-->
-                  <!--</span> </div>-->
-                <div id="upload-file-btn" class="leftSide upDownBtn"><span class="uploadIcon" ></span> Upload Configuration</div>
-               <div class="leftSide upDownBtn downloadConfig">
-                <a id="downloadConfigurations" href="#" download="deployment.xml">
-                  <span class="downloadIcon" ></span>Download Configuration</a>
-                 </div>
+                <div id="upload-file-btn-ok" class="leftSide upDownBtn" style="display:none"><span class="uploadOkBtn" ></span> Ok</div>
+                <div id="upload-file-btn-Cancel" class="leftSide upDownBtn uploadCancel"><span class="uploadOkBtn" ></span> Cancel</div>
+                <div id="upload-file-btn" class="leftSide upDownBtn" style="display:none"><span class="uploadIcon" ></span> Upload Configuration</div>
+                <div class="leftSide upDownBtn downloadConfig">
+                  <a id="downloadConfigurations" href="#" download="deployment.xml">
+                    <span class="downloadIcon" ></span>Download Configuration
+                  </a>
+                </div>
               </form>
             </div>
             <!--<form id="upload-file" method="post" enctype="multipart/form-data">-->
@@ -1232,6 +1228,28 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Disk Limit End-->
+
+<!-- Overwrite data confirmation during starting database-->
+<div id="overwriteConfirmation" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">  Overwrite data</h4>
+      </div>
+      <div class="modal-body">
+        <p class="warningData"><span class="glyphicon glyphicon-alert redcData" aria-hidden="true"></span> All of the existing data will be removed</p>
+        <p class="warningTxtData"> Are you sure to overwrite existing data?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="btnOverwriteYes" data-dismiss="modal">Yes</button>
+        <button type="button" class="btn btn-gray" id="btnOverwriteNo" data-dismiss="modal">No</button>
+
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="loader" ></div>
 </div>

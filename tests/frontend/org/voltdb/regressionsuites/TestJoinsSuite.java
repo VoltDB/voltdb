@@ -533,7 +533,7 @@ public class TestJoinsSuite extends RegressionSuite {
         // R2 3rd joined with R3 null
         // R2 4th joined with R3 null
         VoltTable result = client.callProcedure(
-                "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A")
+                "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A order by R2.A")
                                  .getResults()[0];
         VoltTableRow row = result.fetchRow(2);
         assertEquals(3, row.getLong(1));
@@ -618,13 +618,17 @@ public class TestJoinsSuite extends RegressionSuite {
                 "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A WHERE R3.A IS NULL")
                                  .getResults()[0];
         System.out.println(result.toString());
-        if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        if ( ! isHSQL()) {
+            assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        }
         // Same as above but with partitioned table
         result = client.callProcedure(
                 "@AdHoc", "select * FROM R3 RIGHT JOIN P2 ON R3.A = P2.A WHERE R3.A IS NULL")
                                  .getResults()[0];
         System.out.println(result.toString());
-        if ( ! isHSQL())  assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        if ( ! isHSQL()) {
+            assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+        }
 
         // R2 1st eliminated by R2.C < 0
         // R2 2nd eliminated by R2.C < 0

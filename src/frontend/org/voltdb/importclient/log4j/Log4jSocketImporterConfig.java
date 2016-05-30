@@ -24,7 +24,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 /**
  * ImporterConfig implementation to hold configuration for Log4j socket handler importer.
@@ -78,13 +78,7 @@ public class Log4jSocketImporterConfig implements ImporterConfig
         return m_resourceID;
     }
 
-    @Override
-    public AbstractFormatterFactory getFormatterFactory()
-    {
-        return null;
-    }
-
-    public int getPort()
+       public int getPort()
     {
         return m_port;
     }
@@ -97,5 +91,11 @@ public class Log4jSocketImporterConfig implements ImporterConfig
     public ServerSocket getServerSocket()
     {
         return m_serverSocket;
+    }
+
+    @Override
+    public FormatterBuilder getFormatterBuilder()
+    {
+        return null;
     }
 }

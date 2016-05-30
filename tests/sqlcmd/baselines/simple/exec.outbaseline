@@ -12,6 +12,87 @@ create procedure p as
     select * from t where d between ? and ?;
 Command succeeded.
 
+create procedure max_predicates as 
+select count(*) FROM t WHERE 
+c > ? and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+Command succeeded.
+
+create procedure max_plus_predicates as 
+select count(*) FROM t WHERE c > ? and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+
 create table t2 ( c integer, d varchar(4), e varchar(4) );
 Command succeeded.
 
@@ -209,6 +290,13 @@ C   D
 
 (Returned 2 rows in #.##s)
 
+exec max_predicates 90;
+C1 
+---
+  4
+
+(Returned 1 rows in #.##s)
+
 select * from t order by c;
 C   D    
 --- -----
@@ -260,6 +348,9 @@ C   D   E
 (Returned 2 rows in #.##s)
 
 drop table t2;
+Command succeeded.
+
+drop procedure max_predicates;
 Command succeeded.
 
 drop procedure p;

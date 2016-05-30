@@ -25,13 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.math.NumberUtils;
-import org.voltcore.logging.Level;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -50,6 +43,13 @@ import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
 
+import org.voltcore.logging.Level;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importer.AbstractImporter;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 /**
  * Importer implementation for Kinesis Stream importer. one instance of this per stream, per shard, per app
  */
@@ -148,7 +148,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void initialize(InitializationInput initInput) {
 
             m_shardId = initInput.getShardId();
-            m_formatter = ((Formatter<String>) m_config.getFormatterFactory().create());
+            m_formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
 
             String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
             if (NumberUtils.isDigits(seq)) {
@@ -189,6 +189,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                 try {
                     data = new String(record.getData().array(), StandardCharsets.UTF_8);
                     Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
+
                     StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);
                     if (!callProcedure(invocation, cb)) {
                         rateLimitedLog(Level.ERROR, null, "Call procedure error on shard %s", m_shardId);

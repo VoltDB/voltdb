@@ -57,6 +57,7 @@ public class VoltDB {
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
+    public static final int DEFAULT_HTTPS_PORT = 8443;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
@@ -166,6 +167,8 @@ public class VoltDB {
         public int m_deadHostTimeoutMS =
             org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
+        public boolean m_partitionDetectionEnabled = true;
+
         /** start up action */
         public StartAction m_startAction = null;
 
@@ -216,6 +219,7 @@ public class VoltDB {
 
         /** Placement group */
         public String m_placementGroup = null;
+        public boolean m_isPaused = false;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -484,7 +488,10 @@ public class VoltDB {
                     m_placementGroup = args[++i].trim();
                 else if (arg.equalsIgnoreCase("force"))
                     m_forceVoltdbCreate = true;
-                else {
+                else if (arg.equalsIgnoreCase("paused")) {
+                    //Start paused.
+                    m_isPaused = true;
+                } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
@@ -560,6 +567,11 @@ public class VoltDB {
                 }
             }
 
+            //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
+            if (m_isPaused && ((m_startAction == StartAction.JOIN) || (m_startAction == StartAction.LIVE_REJOIN) || (m_startAction == StartAction.REJOIN)) ) {
+                isValid = false;
+                hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+            }
             return isValid;
         }
 
@@ -719,6 +731,23 @@ public class VoltDB {
     }
 
     /**
+     * turn off client interface as fast as possible
+     */
+    private static boolean turnOffClientInterface() {
+        // we don't expect this to ever fail, but if it does, skip to dying immediately
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance != null) {
+            ClientInterface ci = vdbInstance.getClientInterface();
+            if (ci != null) {
+                if (!ci.ceaseAllPublicFacingTrafficImmediately()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
@@ -752,6 +781,11 @@ public class VoltDB {
             // slightly less important than death, this try/finally block protects code that
             // prints a message to stdout
             try {
+                // turn off client interface as fast as possible
+                // we don't expect this to ever fail, but if it does, skip to dying immediately
+                if (!turnOffClientInterface()) {
+                    return; // this will jump to the finally block and die faster
+                }
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
@@ -867,6 +901,11 @@ public class VoltDB {
         // end test code
 
         try {
+            // turn off client interface as fast as possible
+            // we don't expect this to ever fail, but if it does, skip to dying immediately
+            if (!turnOffClientInterface()) {
+                return; // this will jump to the finally block and die faster
+            }
             // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
             // give the pill a chance to make it through the network buffer

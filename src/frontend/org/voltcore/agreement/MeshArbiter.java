@@ -85,7 +85,7 @@ public class MeshArbiter {
      */
     protected final Set<Long> m_failedSites = Sets.newTreeSet();
 
-    protected final Map<Long,SiteFailureForwardMessage> m_forwardCandidates = Maps.newHashMap();
+    protected final Map<Long, SiteFailureForwardMessage> m_forwardCandidates = Maps.newHashMap();
     /**
      * it builds mesh graphs, and determines the the kill set to resolve
      * an arbitration
@@ -265,12 +265,12 @@ public class MeshArbiter {
      *   indicate either a stale message, or that an agreement has not been
      *   reached
      */
-    public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
+    public Map<Long, Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
         boolean proceed = false;
         do {
-            Discard ignoreIt = mayIgnore(hsIds,fm);
+            Discard ignoreIt = mayIgnore(hsIds, fm);
             if (Discard.DoNot == ignoreIt) {
-                m_inTrouble.put(fm.failedSite,fm.witnessed || fm.decided);
+                m_inTrouble.put(fm.failedSite, fm.witnessed || fm.decided);
                 m_recoveryLog.info("Agreement, Processing " + fm);
                 proceed = true;
             } else {
@@ -280,7 +280,7 @@ public class MeshArbiter {
             if (Discard.Unknown == ignoreIt) {
                 unknownFaultedSites.add(fm.failedSite);
             }
-            fm = (FaultMessage)m_mailbox.recv(justFailures);
+            fm = (FaultMessage) m_mailbox.recv(justFailures);
         } while (fm != null);
 
         if (!proceed) {
@@ -296,7 +296,7 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(hsIds);
 
         if (discoverGlobalFaultData_rcv(hsIds)) {
-            Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
+            Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
                 return ImmutableMap.of();
             }
@@ -333,14 +333,14 @@ public class MeshArbiter {
      * @param decision map where the keys contain the kill sites
      *   and its values are their last known safe transaction ids
      */
-    protected void notifyOnKill(Set<Long> hsIds, Map<Long,Long> decision) {
+    protected void notifyOnKill(Set<Long> hsIds, Map<Long, Long> decision) {
 
         SiteFailureMessage.Builder sfmb = SiteFailureMessage.
                 builder()
                 .decisions(decision.keySet())
                 .failures(decision.keySet());
 
-        Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
+        Set<Long> dests = Sets.filter(m_seeker.getSurvivors(), not(equalTo(m_hsId)));
         if (dests.isEmpty()) return;
 
         sfmb.survivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
@@ -360,10 +360,10 @@ public class MeshArbiter {
         m_inTroubleCount = 0;
     }
 
-    protected Map<Long,Long> getSafeTxnIdsForSites(Set<Long> hsIds) {
-        ImmutableMap.Builder<Long,Long> safeb = ImmutableMap.builder();
+    protected Map<Long, Long> getSafeTxnIdsForSites(Set<Long> hsIds) {
+        ImmutableMap.Builder<Long, Long> safeb = ImmutableMap.builder();
         for (long h: Sets.filter(hsIds, not(equalTo(m_hsId)))) {
-            safeb.put(h,m_meshAide.getNewestSafeTransactionForInitiator(h));
+            safeb.put(h, m_meshAide.getNewestSafeTransactionForInitiator(h));
         }
         return safeb.build();
     }
@@ -376,7 +376,7 @@ public class MeshArbiter {
      * Sends all data all the time to avoid a need for request/response.
      */
     private void discoverGlobalFaultData_send(Set<Long> hsIds) {
-        Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
+        Set<Long> dests = Sets.filter(m_seeker.getSurvivors(), not(equalTo(m_hsId)));
 
         SiteFailureMessage.Builder msgBuilder = SiteFailureMessage.
                 builder()
@@ -395,7 +395,7 @@ public class MeshArbiter {
         m_recoveryLog.info("Agreement, Sending survivors " + sfm);
     }
 
-    protected void updateFailedSitesLedger(Set<Long> hsIds,SiteFailureMessage sfm) {
+    protected void updateFailedSitesLedger(Set<Long> hsIds, SiteFailureMessage sfm) {
         for (Map.Entry<Long, Long> e: sfm.m_safeTxnIds.entrySet()) {
 
             if(  !hsIds.contains(e.getKey())
@@ -452,7 +452,7 @@ public class MeshArbiter {
 
             } else if (m.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
 
-                SiteFailureMessage sfm = (SiteFailureMessage)m;
+                SiteFailureMessage sfm = (SiteFailureMessage) m;
 
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)
@@ -467,7 +467,7 @@ public class MeshArbiter {
 
             } else if (m.getSubject() == Subject.SITE_FAILURE_FORWARD.getId()) {
 
-                SiteFailureForwardMessage fsfm = (SiteFailureForwardMessage)m;
+                SiteFailureForwardMessage fsfm = (SiteFailureForwardMessage) m;
 
                 addForwardCandidate(fsfm);
 
@@ -487,9 +487,9 @@ public class MeshArbiter {
                  * If the fault distributor reports a new fault, ignore it if it is known , otherwise
                  * re-deliver the message to ourself and then abort so that the process can restart.
                  */
-                FaultMessage fm = (FaultMessage)m;
+                FaultMessage fm = (FaultMessage) m;
 
-                Discard ignoreIt = mayIgnore(hsIds,fm);
+                Discard ignoreIt = mayIgnore(hsIds, fm);
                 if (Discard.DoNot == ignoreIt) {
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
@@ -512,7 +512,7 @@ public class MeshArbiter {
                     Map.Entry<Long, SiteFailureForwardMessage> e = itr.next();
                     Set<Long> unseenBy = m_seeker.forWhomSiteIsDead(e.getKey());
                     if (unseenBy.size() > 0) {
-                        m_mailbox.send(Longs.toArray(unseenBy),e.getValue());
+                        m_mailbox.send(Longs.toArray(unseenBy), e.getValue());
                         m_recoveryLog.info("Agreement, fowarding to "
                                 + CoreUtils.hsIdCollectionToString(unseenBy)
                                 + " " + e.getValue());
@@ -560,7 +560,7 @@ public class MeshArbiter {
         return missingMessages.isEmpty();
     }
 
-    private Map<Long,Long> extractGlobalFaultData(Set<Long> hsIds) {
+    private Map<Long, Long> extractGlobalFaultData(Set<Long> hsIds) {
 
         if (!haveNecessaryFaultInfo(m_seeker.getSurvivors(), false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);

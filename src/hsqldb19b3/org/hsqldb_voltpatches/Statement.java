@@ -32,9 +32,9 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
  * Base class for compiled statement objects.<p>
@@ -121,7 +121,7 @@ public abstract class Statement {
 
     public abstract String describe(Session session);
 
-    public HsqlName getSchemalName() {
+    public HsqlName getSchemaName() {
         return schemaName;
     }
 
