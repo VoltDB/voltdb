@@ -761,7 +761,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
         boolean shortcutRead = message.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-        tmLog.error("Shortcutread: " + String.valueOf(shortcutRead));
 
         FragmentTaskMessage msg = message;
         long newSpHandle;
