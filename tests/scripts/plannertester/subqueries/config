@@ -3,39 +3,37 @@ DDL:
 
 SQL:
 select A, C FROM (SELECT A, C FROM R1) T1 WHERE A > 0;
+select A, C FROM (SELECT A, C FROM R1 LIMIT 1) T1 WHERE A > 0;
 select A1, C1 FROM (SELECT A A1, C C1 FROM R1) T1 WHERE T1.A1 < 0;
-select C1 FROM (SELECT A A1, C C1 FROM R1) T1 WHERE T1.A1 < 0;
-select C1 FROM (SELECT A+3, C C1 FROM R1) T1 WHERE T1.C1 < 0;
+select A1, C1 FROM (SELECT A A1, C C1 FROM R1 LIMIT 1) T1 WHERE T1.A1 < 0;
+select C2 FROM (SELECT A A1, C C2 FROM R1) T1 WHERE T1.A1 < 0;
+select C2 FROM (SELECT A A1, C C2 FROM R1 LIMIT 1) T1 WHERE T1.A1 < 0;
+select C2 FROM (SELECT A+3 C1, C C2 FROM R1) T1 WHERE T1.C1 < 0;
+select C2 FROM (SELECT A+3 C1, C C2 FROM R1 LIMIT1) T1 WHERE T1.C1 < 0;
 select A, C FROM (SELECT * FROM R1) T1 WHERE T1.A < 0;
+select A, C FROM (SELECT * FROM R1 LIMIT 1) T1 WHERE T1.A < 0;
 select * FROM (SELECT A, D FROM R1) T1 WHERE T1.A < 0;
+select * FROM (SELECT A, D FROM R1 LIMIT 1) T1 WHERE T1.A < 0;
 select A2 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1 WHERE A < 3) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3;
+select A2 FROM (SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1 WHERE A < 3 LIMIT 1) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3;
 select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1) T1 WHERE ABS(A1) > 3;
+select A1 + 3, ABS(C) FROM (SELECT A A1, C FROM R1 LIMIT 1) T1 WHERE ABS(A1) > 3;
 select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 Limit 3 ) T1 Group by A;
 select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A;
 select A, SUM(D) FROM (SELECT A, D FROM R1 WHERE A > 3 ORDER BY D Limit 3 ) T1 Group by A HAVING SUM(D) < 3;
 select A FROM (SELECT A, SUM(C) FROM R1 WHERE A > 3 GROUP BY A ORDER BY A Limit 3) T1;
 select SC, SUM(A) as SA FROM (SELECT A, SUM(C) as SC, MAX(D) as MD FROM R1 WHERE A > 3 GROUP BY A ORDER BY A Limit 3) T1  Group by SC;
 select T1.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2;
-select A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2;
+select T1.A FROM (SELECT A FROM R1 LIMIT 1) T1, (SELECT A FROM R2 LIMIT 1)T2;
+select T2.A FROM (SELECT A FROM R1) T1, (SELECT A FROM R2)T2;
+select T2.A FROM (SELECT A FROM R1 LIMIT 1) T1, (SELECT A FROM R2 LIMIT 1)T2;
 select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM R2) T2 WHERE A = C;
-select A, C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C;
+select A, C FROM (SELECT A FROM R1 LIMIT 1) T1, (SELECT C FROM R2 LIMIT 1) T2 WHERE A = C;
+select R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, C FROM R2) T1 ON T1.C = R1.C;
+select R1.A, R1.C FROM R1 LEFT JOIN (SELECT A, C FROM R2 LIMIT 1) T1 ON T1.C = R1.C;
 select A, C FROM (SELECT A, C FROM R1 UNION SELECT A, C FROM R2 UNION SELECT A, C FROM R3) T1 order by A;
 select A1 FROM (SELECT A A1 FROM R1 WHERE A > ?) TEMP WHERE A1 < ?;
-select r2.c from r2 where r2.c > ? and exists (SELECT c from r1 where r1.c = r2.c);
-select r2.a from r2, r1 where r2.a = r1.a or exists (SELECT 1 from r2 where exists(SELECT 1 from r2 where r2.a = r1.c));
-select * from R1 where (A,C) in (SELECT 2, C from r2 where r2.c > r1.c group by c);
-select a from r1,r2 where r1.a = r2.a and exists (SELECT 1 from r3 where r2.a = r3.a);
-select a, sum(c) as sc1 from r1 where (a, c) in ( SELECT a, count(c) as sc2 from  r1  GROUP BY a ORDER BY a DESC) GROUP BY A;
-select a from r1 group by a having max(c) in (SELECT c from r2 );
-select a from r1 where c in (SELECT max(c) from r2 group by c having min(a) > 0);
-select a from r1 T1 where exists (SELECT 1 FROM r1 T2 where exists (SELECT c FROM r1 T3 WHERE T1.c * T3.c  = 9));
-select c from r4 where a in (SELECT a from r1);
-select c from r1 where c in (SELECT c from r2 where a in (SELECT a from r3 where r3.c = r1.c) limit 1 offset 1);
-select c from r1 where c in (SELECT a from r2 where a > 2 limit 1 offset 2);
-select r2.c from r2 where r2.a in (SELECT c from r1 union (SELECT c from r3 limit 1 offset 2) intersect SELECT c from r2);
-select a from r1 where exists (SELECT max(c) from r2 where r1.a = r2.c group by r2.c order by r2.c);
-
-
+select A1 FROM (SELECT A A1 FROM R1 WHERE A > ? LIMIT 1) TEMP WHERE A1 < ?;
 
 #Subqueries on partitioned data are only supported in single partition stored procedures.
 ##select A, C FROM (SELECT A FROM R1) T1, (SELECT C FROM P1) T2 WHERE T1.A = T2.C;
