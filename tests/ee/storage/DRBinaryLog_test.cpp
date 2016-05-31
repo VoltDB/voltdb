@@ -131,7 +131,7 @@ public:
         m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
         string exportColumnNamesArray[12] = { "ROW_TYPE", "ACTION_TYPE", "CONFLICT_TYPE", "CONFLICTS_ON_PRIMARY_KEY",
                                            "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
-                                           "CLUSTER_ID_GET_CONFLICT", "CONFLICT_TIMESTAMP", "TUPLE"};
+                                           "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
 
         m_exportStream = new MockExportTupleStream(1, 1);

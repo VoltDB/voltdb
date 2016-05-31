@@ -56,8 +56,8 @@ const static int DR_REMOTE_CLUSTER_ID_COLUMN_INDEX = 5;
 const static int DR_REMOTE_TIMESTAMP_COLUMN_INDEX = 6;
 const static int DR_DIVERGENCE_COLUMN_INDEX = 7;
 const static int DR_TABLE_NAME_COLUMN_INDEX = 8;
-const static int DR_CLUSTER_ID_GET_CONFLICT_COLUMN_INDEX = 9;
-const static int DR_CONFLICT_TIMESTAMP_COLUMN_INDEX = 10;
+const static int DR_CURRENT_CLUSTER_ID_COLUMN_INDEX = 9;
+const static int DR_CURRENT_TIMESTAMP_COLUMN_INDEX = 10;
 const static int DR_TUPLE_COLUMN_INDEX = 11;
 
 const static int DECISION_BIT = 1;
@@ -250,8 +250,8 @@ void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupl
     }
     tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDivergenceStr(NOT_DIVERGE)));
     tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
-    tempMetaTuple.setNValue(DR_CLUSTER_ID_GET_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(localClusterId));
-    tempMetaTuple.setNValue(DR_CONFLICT_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(localTsCounter));
+    tempMetaTuple.setNValue(DR_CURRENT_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue(localClusterId));
+    tempMetaTuple.setNValue(DR_CURRENT_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(localTsCounter));
     tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getNullStringValue());
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
     outputMetaTable->insertTupleNonVirtualWithDeepCopy(tempMetaTuple, pool);
