@@ -335,9 +335,10 @@ public class VoltZK {
                 return true;
             }
         } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE &&
-                e.code() != KeeperException.Code.BADVERSION) {
-                return false;
+            if (e.code() == KeeperException.Code.NONODE ||
+                e.code() == KeeperException.Code.BADVERSION) {
+                // Okay if the rejoin blocker for the given hostId is already gone.
+                return true;
             }
         } catch (InterruptedException e) {
             return false;

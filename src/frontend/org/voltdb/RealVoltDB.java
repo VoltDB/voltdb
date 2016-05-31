@@ -1038,6 +1038,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    /**
+     * This is currently used to prevent simultaneous rejoins and rejoins during network partition.
+     * It returns true for non-rejoin cases.
+     */
     @Override
     public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
     {

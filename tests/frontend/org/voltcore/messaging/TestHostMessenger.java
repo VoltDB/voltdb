@@ -232,13 +232,23 @@ public class TestHostMessenger {
     {
         // Retry immediately
         System.setProperty("MESH_JOIN_RETRY_INTERVAL", "0");
-        System.setProperty("MESH_JOIN_RETRY_INTERVAL_SALT", "0");
+        System.setProperty("MESH_JOIN_RETRY_INTERVAL_SALT", "1");
 
-        final AtomicInteger acceptorCallCount = new AtomicInteger(0);
+        final AtomicInteger hm1CallCount = new AtomicInteger(0);
+        final AtomicInteger hm2CallCount = new AtomicInteger(0);
         HostMessenger.MembershipAcceptor acceptor = new HostMessenger.MembershipAcceptor() {
             @Override
             public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
             {
+                final AtomicInteger acceptorCallCount;
+                // hack to embed the hm index in the request
+                if (request.endsWith("1")) {
+                    acceptorCallCount = hm1CallCount;
+                } else if (request.endsWith("2")) {
+                    acceptorCallCount = hm2CallCount;
+                } else {
+                    acceptorCallCount = null;
+                }
                 final int called = acceptorCallCount.getAndIncrement();
                 // reject the first time, accept the second time
                 return called != 0;
@@ -246,16 +256,47 @@ public class TestHostMessenger {
         };
 
         final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, acceptor, true);
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.LIVE_REJOIN);
+        // Don't start hm2 and hm3 immediately, we'll start them at the same time.
+        final HostMessenger hm2 = createHostMessenger(1, null, null, false);
+        final HostMessenger hm3 = createHostMessenger(2, null, null, false);
 
-        assertEquals(2, acceptorCallCount.get());
+        Thread hm2Start = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    hm2.start(StartAction.LIVE_REJOIN.name()+"1");
+                } catch (Exception e) {
+                }
+            }
+        };
+        Thread hm3Start = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    hm3.start(StartAction.LIVE_REJOIN.name()+"2");
+                } catch (Exception e) {
+                }
+            }
+        };
+
+        hm2Start.start();
+        hm3Start.start();
+        hm2Start.join();
+        hm3Start.join();
+
+        assertEquals(2, hm1CallCount.get());
+        assertEquals(2, hm2CallCount.get());
 
         List<String> root1 = hm1.getZK().getChildren("/", false );
         List<String> root2 = hm2.getZK().getChildren("/", false );
+        List<String> root3 = hm3.getZK().getChildren("/", false );
         assertTrue(root1.equals(root2));
+        assertTrue(root1.equals(root3));
 
         List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
         List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
         assertTrue(hostids1.equals(hostids2));
+        assertTrue(hostids1.equals(hostids3));
     }
 }

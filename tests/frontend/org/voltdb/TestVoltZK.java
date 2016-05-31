@@ -69,5 +69,7 @@ public class TestVoltZK extends ZKTestBase {
         // Should be able to create another blocker now
         assertEquals(-1, VoltZK.createRejoinNodeIndicator(m_zk, 2));
         assertTrue(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
+        // Removing the same hostId twice should be okay
+        assertTrue(VoltZK.removeRejoinNodeIndicatorForHost(m_zk, 2));
     }
 }
