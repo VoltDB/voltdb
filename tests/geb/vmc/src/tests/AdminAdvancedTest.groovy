@@ -798,7 +798,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
          waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         waitFor(30){page.overview.lnkAddNewFeature.isDisplayed()}
         when:"Add SNAPSHOT feature"
@@ -857,7 +859,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -916,7 +920,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -975,7 +981,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1034,7 +1042,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1095,7 +1105,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1134,7 +1146,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1159,7 +1173,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1188,7 +1204,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
@@ -1218,7 +1236,9 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
-        page.overview.openEditDiskLimitPopup()
+        waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
+        page.overview.diskLimitEdit.click()
+        waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
         when:"Add SNAPSHOT feature"
