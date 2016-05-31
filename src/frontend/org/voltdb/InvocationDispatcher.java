@@ -52,6 +52,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
@@ -110,6 +111,8 @@ public final class InvocationDispatcher {
     private final int [] m_allPartitions;
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
@@ -219,6 +222,14 @@ public final class InvocationDispatcher {
                 "given all partitions is null or empty");
         m_allPartitions = allPartitions;
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
+
+        // try to get the global default setting for read consistency, but fall back to SAFE
+        if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
+            m_defaultConsistencyReadLevel = VoltDB.instance().getConfig().m_consistencyReadLevel;
+        }
+        else {
+            m_defaultConsistencyReadLevel = Consistency.ReadLevel.SAFE;
+        }
     }
 
     /*
@@ -1518,11 +1529,17 @@ public final class InvocationDispatcher {
         boolean isShortCircuitRead = false;
 
         /*
+         * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
+         *
+         * ReadLevel.SAFE:
+         * Send the read to the partition leader always (reads & writes)
+         *
+         * Someday could support per-transaction consistency for reads.
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly) {
+            if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
                 initiatorHSId = m_localReplicas.get().get(partition);
             }
             if (initiatorHSId != null) {

@@ -39,6 +39,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
@@ -47,6 +48,7 @@ import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrType;
@@ -274,6 +276,8 @@ public class VoltProjectBuilder {
     private String m_ppdPrefix = "none";
 
     private Integer m_heartbeatTimeout = null;
+
+    private Consistency.ReadLevel m_consistencyReadLevel = null;
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -616,6 +620,10 @@ public class VoltProjectBuilder {
 
     public void setHeartbeatTimeoutSeconds(int seconds) {
         m_heartbeatTimeout = seconds;
+    }
+
+    public void setDefaultConsistencyReadLevel(Consistency.ReadLevel level) {
+        m_consistencyReadLevel = level;
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
@@ -1051,6 +1059,14 @@ public class VoltProjectBuilder {
             HeartbeatType hb = factory.createHeartbeatType();
             deployment.setHeartbeat(hb);
             hb.setTimeout((int) m_heartbeatTimeout);
+        }
+
+        // <consistency>
+        // don't include this element if not explicitly set
+        if (m_consistencyReadLevel != null) {
+            ConsistencyType ct = factory.createConsistencyType();
+            deployment.setConsistency(ct);
+            ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
         }
 
         // <admin-mode>
