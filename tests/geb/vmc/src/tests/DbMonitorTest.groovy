@@ -505,14 +505,14 @@ class DbMonitorTest extends TestBase {
         waitFor(30) { footer.banner.isDisplayed() }
     }
 
-    def "footer text exists and valid"() {
+    def footerTextExistsAndValid() {
         when:
         at DbMonitorPage
         then:
         waitFor(30) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
-            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
+            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2016 VoltDB Inc. All rights reserved.".toLowerCase())
         }
     }
 
