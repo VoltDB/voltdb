@@ -32,8 +32,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,17 +60,18 @@ public class TestHostMessenger {
     }
 
     private HostMessenger createHostMessenger(int index, StartAction action) throws Exception {
-        return createHostMessenger(index, action, true);
+        return createHostMessenger(index, action, null, true);
     }
 
-    private HostMessenger createHostMessenger(int index, StartAction action, boolean start) throws Exception {
+    private HostMessenger createHostMessenger(int index, StartAction action, HostMessenger.MembershipAcceptor acceptor,
+                                              boolean start) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        HostMessenger hm = new HostMessenger(config, null, null);
+        HostMessenger hm = new HostMessenger(config, acceptor, null);
         createdMessengers.add(hm);
         if (start) {
-            hm.start(null);
+            hm.start(action.name());
         }
         return hm;
     }
@@ -96,9 +100,9 @@ public class TestHostMessenger {
     public void testMultiHost() throws Exception {
         HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE);
 
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, false);
+        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, null, false);
 
-        final HostMessenger hm3 = createHostMessenger(2, StartAction.CREATE, false);
+        final HostMessenger hm3 = createHostMessenger(2, StartAction.CREATE, null, false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         Thread hm2Start = new Thread() {
@@ -221,5 +225,37 @@ public class TestHostMessenger {
         previous.add(3);
         // this should not trip partition detection
         assertFalse(HostMessenger.makePPDDecision(previous, current));
+    }
+
+    @Test
+    public void testMembershipAcceptor() throws Exception
+    {
+        // Retry immediately
+        System.setProperty("MESH_JOIN_RETRY_INTERVAL", "0");
+        System.setProperty("MESH_JOIN_RETRY_INTERVAL_SALT", "0");
+
+        final AtomicInteger acceptorCallCount = new AtomicInteger(0);
+        HostMessenger.MembershipAcceptor acceptor = new HostMessenger.MembershipAcceptor() {
+            @Override
+            public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
+            {
+                final int called = acceptorCallCount.getAndIncrement();
+                // reject the first time, accept the second time
+                return called != 0;
+            }
+        };
+
+        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, acceptor, true);
+        final HostMessenger hm2 = createHostMessenger(1, StartAction.LIVE_REJOIN);
+
+        assertEquals(2, acceptorCallCount.get());
+
+        List<String> root1 = hm1.getZK().getChildren("/", false );
+        List<String> root2 = hm2.getZK().getChildren("/", false );
+        assertTrue(root1.equals(root2));
+
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        assertTrue(hostids1.equals(hostids2));
     }
 }

@@ -185,7 +185,7 @@ public class SocketJoiner {
              * The request to join the cluster may be rejected, e.g. multiple hosts
              * rejoining at the same time. In this case, the code will retry.
              */
-            long retryInterval = 10;
+            long retryInterval = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
             final Random salt = new Random();
             while (true) {
                 try {
@@ -196,7 +196,8 @@ public class SocketJoiner {
                                            retryInterval, e.getMessage()));
                     try { Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval)); } catch (InterruptedException e1) {}
                     // exponential back off with a salt to avoid collision. Max is 5 minutes.
-                    retryInterval = Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) + salt.nextInt(30);
+                    retryInterval = (Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) +
+                                     salt.nextInt(Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30)));
                 } catch (Exception e) {
                     hostLog.error("Failed to establish socket mesh.", e);
                     throw new RuntimeException(e);

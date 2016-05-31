@@ -332,6 +332,7 @@ public class VoltZK {
             final int rejoiningHost = ByteBuffer.wrap(zk.getData(rejoinNodeBlocker, false, stat)).getInt();
             if (hostId == rejoiningHost) {
                 zk.delete(rejoinNodeBlocker, stat.getVersion());
+                return true;
             }
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE &&
@@ -341,6 +342,6 @@ public class VoltZK {
         } catch (InterruptedException e) {
             return false;
         }
-        return true;
+        return false;
     }
 }
