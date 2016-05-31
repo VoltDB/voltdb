@@ -1253,6 +1253,29 @@ public class TestIndexesSuite extends RegressionSuite {
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD", "0A0BEF"});
     }
 
+    public void testBooleanExpressions() throws Exception {
+        Client client = getClient();
+        VoltTable results;
+    	client.callProcedure("R2.insert", 16, -123, 3, 109, -92);
+    	client.callProcedure("R2.insert", 17, -123, 3, 109, 120);
+    	client.callProcedure("R2.insert", 18, -123, 3, 109, 91);
+    	client.callProcedure("R2.insert", 19, -123, 3, 109, 35);
+    	results = client.callProcedure("@AdHoc", "select * from R2;").getResults()[0];
+    	System.out.println("R2: " + results.toString());
+    	results = client.callProcedure("@AdHoc", "select * from V_R2_ABS;").getResults()[0];
+    	System.out.println("V_R2_ABS: " + results.toString());
+    	String sql0 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 1000;";
+    	String sql1 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 42;";
+    	String sql2 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 42 AND V_SUM_RENT < 26661;";
+    	// The rent field is 35.  So that's what we expect.
+    	results = client.callProcedure("@AdHoc", sql0).getResults()[0];
+    	assertEquals(1, results.getRowCount());
+    	results = client.callProcedure("@AdHoc", sql1).getResults()[0];
+    	assertEquals(0, results.getRowCount());
+    	// Now, it can't be increased by conjoining another condition.
+    	results = client.callProcedure("@AdHoc", sql2).getResults()[0];
+    	assertEquals(0, results.getRowCount());
+    }
     //
     // JUnit / RegressionSuite boilerplate
     //
