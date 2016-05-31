@@ -431,6 +431,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     }
                 }
 
+                // notifying any watchers who are interested in failure -- used
+                // initially to do ZK cleanup when rejoining nodes die
                 if (m_hostWatcher != null) {
                     m_hostWatcher.hostsFailed(failedHostIds);
                 }
