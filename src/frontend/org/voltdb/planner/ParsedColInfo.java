@@ -47,6 +47,9 @@ public class ParsedColInfo implements Cloneable {
     /** Index of the column in its table.  This is used for MV sanity-checking */
     public int index = 0;
 
+    /** A differentiator used to tell apart column references when there are
+     * duplicate column names produced by the expansion of "*" that happens in HSQL.*/
+    public int differentiator = -1;
     //
     // Used in ParsedSelectStmt.m_displayColumns
     //
@@ -137,7 +140,7 @@ public class ParsedColInfo implements Cloneable {
 
     /** Return this as an instance of SchemaColumn */
     public SchemaColumn asSchemaColumn() {
-        return new SchemaColumn(tableName, tableAlias, columnName, alias, expression);
+        return new SchemaColumn(tableName, tableAlias, columnName, alias, expression, differentiator);
     }
 
     @Override
