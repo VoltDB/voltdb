@@ -800,7 +800,7 @@ class AdminAdvancedTest extends TestBase {
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
         then:"check elements"
-        page.overview.lnkAddNewFeature.isDisplayed()
+        waitFor(30){page.overview.lnkAddNewFeature.isDisplayed()}
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -817,11 +817,11 @@ class AdminAdvancedTest extends TestBase {
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
-    waitFor(30){diskLimitExpanded.click()}
+        waitFor(30){diskLimitExpanded.click()}
         //waitFor(waitTime){ page.overview.expandDiskLimit()}
         then:
         println("Add succeeded")
@@ -831,7 +831,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
-        page.overview.deleteFirstFeature.isDisplayed()
+        waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
@@ -876,7 +876,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
@@ -890,7 +890,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
-        page.overview.deleteFirstFeature.isDisplayed()
+        waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
@@ -935,7 +935,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
@@ -949,7 +949,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
-        page.overview.deleteFirstFeature.isDisplayed()
+        waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
@@ -994,7 +994,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
@@ -1008,7 +1008,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
-        page.overview.deleteFirstFeature.isDisplayed()
+        waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
@@ -1053,7 +1053,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
@@ -1067,7 +1067,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.openEditDiskLimitPopup()
 
         then:"check elements"
-        page.overview.deleteFirstFeature.isDisplayed()
+        waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
