@@ -1375,20 +1375,6 @@ public abstract class AbstractParsedStmt {
         return subqueries;
     }
 
-    /*
-     *  Extract all subexpressions of a given type from this statement
-     */
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        if (m_joinTree != null) {
-            AbstractExpression treeExpr = m_joinTree.getAllFilters();
-            if (treeExpr != null) {
-                exprs.addAll(treeExpr.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        return exprs;
-    }
-
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
     /// the parameter is being used in a BIGINT context.
