@@ -155,6 +155,32 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
                 .getResults()[0];
         assertEquals(2, ts_table.getRowCount());
     }
+
+    public void testTrimunquoted() throws Exception {
+        System.out.println("testTrimunquoted");
+
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+
+        String[] myData = {
+                "12,10.05,  test" };
+
+        CountDownLatch latch = new CountDownLatch(1);
+        (new SocketDataPusher("localhost", 7002, latch, myData)).start();
+
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM importCSVTable ORDER BY clm_integer;")
+                .getResults()[0];
+
+        while (ts_table.advanceRow()) {
+            String value = ts_table.getString(3);
+            assertEquals("  test", value);
+            break;
+        }
+    }
+
     static public junit.framework.Test suite() throws Exception {
         return buildEnv();
     }
@@ -199,6 +225,7 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
         formatConfig.setProperty("escape", "\\");
         formatConfig.setProperty("quotechar", "\"");
         formatConfig.setProperty("strictquotes", "true");
+        formatConfig.setProperty("trimunquoted", "false");
         project.addImport(true, "custom", "csv", "socketstream.jar", props, formatConfig);
 
         project.addPartitionInfo("importCSVTable", "clm_integer");
