@@ -311,7 +311,16 @@ public class TestUnion extends PlannerTestCase {
             AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
             pn = pn.getChild(0);
             String[] columnNames = {"B1", "B2"};
-            int[] idxs = {1, 1};
+            // We are selecting the same column twice from both sides of the union,
+            // so it doesn't matter if the column indices are 0 or 1 here.
+            int[] idxs = {0, 0};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            AbstractPlanNode pn = compile("(select B as B1, B * -1 as B2 from T2 UNION select B as B1, B * -1 as B2 from T2) order by B1 asc, B2 desc");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B1", "B2"};
+            int[] idxs = {0, 1};
             checkOrderByNode(pn, columnNames, idxs);
         }
         {
