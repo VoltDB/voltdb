@@ -1071,7 +1071,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
-        scheduleWork(new Runnable() {
+        getSES(true).submit(new Runnable() {
             @Override
             public void run()
             {
@@ -1082,7 +1082,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
                 }
             }
-        }, 0, 0, TimeUnit.MILLISECONDS);
+        });
     }
 
     class DailyLogTask implements Runnable {

@@ -596,7 +596,7 @@ public class SocketJoiner {
             JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
 
             // check if the membership request is accepted
-            if (jsonObj.has("accepted") && !jsonObj.getBoolean("accepted")) {
+            if (!jsonObj.optBoolean("accepted", true)) {
                 socket.close();
                 throw new CoreUtils.RetryException(jsonObj.getString("reason"));
             }
