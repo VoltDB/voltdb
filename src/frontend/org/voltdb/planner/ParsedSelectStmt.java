@@ -1933,25 +1933,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    @Override
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
-        if (m_having != null) {
-            exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
-        }
-        if (m_groupByExpressions != null) {
-            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
-                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        for(ParsedColInfo col : m_displayColumns) {
-            if (col.expression != null) {
-                exprs.addAll(col.expression.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        return exprs;
-    }
-
     /**
      * This functions tries to find all expression from the statement. For complex group by or complex aggregate,
      * we have a special function ParsedSelectStmt::placeTVEsinColumns() to replace the expression with TVE for
