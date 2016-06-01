@@ -1681,6 +1681,9 @@ color: grey;
     position: relative;
     top: -12px;
     right: 6px;}
+ .btnStartServer , .btnStopServer{
+    cursor: pointer
+ }
 
 /**************Server List Ends******************/
 /************Media Queries for mobile compatibility***************/
