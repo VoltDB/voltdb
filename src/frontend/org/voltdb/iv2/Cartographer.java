@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -482,9 +483,9 @@ public class Cartographer extends StatsSource
                     }
                     // check if any node still in rejoin status
                     try {
-                        List<String> children = m_zk.getChildren(VoltZK.rejoinNodesBlocker, false);
-                        if (!children.isEmpty())
+                        if (m_zk.exists(VoltZK.rejoinNodeBlocker, false) != null) {
                             return false;
+                        }
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
                     return doPartitionsHaveReplicas(hid);
