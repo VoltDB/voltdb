@@ -751,7 +751,8 @@ class ServerAPI(MethodView):
             'public-interface': request.json.get('public-interface', "").strip(),
             'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
             'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
-            'placement-group': request.json.get('placement-group', "").strip()
+            'placement-group': request.json.get('placement-group', "").strip(),
+            'isAdded': False
         }
 
         # Add server to the current database
@@ -872,6 +873,7 @@ class ServerAPI(MethodView):
                 request.json.get('public-interface', current_server['public-interface'])
             current_server['placement-group'] = \
                 request.json.get('placement-group', current_server['placement-group'])
+            current_server['placement-group'] = current_server['isAdded']
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
@@ -928,7 +930,7 @@ class DatabaseAPI(MethodView):
         else:
             database_id = Global.DATABASES.keys()[-1] + 1
 
-        Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': [], 'isAdded': False}
+        Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
 
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
@@ -972,7 +974,7 @@ class DatabaseAPI(MethodView):
             abort(404)
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'],
-                                         'members': database['members'], 'isAdded': database['isAdded']}
+                                         'members': database['members']}
 
         sync_configuration()
         Configuration.write_configuration_file()
