@@ -672,15 +672,6 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testRejectDupInvocation() throws IOException {
-        // by default, the mock initiator returns false for createTransaction()
-        ByteBuffer msg = createMsg("hello", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
-    }
-
-    @Test
     public void testPolicyRejection() throws IOException {
         // incorrect parameters to @AdHoc proc
         ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
