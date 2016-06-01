@@ -302,49 +302,71 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * if we weren't a viable cluster.
      * ALSO NOTE: not private so it may be unit-tested.
      */
-    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts) {
+    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts, boolean pdEnabled) {
+
         // A strict, viable minority is always a partition.
-        if (currentHosts.size() * 2 < previousHosts.size()) {
-            // note that if PD is disabled, you will see this message, but not stop
-            m_tmLog.warn("Partition detection triggered.");
-            m_tmLog.warn("After a recent failure, this host is part of a cluster that has less than "
-                    + "half the node count of the previous cluster. It's possible multiple clusters "
-                    + "can continue in split-brain mode.");
-            return true; // partition detection triggered
+        if ((currentHosts.size() * 2) < previousHosts.size()) {
+            if (pdEnabled) {
+                m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Shutting down to avoid multiple copies of the database running independently.");
+                return true; // partition detection triggered
+            }
+            else {
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, but there "
+                        + "is significant danger that multiple copies of the database are running "
+                        + "independently.");
+                return false; // partition detection not triggered
+            }
         }
 
         // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
         // If the blessed host is in the failure set, this set is not blessed.
         if (currentHosts.size() * 2 == previousHosts.size()) {
-            m_tmLog.warn("Partition detection notice: "
-                    + "The remaining cluster after failure is exactly half the node count "
-                    + "of the previous cluster state. In this situation, it's impossible to "
-                    + "know if there may be two clusters running in split-brain mode. VoltDB "
-                    + "uses the membership of a \"blessed node\" to decide if this cluster "
-                    + "should continue running.");
-
-            // find the lowest hostId between the still-alive hosts and the
-            // failed hosts. Which set contains the lowest hostId?
-            // This should be all the pre-partition hosts IDs.  Any new host IDs
-            // (say, if this was triggered by rejoin), will be greater than any surviving
-            // host ID, so don't worry about including it in this search.
-            if (currentHosts.contains(Collections.min(previousHosts))) {
-                m_tmLog.warn("This survivor set contains the \"blessed node\".");
-                return false; // partition detection not triggered
+            if (pdEnabled) {
+                // find the lowest hostId between the still-alive hosts and the
+                // failed hosts. Which set contains the lowest hostId?
+                // This should be all the pre-partition hosts IDs.  Any new host IDs
+                // (say, if this was triggered by rejoin), will be greater than any surviving
+                // host ID, so don't worry about including it in this search.
+                if (currentHosts.contains(Collections.min(previousHosts))) {
+                    m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains half of the previous servers, "
+                            + "including the \"tie-breaker\" node. Continuing.");
+                    return false; // partition detection not triggered
+                }
+                else {
+                    m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains exactly half of the previous servers, but does "
+                            + "not include the \"tie-breaker\" node. "
+                            + "Shutting down to avoid multiple copies of the database running independently.");
+                    return true; // partition detection triggered
+                }
             }
             else {
-                // note that if PD is disabled, you will see this message, but not stop
-                m_tmLog.warn("Partition detection triggered.");
-                m_tmLog.warn("This survivor set does not contain the \"blessed node\".");
-                return true; // partition detection triggered
+                // 50/50 split. We don't care about tie-breakers for this error message
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains exactly half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, "
+                        + "but there is significant danger that multiple copies of the "
+                        + "database are running independently.");
             }
         }
 
+        // info message will be printed on every failure that isn't handled above (most cases)
+        m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                + "Current cluster contains a majority of the prevous servers and is safe. Continuing.");
         return false; // partition detection not triggered
     }
 
     private void doPartitionDetectionActivities(Set<Integer> failedHostIds)
     {
+        if (m_shuttingDown) {
+            return;
+        }
+
         // We should never re-enter here once we've decided we're partitioned and doomed
         Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
 
@@ -357,33 +379,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Preconditions.checkState(previousHosts.contains(m_localHostId));
         Preconditions.checkState(currentHosts.contains(m_localHostId));
 
-        if (!m_shuttingDown) {
-            // decide if we're partitioned
-            // this will print out warnings if we are
-            boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
-
-            if (partitionDetected) {
-                if (m_partitionDetectionEnabled.get()) {
-                    // record here so we can ensure this only happens once for this node
-                    m_partitionDetected = true;
-                    VoltDB.crashGlobalVoltDB("PARTITION DETECTION: This process will kill itself to ensure "
-                            + "against split-brains. There may be additional info in the full logs. If command "
-                            + "logging or periodic snapshots are enabled, the will be in the voltdb root "
-                            + "folder for this node and may be used for recovery if needed.",
-                                false, null);
-                }
-                else {
-                    // tell the user about their brush with death
-                    m_tmLog.warn("PARTITION DETECTION: This process will continue running only because "
-                            + "Partition Detection has been disabled for this cluster. It is possible that "
-                            + "the previous cluster has split into multiple viable clusters with diverging "
-                            + "data. There may be additional info in the full logs.");
-                }
-            }
-            else {
-                m_tmLog.info("This node and its cluster have met the partition detection requirements "
-                        + "to continue.");
-            }
+        // decide if we're partitioned
+        // this will print out warnings if we are
+        if (makePPDDecision(previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
+            // record here so we can ensure this only happens once for this node
+            m_partitionDetected = true;
+            VoltDB.crashGlobalVoltDB("Partition detection logic will stop this process to ensure agaisnt split brains.",
+                        false, null);
         }
     }
 
