@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -345,6 +346,8 @@ public class TestClientFeatures extends TestCase {
 
     /**
      * Verify a client can reconnect automatically if reconnect on connection loss feature is turned on
+     *
+     * Then verify that nothing is still going when all it shutdown
      */
     public void testAutoReconnect() throws Exception {
         ClientConfig config = new ClientConfig();
@@ -387,10 +390,19 @@ public class TestClientFeatures extends TestCase {
 
         // hunt for reconnect thread to make sure it's gone
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
-        for (StackTraceElement[] st : stMap.values()) {
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            StackTraceElement[] st = e.getValue();
+            Thread t = e.getKey();
+
+            // skip the current thread
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+
             for (StackTraceElement ste : st) {
-                if (ste.getMethodName().contains("connectToOneServerWithRetry")) {
-                    fail("Client reconnect thread didn't die.");
+                if (ste.getClassName().toLowerCase().contains("voltdb.client")) {
+                    System.err.println(ste.getClassName().toLowerCase());
+                    fail("Something failed to clean up.");
                 }
             }
         }
