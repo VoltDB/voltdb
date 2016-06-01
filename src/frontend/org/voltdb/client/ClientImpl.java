@@ -44,7 +44,7 @@ import org.voltdb.utils.Encoder;
  *  and provides methods to call stored procedures and receive
  *  responses.
  */
-public final class ClientImpl implements Client, ReplicaProcCaller {
+public final class ClientImpl implements Client {
 
     // call initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
@@ -251,26 +251,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return callProcedure(cb, System.nanoTime(), unit.toNanos(clientTimeout), invocation);
     }
 
-    /**
-     * The synchronous procedure call method for DR replication
-     */
-    @Override
-    public ClientResponse callProcedure(
-            long originalTxnId,
-            long originalUniqueId,
-            String procName,
-            Object... parameters)
-            throws IOException, NoConnectionsException, ProcCallException
-    {
-        final SyncCallback cb = new SyncCallback();
-        cb.setArgs(parameters);
-        final ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalUniqueId,
-                                    m_handle.getAndIncrement(),
-                                    procName, parameters);
-        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_CLIENT_TIMEOUT, invocation);
-    }
-
     private final ClientResponse callProcedure(SyncCallback cb, long nowNanos, long timeout, ProcedureInvocation invocation)
             throws IOException, NoConnectionsException, ProcCallException
     {
@@ -357,38 +337,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
         return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
-    }
-
-    /**
-     * Asynchronously invoke a replicated procedure. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check
-     * the return value to determine if queuing actually took place.
-     *
-     * @param originalTxnId The original txnId generated for this invocation.
-     * @param originalTimestamp The original timestamp associated with this invocation.
-     * @param callback ProcedureCallback that will be invoked with procedure results.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return <code>true</code> if the procedure was queued and
-     *         <code>false</code> otherwise
-     */
-    @Override
-    public final boolean callProcedure(
-            long originalTxnId,
-            long originalUniqueId,
-            ProcedureCallback callback,
-            String procName,
-            Object... parameters)
-            throws IOException, NoConnectionsException {
-        if (callback instanceof ProcedureArgumentCacher) {
-            ((ProcedureArgumentCacher)callback).setArgs(parameters);
-        }
-        ProcedureInvocation invocation =
-            new ProcedureInvocation(originalTxnId, originalUniqueId,
-                                    m_handle.getAndIncrement(),
-                                    procName, parameters);
-        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_CLIENT_TIMEOUT);
     }
 
     @Override

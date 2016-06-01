@@ -171,22 +171,13 @@ abstract public class Scheduler implements InitiatorMessageHandler
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean drV1 = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDRv1()));
-
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || drV1;
+        boolean replay = commandLog || sentinel;
 
-        assert(!(commandLog && drV1));
 
         if (commandLog || sentinel) {
             sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
-        }
-        else if (drV1) {
-            // should be dead path, mark for future removal
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
-            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 
         if (replay) {

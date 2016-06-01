@@ -320,7 +320,6 @@ public class MpPromoteAlgo implements RepairAlgo
                         false,  // no acks in iv2.
                         restart,   // Indicate rollback for repair as appropriate
                         ftm.isForReplay());
-            rollback.setOriginalTxnId(ftm.getOriginalTxnId());
             return rollback;
         }
     }

@@ -63,7 +63,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
@@ -108,7 +107,6 @@ public final class InvocationDispatcher {
     private final Cartographer m_cartographer;
     private final ConcurrentMap<Long, ClientInterfaceHandleManager> m_cihm;
     private final AtomicReference<Map<Integer,Long>> m_localReplicas = new AtomicReference<>(ImmutableMap.of());
-    private final int [] m_allPartitions;
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
     // used to decide if we should shortcut reads
@@ -220,7 +218,6 @@ public final class InvocationDispatcher {
                                              backendTargetType == BackendTarget.POSTGIS_BACKEND);
         checkArgument(allPartitions != null && allPartitions.length > 0,
                 "given all partitions is null or empty");
-        m_allPartitions = allPartitions;
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         // try to get the global default setting for read consistency, but fall back to SAFE
@@ -356,25 +353,11 @@ public final class InvocationDispatcher {
             else if ("@ExplainProc".equals(task.procName)) {
                 return dispatchExplainProcedure(task, handler, ccxn, user);
             }
-            else if ("@SendSentinel".equals(task.procName)) {
-                dispatchSendSentinel(handler.connectionId(), nowNanos, task);
-                return null;
-            }
             else if ("@AdHoc".equals(task.procName)) {
                 return dispatchAdHoc(task, handler, ccxn, false, user);
             }
             else if ("@AdHocSpForTest".equals(task.procName)) {
                 return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
-            }
-            else if ("@LoadMultipartitionTable".equals(task.procName)) {
-                /*
-                 * For IV2 DR: This will generate a sentinel for each partition,
-                 * but doesn't initiate the invocation. It will fall through to
-                 * the shared dispatch of sysprocs.
-                 */
-                if (ProcedureInvocationType.isDeprecatedInternalDRType(task.getType())) {
-                    sendSentinelsToAllPartitions(task.getOriginalTxnId());
-                }
             }
             else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
@@ -751,30 +734,6 @@ public final class InvocationDispatcher {
     }
 
     /**
-     * Send a multipart sentinel to the specified partition. This comes from the
-     * DR agent in prepare of a multipart transaction.
-     *
-     * @param connectionId
-     * @param now
-     * @param size
-     * @param invocation
-     */
-    void dispatchSendSentinel(long connectionId, long nowNanos, StoredProcedureInvocation invocation) {
-        ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
-        // First parameter of the invocation is the partition ID
-        int pid = (Integer) invocation.getParameterAtIndex(0);
-        final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(pid);
-        long handle = cihm.getHandle(true, pid, invocation.getClientHandle(), invocation.getSerializedSize(),
-                nowNanos, invocation.getProcName(), initiatorHSId, true, false);
-
-        /*
-         * Sentinels will be deduped by ReplaySequencer. They don't advance the
-         * last replayed txnIds.
-         */
-        sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
-    }
-
-   /**
      * Send a command log replay sentinel to the given partition.
      * @param txnId
      * @param partitionId
@@ -797,24 +756,6 @@ public final class InvocationDispatcher {
                         false,  // isReadOnly
                         forReplay);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
-    }
-
-    /**
-     * Send a multipart sentinel to all partitions. This is only used when the
-     * multipart didn't generate any sentinels for partitions, e.g. DR
-     * @LoadMultipartitionTable.
-     *
-     * @param txnId
-     */
-    private final void sendSentinelsToAllPartitions(long txnId) {
-        for (int partition : m_allPartitions) {
-            final long initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
-            /*
-             * HACK! DR LoadMultipartitionTable generates sentinels here,
-             * they pretend to be for replay so that the SPIs won't generate responses for them.
-             */
-            sendSentinel(txnId, initiatorHSId, -1, -1, true);
-        }
     }
 
     private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
@@ -920,7 +861,7 @@ public final class InvocationDispatcher {
                     m_siteId,
                     task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     isAdmin, ccxn, catalogBytes, deploymentString,
-                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                    task.procName, task.type,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     useDdlSchema,
                     m_adhocCompletionHandler, user,
@@ -1112,7 +1053,7 @@ public final class InvocationDispatcher {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
-                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                task.procName, task.type,
                 task.getBatchTimeout(),
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
@@ -1328,8 +1269,6 @@ public final class InvocationDispatcher {
            task.clientHandle = changeResult.clientHandle;
            // DR stuff
            task.type = changeResult.invocationType;
-           task.originalTxnId = changeResult.originalTxnId;
-           task.originalUniqueId = changeResult.originalUniqueId;
            return task;
        }
 
@@ -1385,8 +1324,6 @@ public final class InvocationDispatcher {
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
         task.type = plannedStmtBatch.work.invocationType;
-        task.originalTxnId = plannedStmtBatch.work.originalTxnId;
-        task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
         // HSQL (or PostgreSQL) does not specifically implement AdHoc SP

@@ -55,6 +55,7 @@ public class ClientConfig {
     boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
+    //Consistency.ReadLevel m_connectionReadLevel = null;
 
 
     final static String getUserNameFromSubject(Subject subject) {

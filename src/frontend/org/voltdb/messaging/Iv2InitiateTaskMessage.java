@@ -70,7 +70,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
-        super.setOriginalTxnId(invocation.getOriginalTxnId());
 
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;

@@ -37,8 +37,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
@@ -61,6 +59,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import junit.framework.TestCase;
 
 public class TestSpSchedulerDedupe extends TestCase
 {
@@ -109,7 +109,6 @@ public class TestSpSchedulerDedupe extends TestCase
         // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         when(spi.getProcName()).thenReturn(MockSPName);
-        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =

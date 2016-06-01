@@ -46,13 +46,6 @@ public class StoredProcedureInvocation implements JSONString {
     String procName = null;
 
     public static final long UNITIALIZED_ID = -1L;
-    /*
-     * The original txn ID and the timestamp the procedure invocation was
-     * assigned with. They are saved here so that if the procedure needs them
-     * for determinism, we can provide them again. -1 means not set.
-     */
-    long originalTxnId = UNITIALIZED_ID;
-    long originalUniqueId = UNITIALIZED_ID;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -75,8 +68,6 @@ public class StoredProcedureInvocation implements JSONString {
         copy.clientHandle = clientHandle;
         copy.params = params;
         copy.procName = procName;
-        copy.originalTxnId = originalTxnId;
-        copy.originalUniqueId = originalUniqueId;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -92,29 +83,15 @@ public class StoredProcedureInvocation implements JSONString {
     }
 
     private void setType() {
-        if (originalTxnId == UNITIALIZED_ID && originalUniqueId == UNITIALIZED_ID) {
-            if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
-                type = ProcedureInvocationType.VERSION1;
-            } else {
-                type = ProcedureInvocationType.ORIGINAL;
-            }
+        if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+            type = ProcedureInvocationType.VERSION1;
         } else {
-            type = ProcedureInvocationType.REPLICATED;
+            type = ProcedureInvocationType.ORIGINAL;
         }
     }
 
     public void setProcName(String name) {
         procName = name;
-    }
-
-    public void setOriginalTxnId(long txnId) {
-        originalTxnId = txnId;
-        setType();
-    }
-
-    public void setOriginalUniqueId(long uniqueId) {
-        originalUniqueId = uniqueId;
-        setType();
     }
 
     public void setParams(final Object... parameters) {
@@ -135,14 +112,6 @@ public class StoredProcedureInvocation implements JSONString {
 
     public String getProcName() {
         return procName;
-    }
-
-    public long getOriginalTxnId() {
-        return originalTxnId;
-    }
-
-    public long getOriginalUniqueId() {
-        return originalUniqueId;
     }
 
     public ParameterSet getParams() {
@@ -197,12 +166,6 @@ public class StoredProcedureInvocation implements JSONString {
             + procName.length()
             + 8; // clientHandle
 
-        if (ProcedureInvocationType.isDeprecatedInternalDRType(type))
-        {
-            size += 8 + // original TXN ID for WAN replication procedures
-                    8; // original timestamp for WAN replication procedures
-        }
-
         if (serializedParams != null)
         {
             size += serializedParams.remaining();
@@ -228,10 +191,6 @@ public class StoredProcedureInvocation implements JSONString {
         assert(!((params == null) && (serializedParams == null)));
         assert((params != null) || (serializedParams != null));
         buf.put(type.getValue()); //version and type
-        if (ProcedureInvocationType.isDeprecatedInternalDRType(type)) {
-            buf.putLong(originalTxnId);
-            buf.putLong(originalUniqueId);
-        }
         if (type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
             if (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
                 buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
@@ -281,16 +240,6 @@ public class StoredProcedureInvocation implements JSONString {
         byte version = in.readByte();// version number also embeds the type
         type = ProcedureInvocationType.typeFromByte(version);
 
-        /*
-         * If it's a replicated invocation, there should be two txn IDs
-         * following the version byte. The first txn ID is the new txn ID, the
-         * second one is the original txn ID.
-         */
-        if (ProcedureInvocationType.isDeprecatedInternalDRType(type)) {
-            originalTxnId = in.readLong();
-            originalUniqueId = in.readLong();
-        }
-
         if (version >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
             BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(in.readByte());
             if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
@@ -333,8 +282,6 @@ public class StoredProcedureInvocation implements JSONString {
         retval += " type=" + String.valueOf(type);
         retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(batchTimeout);
         retval += " clientHandle=" + String.valueOf(clientHandle);
-        retval += " originalTxnId=" + String.valueOf(originalTxnId);
-        retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
 
         return retval;
     }

@@ -335,8 +335,6 @@ public class TestRepairLog
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@ApplyBinaryLogSP");
         spi.setParams(0, endSpUniqueId - 10, endSpUniqueId, endSpUniqueId, endMpUniqueId, new byte[]{0});
-        spi.setOriginalUniqueId(endSpUniqueId - 10);
-        spi.setOriginalTxnId(endSpUniqueId -15);
 
         Iv2InitiateTaskMessage msg =
                 new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,

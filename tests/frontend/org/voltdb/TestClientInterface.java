@@ -246,10 +246,6 @@ public class TestClientInterface {
 
     }
 
-    private static ByteBuffer createMsg(String name, final Object...params) throws IOException {
-        return createMsg(null, name, params);
-    }
-
     /**
      * Create a VoltMessage that can be fed into CI's handleRead() method.
      * @param origTxnId The original txnId if it's a replicated transaction
@@ -258,14 +254,10 @@ public class TestClientInterface {
      * @return
      * @throws IOException
      */
-    private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException
+    private static ByteBuffer createMsg(String name, final Object...params) throws IOException
     {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
-        if (origTxnId != null) {
-            proc.setOriginalTxnId(origTxnId);
-        }
         proc.setParams(params);
         ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
         proc.flattenToBuffer(buf);
@@ -478,7 +470,7 @@ public class TestClientInterface {
         catalogResult.deploymentString = "blah";
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
-        catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
+        catalogResult.invocationType = ProcedureInvocationType.ORIGINAL;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
         catalogResult.diffCommandsLength = 10;
@@ -500,9 +492,7 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
-        assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
-        assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
+        assertEquals(ProcedureInvocationType.ORIGINAL, message.getStoredProcedureInvocation().getType());
     }
 
     @Test
@@ -684,7 +674,7 @@ public class TestClientInterface {
     @Test
     public void testRejectDupInvocation() throws IOException {
         // by default, the mock initiator returns false for createTransaction()
-        ByteBuffer msg = createMsg(12345l, "hello", 1);
+        ByteBuffer msg = createMsg("hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());

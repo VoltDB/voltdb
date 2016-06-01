@@ -28,8 +28,7 @@ package org.voltdb.client;
  */
 public enum ProcedureInvocationType {
     ORIGINAL((byte) 0),
-    VERSION1((byte) 1),              // version with individual timeout support
-    REPLICATED ((byte) (1 << 7));    // -128
+    VERSION1((byte) 1);              // version with individual timeout support
 
     private final byte m_value;
 
@@ -47,8 +46,6 @@ public enum ProcedureInvocationType {
             return ORIGINAL;
         case 1:
             return VERSION1;
-        case -128:
-            return REPLICATED;
         default:
             throw new RuntimeException("Unknown ProcedureInvocationType " + b);
         }
@@ -57,12 +54,5 @@ public enum ProcedureInvocationType {
     @Override
     public String toString() {
         return "ProcedureInvocationType." + name();
-    }
-
-    public static boolean isDeprecatedInternalDRType(ProcedureInvocationType type) {
-        if (type == REPLICATED) {
-            return true;
-        }
-        return false;
     }
 }

@@ -43,7 +43,6 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] operationBytes, String operationString,
             String invocationName, ProcedureInvocationType type,
-            long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
             AuthSystem.AuthUser user, byte[] replayHashOverride,
@@ -51,7 +50,6 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName, type,
-              originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
               completionHandler, user);
         if (operationBytes != null) {
@@ -83,8 +81,6 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.clientData,
               adhocDDL.invocationName,
               adhocDDL.invocationType,
-              adhocDDL.originalTxnId,
-              adhocDDL.originalUniqueId,
               adhocDDL.onReplica,
               adhocDDL.useAdhocDDL,
               adhocDDL.completionHandler,

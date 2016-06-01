@@ -27,13 +27,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 
-import junit.framework.TestCase;
-
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
+
+import junit.framework.TestCase;
 
 
 /**
@@ -215,7 +215,7 @@ public class TestProcedureInvocation extends TestCase{
      * @throws IOException
      */
     public void testWriteReplicated() throws IOException {
-        ProcedureInvocation invocation = new ProcedureInvocation(12345, 56789, 54321, "test", 1);
+        ProcedureInvocation invocation = new ProcedureInvocation(54321, "test", 1);
         ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
         try {
             invocation.flattenToBuffer(buf);
@@ -235,8 +235,6 @@ public class TestProcedureInvocation extends TestCase{
         }
 
         assertEquals(54321, spi.getClientHandle());
-        assertEquals(12345, spi.getOriginalTxnId());
-        assertEquals(56789, spi.getOriginalUniqueId());
         assertEquals("test", spi.getProcName());
     }
 

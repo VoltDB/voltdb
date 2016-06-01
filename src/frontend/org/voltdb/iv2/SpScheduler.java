@@ -307,26 +307,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDRv1()));
-
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || dr;
+        boolean replay = commandLog || sentinel;
         boolean sequenceForReplay = m_isLeader && replay;
-
-        assert(!(commandLog && dr));
 
         if (commandLog || sentinel) {
             sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
         }
-        //--------------------------------------------
-        // DRv1 path, mark for future removal
-        else if (dr) {
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
-            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-        //--------------------------------------------
 
         if (sequenceForReplay) {
             InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithUniqueId,
@@ -441,7 +429,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     }
 
             /*
-             * If this is for CL replay or DR, update the unique ID generator
+             * If this is for CL replay, update the unique ID generator
              */
             if (message.isForReplay()) {
                 uniqueId = message.getUniqueId();
@@ -452,13 +440,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     hostLog.fatal(e.getMessage());
                     hostLog.fatal("Invocation: " + message);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-            } else if (message.isForDRv1()) {
-                assert false;
-                uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
-                // @LoadSinglepartitionTable does not have a valid uid
-                if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 }
             }
 

@@ -68,7 +68,7 @@ import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
-public class MockVoltClient implements Client, ReplicaProcCaller{
+public class MockVoltClient implements Client {
     public MockVoltClient() {
         super();
     }
@@ -250,31 +250,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return false;
     }
 
-    @Override
-    public boolean callProcedure(long originalTxnId,
-                                 long originalTimestamp,
-                                 ProcedureCallback callback,
-                                 String procName,
-                                 Object... parameters) throws IOException,
-                                                      NoConnectionsException {
-        numCalls += 1;
-        calledName = procName;
-        calledParameters = parameters;
-        m_lastCallback = callback;
-        m_callbacks.add(callback);
-        if (originalTxnId <= lastOrigTxnId)
-        {
-            origTxnIdOrderCorrect = false;
-        }
-        else
-        {
-            lastOrigTxnId = originalTxnId;
-        }
-
-        return m_nextReturn;
-    }
-
-
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
@@ -298,25 +273,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void setInstanceStartTime(long time)
     {
         m_startTime = time;
-    }
-
-    @Override
-    public ClientResponse callProcedure(long originalTxnId, long originalTimestamp,
-                                        String procName, Object... parameters)
-    throws IOException, NoConnectionsException, ProcCallException
-    {
-        numCalls += 1;
-        calledName = procName;
-        calledParameters = parameters;
-        if (originalTxnId <= lastOrigTxnId)
-        {
-            origTxnIdOrderCorrect = false;
-        }
-        else
-        {
-            lastOrigTxnId = originalTxnId;
-        }
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
     }
 
     @Override
