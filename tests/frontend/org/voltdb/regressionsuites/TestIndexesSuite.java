@@ -1256,17 +1256,20 @@ public class TestIndexesSuite extends RegressionSuite {
     public void testBooleanExpressions() throws Exception {
         Client client = getClient();
         VoltTable results;
-    	client.callProcedure("R2.insert", 16, -123, 3, 109, -92);
-    	client.callProcedure("R2.insert", 17, -123, 3, 109, 120);
-    	client.callProcedure("R2.insert", 18, -123, 3, 109, 91);
-    	client.callProcedure("R2.insert", 19, -123, 3, 109, 35);
-    	results = client.callProcedure("@AdHoc", "select * from R2;").getResults()[0];
-    	System.out.println("R2: " + results.toString());
-    	results = client.callProcedure("@AdHoc", "select * from V_R2_ABS;").getResults()[0];
-    	System.out.println("V_R2_ABS: " + results.toString());
-    	String sql0 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 1000;";
-    	String sql1 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 42;";
-    	String sql2 = "SELECT * FROM V_R2_ABS WHERE V_SUM_RENT < 42 AND V_SUM_RENT < 26661;";
+    	client.callProcedure("BTEST_R2.insert", 16, -123, 3, 109, -92);
+    	client.callProcedure("BTEST_R2.insert", 17, -123, 3, 109, 120);
+    	client.callProcedure("BTEST_R2.insert", 18, -123, 3, 109, 91);
+    	client.callProcedure("BTEST_R2.insert", 19, -123, 3, 109, 35);
+    	// This is handy for debugging.
+    	/*
+    	results = client.callProcedure("@AdHoc", "select * from BTEST_R2;").getResults()[0];
+    	System.out.println("BTEST_R2: " + results.toString());
+    	results = client.callProcedure("@AdHoc", "select * from V_BTEST_R2_ABS;").getResults()[0];
+    	System.out.println("V_BTEST_R2_ABS: " + results.toString());
+    	//*/
+    	String sql0 = "SELECT * FROM V_BTEST_R2_ABS WHERE V_SUM_RENT < 1000;";
+    	String sql1 = "SELECT * FROM V_BTEST_R2_ABS WHERE V_SUM_RENT < 42;";
+    	String sql2 = "SELECT * FROM V_BTEST_R2_ABS WHERE V_SUM_RENT < 42 AND V_SUM_RENT < 26661;";
     	// The rent field is 35.  So that's what we expect.
     	results = client.callProcedure("@AdHoc", sql0).getResults()[0];
     	assertEquals(1, results.getRowCount());
