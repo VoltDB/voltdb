@@ -211,6 +211,7 @@ class VoltDatabase:
 
         retcode = self.start_local_server(sid, recover, is_blocking, add_server)
         if (retcode == 0):
+            HTTPListener.Global.SERVERS[sid]['isAdded'] = True
             return create_response('Success', 200)
         else:
             return create_response('Error', 500)

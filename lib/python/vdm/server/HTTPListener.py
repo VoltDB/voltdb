@@ -928,7 +928,7 @@ class DatabaseAPI(MethodView):
         else:
             database_id = Global.DATABASES.keys()[-1] + 1
 
-        Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': []}
+        Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'], 'members': [], 'isAdded': False}
 
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
@@ -972,7 +972,7 @@ class DatabaseAPI(MethodView):
             abort(404)
 
         Global.DATABASES[database_id] = {'id': database_id, 'name': request.json['name'],
-                                         'members': database['members']}
+                                         'members': database['members'], 'isAdded': database['isAdded']}
 
         sync_configuration()
         Configuration.write_configuration_file()
@@ -1732,7 +1732,7 @@ def main(runner, amodule, config_dir, data_dir, server):
                              'enabled': True, 'external-interface': "", 'internal-interface': "",
                              'public-interface': "", 'client-listener': "", 'internal-listener': "",
                              'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                             'zookeeper-listener': "", 'placement-group': ""}
+                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False}
 
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
 
