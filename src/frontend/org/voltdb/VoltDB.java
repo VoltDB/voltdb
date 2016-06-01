@@ -160,6 +160,9 @@ public class VoltDB {
         public int m_adminPort = DISABLED_PORT;
         public String m_adminInterface = "";
 
+        /** consistency level for reads */
+        public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
+
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
 

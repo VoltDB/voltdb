@@ -59,7 +59,6 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
-import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
@@ -83,6 +82,30 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
+
+    /**
+     * Callback for making decision on whether a new node can join the cluster.
+     */
+    public interface MembershipAcceptor {
+        /**
+         * @param hostId     The new host trying to join the mesh
+         * @param request    The requested action from the node joining the mesh
+         * @param errMsg     Error message to send to the new host
+         * @return true if the new host can join the mesh, false otherwise.
+         */
+        boolean shouldAccept(int hostId, String request, StringBuilder errMsg);
+    }
+
+    /**
+     * Callback for watching for host failures.
+     */
+    public interface HostWatcher {
+        /**
+         * Called when host failures are detected.
+         * @param failedHosts    List of failed hosts, including hosts currently unknown to this host.
+         */
+        void hostsFailed(Set<Integer> failedHosts);
+    }
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -123,10 +146,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             this(null, 3021);
             zkInterface = "127.0.0.1:" + ports.next();
             internalPort = ports.next();
-        }
-
-        public int getZKPort() {
-            return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
         private void initNetworkThreads() {
@@ -224,6 +243,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(false);
     private boolean m_partitionDetected = false;
 
+    private final MembershipAcceptor m_membershipAcceptor;
+    private final HostWatcher m_hostWatcher;
+
     private final Object m_mapLock = new Object();
 
     /*
@@ -253,15 +275,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     /**
-     *
      * @param network
      * @param coordinatorIp
      * @param expectedHosts
      * @param catalogCRC
      * @param hostLog
+     * @param membershipAcceptor
+     * @param m_hostWatcher
      */
-    public HostMessenger(Config config) {
+    public HostMessenger(Config config, MembershipAcceptor membershipAcceptor, HostWatcher hostWatcher) {
         m_config = config;
+        m_membershipAcceptor = membershipAcceptor;
+        m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
@@ -298,54 +323,73 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Given a set of the known host IDs before a fault, and the known host IDs in the
      * post-fault cluster, determine whether or not we think a network partition may have happened.
-     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
-     * if we weren't a viable cluster.
      * ALSO NOTE: not private so it may be unit-tested.
      */
-    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts) {
+    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts, boolean pdEnabled) {
+
         // A strict, viable minority is always a partition.
-        if (currentHosts.size() * 2 < previousHosts.size()) {
-            // note that if PD is disabled, you will see this message, but not stop
-            m_tmLog.error("Partition detection triggered.");
-            m_tmLog.info("After a recent failure, this host is part of a cluster that has less than "
-                    + "half the node count of the previous cluster. It's possible multiple clusters "
-                    + "can continue in split-brain mode.");
-            m_tmLog.error("This minority survivor set may shut down to ensure against a split-brain.");
-            return true; // partition detection triggered
+        if ((currentHosts.size() * 2) < previousHosts.size()) {
+            if (pdEnabled) {
+                m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Shutting down to avoid multiple copies of the database running independently.");
+                return true; // partition detection triggered
+            }
+            else {
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, but there "
+                        + "is significant danger that multiple copies of the database are running "
+                        + "independently.");
+                return false; // partition detection not triggered
+            }
         }
 
         // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
         // If the blessed host is in the failure set, this set is not blessed.
         if (currentHosts.size() * 2 == previousHosts.size()) {
-            m_tmLog.info("Partition detection notice: "
-                    + "The remaining cluster after failure is exactly half the node count "
-                    + "of the previous cluster state. In this situation, it's impossible to "
-                    + "know if there may be two clusters running in split brain mode. VoltDB "
-                    + "uses the membership of a \"blessed node\" to decide if this cluster "
-                    + "should continue running.");
-
-            // find the lowest hostId between the still-alive hosts and the
-            // failed hosts. Which set contains the lowest hostId?
-            // This should be all the pre-partition hosts IDs.  Any new host IDs
-            // (say, if this was triggered by rejoin), will be greater than any surviving
-            // host ID, so don't worry about including it in this search.
-            if (currentHosts.contains(Collections.min(previousHosts))) {
-                m_tmLog.warn("This survivor set contains the \"blessed node\" and will continue operation.");
-                return false; // partition detection not triggered
+            if (pdEnabled) {
+                // find the lowest hostId between the still-alive hosts and the
+                // failed hosts. Which set contains the lowest hostId?
+                // This should be all the pre-partition hosts IDs.  Any new host IDs
+                // (say, if this was triggered by rejoin), will be greater than any surviving
+                // host ID, so don't worry about including it in this search.
+                if (currentHosts.contains(Collections.min(previousHosts))) {
+                    m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains half of the previous servers, "
+                            + "including the \"tie-breaker\" node. Continuing.");
+                    return false; // partition detection not triggered
+                }
+                else {
+                    m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains exactly half of the previous servers, but does "
+                            + "not include the \"tie-breaker\" node. "
+                            + "Shutting down to avoid multiple copies of the database running independently.");
+                    return true; // partition detection triggered
+                }
             }
             else {
-                // note that if PD is disabled, you will see this message, but not stop
-                m_tmLog.error("Partition detection triggered.");
-                m_tmLog.error("This survivor set does not contain the \"blessed node\" and may shut down.");
-                return true; // partition detection triggered
+                // 50/50 split. We don't care about tie-breakers for this error message
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains exactly half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, "
+                        + "but there is significant danger that multiple copies of the "
+                        + "database are running independently.");
             }
         }
 
+        // info message will be printed on every failure that isn't handled above (most cases)
+        m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                + "Current cluster contains a majority of the prevous servers and is safe. Continuing.");
         return false; // partition detection not triggered
     }
 
     private void doPartitionDetectionActivities(Set<Integer> failedHostIds)
     {
+        if (m_shuttingDown) {
+            return;
+        }
+
         // We should never re-enter here once we've decided we're partitioned and doomed
         Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
 
@@ -359,27 +403,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         Preconditions.checkState(currentHosts.contains(m_localHostId));
 
         // decide if we're partitioned
-        // this will print out errors if we are
-        boolean partitionDetected = makePPDDecision(previousHosts, currentHosts);
-
-        if (partitionDetected) {
-            if (m_partitionDetectionEnabled.get()) {
-                // extra logging for now
-                m_tmLog.fatal("PARTITION DETECTION: This process will kill itself to ensure against split-brains.");
-                m_tmLog.warn("If command logging or periodic snapshots are enabled, the will be in the "
-                        + "voltdb root folder for this node and may be used for recovery if needed.");
-                m_partitionDetected = true;
-                VoltDB.crashGlobalVoltDB("This process will kill itself to ensure against split-brains. "
-                        + "There may be additional info in the full logs.",
-                            false, null);
-            }
-            else {
-                // tell the user about their brush with death
-                m_tmLog.error("PARTITION DETECTION: This process will continue running only because "
-                        + "Partition Detection has been disabled for this cluster. It is possible that "
-                        + "the previous cluster has split into multiple viable clusters with diverging "
-                        + "data. There may be additional info in the full logs.");
-            }
+        // this will print out warnings if we are
+        if (makePPDDecision(previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
+            // record here so we can ensure this only happens once for this node
+            m_partitionDetected = true;
+            VoltDB.crashGlobalVoltDB("Partition detection logic will stop this process to ensure agaisnt split brains.",
+                        false, null);
         }
     }
 
@@ -402,6 +431,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         // reportForeignHostFailed should print on the console once
                         m_networkLog.info(String.format("Host %d failed (DisconnectFailedHostsCallback)", hostId));
                     }
+                }
+
+                // notifying any watchers who are interested in failure -- used
+                // initially to do ZK cleanup when rejoining nodes die
+                if (m_hostWatcher != null) {
+                    m_hostWatcher.hostsFailed(failedHostIds);
                 }
             }
         }
@@ -454,9 +489,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary. return true if any node indicates a paused start.
+     * if necessary.
+     *
+     * @param request The requested action to send to other nodes when joining
+     * the mesh. This is opaque to the HostMessenger, it can be any
+     * string. HostMessenger will encode this in the request to join mesh to the
+     * live hosts. The live hosts can use this request string to make further
+     * decision on whether or not to accept the request.
      */
-    public void start() throws Exception {
+    public void start(String request) throws Exception {
         /*
          * SJ uses this barrier if this node becomes the leader to know when ZooKeeper
          * has been finished bootstrapping.
@@ -467,7 +508,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * If start returns true then this node is the leader, it bound to the coordinator address
          * It needs to bootstrap its agreement site so that other nodes can join
          */
-        if(m_joiner.start(zkInitBarrier)) {
+        if(m_joiner.start(zkInitBarrier, request)) {
             m_network.start();
 
             /*
@@ -538,11 +579,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
-    }
-
-    //For test only
-    protected HostMessenger() {
-        this(new Config());
     }
 
     /*
@@ -652,12 +688,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    /*
+    /**
      * Any node can serve a request to join. The coordination of generating a new host id
      * is done via ZK
+     *
+     * @param request The requested action from the rejoining host. This is
+     * opaque to the HostMessenger, it can be any string. The request string can
+     * be used to make further decision on whether or not to accept the request
+     * in the MembershipAcceptor.
      */
     @Override
-    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress) throws Exception {
+    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -666,10 +707,22 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost = null;
         try {
             try {
+                final boolean shouldAcceptMember;
+                final StringBuilder errMsg = new StringBuilder();
+                if (m_membershipAcceptor != null) {
+                    shouldAcceptMember = m_membershipAcceptor.shouldAccept(hostId, request, errMsg);
+                } else {
+                    shouldAcceptMember = true;
+                }
+
                 /*
                  * Write the response that advertises the cluster topology
                  */
-                writeRequestJoinResponse( hostId, socket);
+                writeRequestJoinResponse(hostId, shouldAcceptMember, errMsg.toString(), socket);
+                if (!shouldAcceptMember) {
+                    socket.close();
+                    return;
+                }
 
                 /*
                  * Wait for the a response from the joining node saying that it connected
@@ -683,6 +736,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     int read = socket.read(finishedJoining);
                     if (read == -1) {
                         m_networkLog.info("New connection was unable to establish mesh");
+                        socket.close();
                         return;
                     } else if (read < 1) {
                         Thread.sleep(5);
@@ -699,6 +753,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
                 removeForeignHost(hostId);
+                socket.close();
                 return;
             }
 
@@ -731,43 +786,49 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Advertise to a newly connecting node the topology of the cluster so that it can connect to
      * the rest of the nodes
      */
-    private void writeRequestJoinResponse(int hostId, SocketChannel socket) throws Exception {
+    private void writeRequestJoinResponse(int hostId, boolean shouldAccept, String errMsg, SocketChannel socket) throws Exception {
         JSONObject jsObj = new JSONObject();
 
-        /*
-         * Tell the new node what its host id is
-         */
-        jsObj.put("newHostId", hostId);
+        jsObj.put("accepted", shouldAccept);
+        if (shouldAccept) {
+            /*
+             * Tell the new node what its host id is
+             */
+            jsObj.put("newHostId", hostId);
 
-        /*
-         * Echo back the address that the node connected from
-         */
-        jsObj.put("reportedAddress",
-                ((InetSocketAddress)socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
+            /*
+             * Echo back the address that the node connected from
+             */
+            jsObj.put("reportedAddress",
+                      ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
 
-        /*
-         * Create an array containing an ad for every node including this one
-         * even though the connection has already been made
-         */
-        JSONArray jsArray = new JSONArray();
-        JSONObject hostObj = new JSONObject();
-        hostObj.put("hostId", getHostId());
-        hostObj.put("address",
-                m_config.internalInterface.isEmpty() ?
+            /*
+             * Create an array containing an ad for every node including this one
+             * even though the connection has already been made
+             */
+            JSONArray jsArray = new JSONArray();
+            JSONObject hostObj = new JSONObject();
+            hostObj.put("hostId", getHostId());
+            hostObj.put("address",
+                        m_config.internalInterface.isEmpty() ?
                         socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
-        hostObj.put("port", m_config.internalPort);
-        jsArray.put(hostObj);
-        for (Map.Entry<Integer, ForeignHost>  entry : m_foreignHosts.entrySet()) {
-            if (entry.getValue() == null) continue;
-            int hsId = entry.getKey();
-            ForeignHost fh = entry.getValue();
-            hostObj = new JSONObject();
-            hostObj.put("hostId", hsId);
-            hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
-            hostObj.put("port", fh.m_listeningAddress.getPort());
+            hostObj.put("port", m_config.internalPort);
             jsArray.put(hostObj);
+            for (Map.Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
+                if (entry.getValue() == null) continue;
+                int hsId = entry.getKey();
+                ForeignHost fh = entry.getValue();
+                hostObj = new JSONObject();
+                hostObj.put("hostId", hsId);
+                hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
+                hostObj.put("port", fh.m_listeningAddress.getPort());
+                jsArray.put(hostObj);
+            }
+            jsObj.put("hosts", jsArray);
+        } else {
+            jsObj.put("reason", errMsg);
         }
-        jsObj.put("hosts", jsArray);
+
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");
         ByteBuffer message = ByteBuffer.allocate(4 + messageBytes.length);
         message.putInt(messageBytes.length);

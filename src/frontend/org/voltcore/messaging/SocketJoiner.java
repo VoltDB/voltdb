@@ -29,7 +29,10 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
@@ -78,7 +81,7 @@ public class SocketJoiner {
         /*
          * A node wants to join the socket mesh
          */
-        public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress ) throws Exception;
+        public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, String request) throws Exception;
 
         public void notifyAsPaused();
         /*
@@ -113,7 +116,7 @@ public class SocketJoiner {
      */
     String m_reportedInternalInterface;
 
-    public boolean start(final CountDownLatch externalInitBarrier) {
+    public boolean start(final CountDownLatch externalInitBarrier, String request) {
         boolean retval = false;
 
         // Try to become leader regardless of configuration.
@@ -177,9 +180,29 @@ public class SocketJoiner {
             /*
              * Not a leader, need to connect to the primary to join the cluster.
              * Once connectToPrimary is finishes this node will be physically connected
-             * to all nodes with a working agreement site
+             * to all nodes with a working agreement site.
+             *
+             * The request to join the cluster may be rejected, e.g. multiple hosts
+             * rejoining at the same time. In this case, the code will retry.
              */
-            connectToPrimary();
+            long retryInterval = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
+            final Random salt = new Random();
+            while (true) {
+                try {
+                    connectToPrimary(request);
+                    break;
+                } catch (CoreUtils.RetryException e) {
+                    LOG.warn(String.format("Request to join cluster mesh is rejected, retrying in %d seconds. %s",
+                                           retryInterval, e.getMessage()));
+                    try { Thread.sleep(TimeUnit.SECONDS.toMillis(retryInterval)); } catch (InterruptedException e1) {}
+                    // exponential back off with a salt to avoid collision. Max is 5 minutes.
+                    retryInterval = (Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) +
+                                     salt.nextInt(Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30)));
+                } catch (Exception e) {
+                    hostLog.error("Failed to establish socket mesh.", e);
+                    throw new RuntimeException(e);
+                }
+            }
         }
 
         /*
@@ -387,7 +410,7 @@ public class SocketJoiner {
 
             hostLog.info("Received request type " + type);
             if (type.equals("REQUEST_HOSTID")) {
-                m_joinHandler.requestJoin( sc, listeningAddress);
+                m_joinHandler.requestJoin( sc, listeningAddress, jsObj.optString("request"));
             } else if (type.equals("PUBLISH_HOSTID")){
                 m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress);
             } else {
@@ -487,7 +510,8 @@ public class SocketJoiner {
      * it must connect to the leader which will generate a host id and
      * advertise the rest of the cluster so that connectToPrimary can connect to it
      */
-    private void connectToPrimary() {
+    private void connectToPrimary(String request) throws Exception
+    {
         // collect clock skews from all nodes
         List<Long> skews = new ArrayList<Long>();
 
@@ -533,6 +557,7 @@ public class SocketJoiner {
 
             JSONObject jsObj = new JSONObject();
             jsObj.put("type", "REQUEST_HOSTID");
+            jsObj.put("request", request);
 
             // put the version compatibility status in the json
             jsObj.put("versionString", localVersionString);
@@ -569,6 +594,12 @@ public class SocketJoiner {
 
             // read the json response sent by HostMessenger with HostID
             JSONObject jsonObj = readJSONObjFromWire(socket, remoteAddress);
+
+            // check if the membership request is accepted
+            if (!jsonObj.optBoolean("accepted", true)) {
+                socket.close();
+                throw new CoreUtils.RetryException(jsonObj.getString("reason"));
+            }
 
             /*
              * Get the generated host id, and the interface we connected on
@@ -682,7 +713,7 @@ public class SocketJoiner {
 
             /*
              * Notify the leader that we connected to the entire cluster, it will then go
-             * and queue a txn for our agreement site to join the lcuster
+             * and queue a txn for our agreement site to join the cluster
              */
             ByteBuffer joinCompleteBuffer = ByteBuffer.allocate(1);
             while (joinCompleteBuffer.hasRemaining()) {
@@ -696,9 +727,6 @@ public class SocketJoiner {
             m_joinHandler.notifyOfHosts( m_localHostId, hostIds, hostSockets, listeningAddresses);
         } catch (ClosedByInterruptException e) {
             //This is how shutdown is done
-        } catch (Exception e) {
-            hostLog.error("Failed to establish socket mesh.", e);
-            throw new RuntimeException(e);
         }
     }
 

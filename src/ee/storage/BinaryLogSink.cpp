@@ -342,7 +342,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
+    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
                                                                                       remoteClusterId,
                                                                                       UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                                       drTable->name(),
