@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 
@@ -43,6 +44,7 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
     private final Client m_client;
     private final long m_initialRetryIntervalMS;
     private final long m_maxRetryIntervalMS;
+    private final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
     protected ReconnectStatusListener(Client client, long initialRetryIntervalMS, long maxRetryIntervalMS) {
         if (initialRetryIntervalMS < 1) {
@@ -73,6 +75,14 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
         });
     }
 
+    public void close() {
+        m_shouldContinue.set(false);
+        executor.shutdownNow();
+        try {
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {}
+    }
+
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
@@ -83,7 +93,7 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
      */
     private void connectToOneServerWithRetry(String hostname, int port) {
         long sleep = m_initialRetryIntervalMS;
-        while (true) {
+        while (m_shouldContinue.get()) {
             try {
                 m_client.createConnection(hostname, port);
                 LOG.info(String.format("Connected to VoltDB node at %s:%d.", hostname, port));
