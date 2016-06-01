@@ -1,1 +1,0 @@
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Encountered stack overflow error. Try reducing the number of predicate expressions in the query.

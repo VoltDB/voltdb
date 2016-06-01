@@ -1,0 +1,400 @@
+
+--- Empty Class List -----------------------
+
+
+
+create procedure from class sqlcmdtest.Trivial;
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+exec Trivial;
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ----------------------------------------
+Trivial                   
+
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+
+--- Active Procedure Classes  ------------------------------
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Trivial;
+
+remove classes sqlcmdtest.*;
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+
+--- Active Procedure Classes  ------------------------------
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+create procedure from class sqlcmdtest.Trivial;
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+--- Empty Class List -----------------------
+
+
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+create procedure from class sqlcmdtest.Breakable0;
+Command succeeded.
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ----------------------------------------
+Breakable0                
+
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+
+--- Active Procedure Classes  ------------------------------
+ sqlcmdtest.Breakable0                 
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Breakable0;
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+drop procedure Breakable0;
+Command succeeded.
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+--- Empty Class List -----------------------
+
+
+
+load classes sqlcmdtest-killed-procs.jar;
+
+--- Empty Class List -----------------------
+
+
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+create procedure from class sqlcmdtest.Breakable0;
+Command succeeded.
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ----------------------------------------
+Breakable0                
+
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+
+--- Active Procedure Classes  ------------------------------
+ sqlcmdtest.Breakable0                 
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Breakable0;
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+drop procedure Breakable0;
+Command succeeded.
+--- System Procedures --------------------------------------
+@Explain                  	varchar
+@ExplainProc              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@Pause                    
+@Promote                  
+@Quiesce                  
+@ResetDR                  
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             	varchar
+@SnapshotScan             	varchar
+@SnapshotStatus           
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+--- Empty Class List -----------------------
+
+

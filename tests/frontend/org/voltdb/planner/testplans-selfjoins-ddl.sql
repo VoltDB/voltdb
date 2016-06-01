@@ -27,3 +27,8 @@ CREATE TABLE R2 (
 
 CREATE INDEX R2AC ON R2 (A,C);
 CREATE INDEX R2C ON R2 (C);
+
+CREATE TABLE geo (
+    poly geography NOT NULL,
+    pt geography_point NOT NULL
+);

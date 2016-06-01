@@ -400,7 +400,7 @@ public class TestJoinOrder extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(true, TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder");
+        setupSchema(true, TestJoinOrder.class.getResource("testplans-joinorder-ddl.sql"), "testjoinorder");
     }
 
     @Override

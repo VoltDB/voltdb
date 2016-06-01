@@ -458,7 +458,7 @@ public class plannerTester {
                 AbstractPlanNode pn = pnList.get(0);
                 if (pnList.size() == 2) {// multi partition query plan
                     assert(pnList.get(1) instanceof SendPlanNode);
-                    if ( ! pn.reattachFragment((SendPlanNode) pnList.get(1))) {
+                    if ( ! pn.reattachFragment(pnList.get(1))) {
                         System.err.println("Receive plan node not found in reattachFragment.");
                     }
                 }

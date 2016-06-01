@@ -711,6 +711,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
 
+        if (colExpr.getValueType() == VoltType.BOOLEAN) {
+            throw new PlanningErrorException(
+                    "A SELECT clause does not allow a BOOLEAN expression. " +
+                    "consider using CASE WHEN to decode the BOOLEAN expression " +
+                    "into a value of some other type.");
+        }
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
         if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
             AbstractExpression expr = new OperatorExpression();;
