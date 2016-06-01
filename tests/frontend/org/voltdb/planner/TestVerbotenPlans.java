@@ -23,59 +23,34 @@
 
 package org.voltdb.planner;
 
-import java.io.File;
 import java.io.IOException;
 
-import junit.framework.TestCase;
+public class TestVerbotenPlans extends PlannerTestCase {
 
-import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
+    @Override
+    protected void setUp() throws Exception {
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestVerbotenPlans.class.getResource("testplans-selfjoins-ddl.sql"),
+                "testverboten", planForSinglePartitionFalse);
+    }
 
-public class TestVerbotenPlans extends TestCase {
 
     public void testTwoPartitionedTableJoin() throws IOException {
-        final String simpleSchema =
-            "CREATE TABLE OBJECT_DETAIL (" +
-                "OBJECT_DETAIL_ID INTEGER NOT NULL, " +
-                "NAME VARCHAR(256) NOT NULL, " +
-                "DESCRIPTION VARCHAR(1024) NOT NULL, " +
-                "PRIMARY KEY (OBJECT_DETAIL_ID) );\n" +
-            "CREATE TABLE ASSET (" +
-                "ASSET_ID INTEGER NOT NULL, " +
-                "OBJECT_DETAIL_ID INTEGER NOT NULL, " +
-                "PRIMARY KEY (ASSET_ID) );";
+        // The important aspect is that one of the tables is NOT being joined on its
+        // partition key (always "a" in this schema).
+        failToCompile("SELECT p1.a, p1.c, p2.a " +
+                "FROM p1, p2 " +
+                "WHERE p1.a = p2.c;",
+                "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+    }
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='SelectEng490'>" +
-            "<sql>SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID, OD.OBJECT_DETAIL_ID " +
-                "FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "<partitions>" +
-            "<partition table='ASSET' column='ASSET_ID' />" +
-            "<partition table='OBJECT_DETAIL' column='OBJECT_DETAIL_ID' />" +
-            "</partitions>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, "testout.jar");
-
-        assertFalse(success);
+    public void testBooleanResultColumn() throws IOException {
+        // The important aspect is the column calculated from a boolean function.
+        failToCompile("SELECT geo1.poly, geo2.pt, contains(geo1.poly, geo2.pt) " +
+                "FROM geo geo1, geo geo2; ",
+                "A SELECT clause does not allow a BOOLEAN expression. " +
+                        "consider using CASE WHEN to decode the BOOLEAN expression " +
+                        "into a value of some other type.");
     }
 
 }

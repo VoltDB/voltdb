@@ -24,29 +24,28 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 
 /**
  *
  */
-public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeList> {
+public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
+    private static final String EXECUTE_LIST_MEMBER_NAME = "EXECUTE_LIST";
+    private static final String EXECUTE_LISTS_MEMBER_NAME = "EXECUTE_LISTS";
 
-    public enum Members {
-        EXECUTE_LIST,
-        EXECUTE_LISTS;
-    }
-
-    protected List<List<AbstractPlanNode>> m_executeLists = new ArrayList<List<AbstractPlanNode>>();
+    private PlanNodeTree m_tree;
+    protected List<List<AbstractPlanNode>> m_executeLists = new ArrayList<>();
 
     public PlanNodeList() {
         super();
     }
 
     public PlanNodeList(AbstractPlanNode root_node) {
-        super(root_node);
+        m_tree = new PlanNodeTree(root_node);
         try {
             // Construct execute lists for all sub statement
-            for(List<AbstractPlanNode> nodeList : m_planNodesListMap.values()) {
+            for (List<AbstractPlanNode> nodeList : m_tree.m_planNodesListMap.values()) {
                 List<AbstractPlanNode> list = constructList(nodeList);
                 m_executeLists.add(list);
             }
@@ -65,10 +64,14 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         return m_executeLists.get(idx);
     }
 
+    public AbstractPlanNode getRootPlanNode() {
+        return m_tree.getRootPlanNode();
+    }
+
     @Override
     public String toString() {
-        String ret = "EXECUTE LISTS: " + m_planNodesListMap.size() + " lists\n";
-        for (Map.Entry<Integer, List<AbstractPlanNode>> entry : m_planNodesListMap.entrySet()) {
+        String ret = "EXECUTE LISTS: " + m_tree.m_planNodesListMap.size() + " lists\n";
+        for (Map.Entry<Integer, List<AbstractPlanNode>> entry : m_tree.m_planNodesListMap.entrySet()) {
             List<AbstractPlanNode> nodeList = entry.getValue();
             ret = "\tEXECUTE LIST id:" + entry.getKey() + " ," + nodeList.size() + " nodes\n";
             for (int ctr = 0, cnt = nodeList.size(); ctr < cnt; ctr++) {
@@ -150,22 +153,23 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     @Override
     public String toJSONString() {
-        JSONStringer stringer = new JSONStringer();
         try {
+            JSONStringer stringer = new JSONStringer();
             stringer.object();
-            super.toJSONString(stringer);
+            m_tree.toJSONString(stringer);
 
             if (m_executeLists.size() == 1) {
-                stringer.key(Members.EXECUTE_LIST.name()).array();
-                for (AbstractPlanNode node : m_executeLists.get(0)) {
+                stringer.key(EXECUTE_LIST_MEMBER_NAME).array();
+                List<AbstractPlanNode> list = m_executeLists.get(0);
+                for (AbstractPlanNode node : list) {
                     stringer.value(node.getPlanNodeId().intValue());
                 }
                 stringer.endArray(); //end execution list
             }
             else {
-                stringer.key(Members.EXECUTE_LISTS.name()).array();
+                stringer.key(EXECUTE_LISTS_MEMBER_NAME).array();
                 for (List<AbstractPlanNode> list : m_executeLists) {
-                    stringer.object().key(Members.EXECUTE_LIST.name()).array();
+                    stringer.object().key(EXECUTE_LIST_MEMBER_NAME).array();
                     for (AbstractPlanNode node : list) {
                         stringer.value(node.getPlanNodeId().intValue());
                     }
@@ -175,6 +179,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             }
 
             stringer.endObject(); //end PlanNodeList
+            return stringer.toString();
         }
         catch (JSONException e) {
             // HACK ugly ugly to make the JSON handling
@@ -185,7 +190,6 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             // Consider this the coward's way out.
             return "This JSON error message is a lie";
         }
-        return stringer.toString();
     }
 
     public String toDOTString(String name) {
