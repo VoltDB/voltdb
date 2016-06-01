@@ -75,6 +75,10 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
         });
     }
 
+    /**
+     * Interrupt and shut down the while(true) loop that tries
+     * to reconnect to a server.
+     */
     public void close() {
         m_shouldContinue.set(false);
         executor.shutdownNow();
@@ -85,8 +89,8 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
 
     /**
      * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * No timeout. This will run until the process is killed or interrupted/closed
+     * if it's not able to connect.
      *
      * @param hostname host name
      * @param port     port
