@@ -186,7 +186,7 @@ public class TestHostMessenger {
         previous.add(3);
         previous.add(4);
         // this should trip partition detection
-        assertTrue(HostMessenger.makePPDDecision(previous, current));
+        assertTrue(HostMessenger.makePPDDecision(previous, current, true));
     }
 
     @Test
@@ -203,7 +203,7 @@ public class TestHostMessenger {
         previous.add(0);
         previous.add(1);
         // this should trip partition detection
-        assertTrue(HostMessenger.makePPDDecision(previous, current));
+        assertTrue(HostMessenger.makePPDDecision(previous, current, true));
     }
 
     @Test
@@ -220,6 +220,6 @@ public class TestHostMessenger {
         previous.add(2);
         previous.add(3);
         // this should not trip partition detection
-        assertFalse(HostMessenger.makePPDDecision(previous, current));
+        assertFalse(HostMessenger.makePPDDecision(previous, current, true));
     }
 }

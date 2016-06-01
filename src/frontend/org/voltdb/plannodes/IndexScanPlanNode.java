@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +131,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
         m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        m_differentiatorMap = new HashMap<>(srcNode.m_differentiatorMap);
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
         }

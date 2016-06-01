@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -43,7 +44,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
     private final AbstractParsedStmt m_subqueryStmt;
     private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private final Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
+    private final Map<Pair<String, Integer>, Integer> m_outputColumnIndexMap = new HashMap<>();
 
     private CompiledPlan m_bestCostPlan = null;
 
@@ -70,9 +71,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         int i = 0;
         for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
             String colAlias = col.alias == null? col.columnName : col.alias;
-            SchemaColumn scol = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
+            SchemaColumn scol = col.asSchemaColumn();
             m_outputColumnList.add(scol);
-            m_outputColumnIndexMap.put(colAlias, i);
+            m_outputColumnIndexMap.put(Pair.of(colAlias, col.differentiator), i);
             i++;
         }
     }
@@ -266,7 +267,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     @Override
     public void processTVE(TupleValueExpression expr, String columnName) {
-        Integer idx = m_outputColumnIndexMap.get(columnName);
+        Integer idx = m_outputColumnIndexMap.get(Pair.of(columnName, expr.getDifferentiator()));
         if (idx == null) {
             throw new PlanningErrorException("Mismatched columns " + columnName + " in subquery");
         }
