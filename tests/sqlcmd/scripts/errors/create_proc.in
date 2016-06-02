@@ -1,10 +1,14 @@
+-- Hack! Table t was found to be sometimes(?) lingering from unrelaed prior tests.
+-- Keep it from polluting show procedure output.
+drop table t if exists;
+
 show classes;
 
 -- Expect to fail because the jar has not been loaded yet.
 create procedure from class sqlcmdtest.Trivial;
 show procedures;
 
--- Expect to fail as Breakable should have failed proc creation.
+-- Expect to fail as Trivial should have failed proc creation.
 exec Trivial;
 
 -- This succeeds in spite of how the jar has been sabotaged by dropping

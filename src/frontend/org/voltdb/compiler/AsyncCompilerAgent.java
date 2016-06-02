@@ -398,6 +398,25 @@ public class AsyncCompilerAgent {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
             catch (StackOverflowError error) {
+                // Overly long predicate expressions can cause a
+                // StackOverflowError in various code paths that may be
+                // covered by different StackOverflowError/Error/Throwable
+                // catch blocks. The factors that determine which code path
+                // and catch block get activated appears to be platform
+                // sensitive for reasons we do not entirely understand.
+                // To generate a deterministic error message regardless of
+                // these factors, purposely defer StackOverflowError handling
+                // for as long as possible, so that it can be handled
+                // consistently by a minimum number of high level callers like
+                // this one.
+                // This eliminates the need to synchronize error message text
+                // in multiple catch blocks, which becomes a problem when some
+                // catch blocks lead to re-wrapping of exceptions which tends
+                // to adorn the final error text in ways that are hard to track.
+                // Deferring StackOverflowError handling MAY mean ADDING
+                // explicit StackOverflowError catch blocks that re-throw
+                // the error to bypass the generic catch blocks
+                // for Error or Throwable on the same try block.
                 errorMsgs.add("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");
             }

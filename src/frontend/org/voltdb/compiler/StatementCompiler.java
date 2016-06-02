@@ -181,27 +181,124 @@ public abstract class StatementCompiler {
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
         try {
-            if (xml != null) {
-                planner.parseFromXml(xml);
+            try {
+                if (xml != null) {
+                    planner.parseFromXml(xml);
+                }
+                else {
+                    planner.parse();
+                }
+
+                plan = planner.plan();
+                assert(plan != null);
             }
-            else {
-                planner.parse();
+            catch (PlanningErrorException e) {
+                // These are normal expectable errors -- don't normally need a stack-trace.
+                String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
+                if (e.getMessage() != null) {
+                    msg += " Error: \"" + e.getMessage() + "\"";
+                }
+                throw compiler.new VoltCompilerException(msg);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
             }
 
-            plan = planner.plan();
-            assert(plan != null);
-        }
-        catch (PlanningErrorException e) {
-            // These are normal expectable errors -- don't normally need a stack-trace.
-            String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
-            if (e.getMessage() != null) {
-                msg += " Error: \"" + e.getMessage() + "\"";
+            // There is a hard-coded limit to the number of parameters that can be passed to the EE.
+            if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
+                throw compiler.new VoltCompilerException(
+                    "The statement's parameter count " + plan.parameters.length +
+                    " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
             }
-            throw compiler.new VoltCompilerException(msg);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
+
+            // Check order and content determinism before accessing the detail which
+            // it caches.
+            boolean orderDeterministic = plan.isOrderDeterministic();
+            catalogStmt.setIsorderdeterministic(orderDeterministic);
+            boolean contentDeterministic = plan.isContentDeterministic()
+                                           && (orderDeterministic || !plan.hasLimitOrOffset());
+            catalogStmt.setIscontentdeterministic(contentDeterministic);
+            String nondeterminismDetail = plan.nondeterminismDetail();
+            catalogStmt.setNondeterminismdetail(nondeterminismDetail);
+
+            catalogStmt.setSeqscancount(plan.countSeqScans());
+
+            // Input Parameters
+            // We will need to update the system catalogs with this new information
+            for (int i = 0; i < plan.parameters.length; ++i) {
+                StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+                catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
+                catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
+                catalogParam.setIndex(i);
+            }
+
+            catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
+
+            // output the explained plan to disk (or caller) for debugging
+            StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.
+            planDescription.append("SQL: ").append(plan.sql);
+            // Only output the cost in debug mode.
+            // Cost seems to only confuse people who don't understand how this number is used/generated.
+            if (VoltCompiler.DEBUG_MODE) {
+                planDescription.append("\nCOST: ").append(plan.cost);
+            }
+            planDescription.append("\nPLAN:\n");
+            planDescription.append(plan.explainedPlan);
+            String planString = planDescription.toString();
+            // only write to disk if compiler is in standalone mode
+            if (compiler.standaloneCompiler) {
+                BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
+            }
+            compiler.captureDiagnosticContext(planString);
+
+            // build usage links for report generation and put them in the catalog
+            CatalogUtil.updateUsageAnnotations(db, catalogStmt, plan.rootPlanGraph, plan.subPlanGraph);
+
+            // set the explain plan output into the catalog (in hex) for reporting
+            catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
+
+            // compute a hash of the plan
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance("SHA-1");
+            }
+            catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+                assert(false);
+                System.exit(-1); // should never happen with healthy jvm
+            }
+
+            // Now update our catalog information
+            PlanFragment planFragment = catalogStmt.getFragments().add("0");
+            planFragment.setHasdependencies(plan.subPlanGraph != null);
+            // mark a fragment as non-transactional if it never touches a persistent table
+            planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
+            planFragment.setMultipartition(plan.subPlanGraph != null);
+            byte[] planBytes = writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+            md.update(planBytes, 0, planBytes.length);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(planBytes);
+            planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
+
+            if (plan.subPlanGraph != null) {
+                planFragment = catalogStmt.getFragments().add("1");
+                planFragment.setHasdependencies(false);
+                planFragment.setNontransactional(false);
+                planFragment.setMultipartition(true);
+                byte[] subBytes = writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+                // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+                md.reset();
+                md.update(subBytes);
+                planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
+            }
+
+            // Planner should have rejected with an exception any statement with an unrecognized type.
+            int validType = catalogStmt.getQuerytype();
+            assert(validType != QueryType.INVALID.getValue());
+
+            return false;
         }
         catch (StackOverflowError error) {
             String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
@@ -209,100 +306,6 @@ public abstract class StatementCompiler {
                     "Try reducing the number of predicate expressions in the query.\"";
             throw compiler.new VoltCompilerException(msg);
         }
-
-        // There is a hard-coded limit to the number of parameters that can be passed to the EE.
-        if (plan.parameters.length > CompiledPlan.MAX_PARAM_COUNT) {
-            throw compiler.new VoltCompilerException(
-                "The statement's parameter count " + plan.parameters.length +
-                " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
-        }
-
-        // Check order and content determinism before accessing the detail which
-        // it caches.
-        boolean orderDeterministic = plan.isOrderDeterministic();
-        catalogStmt.setIsorderdeterministic(orderDeterministic);
-        boolean contentDeterministic = plan.isContentDeterministic()
-                                       && (orderDeterministic || !plan.hasLimitOrOffset());
-        catalogStmt.setIscontentdeterministic(contentDeterministic);
-        String nondeterminismDetail = plan.nondeterminismDetail();
-        catalogStmt.setNondeterminismdetail(nondeterminismDetail);
-
-        catalogStmt.setSeqscancount(plan.countSeqScans());
-
-        // Input Parameters
-        // We will need to update the system catalogs with this new information
-        for (int i = 0; i < plan.parameters.length; ++i) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-            catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
-            catalogParam.setIndex(i);
-        }
-
-        catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
-
-        // output the explained plan to disk (or caller) for debugging
-        StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.
-        planDescription.append("SQL: ").append(plan.sql);
-        // Only output the cost in debug mode.
-        // Cost seems to only confuse people who don't understand how this number is used/generated.
-        if (VoltCompiler.DEBUG_MODE) {
-            planDescription.append("\nCOST: ").append(plan.cost);
-        }
-        planDescription.append("\nPLAN:\n");
-        planDescription.append(plan.explainedPlan);
-        String planString = planDescription.toString();
-        // only write to disk if compiler is in standalone mode
-        if (compiler.standaloneCompiler) {
-            BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
-        }
-        compiler.captureDiagnosticContext(planString);
-
-        // build usage links for report generation and put them in the catalog
-        CatalogUtil.updateUsageAnnotations(db, catalogStmt, plan.rootPlanGraph, plan.subPlanGraph);
-
-        // set the explain plan output into the catalog (in hex) for reporting
-        catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
-
-        // compute a hash of the plan
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-            assert(false);
-            System.exit(-1); // should never happen with healthy jvm
-        }
-
-        // Now update our catalog information
-        PlanFragment planFragment = catalogStmt.getFragments().add("0");
-        planFragment.setHasdependencies(plan.subPlanGraph != null);
-        // mark a fragment as non-transactional if it never touches a persistent table
-        planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
-        planFragment.setMultipartition(plan.subPlanGraph != null);
-        byte[] planBytes = writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
-        md.update(planBytes, 0, planBytes.length);
-        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
-        md.reset();
-        md.update(planBytes);
-        planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
-
-        if (plan.subPlanGraph != null) {
-            planFragment = catalogStmt.getFragments().add("1");
-            planFragment.setHasdependencies(false);
-            planFragment.setNontransactional(false);
-            planFragment.setMultipartition(true);
-            byte[] subBytes = writePlanBytes(compiler, planFragment, plan.subPlanGraph);
-            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
-            md.reset();
-            md.update(subBytes);
-            planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
-        }
-
-        // Planner should have rejected with an exception any statement with an unrecognized type.
-        int validType = catalogStmt.getQuerytype();
-        assert(validType != QueryType.INVALID.getValue());
-
-        return false;
     }
 
     static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
@@ -321,16 +324,8 @@ public abstract class StatementCompiler {
     throws VoltCompilerException {
         String json = null;
         // get the plan bytes
-        try {
-            PlanNodeList node_list = new PlanNodeList(planGraph);
-            json = node_list.toJSONString();
-        }
-        catch (StackOverflowError error) {
-            //
-            String msg = "Encountered stack overflow error. "
-                       + "Try reducing the number of predicate expressions in the query.";
-            throw compiler.new VoltCompilerException(msg);
-        }
+        PlanNodeList node_list = new PlanNodeList(planGraph);
+        json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
