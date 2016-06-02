@@ -133,11 +133,28 @@ begin Table                        "A table (relation) in the database"
   Column? partitioncolumn          "On which column is the table partitioned"
   int estimatedtuplecount          "A rough estimate of the number of tuples in the table; used for planning"
   MaterializedViewInfo* views      "Information about materialized views based on this table's content"
+  MaterializedViewHandler* mvHandler "Only on result table of a materialized view"
+  ViewTrigger* viewTriggers        "Only on the source table of a materialized view"
   Table? materializer              "If this is a materialized view, this field stores the source table"
   string signature                 "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                   "A maximum number of rows in a table"
   bool isDRed                      "Is this table DRed?"
   Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
+end
+
+begin ViewTrigger
+  Table? destTable
+  int tablePos
+end
+
+begin MaterializedViewHandler       "Information used to build and update a materialized view"
+  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string predicate                  "A filtering predicate"
+  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
+  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
+  IndexRef* indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
+  Statement* fallbackQueryStmts      "Statements to search for mview min/max fallback value"
+  Statement* createQuery
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
