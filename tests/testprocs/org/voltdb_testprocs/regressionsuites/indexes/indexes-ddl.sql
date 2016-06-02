@@ -126,3 +126,24 @@ CREATE TABLE varbinaryTableTree (
 );
 CREATE INDEX varbinaryTableTree_INDEX_varb2 ON varbinaryTableTree(varb2);
 CREATE INDEX varbinaryTableTree_INDEX_varb512 ON varbinaryTableTree(varb512);
+
+-- ENG-10478
+-- Sometimes we mangle boolean expressions of the form "col < 42 and col < 26661"
+-- when "col" is the same table in both conjuncts.  See TestIndexesSuite.testBooleanExpressions.
+DROP VIEW V_BTEST_R2_ABS IF EXISTS;
+DROP TABLE BTEST_R2 IF EXISTS;
+CREATE TABLE BTEST_R2 (
+    ID          INTEGER NOT NULL, 
+    WAGE        SMALLINT, 
+    DEPT        SMALLINT, 
+    AGE         SMALLINT, 
+    RENT        SMALLINT, 
+    PRIMARY KEY (ID)
+);
+CREATE VIEW V_BTEST_R2_ABS 
+    (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) 
+AS  SELECT ABS(wage), dept, count(*), sum(age), sum(rent)  
+        FROM BTEST_R2 
+        GROUP BY ABS(wage), dept;
+
+
