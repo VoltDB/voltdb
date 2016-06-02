@@ -101,9 +101,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves =
             new ArrayList<TupleValueExpression>();
+        int i = 0;
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
+            col.setDifferentiator(i);
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            ++i;
         }
         // and update their indexes against the table schema
         for (TupleValueExpression tve : output_tves)

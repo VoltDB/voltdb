@@ -259,7 +259,8 @@ public class LoadTableLoader extends BenchmarkThread {
                 log.info("CopyAndDeleteTask row count: " + m_copyDeleteDoneCount);
             } catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                Benchmark.hardStop(e);
+                log.error("CopyAndDeleteDataTask failed a procedure call for table " + m_tableName
+                        + " and the thread will now stop.", e);
             }
         }
     }
@@ -384,7 +385,8 @@ public class LoadTableLoader extends BenchmarkThread {
         }
         catch (Exception e) {
             // on exception, log and end the thread, but don't kill the process
-            Benchmark.hardStop(e);
+            log.error("LoadTableLoader failed a procedure call for table " + m_tableName
+                    + " and the thread will now stop.", e);
         } finally {
             cdtask.shutdown();
             try {
