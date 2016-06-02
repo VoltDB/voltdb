@@ -798,6 +798,7 @@ class AdminAdvancedTest extends TestBase {
         then:"Check if DiskLimit is displayed"
          waitFor(10){page.overview.diskLimit.isDisplayed()}
         when:"Open Edit Disk Limit"
+        println("Opening Disk Limit Popup")
         page.overview.openEditDiskLimitPopup()
         then:"check elements"
         waitFor(30){page.overview.lnkAddNewFeature.isDisplayed()}
