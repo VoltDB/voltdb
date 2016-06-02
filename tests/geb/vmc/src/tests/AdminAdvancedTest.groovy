@@ -792,7 +792,7 @@ class AdminAdvancedTest extends TestBase {
         page.overview.diskLimit.click()
     }
 
-    def VerifyAddDiskLimitForSNAPSHOTSFeature(){
+    def VerifyAddDiskLimitForSNAPSHOTFeature(){
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
