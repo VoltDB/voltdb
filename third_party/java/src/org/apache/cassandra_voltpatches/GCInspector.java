@@ -135,12 +135,12 @@ public class GCInspector
                     double usage = (double) memoryUsed / memoryMax;
 
                     String usageStr = String.format("%.2f", usage * 100);
-                    String memoryMaxStr = String.format("%.2f", (double) (memoryMax / 1000000));
+                    String memoryMaxStr = String.format("%.2f", (double) memoryMax / 1000000);
 
-                    if (50.0 < usage && usage < 60.0)
+                    if (.5 <= usage && usage < .6)
                     {
                         logger.info("Heap is " + usageStr + "% full out of " + memoryMaxStr + "MB.");
-                    } else if (60.0 < usage)
+                    } else if (.6 <= usage)
                     {
                         logger.warn("Heap is " + usageStr + "% full out of " + memoryMaxStr + "MB.");
                     }
