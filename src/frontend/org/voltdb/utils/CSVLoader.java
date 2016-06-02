@@ -109,6 +109,11 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static final boolean DEFAULT_UPSERT_MODE = false;
     /**
+     * First line is column name?
+     */
+    public static final boolean DEFAULT_HEADER = false;
+    
+    /**
      * Used for testing only.
      */
 
@@ -298,6 +303,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
          */
         @Option(desc = "Batch Size for processing.")
         public int batch = 200;
+        
+        @Option(desc = "First line of csv file is column name.", hasArg = false)
+        boolean header = DEFAULT_HEADER;
 
         /**
          * Table name to insert CSV data into.
