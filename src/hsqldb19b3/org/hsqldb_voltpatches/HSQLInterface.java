@@ -43,20 +43,20 @@ import org.voltcore.logging.VoltLogger;
  * </ul>
  */
 public class HSQLInterface {
-    private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
+    private static final VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
 
-    static public String XML_SCHEMA_NAME = "databaseschema";
+    public static final String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
      */
-    static public String AUTO_GEN_MATVIEW = "MATVIEW_PK_";
-    static public String AUTO_GEN_MATVIEW_IDX = AUTO_GEN_MATVIEW + "INDEX";
-    static public String AUTO_GEN_MATVIEW_CONST = AUTO_GEN_MATVIEW + "CONSTRAINT";
-    static public String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
-    static public String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
-    static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
-    static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
-    static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
+    public static final String AUTO_GEN_MATVIEW = "MATVIEW_PK_";
+    public static final String AUTO_GEN_MATVIEW_IDX = AUTO_GEN_MATVIEW + "INDEX";
+    public static final String AUTO_GEN_MATVIEW_CONST = AUTO_GEN_MATVIEW + "CONSTRAINT";
+    public static final String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
+    public static final String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
+    public static final String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    public static final String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    public static final String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
 
     /**
      * The spacer to use for nested XML elements
@@ -73,15 +73,18 @@ public class HSQLInterface {
     public static class HSQLParseException extends Exception {
         private static final long serialVersionUID = -7341323582748684001L;
 
-        private String message = null;
         private Integer lineNo = null;
 
+        HSQLParseException(String msg, Throwable caught) {
+            super(msg, caught);
+        }
+
         HSQLParseException(String msg) {
-            message = msg;
+            super(msg);
         }
 
         HSQLParseException(String msg, int lineNo) {
-            message = msg;
+            super(msg);
             this.lineNo = lineNo;
         }
 
@@ -89,21 +92,19 @@ public class HSQLInterface {
             return lineNo;
         }
 
-        @Override
-        public String getMessage() {
-            return message;
-        }
     }
 
     Session sessionProxy;
     // Keep track of the previous XML for each table in the schema
     Map<String, VoltXMLElement> lastSchema = new TreeMap<>();
     // empty schema for cloning and for null diffs
-    final VoltXMLElement emptySchema = new VoltXMLElement(XML_SCHEMA_NAME);
+    private static final VoltXMLElement emptySchema = new VoltXMLElement(XML_SCHEMA_NAME);
+    static {
+        emptySchema.attributes.put("name", XML_SCHEMA_NAME);
+    }
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
-        emptySchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -122,25 +123,27 @@ public class HSQLInterface {
      * through the returned instance of HSQLInterface
      */
     public static HSQLInterface loadHsqldb() {
-        Session sessionProxy = null;
+        // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
+        // This ensures that all VoltDB data paths use the same timezone for representing time.
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+
         String name = "hsqldbinstance-" + String.valueOf(instanceId) + "-" + String.valueOf(System.currentTimeMillis());
         instanceId++;
 
         HsqlProperties props = new HsqlProperties();
         try {
-            sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "", props, 0);
-        } catch (HsqlException e) {
-            e.printStackTrace();
+            Session sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "", props, 0);
+            // make HSQL case insensitive
+            sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
+
+            return new HSQLInterface(sessionProxy);
         }
-
-        // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
-        // This ensures that all VoltDB data paths use the same timezone for representing time.
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
-
-        // make HSQL case insensitive
-        sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
-
-        return new HSQLInterface(sessionProxy);
+        catch (HsqlException caught) {
+            m_logger.warn("Unexpected error initializing the SQL parser",
+                    caught);
+            caught.printStackTrace();
+            throw caught;
+        }
     }
 
     /**
@@ -223,7 +226,7 @@ public class HSQLInterface {
             tableXMLNew = emptySchema;
         }
 
-        // the old table can be null for CREATE TABLE of for IF EXISTS stuff
+        // the old table can be null for CREATE TABLE or for IF EXISTS stuff
         if (tableXMLOld == null) {
             tableXMLOld = emptySchema;
         }
@@ -286,7 +289,8 @@ public class HSQLInterface {
         for (HSQLFileParser.Statement stmt : stmts) {
             try {
                 runDDLCommand(stmt.statement);
-            } catch (HSQLParseException e) {
+            }
+            catch (HSQLParseException e) {
                 e.lineNo = stmt.lineNo;
                 throw e;
             }
@@ -310,16 +314,34 @@ public class HSQLInterface {
 
         try {
             cs = sessionProxy.compileStatement(sql);
-        } catch( HsqlException hex) {
+        }
+        catch (HsqlException caught) {
             // a switch in case we want to give more error details on additional error codes
-            switch( hex.getErrorCode()) {
+            switch(caught.getErrorCode()) {
             case -ErrorCode.X_42581:
-                throw new HSQLParseException("SQL Syntax error in \"" + sql + "\" " + hex.getMessage());
+                throw new HSQLParseException(
+                        "SQL Syntax error in \"" + sql + "\" " + caught.getMessage(),
+                        caught);
             default:
-                throw new HSQLParseException(hex.getMessage());
+                throw new HSQLParseException("Error in \"" + sql + "\" " + caught.getMessage(), caught);
             }
-        } catch (Throwable t) {
-            throw new HSQLParseException(t.getMessage());
+        }
+        catch (Throwable caught) {
+            // Expectable user errors should have been thrown as HSQLException.
+            // So, this throwable should be an unexpected system error.
+            // The details of these arbitrary Throwables are not typically
+            // useful to an end user reading an error message.
+            // They should be logged.
+            m_logger.error("Unexpected error in the SQL parser for statement \"" + sql + "\" ",
+                    caught);
+            // The important thing for the end user is that
+            // they be notified that there is a system error involved,
+            // suggesting that it is not their fault -- though they MAY be
+            // able to work around the issue with the help of VoltDB support
+            // (especially if they can provide the log traces).
+            throw new HSQLParseException(
+                    "An unexpected system error was logged by the SQL parser for statement \"" + sql + "\" ",
+                    caught);
         }
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
@@ -330,18 +352,20 @@ public class HSQLInterface {
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
-       if (m_logger.isDebugEnabled()) {
-           try {
-               /*
-                * Sometimes exceptions happen.
-                */
-               m_logger.debug(String.format("SQL: %s\n", sql));;
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
-           } catch (Exception ex) {
-               System.out.printf("Exception: %s\n", ex.getMessage());
-               ex.printStackTrace(System.out);
-           }
+        if (m_logger.isDebugEnabled()) {
+            try {
+                /*
+                 * Sometimes exceptions happen.
+                 */
+                m_logger.debug(String.format("SQL: %s\n", sql));;
+                m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
+                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+            }
+            catch (Exception caught) {
+                m_logger.warn("Unexpected error in the SQL parser",
+                        caught);
+                caught.printStackTrace(System.out);
+            }
         }
 
         // this releases some small memory hsql uses that builds up over time if not
@@ -456,9 +480,11 @@ public class HSQLInterface {
                 assert(child.children.size() == 1);
                 inlist.children.addAll(child.children);
             }
-        } else if (subqueryElem != null) {
+        }
+        else if (subqueryElem != null) {
             inlist = subqueryElem;
-        } else {
+        }
+        else {
             assert valueElem != null;
             inlist = valueElem;
         }
@@ -481,8 +507,9 @@ public class HSQLInterface {
         try {
             String schemaName = sessionProxy.getSchemaName(null);
             System.out.println("*** Tables For Schema: " + schemaName + " ***");
-        } catch (HsqlException e) {
-            e.printStackTrace();
+        }
+        catch (HsqlException caught) {
+            caught.printStackTrace();
         }
 
         // load all the tables
@@ -551,7 +578,7 @@ public class HSQLInterface {
     }
 
     /**
-     * Get an serialized XML representation of the a particular table.
+     * Get a serialized XML representation of a particular table.
      */
     public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
         VoltXMLElement xml = emptySchema.duplicate();
@@ -574,20 +601,20 @@ public class HSQLInterface {
         return null;
     }
 
-    /**
-     * This code was repeated a lot so I factored it out.
-     */
     private HashMappedList getHSQLTables() {
-        String schemaName = null;
         try {
+            String schemaName = null;
             schemaName = sessionProxy.getSchemaName(null);
-        } catch (HsqlException e) {
-            e.printStackTrace();
+            // search all the tables XXX probably could do this non-linearly,
+            //  but i don't know about case-insensitivity yet
+            SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+            return schemaManager.getTables(schemaName);
         }
-        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+        catch (HsqlException caught) {
+            m_logger.warn("Unexpected error in the SQL parser",
+                    caught);
+            return new HashMappedList();
+        }
 
-        // search all the tables XXX probably could do this non-linearly,
-        //  but i don't know about case-insensitivity yet
-        return schemaManager.getTables(schemaName);
     }
 }

@@ -239,11 +239,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
 
-        // Finally, resolve predicates
-        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
-
         // Resolve subquery expression indexes
         ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
         ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);

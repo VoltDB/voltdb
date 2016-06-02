@@ -396,7 +396,12 @@ public class AsyncCompilerAgent {
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
-            } catch (AssertionError ae) {
+            }
+            catch (StackOverflowError error) {
+                errorMsgs.add("Encountered stack overflow error. " +
+                        "Try reducing the number of predicate expressions in the query.");
+            }
+            catch (AssertionError ae) {
                 errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }

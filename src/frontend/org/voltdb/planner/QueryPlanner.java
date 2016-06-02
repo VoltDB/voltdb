@@ -173,11 +173,6 @@ public class QueryPlanner {
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
         }
-        catch (StackOverflowError error) {
-            String msg = "Encountered stack overflow error. " +
-                         "Try reducing the number of predicate expressions in the query.";
-            throw new PlanningErrorException(msg);
-        }
 
         if (m_isUpsert) {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));

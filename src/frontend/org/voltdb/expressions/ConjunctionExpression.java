@@ -23,11 +23,11 @@ import org.voltdb.types.ExpressionType;
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
         super(type);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
     public ConjunctionExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
     public ConjunctionExpression() {
         //
@@ -54,7 +54,7 @@ public class ConjunctionExpression extends AbstractExpression {
         // Therefore, it is safe to assume that the output is always going to be an
         // integer (for booleans)
         //
-        m_valueType = VoltType.BIGINT;
+        m_valueType = VoltType.BOOLEAN;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 

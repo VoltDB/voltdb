@@ -1123,14 +1123,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public boolean reattachFragment( SendPlanNode child ) {
-        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            if( pn.reattachFragment( child) )
+    public boolean reattachFragment(AbstractPlanNode child) {
+        for (AbstractPlanNode pn : m_children) {
+            if (pn.reattachFragment(child)) {
                 return true;
-        }
-        for( AbstractPlanNode pn : m_children ) {
-            if( pn.reattachFragment( child) )
-                return true;
+            }
         }
         return false;
     }
