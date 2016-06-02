@@ -620,6 +620,10 @@ public class QuerySpecification extends QueryExpression {
 
         Expression e = orderBy.getLeftNode();
 
+        if (e.dataType != null && e.dataType.isBooleanType()) {
+            throw Error.error(ErrorCode.X_42576);
+        }
+
         if (e.getType() != OpTypes.VALUE) {
             return;
         }

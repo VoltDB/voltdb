@@ -941,6 +941,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    public void testGroupByBooleanConstants() {
+        String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
+        for (String condition : conditions) {
+            failToCompile(String.format("SELECT count(P1.PKEY) FROM P1 GROUP BY %s", condition),
+                          "A GROUP BY clause does not allow a BOOLEAN expression.");
+        }
+    }
+
     public void testGroupByAliasENG9872() {
         // If we have an alias in a group by clause, and
         // the alias is to an aggregate, we need to reject
