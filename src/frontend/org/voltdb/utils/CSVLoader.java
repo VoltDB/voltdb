@@ -322,6 +322,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
          */
         @Override
         public void validate() {
+        	if (header && procedure != "") {
+        		exitWithMessageAndUsage("--header and --procedure options are mutually exclusive.");
+        	}
             if (maxerrors < 0) {
                 exitWithMessageAndUsage("abortfailurecount must be >=0");
             }
