@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.exception.SuperCsvException;
@@ -58,6 +59,8 @@ class CSVFileReader implements Runnable {
     private final BulkLoaderErrorHandler m_errHandler;
     private final VoltType[] m_columnTypes;
     private final int m_columnCount;
+    private Map<String, Integer> nameToCol;
+    private Map<Integer, Integer> orderMap;
 
     static {
         m_blankStrings.put(VoltType.TINYINT, "0");
@@ -86,15 +89,31 @@ class CSVFileReader implements Runnable {
     
     public boolean checkHeader() {
     	try {
-			List<String> firstline = m_listReader.read();
-			// whether num of file column is same as num of table columns
-			if (firstline.size() != m_loader.getColumnTypes().length) {
-				return false;
-			}
-		} catch (IOException ex) {
-			m_log.error("Failed to read CSV line from file: " + ex);
-		}
-    	return true;
+            List<String> firstline = m_listReader.read();
+            // whether column num matches.
+            if (firstline.size() > m_columnCount) {
+                return false;
+            } else if (firstline.size() < m_columnCount){
+            	return false;
+            } else {
+            	// whether column name matches.
+                nameToCol = m_loader.getNameToColumnMap();
+                for (String name : firstline) {
+                	if (!nameToCol.containsKey(name.toUpperCase())) {
+                		return false;
+                	}
+                }
+            }
+            orderMap = new TreeMap<Integer, Integer>();
+            for (int fileCol = 0; fileCol < firstline.size(); fileCol++) {
+                String name = firstline.get(fileCol);
+                int tableCol = nameToCol.get(name.toUpperCase());
+                orderMap.put(fileCol, tableCol);
+            }
+        } catch (IOException ex) {
+            m_log.error("Failed to read CSV line from file: " + ex);
+        }
+        return true;
     }
 
     @Override
@@ -140,6 +159,10 @@ class CSVFileReader implements Runnable {
                     }
                     continue;
                 }
+                
+                if (m_config.header) {
+                    lineValues = reorderCols(lineValues);
+                }
 
                 RowWithMetaData lineData
                         = new RowWithMetaData(m_listReader.getUntokenizedRow(),
@@ -173,7 +196,16 @@ class CSVFileReader implements Runnable {
                     + "A report will be generated with what we processed so far. Error: " + ex);
         }
     }
-
+    
+    private String[] reorderCols (String[] lineValues) {
+    	String[] reorderValues = new String[lineValues.length];
+    	for (int fileCol = 0; fileCol < lineValues.length; fileCol++) {
+            int tableCol = orderMap.get(fileCol);
+            reorderValues[tableCol] = lineValues[fileCol];
+        }
+        return reorderValues;
+    }
+    
     private String checkparams_trimspace(String[] lineValues) {
         if (lineValues.length != m_columnCount) {
             return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);

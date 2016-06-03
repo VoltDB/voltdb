@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import org.voltdb.VoltType;
 import org.voltdb.client.NoConnectionsException;
 
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -64,4 +65,6 @@ public interface CSVDataLoader {
      * Flush use this only when you think you are done and want to push everything before close/quit.
      */
     public void flush() throws ExecutionException, InterruptedException;
+    
+    public Map<String, Integer> getNameToColumnMap();
 }

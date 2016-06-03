@@ -22,6 +22,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -88,5 +90,17 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public long getFailedRows()
     {
         return m_failedInsertCount.get();
+    }
+    
+    @Override
+    public Map<String, Integer> getNameToColumnMap()
+    {
+        Map<Integer, String> colnames = m_loader.getColumnNames();
+        Map<String, Integer> nameToCol = new TreeMap<String, Integer>();
+        for (Integer colnum: colnames.keySet()) {
+            String colname = colnames.get(colnum);
+            nameToCol.put(colname, colnum);
+        }
+        return nameToCol;
     }
 }
