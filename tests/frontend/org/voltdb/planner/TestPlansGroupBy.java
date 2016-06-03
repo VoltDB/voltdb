@@ -982,7 +982,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
             fail();
         } catch (Exception ex) {
-            assertEquals("invalid GROUP BY expression:  COUNT()", ex.getMessage());
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         // Group by alias and expression
