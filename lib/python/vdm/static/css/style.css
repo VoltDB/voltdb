@@ -135,6 +135,12 @@ label.error {
 .redC, .redC a {
 	color: #ff0000;
 }
+
+.infoClass{
+    color: #ff0000;
+    margin-right: 10px
+}
+
 .left-space {
 	padding-left: 5px;
 }
