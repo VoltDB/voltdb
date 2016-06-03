@@ -308,7 +308,11 @@ class Overview extends Module {
         errorValue1 {$("#errorValueDL1")}
         errortxtName2 {$("#error_txtNameDL2")}
         errortxtName1 {$("#error_txtNameDL1")}
+<<<<<<< HEAD
 		diskLimitEdit {$("#btnEditDiskLimit") }
+=======
+        diskLimitEdit {$("#btnEditDiskLimit") }
+>>>>>>> 8a400bd1a1aa07b706e5b2c1366d071a21026ebf
 
 
             //$(class:"labelCollapsed labelExpanded", text:"Disk Limit") }
