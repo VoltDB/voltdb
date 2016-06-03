@@ -1247,9 +1247,14 @@ class StopServerAPI(MethodView):
         if 'force' in request.args:
             is_force = request.args.get('force').lower()
         else:
-            is_force = "false"
+            is_force = 'false'
 
-        if is_force == "true":
+        if 'stopserver' in request.args:
+            is_stop_server = request.args.get('stopserver').lower()
+        else:
+            is_stop_server = 'false'
+
+        if is_force == 'true':
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
@@ -1264,12 +1269,17 @@ class StopServerAPI(MethodView):
                                      500)
         else:
             try:
-                server = voltdbserver.VoltDatabase(database_id)
-                response = server.stop_server(server_id)
-                if 'Connection broken' in response:
-                    return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
+                if is_stop_server == 'true':
+                    server = voltdbserver.VoltDatabase(database_id)
+                    response = server.stop_local_server(server_id)
+                    return make_response(jsonify({'status': 200, 'statusString': response.data}))
                 else:
-                    return make_response(jsonify({'status': 200, 'statusString': response}))
+                    server = voltdbserver.VoltDatabase(database_id)
+                    response = server.stop_server(server_id)
+                    if 'Connection broken' in response:
+                        return make_response(jsonify({'status': 200, 'statusString': 'SUCCESS: Server shutdown successfully.'}))
+                    else:
+                        return make_response(jsonify({'status': 200, 'statusString': response}))
             except Exception, err:
                 print traceback.format_exc()
                 return make_response(jsonify({'status': 500, 'statusString': str(err)}),
