@@ -572,7 +572,7 @@ table td.tdROle label.error {
 }
 .startSelect {
 	margin: 0 auto;
-	padding: 75px 0 0 0;
+	padding: 75px 0 20px 0;
 
 }
 .startSelect input[type="checkbox"] {cursor:pointer;}
@@ -1620,6 +1620,9 @@ select {
 .redcData {color: #ff0000; padding-right:5px; font-size:25px;}
 .warningData {color: #ff0000;font-size: 15px;}
 .warningTxtData { position:relative; top:20px; font-weight:bold; }
+.startAdminMode { margin:10px 0 0 0; padding:0;}
+.startAdminMode input[type="checkbox"] { position:relative; top:-2px;}
+.startAdminMode label { font-weight:normal;}
 /**************Button start/Stop ends******************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
@@ -1698,7 +1701,7 @@ ul.drList {
 	float: none;
 	top: 0;
 }
-.startSelect { padding-top:95px;}
+.startSelect { padding-top:95px; padding-bottom:0;}
 }
 @media (min-width: 320px) and (max-width: 420px) {
 .directories { width:420px; }
@@ -1773,7 +1776,7 @@ ul.drList {
 .overlayWrapper {
 	width: 95.9%;
 }
-.startSelect { padding-top:105px;}
+.startSelect { padding-top:105px; padding-bottom:20px;}
 }
 .ui-menu {
 	z-index: 9999;
@@ -1786,6 +1789,7 @@ ul.drList {
 .overlayText {
 	width: 86%;
 }
+
 }
 @media (width: 480px) {
 .overlayText {
@@ -1798,8 +1802,11 @@ ul.drList {
 }
 .overlayWrapper { width:95.1%;} 
 }
+
+ }
  @media (width: 800px){
 	 .overlayWrapper { width:96.1%;}
+
  }
   @media (width: 980px){
 	 .overlayWrapper { width:96.9%;}

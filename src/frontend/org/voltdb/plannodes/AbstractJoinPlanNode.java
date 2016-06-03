@@ -19,7 +19,6 @@ package org.voltdb.plannodes;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.TreeMap;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -240,11 +239,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
 
-        // Finally, resolve predicates
-        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
-
         // Resolve subquery expression indexes
         ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
         ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
@@ -395,4 +389,23 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         return collected;
     }
 
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * Resolution of columns produced by "SELECT *" is not a problem for joins because
+     * there is always a sequential scan at the top of plans that have this problem,
+     * so just return the passed-in differentiator here.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    @Override
+    public int adjustDifferentiatorField(int differentiator) {
+        return differentiator;
+    }
 }

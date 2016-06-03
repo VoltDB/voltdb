@@ -61,7 +61,7 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
 
         if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
             throw new IllegalArgumentException(
-                    "Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
+                    "Invalid format " + formatName + ", expected \"csv\" or \"tsv\".");
         }
 
         m_separator = "csv".equalsIgnoreCase(formatName) ? ',' : '\t';
@@ -118,7 +118,7 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
         try {
             dataList = m_csvReader.read();
         } catch (IOException | SuperCsvException e) {
-            throw new FormatException("Fail to parse csv data", e);
+            throw new FormatException("Failed to parse csv data", e);
         }
         String[] data = dataList.toArray(new String[0]);
         normalize(data);
@@ -136,8 +136,8 @@ public class VoltSuperCSVFormatter implements Formatter<String> {
             } else {
                 if (m_nowhitespace && (lineValues[i].charAt(0) == ' '
                         || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
-                    throw new FormatException("Whitespace detected--nowhitespace is used");
-                } else {
+                    throw new FormatException("Whitespace detectet when nowhitespace is used");
+                } else if (m_surroundingSpacesNeedQuotes) {
                     lineValues[i] = lineValues[i].trim();
                 }
 

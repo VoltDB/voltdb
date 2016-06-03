@@ -41,6 +41,7 @@ public class SchemaColumn
     private String m_columnName;
     private String m_columnAlias;
     private AbstractExpression m_expression;
+    private int m_differentiator = -1;
 
     /**
      * Create a new SchemaColumn
@@ -75,6 +76,13 @@ public class SchemaColumn
         }
     }
 
+    public SchemaColumn(String tableName, String tableAlias, String columnName,
+            String columnAlias, AbstractExpression expression, int differentiator)
+    {
+        this(tableName, tableAlias, columnName, columnAlias, expression);
+        m_differentiator = differentiator;
+    }
+
     /**
      * Clone a schema column
      */
@@ -82,7 +90,7 @@ public class SchemaColumn
     protected SchemaColumn clone()
     {
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                m_expression);
+                                m_expression, m_differentiator);
     }
 
     /**
@@ -105,7 +113,11 @@ public class SchemaColumn
         }
 
         SchemaColumn sc = (SchemaColumn) obj;
-        return compareNames(sc) == 0;
+        if (compareNames(sc) != 0) {
+            return false;
+        }
+
+        return getDifferentiator() == sc.getDifferentiator();
     }
 
     private int nullSafeStringCompareTo(String str1, String str2) {
@@ -172,6 +184,8 @@ public class SchemaColumn
         } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
             result += m_columnAlias.hashCode();
         }
+
+        result += m_differentiator;
         return result;
     }
 
@@ -195,7 +209,7 @@ public class SchemaColumn
                     m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
-                                new_exp);
+                                new_exp, m_differentiator);
     }
 
     public String getTableName()
@@ -248,12 +262,21 @@ public class SchemaColumn
         return m_expression.getValueSize();
     }
 
+    /**
+     * Return the differentiator that can distinguish columns with the same name.
+     * This value is just the ordinal position of the SchemaColumn within its NodeSchema.
+     * @return  differentiator for this schema column
+     */
     public int getDifferentiator() {
-        if (m_expression instanceof TupleValueExpression) {
-            return ((TupleValueExpression)m_expression).getDifferentiator();
-        }
+        return m_differentiator;
+    }
 
-        return -1;
+    /**
+     * Set the differentiator value for this SchemaColumn.
+     * @param differentiator
+     */
+    public void setDifferentiator(int differentiator) {
+        m_differentiator = differentiator;
     }
 
     @Override
@@ -267,6 +290,7 @@ public class SchemaColumn
         sb.append("\tColumn Alias: ").append(m_columnAlias).append("\n");
         sb.append("\tColumn Type: ").append(getType()).append("\n");
         sb.append("\tColumn Size: ").append(getSize()).append("\n");
+        sb.append("\tDifferentiator: ").append(getDifferentiator()).append("\n");
         sb.append("\tExpression: ").append(m_expression.toString()).append("\n");
         return sb.toString();
     }
