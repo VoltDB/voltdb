@@ -576,6 +576,10 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
+        startUp(clearLocalDataDirectories, role, StartAction.CREATE);
+    }
+
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role, StartAction startAction) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -622,6 +626,11 @@ public class LocalCluster implements VoltServerConfig {
         m_cmdLines.clear();
         int oopStartIndex = 0;
 
+        assert((m_hasLocalServer && (startAction == StartAction.RECOVER)) == false)
+        : "Local servers don't yet work with RECOVER";
+        assert((clearLocalDataDirectories && (startAction == StartAction.RECOVER)) == false)
+        : "Don't clear local data with RECOVER";
+
         // create the in-process server instance.
         if (m_hasLocalServer) {
             startLocalServer(oopStartIndex, clearLocalDataDirectories);
@@ -630,7 +639,14 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
+            startOne(i, clearLocalDataDirectories, role, startAction);
+            // thread sleep is temporarily here to sync up localcluster hostid with voltdb hostid
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
