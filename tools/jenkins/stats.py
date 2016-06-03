@@ -82,6 +82,14 @@ class Stats():
         # test it
         # print self._server.jobs_count()
 
+    def jobs(self, branch):
+        if branch == None:
+            self.runCommand('help')
+            return
+        server = self.getServer()
+        url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
+        branch_job = eval(urlopen(url).read())
+        print(json.dumps(branch_job, indent=2))
 
 if __name__ == '__main__':
     stats = Stats()
@@ -89,6 +97,7 @@ if __name__ == '__main__':
     branch = None
     job = None
     build = None
+    build_range = None
     command = 'help'
 
     (options,args) = stats.getOpts()
