@@ -139,7 +139,13 @@ public final class SortAndSlice {
         try {
             index = table.createAndAddIndexStructure(null, sortOrder,
                     sortDescending, sortNullsLast, false, false, false);
-        } catch (Throwable t) {
+        }
+        catch (StackOverflowError caught) {
+            // Don't mask stack overflows.
+            // Allow them to be consistently handled in a higher-level caller.
+            throw caught;
+        }
+        catch (Throwable t) {
             throw Error.runtimeError(ErrorCode.U_S0500, "SortAndSlice");
         }
     }
