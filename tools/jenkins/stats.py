@@ -46,22 +46,16 @@ class Stats():
         -p <passwd>
         commands:
         help - display help
-        jobs <branch> - displays jobs running on the branch
-        history <branch> <job> - displays history of job on the branch
-        report <branch> <job> [build] - displays test report using build number. defaults to last completed build
-        test-history <branch> <job> [range] - displays test history ranging for range of builds
+        history <branch> <job> - displays job history
+        report <branch> [build] - displays test report using build number. defaults to last completed build
         """
         #print("command: "+command);
         if command == 'help':
             print(cmdHelp)
-        elif command == 'jobs':
-            self.jobs(branch)
         elif command == 'history':
             self.history(branch, job)
         elif command == 'report':
-            self.report(branch, job, build)
-        elif command == 'test-history':
-            self.test_history(branch, job, build_range)
+            self.report(branch, build)
         else:
             print(cmdHelp);
             exit(0)
@@ -82,14 +76,67 @@ class Stats():
         # test it
         # print self._server.jobs_count()
 
-    def jobs(self, branch):
-        if branch == None:
+    def history(self, branch, job):
+        if branch == None or job == None:
             self.runCommand('help')
             return
         server = self.getServer()
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
         branch_job = eval(urlopen(url).read())
-        print(json.dumps(branch_job, indent=2))
+        jobs = branch_job['jobs']
+
+        for j in jobs:
+            if j['name'] == job:
+                print j['url']
+                job_history = eval(urlopen(j['url'] + 'api/python').read())
+                print(json.dumps(job_history, indent=2))
+                return
+        print('Could not find job %s under branch %s' %(job, branch))
+
+    def report(self, branch, build):
+        if branch == None:
+            self.runCommand('help')
+            return
+        if build == None:
+            build = 'lastCompletedBuild'
+        server = self.getServer()
+        url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
+        branch_job = eval(urlopen(url).read())
+        jobs = branch_job['jobs']
+        all_jobs = {}
+
+        for job in jobs:
+            if job['color'] == 'red' or job['color'] == 'red_anime':
+                all_jobs[job['name']] = 'fatal'
+            elif job['color'] == 'yellow' or job['color'] == 'yellow_anime':
+                all_jobs[job['name']] = 'unstable'
+            elif job['color'] != 'disabled':
+                all_jobs[job['name']] = 'good'
+
+        for job in all_jobs:
+            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + \
+                  build + '%s/api/python'
+
+            if all_jobs[job] == 'fatal':
+                filename = job.replace('.', '-') + '-fatal.txt'
+            elif all_jobs[job] == 'unstable':
+                filename = job.replace('.', '-') + '-unstable.txt'
+            else:
+                filename = job.replace('.', '-') + '-good.txt'
+
+            report = {"report":"no info"}
+
+            try:
+                test_url = url % '/testReport'
+                print test_url
+                report = eval(urlopen(test_url).read())
+            except (HTTPError, URLError) as e:
+                print url
+                report = eval(urlopen(url).read())
+                print(e)
+
+            with open(filename, 'w') as tempfile:
+                tempfile.write(json.dumps(report, indent=2))
 
 if __name__ == '__main__':
     stats = Stats()
