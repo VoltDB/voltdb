@@ -1134,7 +1134,7 @@ public class PlanAssembler {
      * @return true if a project node is required
      */
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( false == root.planNodeClassNeedsProjectionNode()) {
+        if (!root.planNodeClassNeedsProjectionNode()) {
             return false;
         }
         // If there is a complexGroupby at his point, it means that
@@ -2123,32 +2123,23 @@ public class PlanAssembler {
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
-        SchemaColumn windowedSchemaColumn = null;
-        for (ParsedColInfo colInfo : m_parsedSelect.m_displayColumns) {
-            AbstractExpression colExpr = colInfo.expression;
-            if (colExpr instanceof WindowedExpression) {
-                windowedSchemaColumn = new SchemaColumn(colInfo.tableName,
-                                                        colInfo.tableAlias,
-                                                        colInfo.columnName,
-                                                        colInfo.alias,
-                                                        colExpr);
-                break;
-            }
-        }
-        // If we haven't set this it's probably bad news.
-        assert(windowedSchemaColumn != null);
+        ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
+        assert(colInfo != null);
+        SchemaColumn windowedSchemaColumn = colInfo.asSchemaColumn();
+
         // This will set the output schema to contain the
         // windowed schema column only.  In generateOutputSchema
         // we will add the input columns.
-        PartitionByPlanNode pnode = new PartitionByPlanNode(windowedSchemaColumn);
-        OrderByPlanNode onode = new OrderByPlanNode();
+        PartitionByPlanNode pnode = new PartitionByPlanNode();
         pnode.setWindowedColumn(windowedSchemaColumn);
+        OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.
         // to construct the output schema.
         WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
-        for (AbstractExpression partitionByExpr : windowedExpression.getPartitionByExpressions()) {
-            SortDirectionType pdir = windowedExpression.getOrderByDirectionOfExpression(partitionByExpr);
-            onode.addSort(partitionByExpr, pdir);
+        List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
+        for (AbstractExpression partitionByExpression : partitionByExpressions) {
+        	SortDirectionType pdir = SortDirectionType.DESC;
+            onode.addSort(partitionByExpression, pdir);
         }
         for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
             AbstractExpression orderByExpr = windowedExpression.getOrderByExpressions().get(idx);
@@ -2165,7 +2156,7 @@ public class PlanAssembler {
         return pnode;
     }
 
-    private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
+	private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
 
         /*

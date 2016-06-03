@@ -589,7 +589,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     /**
      * We need some enumerals which are common to PartitionByPlanNode and OrderByPlanNode
-     * and maybe others.  These are use as keys to create JSON.
+     * and maybe others.  These are used as keys to create JSON.
      */
     public enum SortMembers {
         SORT_COLUMNS,

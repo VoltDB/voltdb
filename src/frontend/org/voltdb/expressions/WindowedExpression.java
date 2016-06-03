@@ -255,25 +255,5 @@ public class WindowedExpression extends AbstractExpression {
         }
         return false;
     }
-
-    /**
-     *
-     * Given an expression, E, in the partition by list, if E is in the
-     * order by list, then return the order direction of E in that list.
-     * Otherwise, return the default value.
-     *
-     * There's got to be a better way to do this.
-     *
-     * @param partitionByExpr
-     * @return
-     */
-    public SortDirectionType getOrderByDirectionOfExpression(AbstractExpression partitionByExpr) {
-        for (int idx = 0; idx < m_orderByExpressions.size(); idx += 1) {
-            if (m_orderByExpressions.get(idx).equals(partitionByExpr)) {
-                return m_orderByDirections.get(idx);
-            }
-        }
-        return DEFAULT_ORDER_BY_DIRECTION;
-    }
 }
 

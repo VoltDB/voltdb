@@ -147,7 +147,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
-    private boolean m_hasWindowingExpression = false;
+    private boolean m_hasWindowedExpression = false;
     private boolean m_hasAverage = false;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
@@ -358,7 +358,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean needComplexAggregation () {
-        if (!hasAggregateExpression() && !isGrouped()) {
+        if (!m_hasAggregateExpression && !isGrouped()) {
             m_hasComplexAgg = false;
             return false;
         }
@@ -709,11 +709,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Check for windowed expressions.
         List<AbstractExpression> windowedExprs = ExpressionUtil.findAllExpressionsOfClass(colExpr, WindowedExpression.class);
         if (windowedExprs != null && !windowedExprs.isEmpty()) {
-            if (m_hasWindowingExpression || (windowedExprs.size() > 1)) {
+            if (m_hasWindowedExpression || (windowedExprs.size() > 1)) {
                 throw new PlanningErrorException(
                         "At most one windowed display column is supported.");
             }
-            m_hasWindowingExpression = true;
+            m_hasWindowedExpression = true;
         }
 
         if (isDistributed) {
@@ -800,7 +800,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
-        if (m_hasWindowingExpression) {
+        if (m_hasWindowedExpression) {
             throw new PlanningErrorException(
                     "Use of both windowed operations and GROUP BY is not supported.");
         }
@@ -1493,7 +1493,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean hasWindowedExpression() {
-        return m_hasWindowingExpression;
+        return m_hasWindowedExpression;
     }
 
     public boolean hasAggregateExpression() {

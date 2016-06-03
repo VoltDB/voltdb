@@ -16,11 +16,15 @@
  */
 package org.voltdb.plannodes;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -30,10 +34,14 @@ import org.voltdb.types.SortDirectionType;
  * The only one we implement now is windowed RANK.  But more
  * could be possible.
  */
-public class PartitionByPlanNode extends HashAggregatePlanNode {
+public class PartitionByPlanNode extends AbstractPlanNode {
     public enum Members {
         WINDOWED_COLUMN
     };
+
+    public PartitionByPlanNode() {
+        m_outputSchema = new NodeSchema();
+    }
 
     @Override
     public PlanNodeType getPlanNodeType() {
@@ -42,21 +50,58 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-        super.resolveColumnIndexes();
-    }
+    	/*
+    	 * We need to resolve all the tves in the partition by and
+    	 * order by expressions of the windowed expression.
+    	 */
+        assert (m_children.size() == 1);
+        m_children.get(0).resolveColumnIndexes();
+        NodeSchema input_schema = m_children.get(0).getOutputSchema();
 
-    public PartitionByPlanNode() {
-        this(null);
-    }
-
-    public PartitionByPlanNode(SchemaColumn winAggregateColumn) {
-        m_outputSchema = new NodeSchema();
-        if (winAggregateColumn != null) {
-            m_outputSchema.addColumn(winAggregateColumn.clone());
-            m_hasSignificantOutputSchema = true;
-            m_windowedSchemaColumn = winAggregateColumn;
+        List<AbstractExpression> tves = getAllTVEs();
+        // Resolve all of them.
+        for (AbstractExpression ae : tves) {
+        	TupleValueExpression tve = (TupleValueExpression)ae;
+            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
+            if (index == -1) {
+                // check to see if this TVE is the aggregate output
+                // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
+                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
+                    throw new RuntimeException("Unable to find index for column: " +
+                                               tve.getColumnName());
+                }
+            } else {
+                tve.setColumnIndex(index);
+            }
         }
     }
+
+    /**
+     * This is used to get all the TVEs in the partition by plan node.  It's
+     * only used for resolution of TVE indices.  But it may be useful in
+     * testing that the TVEs are properly resolved,
+     *
+     * @return All the TVEs in expressions in this plan node.
+     */
+	public List<AbstractExpression> getAllTVEs() {
+		List<AbstractExpression> tves =  new ArrayList<AbstractExpression>();
+        // Get all the partition by expressions.
+        for (AbstractExpression ae : getWindowedExpression().getPartitionByExpressions()) {
+        	tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
+        }
+        // Get all the order by expressions.
+        for (AbstractExpression ae : getWindowedExpression().getOrderByExpressions()) {
+        	tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
+        }
+        // Get everything else.
+        for (SchemaColumn col : getOutputSchema().getColumns()) {
+        	AbstractExpression expr = col.getExpression();
+        	if (col != null) {
+        		tves.addAll(expr.findAllSubexpressionsOfClass(TupleValueExpression.class));
+        	}
+        }
+		return tves;
+	}
 
     /**
      * Generate the output schema.  This node will already have
@@ -67,13 +112,18 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     @Override
     public void generateOutputSchema(Database db) {
         assert(getChildCount() == 1);
-        super.generateOutputSchema(db);
-        NodeSchema outputSchema = getOutputSchema();
+
+        // Do the children's generation.
+        m_children.get(0).generateOutputSchema(db);
+
+        // Now, generate the output columns for this plan node.  First
+        // add the windowed column, and then add the input columns.
         // The output schema must have one column, which
         // is an windowed expression.
-        assert(outputSchema != null);
-        assert(outputSchema.getColumns().size() == 1);
-        assert(outputSchema.getColumns().get(0).getExpression() instanceof WindowedExpression);
+        assert(m_outputSchema != null);
+        assert(0 == m_outputSchema.getColumns().size());
+        m_outputSchema.addColumn(m_windowedSchemaColumn);
+        m_hasSignificantOutputSchema = true;
         NodeSchema inputSchema = getChild(0).getOutputSchema();
         assert(inputSchema != null);
         for (SchemaColumn schemaCol : inputSchema.getColumns()) {
@@ -83,7 +133,7 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
             // the default column index algorithm will work quite
             // nicely for us.
             SchemaColumn newCol = schemaCol.clone();
-            outputSchema.addColumn(newCol);
+            m_outputSchema.addColumn(newCol);
         }
     }
 
@@ -91,7 +141,7 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     protected String explainPlanForNode(String indent) {
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
         String newIndent = "  " + indent;
-        StringBuilder sb = new StringBuilder(indent + "PARTITION BY PLAN: " + super.explainPlanForNode(newIndent) + "\n");
+        StringBuilder sb = new StringBuilder(indent + "PARTITION BY PLAN\n");
         sb.append(newIndent + "PARTITION BY:\n");
         int numExprs = numberPartitionByExpressions();
         for (int idx = 0; idx < numExprs; idx += 1) {
@@ -124,21 +174,21 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_windowedSchemaColumn != null) {
-            stringer.key(Members.WINDOWED_COLUMN.name());
-            m_windowedSchemaColumn.toJSONString(stringer, true);
+        	stringer.key(Members.WINDOWED_COLUMN.name());
+        	m_windowedSchemaColumn.toJSONString(stringer, true);
         }
     }
 
     @Override
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
         JSONObject windowedColumn = (JSONObject) jobj.get(Members.WINDOWED_COLUMN.name());
         if (windowedColumn != null) {
-            m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
+        	m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
         }
     }
 
     private WindowedExpression getWindowedExpression() {
+    	assert(m_windowedSchemaColumn != null);
         AbstractExpression abstractSE = m_windowedSchemaColumn.getExpression();
         assert(abstractSE instanceof WindowedExpression);
         return (WindowedExpression)abstractSE;
@@ -168,14 +218,6 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
         return we.getOrderbySize();
     }
 
-    public void addWindowedColumn(SchemaColumn col) {
-        m_windowedSchemaColumn = col;
-    }
-
-    public SchemaColumn getWindowedColumns() {
-        return m_windowedSchemaColumn;
-    }
-
     public void setWindowedColumn(SchemaColumn col) {
         m_windowedSchemaColumn = col;
     }
@@ -189,5 +231,5 @@ public class PartitionByPlanNode extends HashAggregatePlanNode {
         return true;
     }
 
-    SchemaColumn       m_windowedSchemaColumn = null;
+    private SchemaColumn       m_windowedSchemaColumn = null;
 }

@@ -1583,7 +1583,6 @@ public class ParserDQL extends ParserBase {
         if (token.tokenType != Tokens.ORDER) {
             throw unexpectedToken();
         }
-        assert(token.tokenType == Tokens.ORDER);
         // order by clause
         read();
         readThis(Tokens.BY);

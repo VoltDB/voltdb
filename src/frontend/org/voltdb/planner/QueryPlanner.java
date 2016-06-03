@@ -357,8 +357,7 @@ public class QueryPlanner {
      * </li>
      * <li>
      *   If the plan is read only, slap a SendPlanNode on the front.  Presumably
-     *   an insert, delete or upsert will have added the SendPlanNode and perhaps
-     *   a ReceivePlanNode in the plan node tree already.
+     *   an insert, delete or upsert will have added the SendPlanNode into the plan node tree already.
      * </li>
      * <li>
      *   Compute the output schema.  This computes the output schema for each
@@ -370,7 +369,7 @@ public class QueryPlanner {
      * </li>
      * <li>
      *   Do some final cleaning up and verifying of the plan.  For example,
-     *   We renumber the nodes staring at 1.
+     *   We renumber the nodes starting at 1.
      * </li>
      * </ol>
      *
@@ -459,7 +458,7 @@ public class QueryPlanner {
         // this makes the ids deterministic
         bestPlan.resetPlanNodeIds(1);
 
-        // split up the plan everywhere we see send/recieve into multiple plan fragments
+        // split up the plan everywhere we see send/receive into multiple plan fragments
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfClass(AbstractReceivePlanNode.class);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit

@@ -37,7 +37,7 @@ public class InlineAggregation extends MicroOptimization {
         // breadth first:
         //     find AggregatePlanNode with exactly one child
         //     where that child is an AbstractScanPlanNode.
-        //     Inline any qualifying AggregatePlanNode to the its AbstractScanPlanNode.
+        //     Inline any qualifying AggregatePlanNode to its AbstractScanPlanNode.
 
         Queue<AbstractPlanNode> children = new LinkedList<AbstractPlanNode>();
         children.add(planNode);

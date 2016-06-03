@@ -157,13 +157,7 @@ public enum ExpressionType {
     // Subquery
     // -----------------------------
     ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
-    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
-
-    // ----------------------------
-    // WINDOWING
-    // ----------------------------
-    WINDOWING_RANK                (WindowedExpression.class, 500, "RANK")
-    // TODO: dense_rank, row_number, etc
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>")
     ;
 
     private final int m_value;

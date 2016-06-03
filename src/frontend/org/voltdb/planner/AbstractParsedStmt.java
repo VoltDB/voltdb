@@ -527,14 +527,14 @@ public abstract class AbstractParsedStmt {
 
         for (VoltXMLElement ele : exprNode.children) {
             if (ele.name.equals("partitionbyList")) {
-                for(int i = 0; i < ele.children.size(); i++) {
+                for (int i = 0; i < ele.children.size(); i++) {
                     VoltXMLElement childNode = ele.children.get(i);
                     AbstractExpression expr = parseExpressionNode(childNode);
                     partitionbyExprs.add(expr);
                 }
 
             } else if (ele.name.equals("orderbyList")) {
-                for(int i = 0; i < ele.children.size(); i++) {
+                for (int i = 0; i < ele.children.size(); i++) {
                     VoltXMLElement childNode = ele.children.get(i);
                     SortDirectionType sortDir
                         = Boolean.valueOf(childNode.attributes.get("decending"))
