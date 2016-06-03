@@ -465,6 +465,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
             CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
+            
+            // if header option is true, check whether csv first line is valid
+            if (config.header) {
+            	if (!csvReader.checkHeader()) {
+            		m_log.error("CSV file '" + config.file + "' does not match the table");
+                    System.exit(-1);
+            	}
+            }
+            
             Thread readerThread = new Thread(csvReader);
             readerThread.setName("CSVFileReader");
             readerThread.setDaemon(true);

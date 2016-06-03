@@ -83,6 +83,19 @@ class CSVFileReader implements Runnable {
         m_columnTypes = m_loader.getColumnTypes();
         m_columnCount = m_columnTypes.length;
     }
+    
+    public boolean checkHeader() {
+    	try {
+			List<String> firstline = m_listReader.read();
+			// whether num of file column is same as num of table columns
+			if (firstline.size() != m_loader.getColumnTypes().length) {
+				return false;
+			}
+		} catch (IOException ex) {
+			m_log.error("Failed to read CSV line from file: " + ex);
+		}
+    	return true;
+    }
 
     @Override
     public void run() {
