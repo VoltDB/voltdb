@@ -42,6 +42,8 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -130,10 +132,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public int overrideId(int newId) {
         m_id = newId++;
         // Override subqueries ids
-        Collection<AbstractExpression> subqueries = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subquery : subqueries) {
-            assert(subquery instanceof AbstractSubqueryExpression);
-            newId = ((AbstractSubqueryExpression) subquery).overrideSubqueryNodeIds(newId);
+        Collection<AbstractExpression> subqueries = findAllSubquerySubexpressions();
+        for (AbstractExpression expr : subqueries) {
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+            // overrideSubqueryNodeIds(newId) will get an NPE if the subquery
+            // has not been planned, presumably the effect of hitting a bug
+            // earlier in the planner. If that happens again, it MAY be useful
+            // to preempt those cases here and single-step through a replay of
+            // findAllSubquerySubexpressions. Determining where in the parent
+            // plan this subquery expression was found MAY provide a clue
+            // as to why the subquery was not planned. It has helped before.
+            //REDO to debug*/ if (subquery instanceof SelectSubqueryExpression) {
+            //REDO to debug*/     CompiledPlan subqueryPlan = ((SelectSubqueryExpression)subquery)
+            //REDO to debug*/             .getSubqueryScan().getBestCostPlan();
+            //REDO to debug*/     if (subqueryPlan == null) {
+            //REDO to debug*/         findAllSubquerySubexpressions();
+            //REDO to debug*/     }
+            //REDO to debug*/ }
+            newId = subquery.overrideSubqueryNodeIds(newId);
         }
         return newId;
     }
@@ -219,6 +236,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
+
+    protected void resolveSubqueryColumnIndexes() {
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractExpression expr: exprs) {
+            ((AbstractSubqueryExpression) expr).resolveColumnIndexes();
+        }
+    }
 
     public void validate() throws Exception {
         //
@@ -733,12 +758,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             inlined.findAllNodesOfType_recurse(type, pnClass, collected, visited);
     }
 
+    final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
+        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
+        return collected;
+    }
+
     /**
      * Collect a unique list of expressions of a given type that this node has including its inlined nodes
      * @param type expression type to search for
      * @return a collection(set) of expressions that this node has
      */
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+    final private Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
         findAllExpressionsOfClass(aeClass, collected);
         return collected;
@@ -748,8 +779,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!
-            Collection<AbstractExpression> exprs = inlineNode.findAllExpressionsOfClass(aeClass);
-            collected.addAll(exprs);
+            inlineNode.findAllExpressionsOfClass(aeClass, collected);
         }
 
         // and the output column expressions if there were no projection
@@ -757,11 +787,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (schema != null) {
             for (SchemaColumn col : schema.getColumns()) {
                 AbstractExpression expr = col.getExpression();
-                if (expr != null) {
-                    List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(
-                            aeClass);
-                    collected.addAll(exprs);
+                if (expr == null) {
+                    continue;
                 }
+                List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(aeClass);
+                if (exprs.isEmpty()) {
+                    continue;
+                }
+                collected.addAll(exprs);
             }
         }
     }
