@@ -71,8 +71,8 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
     public String nondeterminismDetail() { return m_nondeterminismDetail; }
 
     @Override
-    public boolean reattachFragment( SendPlanNode child  ) {
-        this.addAndLinkChild(child);
+    public boolean reattachFragment(AbstractPlanNode child) {
+        addAndLinkChild(child);
         return true;
     }
 

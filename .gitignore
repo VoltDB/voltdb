@@ -63,6 +63,7 @@ doc/tutorials/auction/csvloader_*.csv
 /tests/sqlcmd/scripts/**/*.out
 /tests/sqlcmd/scripts/**/*.outclean
 /tests/sqlcmd/scripts/**/*.outdiffs
+/tests/sqlcmd/sqlcmdtest-*-procs.jar
 /tools/voltify.venv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java

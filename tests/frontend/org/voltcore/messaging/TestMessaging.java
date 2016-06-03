@@ -151,14 +151,14 @@ public class TestMessaging extends TestCase {
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
                     HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
-                    final HostMessenger messenger = new HostMessenger(config);
+                    final HostMessenger messenger = new HostMessenger(config, null, null);
                     currentMessenger = messenger;
                     messengers[hostId] = currentMessenger;
                     new Thread() {
                         @Override
                         public void run() {
                             try {
-                                messenger.start();
+                                messenger.start(null);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
@@ -302,10 +302,10 @@ public class TestMessaging extends TestCase {
     }
 
     public void testSimple() throws Exception {
-        HostMessenger msg1 = new HostMessenger(getConfig());
-        msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig());
-        msg2.start();
+        HostMessenger msg1 = new HostMessenger(getConfig(), null, null);
+        msg1.start(null);
+        HostMessenger msg2 = new HostMessenger(getConfig(), null, null);
+        msg2.start(null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
@@ -360,12 +360,12 @@ public class TestMessaging extends TestCase {
     }
 
     public void testMultiMailbox() throws Exception {
-        HostMessenger msg1 = new HostMessenger(getConfig());
-        msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig());
-        msg2.start();
-        HostMessenger msg3 = new HostMessenger(getConfig());
-        msg3.start();
+        HostMessenger msg1 = new HostMessenger(getConfig(), null, null);
+        msg1.start(null);
+        HostMessenger msg2 = new HostMessenger(getConfig(), null, null);
+        msg2.start(null);
+        HostMessenger msg3 = new HostMessenger(getConfig(), null, null);
+        msg3.start(null);
 
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(3);
@@ -495,8 +495,8 @@ public class TestMessaging extends TestCase {
         public void run() {
             try {
                 HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
-                HostMessenger msg = new HostMessenger(config);
-                msg.start();
+                HostMessenger msg = new HostMessenger(config, null, null);
+                msg.start(null);
                 m_ready.set(true);
                 msg.waitForGroupJoin(2);
             } catch (Exception e) {
@@ -514,10 +514,10 @@ public class TestMessaging extends TestCase {
             throw new RuntimeException(ex);
         }
 
-        HostMessenger msg1 = new HostMessenger(getConfig());
-        msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig());
-        msg2.start();
+        HostMessenger msg1 = new HostMessenger(getConfig(), null, null);
+        msg1.start(null);
+        HostMessenger msg2 = new HostMessenger(getConfig(), null, null);
+        msg2.start(null);
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
         System.out.println("Finished socket joiner for msg1");

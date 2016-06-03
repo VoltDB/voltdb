@@ -190,7 +190,8 @@ public abstract class StatementCompiler {
 
             plan = planner.plan();
             assert(plan != null);
-        } catch (PlanningErrorException e) {
+        }
+        catch (PlanningErrorException e) {
             // These are normal expectable errors -- don't normally need a stack-trace.
             String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
             if (e.getMessage() != null) {
@@ -201,6 +202,12 @@ public abstract class StatementCompiler {
         catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
+        }
+        catch (StackOverflowError error) {
+            String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
+            msg += " Error: \"Encountered stack overflow error. " +
+                    "Try reducing the number of predicate expressions in the query.\"";
+            throw compiler.new VoltCompilerException(msg);
         }
 
         // There is a hard-coded limit to the number of parameters that can be passed to the EE.

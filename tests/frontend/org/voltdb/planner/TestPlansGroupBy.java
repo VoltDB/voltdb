@@ -965,7 +965,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
             fail();
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
@@ -973,16 +974,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
             fail();
-        } catch (Exception ex) {
-            assertEquals("invalid GROUP BY expression:  COUNT()", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
             fail();
-        } catch (Exception ex) {
-            assertEquals("invalid GROUP BY expression:  COUNT()", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression:  COUNT()"));
         }
 
         // Group by alias and expression
@@ -990,8 +993,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: SP", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: SP"));
         }
 
         // Having
@@ -999,8 +1004,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT ABS(A1), count(*) as ct FROM P1 GROUP BY ABS(A1) having ct > 3");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: CT"));
         }
 
         // Group by column.alias
@@ -1008,8 +1015,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
             fail();
-        } catch (Exception ex) {
-            assertEquals("user lacks privilege or object not found: P1.SP", ex.getMessage());
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(
+                    "user lacks privilege or object not found: P1.SP"));
         }
 
         //

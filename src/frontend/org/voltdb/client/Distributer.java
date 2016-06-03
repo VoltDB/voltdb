@@ -46,8 +46,6 @@ import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
 
-import jsr166y.ThreadLocalRandom;
-
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -66,6 +64,8 @@ import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+
+import jsr166y.ThreadLocalRandom;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -969,7 +969,6 @@ class Distributer {
             //Subscribe to topology updates before retrieving the current topo
             //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
-            final ByteBuffer buf = serializeSPI(spi);
             cxn.createWork(System.nanoTime(),
                     spi.getHandle(),
                     spi.getProcName(),

@@ -1333,44 +1333,40 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_MOD : {
                 if (nodes[0].dataType == null) {
-                    nodes[1].dataType = nodes[0].dataType;
+                    if (nodes[1].dataType == null) {
+                        throw Error.error(ErrorCode.X_42567);
+                    }
+                    if (nodes[0].dataType.isIntegralType()) {
+                        nodes[0].dataType = Type.SQL_BIGINT;
+                    }
+                    else {
+                        nodes[0].dataType = nodes[1].dataType;
+                    }
                 }
 
                 if (nodes[1].dataType == null) {
-                    nodes[0].dataType = nodes[1].dataType;
+                    nodes[1].dataType = nodes[0].dataType;
                 }
 
-                if (nodes[0].dataType == null) {
-                    throw Error.error(ErrorCode.X_42567);
-                }
-
-                if (!nodes[0].dataType.isNumberType()
-                        || !nodes[1].dataType.isNumberType()) {
+                // Only allow integral (standard) and decimal
+                // (actually a non-standard extension when
+                // "scale != 0", supported by customer request).
+                if (!(nodes[0].dataType.isIntegralType() || nodes[0].dataType.typeCode == Types.SQL_DECIMAL)) {
                     throw Error.error(ErrorCode.X_42565);
                 }
-                
-                if (!(nodes[0].dataType.isIntegralType() && nodes[1].dataType.isIntegralType())
-                        && !(((NumberType)nodes[0].dataType).typeCode == Types.SQL_DECIMAL && ((NumberType)nodes[1].dataType).typeCode == Types.SQL_DECIMAL)) {
-                    throw new RuntimeException("unsupported non-integral or non-decimal type for SQL MOD function");
+
+                if (!(nodes[1].dataType.isIntegralType() || nodes[1].dataType.typeCode == Types.SQL_DECIMAL)) {
+                    throw Error.error(ErrorCode.X_42565);
                 }
 
-                if (nodes[0].dataType.isIntegralType()) {
-                    nodes[0].dataType = ((NumberType)nodes[0].dataType).getIntegralType();
-                    nodes[1].dataType = ((NumberType)nodes[1].dataType).getIntegralType();
-                    dataType = nodes[1].dataType;
-                    // A VoltDB extension to customize the SQL function set support
-                    parameterArg = 1;
-
-                } else {
-
-                    nodes[0].dataType = new NumberType(Types.SQL_DECIMAL, ((NumberType)nodes[0].dataType).precision, ((NumberType)nodes[0].dataType).scale);
-                    nodes[1].dataType = new NumberType(Types.SQL_DECIMAL, ((NumberType)nodes[1].dataType).precision, ((NumberType)nodes[1].dataType).scale);
-                    dataType = nodes[1].dataType;
-                    // A VoltDB extension to customize the SQL function set support
-                    parameterArg = 1;
+                // Don't allow mixing of integral and decimal types
+                // (by the decision of the requesting customer).
+                if (nodes[0].dataType.isIntegralType() != nodes[1].dataType.isIntegralType()) {
+                    throw Error.error(ErrorCode.X_42565);
                 }
 
-                // End of VoltDB extension
+                parameterArg = 1;
+                dataType = nodes[1].dataType;
                 break;
             }
             case FUNC_POWER : {
