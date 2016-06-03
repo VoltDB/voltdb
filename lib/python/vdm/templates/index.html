@@ -1270,6 +1270,26 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
 	</div>
 </div>
 <!-- Log View End -->
+<!-- Stop Confirmation -->
+<div id="divStopServerPopup" class="errorLogPopup modal fadein  in" role="dialog" style="display: none;" data-ip="" data-serverid="">
+	<div class="modal-dialog modal-dialog-center modal-add-user">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title" id="msgHeader">Confirmation</h4>
+			</div>
+			<div class="modal-body">
+				<div class="errorWrapper" id="stopMessage">
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button id="btnConfirmStopServerOk" type="button" class="btnPopup btn" data-dismiss="modal">OK</button>
+                <button id="btnConfirmStopServerCancel" type="button" class="btnPopup btn btn-gray" data-dismiss="modal">Cancel</button>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- Stop Confirmation End -->
+
 <div class="loader" ></div>
 </div>
 </body>
