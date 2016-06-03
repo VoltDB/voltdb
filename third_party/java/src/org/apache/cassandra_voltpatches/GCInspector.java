@@ -135,7 +135,7 @@ public class GCInspector
                     double usage = (double) memoryUsed / memoryMax;
 
                     String usageStr = String.format("%.2f", usage * 100);
-                    String memoryMaxStr = String.format("%.2f", (double) memoryMax / 1000000);
+                    String memoryMaxStr = String.format("%.2f", (double) memoryMax / 1_048_576);  //2^20 Bytes 
 
                     if (.5 <= usage && usage < .6)
                     {
