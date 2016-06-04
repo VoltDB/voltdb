@@ -88,6 +88,12 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
+        if (columns.length > 0) {
+            checkOutputSchema(planNode, null, columns);
+        }
+    }
+
+    private void checkOutputSchema(AbstractPlanNode planNode, String tableAlias, String[] columns) {
         NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
@@ -95,6 +101,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         for (int i = 0; i < schemaColumn.size(); ++i) {
             SchemaColumn col = schemaColumn.get(i);
             checkOutputColumn(null, columns[i], col);
+            checkOutputColumn(tableAlias, columns[i], col);
         }
     }
 
@@ -223,6 +230,11 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkSimple("select COL1 FROM (SELECT A+3, C COL1 FROM R1  LIMIT 10) T1 WHERE T1.COL1 < 0",
                 tbName, new String[]{"COL1"}, "R1", new String[]{"C1", "C"}, true);
 
+
+        // Complex columns in sub selects
+        checkSimple("select C1 FROM (SELECT A+3 A1, C C1 FROM R1) T1 WHERE T1.A1 < 0",
+                tbName, new String[]{"C1"}, "R1", new String[]{"A1", "C"}, true);
+
         // select *
         sql = "select A, C FROM (SELECT * FROM R1) T1 WHERE T1.A < 0";
         sqlNoSimplification = "select A, C FROM (SELECT * FROM R1  LIMIT 10) T1 WHERE T1.A < 0";
@@ -251,7 +263,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
         // Three levels selects
         pn = compile("select A2 FROM " +
-                "(SELECT A1 AS A2 FROM (SELECT A AS A1 FROM R1 WHERE A < 3 LIMIT 10) T1 WHERE T1.A1 > 0) T2  WHERE T2.A2 = 3");
+                "(SELECT A1 AS A2 FROM " +
+                "(SELECT A AS A1 FROM R1 WHERE A < 3 LIMIT 10) T1 " +
+                "WHERE T1.A1 > 0) T2 " +
+                "WHERE T2.A2 = 3");
         pn = pn.getChild(0);
         checkSeqScan(pn, "T2",  "A2");
         checkPredicateComparisonExpression(pn, "T2");
@@ -260,6 +275,21 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkPredicateComparisonExpression(pn, "T1");
         pn = pn.getChild(0);
         checkSeqScan(pn, "R1",  "A");
+        checkPredicateComparisonExpression(pn, "R1");
+
+        pn = compile("select A2 FROM " +
+                "(SELECT A1 AS A2 FROM " +
+                "(SELECT A + 1 AS A1 FROM R1 WHERE A < 3) T1" +
+                "WHERE T1.A1 > 0) T2 " +
+                "WHERE T2.A2 = 3");
+        pn = pn.getChild(0);
+        checkSeqScan(pn, "T2",  "A2");
+        checkPredicateComparisonExpression(pn, "T2");
+        pn = pn.getChild(0);
+        checkSeqScan(pn, "T1",  "A1");
+        checkPredicateComparisonExpression(pn, "T1");
+        pn = pn.getChild(0);
+        checkSeqScan(pn, "R1",  "A1");
         checkPredicateComparisonExpression(pn, "R1");
 
         //
