@@ -793,15 +793,16 @@ public abstract class AbstractParsedStmt {
      * @param tableAlias
      * @return StmtTargetTableScan
      */
-    private StmtTargetTableScan addSimplifiedSubqueryToStmtCache(StmtSubqueryScan subqueryScan, String tableAlias) {
+    private StmtTargetTableScan addSimplifiedSubqueryToStmtCache(
+            StmtSubqueryScan subqueryScan, String tableAlias) {
         assert(tableAlias != null);
-        // It is guaranteed by the canSimplifySubquery that there is one and only one TABLE in the
-        // whole subquery FROM clause. There could be VOLT_TEMP_TABLEs though that we need to skip
-        // The VOLT_TEMP_TABLE_* are scans for subquery expressions
+        // It is guaranteed by the canSimplifySubquery that there is
+        // one and only one TABLE in the subquery's FROM clause.
         List<StmtTargetTableScan> targetTablesList = subqueryScan.getAllTargetTables();
         assert(targetTablesList.size() == 1);
         StmtTargetTableScan origTableScan = targetTablesList.get(0);
-        StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
+        StmtTargetTableScan newTableScan =
+                new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
         newTableScan.setOriginalSubqueryScan(subqueryScan);
         // Replace the subquery scan with the table scan
         assert(m_tableAliasMap.get(tableAlias) != null);
