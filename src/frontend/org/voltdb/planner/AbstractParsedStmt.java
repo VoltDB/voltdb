@@ -760,12 +760,17 @@ public abstract class AbstractParsedStmt {
         if (selectSubquery.hasLimitOrOffset() || selectSubquery.hasLimitOrOffsetParameters()) {
             return false;
         }
-        // Only SELECT from a single TABLE is allowed
-        if (selectSubquery.m_tableAliasMap.size() != 1) {
-            return false;
-        }
-        // No subqueries
+        // Only SELECT from a single TARGET TABLE is allowed
+        int tableCount = 0;
         for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
+            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+                // This is an artificial table for a subquery expression
+                continue;
+            }
+            if (++tableCount > 1) {
+                return false;
+            }
+            // Only TRAGET TABLE
             if (!(entry.getValue() instanceof StmtTargetTableScan)) {
                 return false;
             }
@@ -784,15 +789,27 @@ public abstract class AbstractParsedStmt {
      * has already passed all the checks from the canSimplifySubquery method.
      * Subquery ORDER BY clause is ignored if such exists.
      *
+     * @param subquery Parsed subquery statement
      * @param subqueryScan subquery scan to simplify
      * @param tableAlias
      * @return StmtTargetTableScan
      */
-    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(StmtSubqueryScan subqueryScan, String tableAlias) {
+    protected StmtTargetTableScan addSimplifiedSubqueryToStmtCache(AbstractParsedStmt subquery, StmtSubqueryScan subqueryScan, String tableAlias) {
         assert(tableAlias != null);
-        List<StmtTargetTableScan> targetTablesList = subqueryScan.getAllTargetTables();
-        assert(targetTablesList.size() == 1);
-        StmtTargetTableScan origTableScan = targetTablesList.get(0);
+        // It is guaranteed by the canSimplifySubquery that there is one and only one TABLE in the
+        // whole subquery FROM clause. There could be VOLT_TEMP_TABLEs though that we need to skip
+        // The VOLT_TEMP_TABLE_* are scans for subquery expressions
+        StmtTableScan origScan = null;
+        for (Map.Entry<String, StmtTableScan> entry : subquery.m_tableAliasMap.entrySet()) {
+            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+                // This is an artificial table for a subquery expression
+                continue;
+            }
+            origScan = entry.getValue();
+            break;
+        }
+        assert(origScan instanceof StmtTargetTableScan);
+        StmtTargetTableScan origTableScan = (StmtTargetTableScan) origScan;
         StmtTargetTableScan newTableScan = new StmtTargetTableScan(origTableScan.getTargetTable(), tableAlias, m_stmtId);
         newTableScan.setOriginalSubqueryScan(subqueryScan);
         // Replace the subquery scan with the table scan
@@ -1253,7 +1270,7 @@ public abstract class AbstractParsedStmt {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
             tableScan = addSubqueryToStmtCache(subquery, tableAlias);
             if (canSimplifySubquery(subquery)) {
-                tableScan = addSimplifiedSubqueryToStmtCache((StmtSubqueryScan) tableScan, tableAlias);
+                tableScan = addSimplifiedSubqueryToStmtCache(subquery, (StmtSubqueryScan) tableScan, tableAlias);
                 table = ((StmtTargetTableScan) tableScan).getTargetTable();
                 m_tableList.add(table);
                 // Extract subquery's filters
