@@ -42,8 +42,6 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -775,7 +773,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return collected;
     }
 
-    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass,
+            Set<AbstractExpression> collected) {
         // Check the inlined plan nodes
         for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
             // For inline node we MUST go recursive to its children!!!!!
@@ -785,17 +784,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // and the output column expressions if there were no projection
         NodeSchema schema = getOutputSchema();
         if (schema != null) {
-            for (SchemaColumn col : schema.getColumns()) {
-                AbstractExpression expr = col.getExpression();
-                if (expr == null) {
-                    continue;
-                }
-                List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(aeClass);
-                if (exprs.isEmpty()) {
-                    continue;
-                }
-                collected.addAll(exprs);
-            }
+            schema.addAllSubexpressionsOfClassFromNodeSchema(collected, aeClass);
         }
     }
 
@@ -804,8 +793,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return whether a node of that type is contained in the plan tree
      */
     public boolean hasAnyNodeOfType(PlanNodeType type) {
-        if (getPlanNodeType() == type)
+        if (getPlanNodeType() == type) {
             return true;
+        }
 
         for (AbstractPlanNode n : m_children) {
             if (n.hasAnyNodeOfType(type)) {

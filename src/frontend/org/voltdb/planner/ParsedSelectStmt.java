@@ -1958,7 +1958,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_groupByColumns);
         if (m_projectSchema != null) {
-            addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass, m_projectSchema);
+            m_projectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }
         // m_having, m_groupByExpressions, m_projectSchema
         // may contain the aggregation or group by expression that have been
@@ -1978,7 +1978,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_avgPushdownGroupByColumns);
         }
         if (m_avgPushdownProjectSchema != null && m_avgPushdownProjectSchema != m_projectSchema) {
-            addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass, m_avgPushdownProjectSchema);
+            m_avgPushdownProjectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }
         // m_avgPushdownHaving, m_avgPushdownGroupByColumns, m_avgPushdownProjectSchema
         // may contain the aggregation or group by expression that have been
@@ -1993,23 +1993,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private static void addAllSubexpressionsOfClassFromColList(Set<AbstractExpression> exprs,
             Class<? extends AbstractExpression> aeClass, List<ParsedColInfo> colList) {
-        for (ParsedColInfo groupByCol : colList) {
-            AbstractExpression groupByExpr = groupByCol.expression;
-            if (groupByExpr == null) {
-                continue;
-            }
-            Collection<AbstractExpression> found = groupByExpr.findAllSubexpressionsOfClass(aeClass);
-            if (found.isEmpty()) {
-                continue;
-            }
-            exprs.addAll(found);
-        }
-    }
-
-    private static void addAllSubexpressionsOfClassFromNodeSchema(Set<AbstractExpression> exprs,
-            Class<? extends AbstractExpression> aeClass, NodeSchema colList) {
-        for (SchemaColumn col : colList.getColumns()) {
-            AbstractExpression colExpr = col.getExpression();
+        for (ParsedColInfo col : colList) {
+            AbstractExpression colExpr = col.expression;
             if (colExpr == null) {
                 continue;
             }
