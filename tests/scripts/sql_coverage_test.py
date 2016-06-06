@@ -751,7 +751,7 @@ if __name__ == "__main__":
             if result["mis"] > 1140:
                 success = False
         elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
-            if result["mis"] > 2810:
+            if result["mis"] > 2820:
                 success = False
         else:
             # end of kludge; the following are the normal behavior:
