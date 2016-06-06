@@ -145,8 +145,8 @@ class Stats():
                     print(e)
                     print("Could not retrieve report")
 
-            with open(filename, 'w') as tempfile:
-                tempfile.write(json.dumps(report, indent=2))
+            with open(filename, 'w') as outfile:
+                outfile.write(json.dumps(report, indent=2))
 
     def build_history(self, branch, job, build_range):
         if branch == None or job == None or build_range == None:
@@ -164,17 +164,46 @@ class Stats():
                 return
 
         server = self.getServer()
+        test_map = {}
 
         for build in range(build_low, build_high+1):
             url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '%s/api/python'
 
             report = {"report":"no info"}
 
-            # testReport only works for some jobs depending on plugins installed
+            # '/testReport' only works for some jobs depending on plugins installed
             try:
                 test_url = url % '/testReport'
-                print test_url
                 report = eval(urlopen(test_url).read())
+                childReports = report['childReports']
+                for child in childReports:
+                    suites = child['result']['suites']
+                    for suite in suites:
+                        cases = suite['cases']
+                        for case in cases:
+                            name = case['className'] + '.' + case['name']
+                            if test_map.get(name, None) == None:
+                                test_map[name] = []
+                            test_map[name].append(case['status'])
+
+                # for case in all_cases:
+                #     name = test_case['className'] + '.' + test_case['name']
+                #     if test_map.get(name, None) == None:
+                #         test_map[name] = []
+                #     test_map[name].append(test_case['status'])
+
+                # for cases in all_cases:
+                #     print json.dumps(cases, indent=2)
+                #     return
+                #     for test_case in cases:
+                #         print json.dumps(test_case, indent=2)
+                #         return
+                #         name = test_case['className'] + '.' + test_case['name']
+                #         if test_map.get(name, None) == None:
+                #             test_map[name] = []
+                #         test_map[name].append(test_case['status'])
+
+            # doesn't have '/testReport' so try to get normal report
             except (HTTPError, URLError) as e:
                 try:
                     test_url = url % ''
@@ -182,16 +211,36 @@ class Stats():
                 except (HTTPError, URLError) as e:
                     print(e)
                     print("Could not retrieve report")
+            except AttributeError as e:
+                print('Error retriving test data')
+                print(e)
 
-            childReports = None
-            failCount = report.get('failCount', None)
-            if failCount != None:
-                childReports = report.get('childReports', None)
-            if childReports != None:
-                print(len(childReports))
-                for child in childReports:
-                    with open('temp-%d.txt' % build, 'a') as tempfile:
-                        tempfile.write(json.dumps(child, indent=2))
+        for test in test_map:
+            failure_tally = 0
+            regression_tally = 0
+            passed_tally = 0
+            other_tally = 0
+            for status in test_map[test]:
+                if status == 'FAILURE' or status == 'FAILED':
+                    failure_tally += 1
+                elif status == 'REGRESSION':
+                    regression_tally += 1
+                elif status == 'PASSED':
+                    passed_tally += 1
+                else:
+                    print(status)
+                    other_tally += 1
+            with open('temp.txt', 'a') as outfile:
+                outfile.write(json.dumps(
+                {
+                    'build range': build_range,
+                    'test': test,
+                    'failure tally': failure_tally,
+                    'regression tally': regression_tally,
+                    'passed tally': passed_tally,
+                    'other tally': other_tally
+                }, indent=2
+                ))
 
 if __name__ == '__main__':
     stats = Stats()
