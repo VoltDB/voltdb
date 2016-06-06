@@ -1229,7 +1229,7 @@ public class TestCSVLoader {
             int validLineCnt) throws Exception {
         test_Interface(my_options, my_data, invalidLineCnt, validLineCnt, 0, new String[0]);
     }
-    
+
     @Test
     public void testHeaderSuperSetHeader() throws Exception
     {

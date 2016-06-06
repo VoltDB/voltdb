@@ -17,15 +17,15 @@
 
 package org.voltdb.utils;
 
-import org.voltdb.client.ClientImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
-
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
 /**
  * A CSVDataLoader implementation that uses the bulk loader to insert batched rows.

@@ -301,7 +301,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
          */
         @Option(desc = "Batch Size for processing.")
         public int batch = 200;
-        
+
         @Option(desc = "First line of csv file is column name.", hasArg = false)
         boolean header = DEFAULT_HEADER;
 
