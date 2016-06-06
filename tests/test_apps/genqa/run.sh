@@ -56,12 +56,12 @@ function clean() {
 function srccompile() {
     ant -f build.xml
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/$APPNAME2/procedures/*.java
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/customexport/*.java
 
     # stop if compilation fails
@@ -161,6 +161,22 @@ function server-pg() {
     sleep 5
     wait-for-create
     $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
+    $VOLTDB_BIN/sqlcmd < ddl-geo-nocat.sql
+}
+
+function server-pg-geo() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+
+    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+
+    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
+    sleep 5
+    wait-for-create
+    $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
+    $VOLTDB_BIN/sqlcmd < ddl-geo-nocat.sql
+
 }
 
 # run the voltdb server locally
@@ -253,6 +269,25 @@ function async-export() {
         --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
+}
+
+function async-export-geo() {
+    srccompile
+    rm -rf $CLIENTLOG/*
+    mkdir $CLIENTLOG
+    echo file:/${PWD}/../../log4j-allconsole.xml
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
+        --displayinterval=5 \
+        --duration=10 \
+        --servers=localhost \
+        --port=21212 \
+        --procedure=JiggleExportGeoSinglePartition \
+        --poolsize=100000 \
+        --autotune=false \
+        --catalogswap=false \
+        --latencytarget=10 \
+        --ratelimit=500 \
+        --timeout=300 \
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -378,6 +413,7 @@ function start-postgres() {
     sudo su - postgres -c "$PG_PATH/psql -c \"create role vexport with superuser createdb login\""
     sudo su - postgres -c "$PG_PATH/psql -c \"create database vexport\""
 }
+
 function stop-postgres() {
     set_pgpaths
     if [ -d "$PGTMPDIR" ]; then
