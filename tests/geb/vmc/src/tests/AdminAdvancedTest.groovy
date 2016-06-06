@@ -804,7 +804,6 @@ class AdminAdvancedTest extends TestBase {
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
-        =======a60aca2155e40c7d0a3e8dc11b175336d9a
         then:"check elements"
         waitFor(30){page.overview.lnkAddNewFeature.isDisplayed()}
         when:"Add SNAPSHOT feature"
