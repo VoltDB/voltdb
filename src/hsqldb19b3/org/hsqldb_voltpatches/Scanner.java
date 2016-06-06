@@ -1879,13 +1879,7 @@ public class Scanner {
         try {
             seconds = HsqlDateTime.getTimestampSeconds(s.substring(0,
                     intervalPosition));
-        }
-        catch (StackOverflowError caught) {
-            // Don't mask stack overflows.
-            // Allow them to be consistently handled in a higher-level caller.
-            throw caught;
-        }
-        catch (Throwable e) {
+        } catch (Throwable e) {
             throw Error.error(ErrorCode.X_22007);
         }
 

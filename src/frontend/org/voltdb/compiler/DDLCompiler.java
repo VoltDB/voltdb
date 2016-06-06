@@ -2911,11 +2911,11 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
-        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }
-        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
+        if (!predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty()) {
             msg += "with subquery expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }

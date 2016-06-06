@@ -28,6 +28,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -74,11 +75,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         generateRealOutputSchema(db);
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
     }
 
     @Override
@@ -121,8 +120,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_joinPredicate, outer_schema, complete_schema_of_inner_table);
         resolvePredicate(m_wherePredicate, outer_schema, complete_schema_of_inner_table);
 
-        // Resolve subquery expression indexes
-        resolveSubqueryColumnIndexes();
+        // resolve subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
 
         // Resolve TVE indexes for each schema column.
         for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {

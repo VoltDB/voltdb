@@ -38,6 +38,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -450,7 +451,8 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
+        Set<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
                 m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
@@ -476,7 +478,7 @@ public class PlanAssembler {
                         return null;
                     }
                 }
-            }
+             }
 
             if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
                 // There was at least one sub-query and we should have a compiled plan for it
@@ -604,9 +606,9 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
-            assert(expr instanceof SelectSubqueryExpression);
             if (!(expr instanceof SelectSubqueryExpression)) {
-                continue; // DEAD CODE?
+                // it can be IN (values)
+                continue;
             }
             SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
@@ -940,10 +942,12 @@ public class PlanAssembler {
         HashAggregatePlanNode mvReAggTemplate = m_parsedSelect.m_mvFixInfo.getReAggregationPlanNode();
         if (mvReAggTemplate != null) {
             reAggNode = new HashAggregatePlanNode(mvReAggTemplate);
-            AbstractExpression postPredicate = reAggNode.getPostPredicate();
-            if (postPredicate != null && postPredicate.hasSubquerySubexpression()) {
+            List<AbstractExpression> subqueryExprs =
+                    ExpressionUtil.findAllExpressionsOfClass(reAggNode.getPostPredicate(),
+                    AbstractSubqueryExpression.class);
+            if ( ! subqueryExprs.isEmpty()) {
                 // For now, this is just a special case violation of the limitation on
-                // use of subquery expressions in MP queries on partitioned data.
+                // use of expression subqueries in MP queries on partitioned data.
                 // That special case was going undetected when we didn't flag it here.
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                 return null;
@@ -2657,7 +2661,7 @@ public class PlanAssembler {
         for (ParsedColInfo col : orderBys) {
             AbstractExpression rootExpr = col.expression;
             // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-            Collection<AbstractExpression> tves = rootExpr.findAllTupleValueSubexpressions();
+            ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
             for (AbstractExpression tve: tves) {
                 if  (((TupleValueExpression) tve).hasAggregate()) {
                     return true;
