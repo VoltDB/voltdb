@@ -40,22 +40,25 @@ class Stats():
         return parser.parse_args();
 
     def runCommand(self, command, branch=None, job=None, build=None, build_range=None):
-        cmdHelp = """usage: stats [options] help|jobs|history|report|test-history
+        cmdHelp = """usage: stats [options] help|history|build-report|build-history
         options:
         -u <username> defaults to local user
         -p <passwd>
         commands:
         help - display help
         history <branch> <job> - displays job history
-        report <branch> [build] - displays test report using build number. defaults to last completed build
+        build-report <branch> [build] - displays a report using build number. defaults to last completed build
+        build-history <branch> <job> <range> - analyze job history for a range of builds, ex: 500-512
         """
         #print("command: "+command);
         if command == 'help':
             print(cmdHelp)
         elif command == 'history':
             self.history(branch, job)
-        elif command == 'report':
-            self.report(branch, build)
+        elif command == 'build-report':
+            self.build_report(branch, build)
+        elif command == 'build-history':
+            self.build_history(branch, job, build_range)
         else:
             print(cmdHelp);
             exit(0)
@@ -80,6 +83,7 @@ class Stats():
         if branch == None or job == None:
             self.runCommand('help')
             return
+
         server = self.getServer()
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
         branch_job = eval(urlopen(url).read())
@@ -93,12 +97,13 @@ class Stats():
                 return
         print('Could not find job %s under branch %s' %(job, branch))
 
-    def report(self, branch, build):
+    def build_report(self, branch, build):
         if branch == None:
             self.runCommand('help')
             return
         if build == None:
             build = 'lastCompletedBuild'
+
         server = self.getServer()
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
         branch_job = eval(urlopen(url).read())
@@ -126,24 +131,67 @@ class Stats():
 
             report = {"report":"no info"}
 
+            # '/testReport' only works for some jobs depending on plugins installed on Jenkins
+            try:
+                test_url = url % '/testReport'
+                print test_url
+                report = eval(urlopen(test_url).read())
+            except (HTTPError, URLError) as e:
+                try:
+                    test_url = url % ''
+                    print test_url
+                    report = eval(urlopen(test_url).read())
+                except (HTTPError, URLError) as e:
+                    print(e)
+                    print("Could not retrieve report")
+
+            with open(filename, 'w') as tempfile:
+                tempfile.write(json.dumps(report, indent=2))
+
+    def build_history(self, branch, job, build_range):
+        if branch == None or job == None or build_range == None:
+            self.runCommand('help')
+            return
+        else:
+            try:
+                builds = build_range.split('-')
+                build_low = int(builds[0])
+                build_high = int(builds[1])
+                if build_high < build_low: raise Exception('left number must be lesser than or equal to right')
+            except:
+                print sys.exc_info()[0]
+                self.runCommand('help')
+                return
+
+        server = self.getServer()
+
+        for build in range(build_low, build_high+1):
+            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '%s/api/python'
+
+            report = {"report":"no info"}
+
             # testReport only works for some jobs depending on plugins installed
             try:
                 test_url = url % '/testReport'
                 print test_url
                 report = eval(urlopen(test_url).read())
             except (HTTPError, URLError) as e:
-                pass
+                try:
+                    test_url = url % ''
+                    report = eval(urlopen(test_url).read())
+                except (HTTPError, URLError) as e:
+                    print(e)
+                    print("Could not retrieve report")
 
-            try:
-                test_url = url % ''
-                print test_url
-                report = eval(urlopen(test_url).read())
-            except (HTTPError, URLError) as e:
-                print(e)
-                print("Could not retrieve report")
-
-            with open(filename, 'w') as tempfile:
-                tempfile.write(json.dumps(report, indent=2))
+            childReports = None
+            failCount = report.get('failCount', None)
+            if failCount != None:
+                childReports = report.get('childReports', None)
+            if childReports != None:
+                print(len(childReports))
+                for child in childReports:
+                    with open('temp-%d.txt' % build, 'a') as tempfile:
+                        tempfile.write(json.dumps(child, indent=2))
 
 if __name__ == '__main__':
     stats = Stats()
@@ -169,9 +217,9 @@ if __name__ == '__main__':
 
     if len(args) > 2:
         job = args[2]
+        build = args[2]
 
     if len(args) > 3:
-        build = args[3]
         build_range = args[3]
 
     stats.runCommand(command, branch, job, build, build_range)
