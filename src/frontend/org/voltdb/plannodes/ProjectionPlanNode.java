@@ -83,11 +83,8 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         resolveColumnIndexesUsingSchema(input_schema);
 
-        // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
-        }
+        // Resolve subquery expression indexes
+        resolveSubqueryColumnIndexes();
     }
 
     /**
@@ -154,12 +151,11 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
         }
-
-        return;
     }
 
     @Override

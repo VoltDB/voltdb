@@ -649,7 +649,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
              inline Serial AGGREGATION ops
               inline LIMIT 5
         */
-        String expectedStr = "  inline Serial AGGREGATION ops\n" +
+        String expectedStr = "  inline Serial AGGREGATION ops: \n" +
                              "   inline LIMIT 5";
         String explainPlan = "";
         for (AbstractPlanNode apn: pns) {

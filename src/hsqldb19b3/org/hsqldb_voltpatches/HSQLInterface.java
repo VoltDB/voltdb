@@ -326,6 +326,14 @@ public class HSQLInterface {
                 throw new HSQLParseException("Error in \"" + sql + "\" " + caught.getMessage(), caught);
             }
         }
+        catch (StackOverflowError caught) {
+            // Handle this consistently in high level callers
+            // regardless of where it is thrown.
+            // It should be presumed to be a user error where the user is
+            // exceeding a soft limit on the supportable complexity of a
+            // SQL statement causing unreasonable levels of recursion.
+            throw caught;
+        }
         catch (Throwable caught) {
             // Expectable user errors should have been thrown as HSQLException.
             // So, this throwable should be an unexpected system error.
