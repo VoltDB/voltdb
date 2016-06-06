@@ -25,7 +25,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class encapsulates the representation and common operations for
@@ -233,13 +232,13 @@ public class NodeSchema
 
     public NodeSchema replaceTableClone(String tableAlias) {
         NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
+        for (int i = 0; i < m_columns.size(); ++i) {
             SchemaColumn col = m_columns.get(i);
             String colAlias = col.getColumnAlias();
+            int differentiator = col.getDifferentiator();
 
-            TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
-            tve.setDifferentiator(col.getDifferentiator());
+            TupleValueExpression tve = new TupleValueExpression(
+                    tableAlias, tableAlias, colAlias, colAlias, i, differentiator);
             tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getExpression().getInBytes());
             SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve, col.getDifferentiator());
             copy.addColumn(sc);
