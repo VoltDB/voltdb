@@ -28,7 +28,9 @@
 #include "common/NValue.hpp"
 
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
-static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
+static const int64_t GREGORIAN_EPOCH = -12212553600000000;  //  1583-01-01 00:00:00
+static const int64_t NYE9999         = 253402300799999999;  //  9999-12-31 23:59:59.999999
+
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
 
@@ -53,42 +55,37 @@ static const int64_t PTIME_MIN_MILLISECOND_INTERVAL = -PTIME_MAX_MILLISECOND_INT
 static const int64_t PTIME_MAX_MICROSECOND_INTERVAL = PTIME_MAX_MILLISECOND_INTERVAL * 1000;
 static const int64_t PTIME_MIN_MICROSECOND_INTERVAL = -PTIME_MAX_MICROSECOND_INTERVAL;
 
+static inline void checkRangeOfEpochMicros(int64_t epochMicros) {
+    if (epochMicros < GREGORIAN_EPOCH || epochMicros > NYE9999) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
+                                   "Value out of range. Cannot convert dates prior to the year 1583 or after the year 9999");
+    }
+}
+
 /** Convert from epoch_micros to date **/
 static inline void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
-    if (epoch_micros_in < GREGORIAN_EPOCH) {
-        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
+    checkRangeOfEpochMicros(epoch_micros_in);
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
     date_out = input_ptime.date();
 }
 
 /** Convert from epoch_micros to time **/
 static inline void micros_to_time(int64_t epoch_micros_in, boost::posix_time::time_duration& time_out) {
-    if (epoch_micros_in < GREGORIAN_EPOCH) {
-        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
+    checkRangeOfEpochMicros(epoch_micros_in);
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
     time_out = input_ptime.time_of_day();
 }
 
 /** Convert from epoch_micros to ptime **/
 static inline void micros_to_ptime(int64_t epoch_micros_in, boost::posix_time::ptime& ptime_out) {
-    if (epoch_micros_in < GREGORIAN_EPOCH) {
-        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-        }
-        ptime_out = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
+    checkRangeOfEpochMicros(epoch_micros_in);
+    ptime_out = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
 }
 
 /** Convert from epoch_micros to date and time **/
 static inline void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::date& date_out,
-        boost::posix_time::time_duration& time_out) {
-    if (epoch_micros_in < GREGORIAN_EPOCH) {
-        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
+                                           boost::posix_time::time_duration& time_out) {
+    checkRangeOfEpochMicros(epoch_micros_in);
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
     date_out = input_ptime.date();
     time_out = input_ptime.time_of_day();
@@ -361,20 +358,40 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const
 
 /** implement the timestamp TO_TIMESTAMP from SECONDs function **/
 template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_SECOND>() const {
+    static const int64_t MAX_SECONDS = std::numeric_limits<int64_t>::max() / 1000000;
+
     if (isNull()) {
         return *this;
     }
+
     int64_t seconds = castAsBigIntAndGetValue();
+    if (seconds > MAX_SECONDS || seconds < -MAX_SECONDS) {
+        // This would overflow the valid range of the 64-bit int storage, so decline to
+        // produce a result from this undefined behavior
+        std::string message = "Input to TO_TIMESTAMP would overflow TIMESTAMP data type";
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+    }
+
     int64_t epoch_micros = seconds * 1000000;
     return getTimestampValue(epoch_micros);
 }
 
 /** implement the timestamp TO_TIMESTAMP from MILLISECONDs function **/
 template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MILLISECOND>() const {
+    static const int64_t MAX_MILLIS = std::numeric_limits<int64_t>::max() / 1000;
+
     if (isNull()) {
         return *this;
     }
+
     int64_t millis = castAsBigIntAndGetValue();
+    if (millis > MAX_MILLIS || millis < -MAX_MILLIS) {
+        // This would overflow the valid range of the 64-bit int storage, so decline to
+        // produce a result from this undefined behavior
+        std::string message = "Input to TO_TIMESTAMP would overflow TIMESTAMP data type";
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message.c_str());
+    }
+
     int64_t epoch_micros = millis * 1000;
     return getTimestampValue(epoch_micros);
 }
@@ -384,6 +401,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
     if (isNull()) {
         return *this;
     }
+
     int64_t epoch_micros = castAsBigIntAndGetValue();
     return getTimestampValue(epoch_micros);
 }
@@ -526,6 +544,8 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
     }
 
     int64_t epoch_micros = getTimestamp();
+    checkRangeOfEpochMicros(epoch_micros);
+
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     if (epoch_micros < 0) {
         epoch_millis -= 1;
@@ -544,6 +564,8 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
     }
 
     int64_t epoch_micros = getTimestamp();
+    checkRangeOfEpochMicros(epoch_micros);
+
     return getTimestampValue(epoch_micros);
 }
 
