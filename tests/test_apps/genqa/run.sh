@@ -287,7 +287,7 @@ function async-export-geo() {
         --catalogswap=false \
         --latencytarget=10 \
         --ratelimit=500 \
-        --timeout=300 \
+        --timeout=300
 }
 
 # Multi-threaded synchronous benchmark sample
