@@ -143,7 +143,7 @@ public class PartitionByPlanNode extends AbstractPlanNode {
         String newIndent = "  " + indent;
         StringBuilder sb = new StringBuilder(indent + "PARTITION BY PLAN\n");
         sb.append(newIndent + "PARTITION BY:\n");
-        int numExprs = numberPartitionByExpressions();
+        int numExprs = getNumberOfPartitionByExpressions();
         for (int idx = 0; idx < numExprs; idx += 1) {
             AbstractExpression ae = getPartitionByExpression(idx);
             // Apparently ae.toString() adds a trailing newline.  That's
@@ -199,7 +199,7 @@ public class PartitionByPlanNode extends AbstractPlanNode {
         return we.getPartitionByExpressions().get(idx);
     }
 
-    public int numberPartitionByExpressions() {
+    public int getNumberOfPartitionByExpressions() {
         return getWindowedExpression().getPartitionbySize();
     }
 

@@ -977,7 +977,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // DISTINCT without GROUP BY
         if (groupbyElement == null || groupbyElement.children.isEmpty()) {
             // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
-            if ( ! hasAggregateExpression()) {
+            if ( ! m_hasAggregateExpression) {
                 // attribute "id" is the only one that differs from a real GROUP BY query
                 groupbyElement = displayElement.duplicate();
             }
@@ -1501,7 +1501,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public boolean hasAggregateOrGroupby() {
-        return hasAggregateExpression() || isGrouped();
+        return m_hasAggregateExpression || isGrouped();
     }
 
     public NodeSchema getFinalProjectionSchema() {
