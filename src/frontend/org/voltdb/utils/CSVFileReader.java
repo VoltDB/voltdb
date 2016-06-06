@@ -18,8 +18,10 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,6 +42,9 @@ class CSVFileReader implements Runnable {
     private static final String COLUMN_COUNT_ERROR =
             "Incorrect number of columns. %d found, %d expected. Please check the table schema " +
             "and the line content";
+    private static final String HEADER_COUNT_ERROR = 
+            "Incorrect number of columns. %d found, %d expected. Please check the csv file header " +
+            "and the line content";
     private static final String BLANK_ERROR =
             "A blank value is detected in column %d while \"--blank error\" is used. " +
             "To proceed, either fill in the blank column or use \"--blank {null|empty}\".";
@@ -59,6 +64,7 @@ class CSVFileReader implements Runnable {
     private final BulkLoaderErrorHandler m_errHandler;
     private final VoltType[] m_columnTypes;
     private final int m_columnCount;
+    private int headerlen;
     private Map<String, Integer> nameToCol;
     private Map<Integer, Integer> orderMap;
 
@@ -86,29 +92,40 @@ class CSVFileReader implements Runnable {
         m_columnTypes = m_loader.getColumnTypes();
         m_columnCount = m_columnTypes.length;
     }
-    
+
     public boolean checkHeader() {
-    	try {
+        try {
             List<String> firstline = m_listReader.read();
+            Set<String> firstset = new HashSet<String>();
+            // remove duplicate.
+            for (String name : firstline) {
+                firstset.add(name.toUpperCase());
+            }
             // whether column num matches.
-            if (firstline.size() > m_columnCount) {
+            if (firstline.size() < m_columnCount) {
                 return false;
-            } else if (firstline.size() < m_columnCount){
-            	return false;
             } else {
-            	// whether column name matches.
+                // whether column name has according table column.
+                headerlen = firstline.size();
                 nameToCol = m_loader.getNameToColumnMap();
-                for (String name : firstline) {
-                	if (!nameToCol.containsKey(name.toUpperCase())) {
-                		return false;
-                	}
+                int matchColCount = 0;
+                for (String name : firstset) {
+                    if (nameToCol.containsKey(name)) {
+                        matchColCount++;
+                    }
+                }
+                if (matchColCount != m_columnCount) {
+                    return false;
                 }
             }
+            // get the mapping from file column num to table column num.
             orderMap = new TreeMap<Integer, Integer>();
             for (int fileCol = 0; fileCol < firstline.size(); fileCol++) {
                 String name = firstline.get(fileCol);
-                int tableCol = nameToCol.get(name.toUpperCase());
-                orderMap.put(fileCol, tableCol);
+                if (nameToCol.containsKey(name.toUpperCase())) {
+                    int tableCol = nameToCol.get(name.toUpperCase());
+                    orderMap.put(fileCol, tableCol);
+                }
             }
         } catch (IOException ex) {
             m_log.error("Failed to read CSV line from file: " + ex);
@@ -159,7 +176,7 @@ class CSVFileReader implements Runnable {
                     }
                     continue;
                 }
-                
+
                 if (m_config.header) {
                     lineValues = reorderCols(lineValues);
                 }
@@ -196,19 +213,25 @@ class CSVFileReader implements Runnable {
                     + "A report will be generated with what we processed so far. Error: " + ex);
         }
     }
-    
+
     private String[] reorderCols (String[] lineValues) {
-    	String[] reorderValues = new String[lineValues.length];
-    	for (int fileCol = 0; fileCol < lineValues.length; fileCol++) {
-            int tableCol = orderMap.get(fileCol);
-            reorderValues[tableCol] = lineValues[fileCol];
+        String[] reorderValues = new String[m_columnCount];
+        for (int fileCol = 0; fileCol < lineValues.length; fileCol++) {
+            if (orderMap.containsKey(fileCol)) {
+                int tableCol = orderMap.get(fileCol);
+                reorderValues[tableCol] = lineValues[fileCol];
+            }
         }
         return reorderValues;
     }
-    
+
     private String checkparams_trimspace(String[] lineValues) {
-        if (lineValues.length != m_columnCount) {
+        if (lineValues.length != m_columnCount && !m_config.header) {
             return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
+        }
+
+        if (lineValues.length != headerlen && m_config.header) {
+            return String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
         }
 
         for (int i = 0; i<lineValues.length; i++) {

@@ -449,6 +449,6 @@ public class VoltBulkLoader {
     }
 
     public Map<Integer, String> getColumnNames() {
-    	return m_colNames;
+        return m_colNames;
     }
 }

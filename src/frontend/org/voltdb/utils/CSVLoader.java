@@ -467,7 +467,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             //if header option is true, check whether csv first line is valid
             if (config.header) {
                 if (!csvReader.checkHeader()) {
-            	    m_log.error("CSV file '" + config.file + "' header does not match the table");
+                    m_log.error("CSV file '" + config.file + "' header does not match the table");
                     System.exit(-1);
                 }
             }

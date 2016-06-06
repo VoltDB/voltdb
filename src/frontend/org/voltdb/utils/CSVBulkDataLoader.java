@@ -91,7 +91,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     {
         return m_failedInsertCount.get();
     }
-    
+
     @Override
     public Map<String, Integer> getNameToColumnMap()
     {
