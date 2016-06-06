@@ -153,8 +153,8 @@ begin MaterializedViewHandler       "Information used to build and update a mate
   string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
   IndexRef* indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
-  Statement* fallbackQueryStmts      "Statements to search for mview min/max fallback value"
-  Statement* createQuery
+  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
+  Statement* createQuery            "The SELECT statement that defines the view"
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"
