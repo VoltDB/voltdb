@@ -68,6 +68,60 @@ public class TestProcCompiler extends TestCase {
         assertEquals(2, countLinesMatching(lines, "^\\s*\\[TABLE SCAN]\\sselect.*indexed_replicated_blah.*"));
     }
 
+    protected static String getQueryForFoo(int numberOfPredicates) {
+        StringBuilder string = new StringBuilder("SELECT * FROM FOO ");
+        if (numberOfPredicates > 0) {
+            string.append("WHERE ID = 10 ");
+            for (int i = 1; i < numberOfPredicates; i++) {
+                string.append("AND ID > 1 ");
+            }
+        }
+        string.append(";");
+        return string.toString();
+    }
+
+    public void testStmntWithLotsOfPredicates() throws Exception {
+        String simpleSchema =  "Create Table foo ( " +
+                               "id BIGINT DEFAULT 0 NOT NULL, " +
+                               "name VARCHAR(255) NOT NULL, " +
+                               "PRIMARY KEY(id));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+
+        // generate with query with lot of predicates for stored procedure
+        String sql = getQueryForFoo(350);
+        builder.addStmtProcedure("StmntWithPredicates", sql, null);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("lots_of_predicates.jar"));
+        assert(success);
+    }
+
+    public void testStmntForStackOverflowCondition() throws Exception {
+        String schema =  "Create Table foo ( " +
+                         "id BIGINT DEFAULT 0 NOT NULL, " +
+                         "name VARCHAR(255) NOT NULL, " +
+                         "PRIMARY KEY(id));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        builder.setCompilerDebugPrintStream(capturing);
+        builder.addLiteralSchema(schema);
+
+        // Test for stored procedure which have more than max allowable predicates in the
+        // results in error and does not crash or hang the system
+        String sql = getQueryForFoo(1800);
+        builder.addStmtProcedure("StmntForStaclOverFlow", sql, null);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));
+        assert(!success);
+        String captured = capturer.toString("UTF-8");
+        String errMsg = "Encountered stack overflow error. " +
+                        "Try reducing the number of predicate expressions in the query";
+        assert(captured.contains(errMsg));
+    }
+
     private int countLinesMatching(String[] lines, String pattern) {
         int count = 0;
         for (String string : lines) {

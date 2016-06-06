@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,9 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -63,10 +61,14 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -78,6 +80,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
     private static final VoltLogger m_hostLog = new VoltLogger("HOST");
+    private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
@@ -101,6 +104,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
+        public AtomicBoolean isPaused = new AtomicBoolean(false);
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -216,6 +220,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
+    // default to false for PD, so hopefully this gets set to true very quickly
+    private AtomicBoolean m_partitionDetectionEnabled = new AtomicBoolean(false);
+    private boolean m_partitionDetected = false;
 
     private final Object m_mapLock = new Object();
 
@@ -253,15 +260,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param catalogCRC
      * @param hostLog
      */
-    public HostMessenger(
-            Config config)
-    {
+    public HostMessenger(Config config) {
         m_config = config;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
-                m_config.internalPort,
+                m_config.internalPort, m_config.isPaused,
                 this);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
@@ -286,10 +291,115 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     }
 
+    public void setPartitionDetectionEnabled(boolean enabled) {
+        m_partitionDetectionEnabled.set(enabled);
+    }
+
+    /**
+     * Given a set of the known host IDs before a fault, and the known host IDs in the
+     * post-fault cluster, determine whether or not we think a network partition may have happened.
+     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
+     * if we weren't a viable cluster.
+     * ALSO NOTE: not private so it may be unit-tested.
+     */
+    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts, boolean pdEnabled) {
+
+        // A strict, viable minority is always a partition.
+        if ((currentHosts.size() * 2) < previousHosts.size()) {
+            if (pdEnabled) {
+                m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Shutting down to avoid multiple copies of the database running independently.");
+                return true; // partition detection triggered
+            }
+            else {
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains fewer than half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, but there "
+                        + "is significant danger that multiple copies of the database are running "
+                        + "independently.");
+                return false; // partition detection not triggered
+            }
+        }
+
+        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
+        // If the blessed host is in the failure set, this set is not blessed.
+        if (currentHosts.size() * 2 == previousHosts.size()) {
+            if (pdEnabled) {
+                // find the lowest hostId between the still-alive hosts and the
+                // failed hosts. Which set contains the lowest hostId?
+                // This should be all the pre-partition hosts IDs.  Any new host IDs
+                // (say, if this was triggered by rejoin), will be greater than any surviving
+                // host ID, so don't worry about including it in this search.
+                if (currentHosts.contains(Collections.min(previousHosts))) {
+                    m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains half of the previous servers, "
+                            + "including the \"tie-breaker\" node. Continuing.");
+                    return false; // partition detection not triggered
+                }
+                else {
+                    m_tmLog.fatal("It's possible a network partition has split the cluster into multiple viable clusters. "
+                            + "Current cluster contains exactly half of the previous servers, but does "
+                            + "not include the \"tie-breaker\" node. "
+                            + "Shutting down to avoid multiple copies of the database running independently.");
+                    return true; // partition detection triggered
+                }
+            }
+            else {
+                // 50/50 split. We don't care about tie-breakers for this error message
+                m_tmLog.warn("It's possible a network partition has split the cluster into multiple viable clusters. "
+                        + "Current cluster contains exactly half of the previous servers. "
+                        + "Continuing because network partition detection is disabled, "
+                        + "but there is significant danger that multiple copies of the "
+                        + "database are running independently.");
+            }
+        }
+
+        // info message will be printed on every failure that isn't handled above (most cases)
+        m_tmLog.info("It's possible a network partition has split the cluster into multiple viable clusters. "
+                + "Current cluster contains a majority of the prevous servers and is safe. Continuing.");
+        return false; // partition detection not triggered
+    }
+
+    private void doPartitionDetectionActivities(Set<Integer> failedHostIds)
+    {
+        if (m_shuttingDown) {
+            return;
+        }
+
+        // We should never re-enter here once we've decided we're partitioned and doomed
+        Preconditions.checkState(!m_partitionDetected, "Partition detection triggered twice.");
+
+        // figure out previous and current cluster memberships
+        Set<Integer> previousHosts = getLiveHostIds();
+        Set<Integer> currentHosts = new HashSet<>(previousHosts);
+        currentHosts.removeAll(failedHostIds);
+
+        // sanity!
+        Preconditions.checkState(previousHosts.contains(m_localHostId));
+        Preconditions.checkState(currentHosts.contains(m_localHostId));
+
+        // decide if we're partitioned
+        // this will print out warnings if we are
+        if (makePPDDecision(previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
+            // record here so we can ensure this only happens once for this node
+            m_partitionDetected = true;
+            VoltDB.crashGlobalVoltDB("Partition detection logic will stop this process to ensure agaisnt split brains.",
+                        false, null);
+        }
+    }
+
     private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
         @Override
         public void disconnect(Set<Integer> failedHostIds) {
             synchronized(HostMessenger.this) {
+
+                // Decide if the failures given could put the cluster in a split-brain
+                // Then decide if we should shut down to ensure that at a MAXIMUM, only
+                // one viable cluster is running.
+                // This feature is called "Partition Detection" in the docs.
+                doPartitionDetectionActivities(failedHostIds);
+
                 for (int hostId: failedHostIds) {
                     addFailedHost(hostId);
                     removeForeignHost(hostId);
@@ -350,7 +460,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      * Start the host messenger and connect to the leader, or become the leader
-     * if necessary.
+     * if necessary. return true if any node indicates a paused start.
      */
     public void start() throws Exception {
         /*
@@ -496,6 +606,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
+    }
+
+    @Override
+    public void notifyAsPaused() {
+        m_config.isPaused.set(true);
     }
 
     /*
@@ -804,6 +919,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         assert hostGroups.size() == expectedHosts;
         return hostGroups;
+    }
+
+    public boolean isPaused() {
+        return m_config.isPaused.get();
+    }
+
+    public void resetPaused() {
+        m_config.isPaused.set(false);
+    }
+
+    //Set Paused so socketjoiner will communicate correct status during mesh building.
+    public void pause() {
+        m_config.isPaused.set(true);
     }
 
     public int getHostId() {
@@ -1178,6 +1306,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         return m_network.getIOStats(interval, picoNetworks);
+    }
+
+    /**
+     * Cut the network connection between two hostids immediately
+     * Useful for simulating network partitions
+     */
+    public void cutLink(int hostIdA, int hostIdB) {
+        if (m_localHostId == hostIdA) {
+            ForeignHost fh = m_foreignHosts.get(hostIdB);
+            fh.cutLink();
+        }
+        if (m_localHostId == hostIdB) {
+            ForeignHost fh = m_foreignHosts.get(hostIdA);
+            fh.cutLink();
+        }
     }
 
 }

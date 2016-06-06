@@ -126,7 +126,7 @@ public class PlanAssembler {
     private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
-    private PlanSelector m_planSelector;
+    private final PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -1675,6 +1675,16 @@ public class PlanAssembler {
 
         // Build the output schema for the projection based on the display columns
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
+        List<TupleValueExpression> allTves =  new ArrayList<>();
+        for (SchemaColumn col : proj_schema.getColumns()) {
+            allTves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+        }
+
+        // Adjust the differentiator fields of TVEs, since they need to reflect
+        // the inlined projection node in scan nodes.
+        for (TupleValueExpression tve : allTves) {
+            tve.setDifferentiator(rootNode.adjustDifferentiatorField(tve.getColumnIndex()));
+        }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // if the projection can be done inline...

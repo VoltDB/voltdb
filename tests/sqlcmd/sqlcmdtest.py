@@ -91,7 +91,7 @@ def launch_and_wait_on_voltdb(reportout):
     # Launch a single local voltdb server to serve all scripted sqlcmd runs.
     # The scripts are expected to clean up after themselves  -- and/or defensively
     # drop and create all of their tables up front.
-    subprocess.Popen(['../../bin/voltdb', 'create'], shell=False)
+    subprocess.Popen(['../../bin/voltdb', 'create', '--force'], shell=False)
     # give server a little startup time.
     time.sleep(5)
 

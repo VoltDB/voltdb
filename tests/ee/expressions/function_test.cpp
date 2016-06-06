@@ -116,6 +116,11 @@ private:
         ExecutorContext m_executorContext;
 };
 
+static NValue getSomeValue(const char* &val)
+{
+    return ValueFactory::getTempStringValue(std::string(val));
+}
+
 static NValue getSomeValue(const std::string &val)
 {
     return ValueFactory::getTempStringValue(val);
@@ -124,6 +129,11 @@ static NValue getSomeValue(const std::string &val)
 static NValue getSomeValue(const int64_t val)
 {
     return ValueFactory::getBigIntValue(val);
+}
+
+static NValue getSomeValue(const TTInt &val)
+{
+    return ValueFactory::getDecimalValueFromString(val.ToString());
 }
 
 /**
@@ -320,6 +330,66 @@ TEST_F(FunctionTest, NaturalLogTest) {
     } catch(SQLException &sqlExcp) {
         const char *errMsg = sqlExcp.message().c_str();
         sawExecption = (strncmp(errMsg, "Invalid result value (-inf)", strlen(errMsg)) >= 0)? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+}
+
+TEST_F(FunctionTest, NaturalLog10Test) {
+    ASSERT_EQ(testUnary(FUNC_LOG10, 100, 2), 0);
+    ASSERT_EQ(testUnary(FUNC_LOG10, 100.0, 2.0), 0);
+
+    //invalid parameter value
+    bool sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, -100, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+
+    //invalid parameter value
+    sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, -1, 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+
+    //invalid parameter type
+    sawExecption = false;
+    try {
+        testUnary(FUNC_LOG10, "100", 0);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    }
+    ASSERT_EQ(sawExecption, true);
+}
+
+TEST_F(FunctionTest, NaturalModTest) {
+    ASSERT_EQ(testBinary(FUNC_MOD, 2, 1, 0), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, 3, 2, 1), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, 0, 2, 0), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("2.0"), TTInt("1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("3.0"), TTInt("-2.0"), TTInt("1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-3.0"), TTInt("-2.0"), TTInt("-1.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("25.2"), TTInt("-7.4"), TTInt("4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
+    ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
+
+    //invalid parameter value
+    bool sawExecption = false;
+    try {
+        testBinary(FUNC_MOD, "-100", 3, 1);
+    } catch(SQLException &sqlExcp) {
+        const char *errMsg = sqlExcp.message().c_str();
+        sawExecption = (strncmp(errMsg,
+            "unsupported non-numeric type for SQL MOD function", strlen(errMsg)) >= 0) ? true : false;
     }
     ASSERT_EQ(sawExecption, true);
 }

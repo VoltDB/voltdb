@@ -308,6 +308,11 @@ class Overview extends Module {
         errorValue1 {$("#errorValueDL1")}
         errortxtName2 {$("#error_txtNameDL2")}
         errortxtName1 {$("#error_txtNameDL1")}
+<<<<<<< HEAD
+		diskLimitEdit {$("#btnEditDiskLimit") }
+=======
+        diskLimitEdit {$("#btnEditDiskLimit") }
+>>>>>>> 8a400bd1a1aa07b706e5b2c1366d071a21026ebf
 
 
             //$(class:"labelCollapsed labelExpanded", text:"Disk Limit") }
@@ -689,17 +694,18 @@ class Overview extends Module {
     }
 
     def openEditDiskLimitPopup() {
-        waitFor(waitTime) { page.diskLimitEdit.isDisplayed() }
-        int count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.diskLimitEdit.click()
-                waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
-                break
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
+        waitFor(waitTime) { diskLimitEdit.isDisplayed() }
+        diskLimitEdit.click()
+        waitFor(waitTime) { addDiskLimitHeader.isDisplayed() }
+//        int count = 0
+//        while(count<numberOfTrials) {
+//            count++
+//            try {
+//
+//                break
+//            } catch(geb.waiting.WaitTimeoutException e) {
+//            }
+//        }
     }
 
     // For Export

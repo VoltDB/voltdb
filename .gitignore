@@ -71,3 +71,15 @@ doc/tutorials/auction/csvloader_*.csv
 out
 bundles
 *.lcbak
+.gradle/*
+build.gradle
+/lib/python/vdm/.idea/
+/lib/python/vdm/server/nohup.out/*
+/lib/python/vdm/tests/geb_vdm/.gradle/*
+/lib/python/vdm/tests/geb_vdm/build/*
+/lib/python/vdm/tests/server/test_reports/*
+/src/frontend/org/voltdb/.gradle/*
+/src/frontend/org/voltdb/.idea/*
+/tests/.idea/*
+/tests/geb/vmc/.idea/*
+/build/lib/voltdb.war

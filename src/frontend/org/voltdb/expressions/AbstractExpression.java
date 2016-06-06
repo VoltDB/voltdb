@@ -841,60 +841,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     public ArrayList<AbstractExpression> findBaseTVEs() {
-        return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
-    }
-
-    /**
-     * @param type expression type to search for
-     * @return a list of contained expressions that are of the desired type
-     */
-    public ArrayList<AbstractExpression> findAllSubexpressionsOfType(ExpressionType type) {
-        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
-        findAllSubexpressionsOfType_recurse(type, collected);
-        return collected;
-    }
-
-    private void findAllSubexpressionsOfType_recurse(ExpressionType type,ArrayList<AbstractExpression> collected) {
-        if (getExpressionType() == type)
-            collected.add(this);
-
-        if (m_left != null) {
-            m_left.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-        if (m_right != null) {
-            m_right.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-        if (m_args != null) {
-        for (AbstractExpression argument : m_args) {
-            argument.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-    }
-    }
-
-    /**
-     * @param type expression type to search for
-     * @return whether the expression or any contained expressions are of the desired type
-     */
-    public boolean hasAnySubexpressionOfType(ExpressionType type) {
-        if (getExpressionType() == type) {
-            return true;
-        }
-
-        if (m_left != null && m_left.hasAnySubexpressionOfType(type)) {
-            return true;
-        }
-
-        if (m_right != null && m_right.hasAnySubexpressionOfType(type)) {
-            return true;
-        }
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionOfType(type)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return findAllSubexpressionsOfClass(TupleValueExpression.class);
     }
 
     /**
@@ -949,6 +896,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
         }
         return false;
+    }
+
+    public boolean hasTVE() {
+        return hasAnySubexpressionOfClass(TupleValueExpression.class);
     }
 
     /**

@@ -168,9 +168,15 @@ public class QueryPlanner {
         // this is much easier to parse than SQL and is checked against the catalog
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
-        } catch (HSQLParseException e) {
+        }
+        catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
+        }
+        catch (StackOverflowError error) {
+            String msg = "Encountered stack overflow error. " +
+                         "Try reducing the number of predicate expressions in the query.";
+            throw new PlanningErrorException(msg);
         }
 
         if (m_isUpsert) {
@@ -271,7 +277,7 @@ public class QueryPlanner {
                 }
                 // fall through to try replan without parameterization.
             }
-            catch (Exception e) {
+            catch (Exception | StackOverflowError e) {
                 // ignore any errors planning with parameters
                 // fall through to re-planning without them
                 m_hasExceptionWhenParameterized = true;
@@ -282,17 +288,25 @@ public class QueryPlanner {
             }
         }
 
-        // if parameterization isn't requested or if it failed, plan here
-        CompiledPlan plan = compileFromXML(m_xmlSQL, null);
-        if (plan == null) {
-            if (m_debuggingStaticModeToRetryOnError) {
-                plan = compileFromXML(m_xmlSQL, null);
+        CompiledPlan plan = null;
+        try {
+            // if parameterization isn't requested or if it failed, plan here
+            plan = compileFromXML(m_xmlSQL, null);
+            if (plan == null) {
+                if (m_debuggingStaticModeToRetryOnError) {
+                    plan = compileFromXML(m_xmlSQL, null);
+                }
+                throw new PlanningErrorException(m_recentErrorMsg);
             }
-            throw new PlanningErrorException(m_recentErrorMsg);
-        }
 
-        if (m_isUpsert) {
-            replacePlanForUpsert(plan);
+            if (m_isUpsert) {
+                replacePlanForUpsert(plan);
+            }
+        }
+        catch (StackOverflowError error) {
+            String msg = "Encountered stack overflow error. " +
+                         "Try reducing the number of predicate expressions in the query.";
+            throw new PlanningErrorException(msg);
         }
 
         return plan;

@@ -64,6 +64,26 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runAllAdHocSPtests(0, 1, 2, 3);
     }
 
+    public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
+        // query with max predicates in where clause
+        String sql = getQueryForLongQueryTable(300);
+        runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+
+        // generate query with lots of predicate to simulate stack overflow when parsing the expression
+        sql = getQueryForLongQueryTable(2000);
+        try {
+            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            fail("Query was expected to generate stack over flow error");
+        }
+        catch (Exception exception) {
+            String expectedMsg;
+            expectedMsg = "Encountered stack overflow error. " +
+                          "Try reducing the number of predicate expressions in the query";
+            boolean foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue(foundMsg);
+        }
+    }
+
     /**
      * For planner-only testing, most of the args are ignored.
      */

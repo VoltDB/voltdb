@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -61,6 +62,12 @@ public abstract class NonVoltDBBackend {
     protected static FileWriter transformedSqlFileWriter;
     protected static final boolean DEBUG = false;
 
+    /** Pattern used to recognize "variables", such as {table} or {column:pk},
+     *  in a QueryTransformer's prefix, suffix or (group) replacement text, for
+     *  which an appropriate group value will be substituted. */
+    protected static final Pattern groupNameVariables = Pattern.compile(
+            "\\{(?<groupName>\\w+)(:(?<columnType>\\w+))?\\}");
+
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
     public NonVoltDBBackend(String databaseType, String driverClassName,
@@ -76,6 +83,9 @@ public abstract class NonVoltDBBackend {
             dbconn = DriverManager.getConnection(connectionURL, username, password);
             dbconn.setAutoCommit(true);
             dbconn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            DatabaseMetaData meta = dbconn.getMetaData();
+            System.out.println("Using database: " + meta.getDatabaseProductName()+" "+meta.getDatabaseProductVersion());
+            System.out.println(" & JDBC driver: " + meta.getDriverName()+", "+meta.getDriverVersion());
         } catch (SQLException e) {
             throw new RuntimeException("Failed to open connection to: " + connectionURL, e);
         }
@@ -114,8 +124,8 @@ public abstract class NonVoltDBBackend {
 
     /**
      * A QueryTransformer object is used to specify (using the builder pattern)
-     * which options should be used, when transforming SQL statements (DDL or
-     * DML) fitting certain patterns, as is often needed in order for the
+     * which options should be used, when transforming SQL statements (DDL, DML
+     * or DQL) fitting certain patterns, as is often needed in order for the
      * results of a backend database (e.g. PostgreSQL) to match those of VoltDB.
      * This collection of options (the QueryTransformer object) is then passed
      * to the <i>transformQuery</i> method (see below).
@@ -136,6 +146,7 @@ public abstract class NonVoltDBBackend {
         private Double m_multiplier = null;
         private Integer m_minimum = null;
         private List<String> m_groups = new ArrayList<String>();
+        private List<String> m_groupReplacementTexts = new ArrayList<String>();
         private boolean m_debugPrint = false;
 
         /**
@@ -224,6 +235,17 @@ public abstract class NonVoltDBBackend {
             return this;
         }
 
+        /** Specifies one or more strings to replace each group, within the
+         *  whole match (e.g. "INSERT", to replace "UPSERT"); default is an
+         *  empty list, in which case it is ignored. */
+        protected QueryTransformer groupReplacementText(String ... text) {
+            this.m_groupReplacementTexts = new ArrayList<String>();
+            for (String t : text) {
+                this.m_groupReplacementTexts.add(t);
+            }
+            return this;
+        }
+
         /** Specifies a ColumnType to which this QueryTransformer should be
          *  applied, i.e., a query will only be modified if the <i>group</i>
          *  is a column of the specified type; default is <b>null</b>, in which
@@ -271,43 +293,92 @@ public abstract class NonVoltDBBackend {
 
     }
 
+    /** Returns all column names for the specified table, in the order defined
+     *  in the DDL. */
+    protected List<String> getAllColumns(String tableName) {
+        List<String> columns = new ArrayList<String>();
+        try {
+            // Lower-case table names are required for PostgreSQL; we might need to
+            // alter this if we use another comparison database (besides HSQL) someday
+            ResultSet rs = dbconn.getMetaData().getColumns(null, null, tableName.toLowerCase(), null);
+            while (rs.next()) {
+                columns.add(rs.getString(4));
+            }
+        } catch (SQLException e) {
+            System.out.println("In NonVoltDBBackend.getAllColumns, caught SQLException: " + e);
+        }
+        return columns;
+    }
+
+    /** Returns all primary key column names for the specified table, in the
+     *  order defined in the DDL. */
+    protected List<String> getPrimaryKeys(String tableName) {
+        List<String> pkCols = new ArrayList<String>();
+        try {
+            // Lower-case table names are required for PostgreSQL; we might need to
+            // alter this if we use another comparison database (besides HSQL) someday
+            ResultSet rs = dbconn.getMetaData().getPrimaryKeys(null, null, tableName.toLowerCase());
+            while (rs.next()) {
+                pkCols.add(rs.getString(4));
+            }
+        } catch (SQLException e) {
+            System.out.println("In NonVoltDBBackend.getPrimaryKeys, caught SQLException: " + e);
+        }
+        return pkCols;
+    }
+
+    /** Returns all non-primary-key column names for the specified table, in the
+     *  order defined in the DDL. */
+    protected List<String> getNonPrimaryKeyColumns(String tableName) {
+        List<String> columns = getAllColumns(tableName);
+        columns.removeAll(getPrimaryKeys(tableName));
+        return columns;
+    }
+
+    /** Returns true if the <i>columnName</i> is one of the specified
+     *  <i>columnTypes</i>, e.g., one of the integer column types, or one of
+     *  the Geospatial column types - for one or more of the <i>tableNames</i>,
+     *  if specified; otherwise, for any table in the database schema. */
+    private boolean isColumnType(List<String> columnTypes, String columnName,
+                                 String ... tableNames) {
+        if (tableNames == null || tableNames.length == 0) {
+            tableNames = new String[] {null};
+        }
+        for (String tn : tableNames) {
+            // Lower-case table and column names are required for PostgreSQL;
+            // we might need to alter this if we use another comparison
+            // database (besides HSQL) someday
+            String tableName = (tn == null) ? tn : tn.trim().toLowerCase();
+            try {
+                ResultSet rs = dbconn.getMetaData().getColumns(null, null,
+                        tableName, columnName.trim().toLowerCase());
+                while (rs.next()) {
+                    String columnType = getVoltColumnTypeName(rs.getString(6));
+                    if (columnTypes.contains(columnType)) {
+                        return true;
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println("In NonVoltDBBackend.isColumnType, with tableName "+tableName+", columnName "
+                        + columnName+", columnTypes "+columnTypes+", caught SQLException:\n  " + e);
+            }
+        }
+        return false;
+    }
+
     /** Returns true if the <i>columnName</i> is an integer column (including
-     *  types TINYINT, SMALLINT, INTEGER, BIGINT, etc.); false otherwise. */
-    static private boolean isIntegerColumn(String columnName, String... tableNames) {
-        // TODO: we may want to modify this to actually check the column type,
-        // rather than just go by the column name (ENG-9945)
-        if (DEBUG) {
-            System.out.println("In NonVoltDBBackend.isIntegerColumn, with columnName: '" + columnName + "'");
-        }
-        if (columnName == null) {
-            return false;
-        }
-        String columnNameUpper = columnName.trim().toUpperCase();
-        return  columnNameUpper.equals("ID")   || columnNameUpper.equals("NUM") ||
-                columnNameUpper.equals("TINY") || columnNameUpper.equals("SMALL") ||
-                columnNameUpper.equals("BIG")  || columnNameUpper.equals("POINTS") ||
-                columnNameUpper.equals("WAGE") || columnNameUpper.equals("DEPT") ||
-                columnNameUpper.equals("AGE")  || columnNameUpper.equals("RENT") ||
-                columnNameUpper.equals("A1")   || columnNameUpper.equals("A2") ||
-                columnNameUpper.equals("A3")   || columnNameUpper.equals("A4") ||
-                columnNameUpper.equals("V_G1") || columnNameUpper.equals("V_CNT") ||
-                columnNameUpper.equals("V_G2") || columnNameUpper.equals("V_SUM_AGE") ||
-                columnNameUpper.equals("V_SUM_RENT");
+     *  types TINYINT, SMALLINT, INTEGER, BIGINT, or equivalents in a
+     *  comparison, non-VoltDB database); false otherwise. */
+    private boolean isIntegerColumn(String columnName, String... tableNames) {
+        List<String> intColumnTypes = Arrays.asList("TINYINT", "SMALLINT", "INTEGER", "BIGINT");
+        return isColumnType(intColumnTypes, columnName, tableNames);
     }
 
     /** Returns true if the <i>columnName</i> is a Geospatial column type, i.e. a
      *  GEOGRAPHY_POINT (point) or GEOGRAPHY (polygon) column; false otherwise. */
-    static private boolean isGeoColumn(String columnName, String... tableNames) {
-        // TODO: we may want to modify this to actually check the column type,
-        // rather than just go by the column name (ENG-9945)
-        if (DEBUG) {
-            System.out.println("In NonVoltDBBackend.isGeoColumn, with columnName: '" + columnName + "'");
-        }
-        if (columnName == null) {
-            return false;
-        }
-        String columnNameUpper = columnName.trim().toUpperCase();
-        return columnNameUpper.startsWith("PT") || columnNameUpper.startsWith("POLY");
+    private boolean isGeoColumn(String columnName, String... tableNames) {
+        List<String> geoColumnTypes = Arrays.asList("GEOGRAPHY", "GEOGRAPHY_POINT");
+        return isColumnType(geoColumnTypes, columnName, tableNames);
     }
 
     /** Returns the number of occurrences of the specified character in the specified String. */
@@ -329,6 +400,27 @@ public abstract class NonVoltDBBackend {
             }
         }
         return index;
+    }
+
+    /** Returns the column type name, in VoltDB, corresponding to the specified
+     *  column type name in the comparison non-VoltDB backend database. This
+     *  base version merely passes back the identical column type name, but it
+     *  may be overridden by sub-classes, to return the appropriate values for
+     *  that database. */
+    protected String getVoltColumnTypeName(String columnTypeName) {
+        return columnTypeName;
+    }
+
+    /** Potentially returns the specified String, after replacing certain
+     *  "variables", such as {table} or {column:pk}, in a QueryTransformer's
+     *  prefix, suffix or (group) replacement text, for which a corresponding
+     *  group value will be substituted. However, this base version just
+     *  returns the original String unchanged; it may be overridden by
+     *  sub-classes, to determine appropriate changes for that non-VoltDB
+     *  backend database. */
+    protected String replaceGroupNameVariables(String str,
+            List<String> groupNames,List<String> groupValues) {
+        return str;
     }
 
     /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
@@ -374,7 +466,7 @@ public abstract class NonVoltDBBackend {
      * or if the <i>qt</i>'s <i>queryPattern</i>, <i>initText</i>, <i>prefix</i>,
      * or <i>suffix</i> is <b>null</b>.
      */
-    static protected String transformQuery(String query, QueryTransformer qt) {
+    protected String transformQuery(String query, QueryTransformer qt) {
         StringBuffer modified_query = new StringBuffer();
         Matcher matcher = qt.m_queryPattern.matcher(query);
         int count = 0;
@@ -382,14 +474,17 @@ public abstract class NonVoltDBBackend {
             StringBuffer replaceText = new StringBuffer(qt.m_initialText);
             String wholeMatch = matcher.group();
             String group = wholeMatch;
+            List<String> groups = new ArrayList<String>();
             if (qt.m_debugPrint) {
                 if (count < 1) {
                     System.out.println("In NonVoltDBBackend.transformQuery,\n  with query    : " + query);
                     System.out.println("  queryPattern: " + qt.m_queryPattern);
-                    System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix, replacementText:\n    '"
+                    System.out.println("  initialText, prefix, suffix, useAltSuffixAfter, altSuffix; "
+                            + "replacementText; groupReplacementText(s):\n    '"
                             + qt.m_initialText + "', '" + qt.m_prefix + "', '" + qt.m_suffix + "', '"
-                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "', '" + qt.m_replacementText
-                            + "'\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
+                            + qt.m_useAltSuffixAfter + "', '" + qt.m_altSuffix + "'\n    '"
+                            + qt.m_replacementText + "'; " + qt.m_groupReplacementTexts
+                            + "\n  useWholeMatch, columnType, multiplier, minimum, debugPrint; groups:\n    "
                             + qt.m_useWholeMatch + ", " + qt.m_columnType + ", " + qt.m_multiplier + ", "
                             + qt.m_minimum + ", " + qt.m_debugPrint + "\n    " + qt.m_groups);
                 }
@@ -397,11 +492,12 @@ public abstract class NonVoltDBBackend {
             }
             for (String groupName : qt.m_groups) {
                 group = matcher.group(groupName);
+                groups.add(group);
                 if (qt.m_debugPrint) {
                     System.out.println("    group     : " + group);
                 }
                 if (group == null) {
-                    break;
+                    continue;
                 } else if (!qt.m_useWholeMatch) {
                     String groupValue = group, suffixValue = qt.m_suffix;
                     // Check for the case where a multiplier & minimum are used
@@ -424,12 +520,23 @@ public abstract class NonVoltDBBackend {
                     // but does not match the column type found in this query)
                     replaceText.append(wholeMatch);
                 } else {
-                    // Check for the case where the group is to be replaced with replacementText
+                    // Check for the case where the group (or the whole text) is to be replaced with replacementText
                     if (qt.m_replacementText != null) {
                         wholeMatch = wholeMatch.replace(group, qt.m_replacementText);
                     }
-                    // Make sure not to swallow up extra ')', in whole match
-                    replaceText.append(handleParens(wholeMatch, qt.m_prefix, qt.m_suffix));
+                    // Check for the case where each group is to be replaced using groupReplacementTexts
+                    if (qt.m_groupReplacementTexts != null && !qt.m_groupReplacementTexts.isEmpty()) {
+                        for (int i=0; i < Math.min(groups.size(), qt.m_groupReplacementTexts.size()); i++) {
+                            if (groups.get(i) != null && qt.m_groupReplacementTexts.get(i) != null) {
+                                wholeMatch = wholeMatch.replaceFirst(groups.get(i), qt.m_groupReplacementTexts.get(i));
+                            }
+                        }
+                    }
+                    // Make sure not to swallow up extra ')', in whole match; and
+                    // replace symbols like {foo} with the appropriate group values
+                    replaceText.append(replaceGroupNameVariables(
+                            handleParens(wholeMatch, qt.m_prefix, qt.m_suffix),
+                            qt.m_groups, groups));
                 }
             }
             if (qt.m_debugPrint) {
@@ -447,7 +554,7 @@ public abstract class NonVoltDBBackend {
 
     /** Calls the transformQuery method above multiple times, for each
      *  specified QueryTransformer. */
-    static protected String transformQuery(String query, QueryTransformer ... qts) {
+    protected String transformQuery(String query, QueryTransformer ... qts) {
         String result = query;
         for (QueryTransformer qt : qts) {
             result = transformQuery(result, qt);
@@ -616,7 +723,7 @@ public abstract class NonVoltDBBackend {
                 if (e.getMessage().contains("constraint")) {
                     sqlLog.l7dlog( Level.TRACE, LogKeys.sql_Backend_ConvertingHSQLExtoCFEx.name(), e);
                     final byte messageBytes[] = e.getMessage().getBytes();
-                    ByteBuffer b = ByteBuffer.allocate(25 + messageBytes.length);
+                    ByteBuffer b = ByteBuffer.allocate(100 + messageBytes.length);
                     b.putInt(messageBytes.length);
                     b.put(messageBytes);
                     b.put(e.getSQLState().getBytes());

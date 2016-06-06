@@ -53,10 +53,10 @@ public class NodeSchema
     }
 
     // The list of columns produced by a plan node, in storage order.
-    private ArrayList<SchemaColumn> m_columns;
+    private final ArrayList<SchemaColumn> m_columns;
 
     // A helpful map that goes from a schema column to the columns index in the list.
-    private TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
+    private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
     public NodeSchema()
     {
@@ -134,25 +134,24 @@ public class NodeSchema
         SchemaColumn floorSchemaColumn = new SchemaColumnFloor(col);
         SortedMap<SchemaColumn, Integer> submap = m_columnsMapHelper.tailMap(floorSchemaColumn);
         int index = -1;
-        int numMatchesFound = 0;
+
+        // If more than one column in this NodeSchema has the same name of the column
+        // we're looking for, then we "break the tie" and prefer the one with a matching
+        // differentiator field.
         for (Map.Entry<SchemaColumn, Integer> entry : submap.entrySet()) {
-            if (entry.getKey().compareNames(col) == 0) {
-                ++numMatchesFound;
+            SchemaColumn key = entry.getKey();
+            if (key.compareNames(col) == 0) {
+                if (col.getDifferentiator() == key.getDifferentiator()) {
+                    // An exact match
+                    index = entry.getValue();
+                    break;
+                }
+
                 index = entry.getValue();
             }
             else {
                 break;
             }
-        }
-
-        if (numMatchesFound > 1) {
-            // Subqueries with joins can produce intermediate tables containing
-            // columns with the same names.  Referred to explicitly, an "ambiguous
-            // column" error will be produced.  But it's still possible to reference them
-            // with "SELECT * ...".  This is standard SQL but problematic for VoltDB, since
-            // column resolution is complex and happens based on names.
-            throw new PlanningErrorException("This combination of \"SELECT * ...\" "
-                    + "and subqueries is not supported.");
         }
 
         return index;
@@ -166,7 +165,7 @@ public class NodeSchema
     public int getIndexOfTve(TupleValueExpression tve)
     {
         SchemaColumn col = new SchemaColumn(tve.getTableName(), tve.getTableAlias(),
-                tve.getColumnName(), tve.getColumnAlias(), tve);
+                tve.getColumnName(), tve.getColumnAlias(), tve, tve.getDifferentiator());
 
         return findIndexOfColumn(col);
     }
@@ -242,7 +241,7 @@ public class NodeSchema
             TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
             tve.setDifferentiator(col.getDifferentiator());
             tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getExpression().getInBytes());
-            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve);
+            SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve, col.getDifferentiator());
             copy.addColumn(sc);
         }
 
@@ -267,6 +266,24 @@ public class NodeSchema
                 return false;
             }
         }
+        return true;
+    }
+
+    // Similar to the equals method above, but consider SchemaColumn objects as equal if their
+    // names are the same.  Don't worry about the differentiator field.
+    public boolean equalsOnlyNames (NodeSchema otherSchema) {
+        if (otherSchema == null) return false;
+
+        if (otherSchema.size() != size()) return false;
+
+        ArrayList<SchemaColumn> columns = otherSchema.getColumns();
+        for (int i = 0; i < size(); i++ ) {
+            SchemaColumn col1 = columns.get(i);
+            if (col1.compareNames(m_columns.get(i)) != 0) {
+                return false;
+            }
+        }
+
         return true;
     }
 

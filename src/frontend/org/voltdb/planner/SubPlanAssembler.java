@@ -456,7 +456,7 @@ public abstract class SubPlanAssembler {
                         // were based on constants and/or parameters.
                         for (AbstractExpression eq_comparator : retval.indexExprs) {
                             AbstractExpression otherExpr = eq_comparator.getRight();
-                            if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                            if (otherExpr.hasTVE()) {
                                 // Can't index this IN LIST filter without some kind of three-way NLIJ,
                                 // so, add it to the post-filters.
                                 AbstractExpression in_list_comparator = inListExpr.getOriginalFilter();
@@ -1194,7 +1194,7 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                        if (otherExpr.hasTVE()) {
                             // This filter can not be used with the index, possibly due to interactions
                             // wih IN LIST processing that would require a three-way NLIJ.
                             binding = null;
@@ -1240,7 +1240,7 @@ public abstract class SubPlanAssembler {
                         }
                     }
                     if (targetComparator == ExpressionType.COMPARE_IN) {
-                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                        if (otherExpr.hasTVE()) {
                             // This is a fancy edge case where the expression could only be indexed
                             // if it:
                             // A) does not reference the indexed table and
@@ -1293,7 +1293,7 @@ public abstract class SubPlanAssembler {
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
                     if ( ! allowIndexedJoinFilters) {
-                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                        if (otherExpr.hasTVE()) {
                             // This filter can not be used with the index, probably due to interactions
                             // with IN LIST processing of another key component that would require a
                             // three-way NLIJ to be injected.

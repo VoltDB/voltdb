@@ -35,7 +35,7 @@ import org.voltdb.utils.MiscUtils;
  * Make sure responses over network thread does not touch this class.
  */
 public class InternalConnectionHandler {
-    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_YOMAMA_!+";
+    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_InternalAdapter_!+";
 
     public final static long SUPPRESS_INTERVAL = 60;
     private static final VoltLogger m_logger = new VoltLogger("InternalConnectionHandler");

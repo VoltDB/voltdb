@@ -17,19 +17,17 @@
 
 package org.voltdb.iv2;
 
-import java.io.UnsupportedEncodingException;
-
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -41,8 +39,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
-import org.voltdb.VoltDB;
-
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -121,17 +118,13 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     @Override
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException {
         try {
-            try {
-                m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                        Long.toString(HSId).getBytes("UTF-8"),
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (KeeperException.NodeExistsException e) {
-                m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                        Long.toString(HSId).getBytes("UTF-8"), -1);
-            }
+            m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                    Long.toString(HSId).getBytes(Charsets.UTF_8),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         }
-        catch (UnsupportedEncodingException utf8) {
-            VoltDB.crashLocalVoltDB("Invalid string encoding: UTF-8", true, utf8);
+        catch (KeeperException.NodeExistsException e) {
+            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                    Long.toString(HSId).getBytes(Charsets.UTF_8), -1);
         }
     }
 

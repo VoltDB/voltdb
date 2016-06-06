@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected NodeSchema m_tableSchema = null;
     // Store the columns we use from this table as an internal schema
     protected NodeSchema m_tableScanSchema = new NodeSchema();
+    protected Map<Integer, Integer> m_differentiatorMap = new HashMap<>();
     protected AbstractExpression m_predicate;
 
     // The target table is the table that the plannode wants to perform some operation on.
@@ -158,7 +160,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         setSubQuery(tableScan instanceof StmtSubqueryScan);
         setTargetTableAlias(tableScan.getTableAlias());
         setTargetTableName(tableScan.getTableName());
-        Collection<SchemaColumn> scanColumns = tableScan.getScanColumns();
+        List<SchemaColumn> scanColumns = tableScan.getScanColumns();
         if (scanColumns != null && ! scanColumns.isEmpty()) {
             setScanColumns(scanColumns);
         }
@@ -186,12 +188,42 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_predicate = ExpressionUtil.cloneAndCombinePredicates(exps);
     }
 
-    protected void setScanColumns(Collection<SchemaColumn> scanColumns)
+    protected void setScanColumns(List<SchemaColumn> scanColumns)
     {
         assert(scanColumns != null);
+        int i = 0;
         for (SchemaColumn col : scanColumns) {
-            m_tableScanSchema.addColumn(col.clone());
+            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+            m_differentiatorMap.put(tve.getDifferentiator(), i);
+            SchemaColumn clonedCol = col.clone();
+            clonedCol.setDifferentiator(i);
+            m_tableScanSchema.addColumn(clonedCol);
+            ++i;
         }
+    }
+
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * For scan nodes, we need to reflect the difference between the
+     * storage order of columns produced by a subquery, and the columns
+     * that are actually projected (via an inlined project) from the scan,
+     * since unused columns are typically omitted from the output schema
+     * of the scan.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    @Override
+    public int adjustDifferentiatorField(int storageIndex) {
+        Integer scanIndex = m_differentiatorMap.get(storageIndex);
+        assert(scanIndex != null);
+        return scanIndex;
     }
 
     NodeSchema getTableSchema()
@@ -244,7 +276,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                                              m_targetTableAlias,
                                                              col.getTypeName(),
                                                              col.getTypeName(),
-                                                             tve));
+                                                             tve, col.getIndex()));
                 }
             }
         }
@@ -287,10 +319,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // before we stick them in the projection output
             List<TupleValueExpression> scan_tves =
                     new ArrayList<TupleValueExpression>();
+            int i = 0;
             for (SchemaColumn col : m_tableScanSchema.getColumns())
             {
                 assert(col.getExpression() instanceof TupleValueExpression);
+                col.setDifferentiator(i);
                 scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+                ++i;
             }
             // and update their indexes against the table schema
             for (TupleValueExpression tve : scan_tves)

@@ -161,7 +161,8 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
                     stringer.value(node.getPlanNodeId().intValue());
                 }
                 stringer.endArray(); //end execution list
-            } else {
+            }
+            else {
                 stringer.key(Members.EXECUTE_LISTS.name()).array();
                 for (List<AbstractPlanNode> list : m_executeLists) {
                     stringer.object().key(Members.EXECUTE_LIST.name()).array();
@@ -174,7 +175,8 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             }
 
             stringer.endObject(); //end PlanNodeList
-        } catch (JSONException e) {
+        }
+        catch (JSONException e) {
             // HACK ugly ugly to make the JSON handling
             // in QueryPlanner generate a JSONException for a plan we know
             // here that we can't serialize.  Making this method throw

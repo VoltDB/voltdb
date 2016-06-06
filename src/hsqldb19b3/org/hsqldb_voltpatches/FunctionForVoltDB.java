@@ -140,6 +140,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DATEADD_MILLISECOND    = 20039;
         static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
         static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
+
+        static final int FUNC_VOLT_ROUND                  = 20042;
+        static final int FUNC_VOLT_STR                    = 20043;
+
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
         static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
@@ -244,6 +248,16 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                     Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("round", Type.SQL_DECIMAL, FUNC_VOLT_ROUND, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("str", Type.SQL_VARCHAR, FUNC_VOLT_STR, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 6, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
                     new Type[] { Type.SQL_BIGINT },

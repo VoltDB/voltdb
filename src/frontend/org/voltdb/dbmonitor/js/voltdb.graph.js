@@ -1082,7 +1082,7 @@
             memMinCount++;
         };
 
-        this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
+         this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var datatrans = monitor.tpsData;
             var datatransMin = monitor.tpsDataMin;
@@ -1097,7 +1097,7 @@
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
-                
+
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
 
                 if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
@@ -1105,7 +1105,7 @@
 
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0) || calculatedValue == 0) {
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     } else {
                         datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransMin[datatransMin.length - 1].y });
@@ -1115,7 +1115,7 @@
                 }
                 if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
-                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                    if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     } else {
                         datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatransDay[datatransDay.length - 1].y });
@@ -1124,7 +1124,7 @@
                     tpsMinCount = 0;
                 }
                 datatrans = sliceFirstData(datatrans, dataView.Seconds);
-                if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                if (monitor.tpsFirstData || delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)|| calculatedValue == 0) {
                     datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                 } else {
                     datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": datatrans[datatrans.length - 1].y });
@@ -1153,6 +1153,7 @@
             tpsSecCount++;
             tpsMinCount++;
         };
+
 
         this.RefreshCpu = function (cpuDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
