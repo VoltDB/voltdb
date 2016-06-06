@@ -236,6 +236,10 @@ public:
      */
     bool verify() const;
     bool verifyRank() const;
+    /** Do we have a cached last buffer?  This is used in testing. */
+    bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
+    /** Are we caching the last buffer?  This is used in testing. */
+    bool isCachingLastBuffer() const { return (m_allocator.isCachingLastBuffer()); }
 
 protected:
     // main internal functions
@@ -274,7 +278,7 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 CompactingMap<KeyValuePair, Compare, hasRank>::CompactingMap(bool unique, Compare comper)
     : m_count(0),
       m_root(&NIL),
-      m_allocator(static_cast<int>(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount))), static_cast<int>(10000)),
+      m_allocator(static_cast<int>(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount))), static_cast<int>(10000), true),
       m_unique(unique),
       NIL(&NIL, &NIL, INVALIDCT),
       m_comper(comper)

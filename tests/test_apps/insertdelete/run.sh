@@ -74,9 +74,12 @@ function client-help() {
 }
 
 # run the client that drives the example with some editable options
+# Here we run the tests with both inline and outofline data.
 function client() {
+    local DONE
+    local ARG
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark $SERVERS
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark $INLINE $OUTLINE $NUMITERS $SERVERS
 }
 
 function seed() {
@@ -91,9 +94,50 @@ function help() {
 
 # Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -eq 0 ]; then server; exit; fi
-for arg in "$@"
-do
-    echo "${0}: Performing $arg..."
-    $arg
+if [ -n "$1" ] ; then
+    CMD="$1"
+    shift
+fi
+while [ -z "$DONE" ] ; do
+    case "$1" in
+    --#)
+        shift;
+        ECHO=echo
+        ;;
+    --inline)
+        shift;
+        # Both --inline and --outline means nothing.
+        if [ -n "$OUTLINE" ] ; then
+            unset OUTLINE
+        else
+            INLINE="--inline"
+        fi
+        ;;
+    --outline)
+        shift;
+        # Both --inline and --outline means nothing.
+        if [ -n "$INLINE" ] ; then
+            unset INLINE
+        else
+            OUTLINE="--outline"
+        fi
+        ;;
+    --numiters)
+        shift;
+        NUMITERS="--numiters $1"
+        shift
+        ;;
+    "")
+        DONE=YES
+        ;;
+    *)
+	shift
+	CMD="$1"
+	shift
+        ;;
+    esac
 done
+
+if [ -z "$CMD" ]; then server; exit; fi
+echo "Performing $CMD"
+$CMD

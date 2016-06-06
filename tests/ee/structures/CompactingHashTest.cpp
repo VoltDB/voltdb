@@ -559,6 +559,8 @@ TEST_F(CompactingHashTest, Trivial) {
 
     // UNIQUE MAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m(true);
+    ASSERT_FALSE(m.hasCachedLastBuffer());
+    ASSERT_TRUE(m.isCachingLastBuffer());
     success = (m.insert(two,two) == NULL);
     ASSERT_TRUE(success);
     success = (m.insert(one,one) == NULL);
@@ -574,12 +576,14 @@ TEST_F(CompactingHashTest, Trivial) {
     ASSERT_EQ(iter.key(), two);
 
     success = m.erase(iter);
+    ASSERT_FALSE(m.hasCachedLastBuffer());
     ASSERT_TRUE(success);
     ASSERT_TRUE(m.verify());
     ASSERT_TRUE(m.size() == 2);
 
     iter = m.find(two);
     ASSERT_TRUE(iter.isEnd());
+    ASSERT_TRUE(m.hasCachedLastBuffer());
 
     // MULTIMAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m2(false);

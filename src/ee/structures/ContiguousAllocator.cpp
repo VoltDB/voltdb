@@ -21,14 +21,23 @@
 
 using namespace voltdb;
 
-ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
-: m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL), m_blockCount(0) {}
+ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize, bool cacheLast)
+    : m_count(0),
+      m_allocSize(allocSize),
+      m_chunkSize(chunkSize),
+      m_tail(NULL),
+      m_blockCount(0),
+      m_cacheLast(cacheLast),
+      m_cachedBuffer(0) {}
 
 ContiguousAllocator::~ContiguousAllocator() {
     while (m_tail) {
         Buffer *buf = m_tail->prev;
         free(m_tail);
         m_tail = buf;
+    }
+    if (m_cachedBuffer != NULL) {
+        free(m_cachedBuffer);
     }
 }
 
@@ -40,12 +49,18 @@ void *ContiguousAllocator::alloc() {
 
     // if a new block is needed...
     if (blockOffset == 0) {
-        void *memory = malloc(sizeof(Buffer) + m_allocSize * m_chunkSize);
+        void *memory;
+        if (m_cachedBuffer != NULL) {
+            memory = static_cast<void *>(m_cachedBuffer);
+            m_cachedBuffer = NULL;
+        } else {
+            memory = static_cast<void *>(malloc(sizeof(Buffer) + m_allocSize * m_chunkSize));
+        }
 
         Buffer *buf = reinterpret_cast<Buffer*>(memory);
 
         // for debugging
-        //memset(buf, 0, sizeof(sizeof(ChainedBuffer) + m_allocSize * m_chunkSize));
+        //memset(buf, 0, sizeof(sizeof(Buffer) + m_allocSize * m_chunkSize));
 
         buf->prev = m_tail;
         m_tail = buf;
@@ -82,9 +97,13 @@ void ContiguousAllocator::trim() {
     // yay! kill a block
     if (blockOffset == 0) {
         Buffer *buf = m_tail->prev;
-        free(m_tail);
-        m_tail = buf;
         m_blockCount--;
+        if (m_blockCount == 0 && m_cacheLast) {
+            m_cachedBuffer = m_tail;
+        } else {
+            free(m_tail);
+        }
+        m_tail = buf;
     }
 }
 
