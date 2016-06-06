@@ -282,10 +282,6 @@ public class PlannerTool {
                 throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
                                            e);
             }
-            catch (StackOverflowError error) {
-                throw new RuntimeException("Error compiling query: Encountered stack overflow error. " +
-                             "Try reducing the number of predicate expressions in the query.");
-            }
 
             if (plan == null) {
                 throw new RuntimeException("Null plan received in PlannerTool.planSql");
