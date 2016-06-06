@@ -18,12 +18,15 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
 /**
@@ -351,6 +354,21 @@ public class NodeSchema
         sb.append("}");
 
         return sb.toString();
+    }
+
+    public void addAllSubexpressionsOfClassFromNodeSchema(Set<AbstractExpression> exprs,
+            Class<? extends AbstractExpression> aeClass) {
+        for (SchemaColumn col : getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
+            if (colExpr == null) {
+                continue;
+            }
+            Collection<AbstractExpression> found = colExpr.findAllSubexpressionsOfClass(aeClass);
+            if (found.isEmpty()) {
+                continue;
+            }
+            exprs.addAll(found);
+        }
     }
 }
 

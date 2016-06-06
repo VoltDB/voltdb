@@ -35,6 +35,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
+ * @param <aeClass>
  *
  */
 public abstract class AbstractExpression implements JSONString, Cloneable {
@@ -841,19 +842,24 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * @param <aeClass>
      * @param aeClass AbstractExpression-based class of instances to search for.
      * @return a list of contained expressions that are instances of the desired class
      */
-    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
+    public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        ArrayList<aeClass> collected = new ArrayList<aeClass>();
         findAllSubexpressionsOfClass_recurse(aeClass, collected);
         return collected;
     }
 
-    public void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
-            ArrayList<AbstractExpression> collected) {
+    public <aeClass> void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
+            ArrayList<aeClass> collected) {
         if (aeClass.isInstance(this)) {
-            collected.add(this);
+            // Suppress the expected warning for the "unchecked" cast.
+            // The runtime isInstance check ensures that it is typesafe.
+            @SuppressWarnings("unchecked")
+            aeClass e = (aeClass) this;
+            collected.add(e);
             // Don't return early, because in a few rare cases,
             // like when searching for function expressions,
             // an instance CAN be a parent expression of another instance.
