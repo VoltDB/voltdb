@@ -126,14 +126,21 @@ class Stats():
 
             report = {"report":"no info"}
 
+            # testReport only works for some jobs depending on plugins installed
             try:
                 test_url = url % '/testReport'
                 print test_url
                 report = eval(urlopen(test_url).read())
             except (HTTPError, URLError) as e:
-                print url
-                report = eval(urlopen(url).read())
+                pass
+
+            try:
+                test_url = url % ''
+                print test_url
+                report = eval(urlopen(test_url).read())
+            except (HTTPError, URLError) as e:
                 print(e)
+                print("Could not retrieve report")
 
             with open(filename, 'w') as tempfile:
                 tempfile.write(json.dumps(report, indent=2))
