@@ -98,38 +98,38 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validateTVEs(input_schema, pbPlanNode);
     }
 
-	public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
-		// System.out.printf("Validating TVEs\n");
-		List<AbstractExpression> tves = pbPlanNode.getAllTVEs();
+    public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
+        // System.out.printf("Validating TVEs\n");
+        List<AbstractExpression> tves = pbPlanNode.getAllTVEs();
         List<SchemaColumn> columns = input_schema.getColumns();
         for (AbstractExpression ae : tves) {
-        	TupleValueExpression tve = (TupleValueExpression)ae;
-        	assertTrue(0 <= tve.getColumnIndex() && tve.getColumnIndex() < columns.size());
-        	SchemaColumn col = columns.get(tve.getColumnIndex());
-         	String msg = String.format("TVE %d, COL %s: ",
-        							   tve.getColumnIndex(),
-        							   col.getColumnName() + ":" + col.getColumnAlias());
-        	assertEquals(msg, col.getTableName(), tve.getTableName());
-        	assertEquals(msg, col.getTableAlias(), tve.getTableAlias());
-        	assertEquals(msg, col.getColumnName(), tve.getColumnName());
-        	assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
+            TupleValueExpression tve = (TupleValueExpression)ae;
+            assertTrue(0 <= tve.getColumnIndex() && tve.getColumnIndex() < columns.size());
+            SchemaColumn col = columns.get(tve.getColumnIndex());
+            String msg = String.format("TVE %d, COL %s: ",
+                                       tve.getColumnIndex(),
+                                       col.getColumnName() + ":" + col.getColumnAlias());
+            assertEquals(msg, col.getTableName(), tve.getTableName());
+            assertEquals(msg, col.getTableAlias(), tve.getTableAlias());
+            assertEquals(msg, col.getColumnName(), tve.getColumnName());
+            assertEquals(msg, col.getColumnAlias(), tve.getColumnAlias());
         }
-	}
+    }
 
-	public String nodeSchemaString(String label, NodeSchema schema) {
-		List<SchemaColumn> columns = schema.getColumns();
-		StringBuffer sb = new StringBuffer();
+    public String nodeSchemaString(String label, NodeSchema schema) {
+        List<SchemaColumn> columns = schema.getColumns();
+        StringBuffer sb = new StringBuffer();
         sb.append(label).append(": \n");
         for (SchemaColumn col : columns) {
-        	sb.append("  ")
-        	  .append(col.getTableName()).append(": ")
-        	  .append(col.getTableAlias()).append(", ")
-        	  .append(col.getColumnName()).append(": ")
-        	  .append(col.getColumnAlias()).append(";");
-        	sb.append("\n");
+            sb.append("  ")
+              .append(col.getTableName()).append(": ")
+              .append(col.getTableAlias()).append(", ")
+              .append(col.getColumnName()).append(": ")
+              .append(col.getColumnAlias()).append(";");
+            sb.append("\n");
         }
-		return sb.toString();
-	}
+        return sb.toString();
+    }
 
     public void testRankWithSubqueries() {
         AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");

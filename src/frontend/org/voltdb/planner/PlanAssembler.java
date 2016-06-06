@@ -2138,7 +2138,7 @@ public class PlanAssembler {
         WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
         List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
         for (AbstractExpression partitionByExpression : partitionByExpressions) {
-        	SortDirectionType pdir = SortDirectionType.DESC;
+            SortDirectionType pdir = SortDirectionType.DESC;
             onode.addSort(partitionByExpression, pdir);
         }
         for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
@@ -2156,7 +2156,7 @@ public class PlanAssembler {
         return pnode;
     }
 
-	private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
+    private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
 
         /*

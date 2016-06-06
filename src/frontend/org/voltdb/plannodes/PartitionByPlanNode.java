@@ -50,10 +50,10 @@ public class PartitionByPlanNode extends AbstractPlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-    	/*
-    	 * We need to resolve all the tves in the partition by and
-    	 * order by expressions of the windowed expression.
-    	 */
+        /*
+         * We need to resolve all the tves in the partition by and
+         * order by expressions of the windowed expression.
+         */
         assert (m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
@@ -61,7 +61,7 @@ public class PartitionByPlanNode extends AbstractPlanNode {
         List<AbstractExpression> tves = getAllTVEs();
         // Resolve all of them.
         for (AbstractExpression ae : tves) {
-        	TupleValueExpression tve = (TupleValueExpression)ae;
+            TupleValueExpression tve = (TupleValueExpression)ae;
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             if (index == -1) {
                 // check to see if this TVE is the aggregate output
@@ -83,25 +83,25 @@ public class PartitionByPlanNode extends AbstractPlanNode {
      *
      * @return All the TVEs in expressions in this plan node.
      */
-	public List<AbstractExpression> getAllTVEs() {
-		List<AbstractExpression> tves =  new ArrayList<AbstractExpression>();
+    public List<AbstractExpression> getAllTVEs() {
+        List<AbstractExpression> tves =  new ArrayList<AbstractExpression>();
         // Get all the partition by expressions.
         for (AbstractExpression ae : getWindowedExpression().getPartitionByExpressions()) {
-        	tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
+            tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
         }
         // Get all the order by expressions.
         for (AbstractExpression ae : getWindowedExpression().getOrderByExpressions()) {
-        	tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
+            tves.addAll(ae.findAllSubexpressionsOfClass(TupleValueExpression.class));
         }
         // Get everything else.
         for (SchemaColumn col : getOutputSchema().getColumns()) {
-        	AbstractExpression expr = col.getExpression();
-        	if (col != null) {
-        		tves.addAll(expr.findAllSubexpressionsOfClass(TupleValueExpression.class));
-        	}
+            AbstractExpression expr = col.getExpression();
+            if (col != null) {
+                tves.addAll(expr.findAllSubexpressionsOfClass(TupleValueExpression.class));
+            }
         }
-		return tves;
-	}
+        return tves;
+    }
 
     /**
      * Generate the output schema.  This node will already have
@@ -174,8 +174,8 @@ public class PartitionByPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_windowedSchemaColumn != null) {
-        	stringer.key(Members.WINDOWED_COLUMN.name());
-        	m_windowedSchemaColumn.toJSONString(stringer, true);
+            stringer.key(Members.WINDOWED_COLUMN.name());
+            m_windowedSchemaColumn.toJSONString(stringer, true);
         }
     }
 
@@ -183,12 +183,12 @@ public class PartitionByPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject(JSONObject jobj, Database db) throws JSONException {
         JSONObject windowedColumn = (JSONObject) jobj.get(Members.WINDOWED_COLUMN.name());
         if (windowedColumn != null) {
-        	m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
+            m_windowedSchemaColumn = SchemaColumn.fromJSONObject(windowedColumn);
         }
     }
 
     private WindowedExpression getWindowedExpression() {
-    	assert(m_windowedSchemaColumn != null);
+        assert(m_windowedSchemaColumn != null);
         AbstractExpression abstractSE = m_windowedSchemaColumn.getExpression();
         assert(abstractSE instanceof WindowedExpression);
         return (WindowedExpression)abstractSE;
