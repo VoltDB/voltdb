@@ -579,6 +579,7 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
+                    fileInputBufferC.discard();
                     return;
                 }
                 boolean expectedAnotherChunk = false;
