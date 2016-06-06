@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <iostream>
 #include <vector>
 #include <string>
 
@@ -334,15 +335,6 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 }
 
 TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
-    {
-        std::unique_ptr<PersistentTable> table = getTableWithManyObjects();
-        const int NUMROWS = 100000;
-
-        std::cout << "\n           Loading table...";
-
-        SimpleTimer timer;
-<<<<<<< HEAD
-TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
 
     std::unique_ptr<PersistentTable> table = getTableWithManyObjects();
     const int NUMROWS = 100000;
@@ -419,6 +411,58 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
+}
+
+TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
+
+    std::unique_ptr<PersistentTable> table = getTableWithManyObjects();
+    const int NUMROWS = 100000;
+
+    std::cout << "\n           Loading table...";
+
+    SimpleTimer timer;
+
+    // Insert lots of rows.
+    TableTuple tempTuple = table->tempTuple();
+    for (int i = 0; i < NUMROWS; ++i) {
+        char fillChar = (i % 26) + 'A';
+
+        tempTuple.setNValue(0, ValueFactory::getIntegerValue(i));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+
+        table->insertTuple(tempTuple);
+        commit();
+    }
+
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    // std::cout << "           Updating tuples...";
+
+    // timer.reset();
+    // for (int i = 0; i < NUMROWS; ++i) {
+    //     char fillChar = (i % 26) + 'a';
+
+    //     int64_t whichRow = std::rand() % NUMROWS;
+    //     tempTuple.setNValue(0, ValueFactory::getIntegerValue(whichRow));
+    //     tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
+    //     tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
+    //     tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+    //     TableTuple tupleToUpdate = table->lookupTupleByValues(tempTuple);
+    //     ASSERT_FALSE(tupleToUpdate.isNullTuple());
+
+    //     table->updateTuple(tupleToUpdate, tempTuple);
+    //     commit();
+    // }
+    // std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           Destroying table...";
+    timer.reset();
+    table.reset(nullptr);
+    std::cout << "  " << timer.elapsedAsString() << "\n";
+
+    std::cout << "           ";
 }
 
 int main() {
