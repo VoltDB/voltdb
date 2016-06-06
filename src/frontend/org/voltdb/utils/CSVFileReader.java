@@ -42,7 +42,7 @@ class CSVFileReader implements Runnable {
     private static final String COLUMN_COUNT_ERROR =
             "Incorrect number of columns. %d found, %d expected. Please check the table schema " +
             "and the line content";
-    private static final String HEADER_COUNT_ERROR = 
+    private static final String HEADER_COUNT_ERROR =
             "Incorrect number of columns. %d found, %d expected. Please check the csv file header " +
             "and the line content";
     private static final String BLANK_ERROR =
