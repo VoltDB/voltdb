@@ -31,6 +31,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -965,9 +966,24 @@ public class SQLCommand
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
+        
+        // ENG-10483: Only fail if we can't connect to any servers
+        boolean connectedAnyServer = false;
 
         for (String server : servers) {
-            client.createConnection(server.trim(), port);
+        	try {
+        		client.createConnection(server.trim(), port);
+        		connectedAnyServer = true;
+        	}
+        	catch (UnknownHostException e) {
+        	}
+        	catch (IOException e) {
+        		
+        	}
+        }
+        
+        if(!connectedAnyServer) {
+        	throw new IOException("Unable to connect to VoltDB cluster");
         }
         return client;
     }
