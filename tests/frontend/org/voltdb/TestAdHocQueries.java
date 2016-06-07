@@ -862,7 +862,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
             }
             catch (ProcCallException pcex) {
-            		fail("failed on static clause");
+                fail("failed on static clause");
             }
             adHocQuery = "ROLLBACK;";
             try {
