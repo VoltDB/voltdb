@@ -2543,10 +2543,11 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select id, count(*), approx_count_distinct(num) from t group by id;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // comparison expression not supported in group by clause
-        errorMsg = "Materialized view \"MY_VIEW\" with comparison expression '=' in GROUP BY clause not supported.";
+        // comparison expression not supported in group by clause -- actually gets caught because it's not allowed
+        // in the select list either.
+        errorMsg = "SELECT clause does not allow a BOOLEAN expression.";
         ddl = "create table t(id integer not null, num integer not null);\n" +
-                "create view my_view as select (id = num) as idNumber, count(*) from t group by (id = num);" +
+                "create view my_view as select (id = num) as idVsNumber, count(*) from t group by (id = num);" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
@@ -3006,7 +3007,7 @@ public class TestVoltCompiler extends TestCase {
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select isValid(Region1), count(*) from geogs group by isValid(Region1);\n";
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'ISVALID' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
@@ -3014,7 +3015,7 @@ public class TestVoltCompiler extends TestCase {
                                   " point1 geography_point NOT NULL );\n" +
               "create view geo_view as select Contains(Region1, POINT1), count(*) from geogs group by Contains(Region1, POINT1);\n";
         badDDLAgainstSimpleSchema(
-                "Materialized view \"GEO_VIEW\" with a BOOLEAN valued function 'CONTAINS' in GROUP BY clause not supported.",
+                "A SELECT clause does not allow a BOOLEAN expression. consider using CASE WHEN to decode the BOOLEAN expression into a value of some other type.",
                 ddl);
 
         ddl = "create table geogs ( id integer primary key, " +

@@ -80,7 +80,7 @@ public class TestProcCompiler extends TestCase {
         return string.toString();
     }
 
-    public void testStmntWithLotsOfPredicates() throws Exception {
+    public void testStmtWithLotsOfPredicates() throws Exception {
         String simpleSchema =  "Create Table foo ( " +
                                "id BIGINT DEFAULT 0 NOT NULL, " +
                                "name VARCHAR(255) NOT NULL, " +
@@ -89,15 +89,15 @@ public class TestProcCompiler extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
 
-        // generate with query with lot of predicates for stored procedure
+        // Generate a stored procedure with a query with a lot of predicates.
         String sql = getQueryForFoo(350);
-        builder.addStmtProcedure("StmntWithPredicates", sql, null);
+        builder.addStmtProcedure("StmtWithPredicates", sql, null);
 
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("lots_of_predicates.jar"));
         assert(success);
     }
 
-    public void testStmntForStackOverflowCondition() throws Exception {
+    public void testStmtForStackOverflowCondition() throws Exception {
         String schema =  "Create Table foo ( " +
                          "id BIGINT DEFAULT 0 NOT NULL, " +
                          "name VARCHAR(255) NOT NULL, " +
@@ -109,10 +109,10 @@ public class TestProcCompiler extends TestCase {
         builder.setCompilerDebugPrintStream(capturing);
         builder.addLiteralSchema(schema);
 
-        // Test for stored procedure which have more than max allowable predicates in the
-        // results in error and does not crash or hang the system
+        // Test that a stored procedure with more than the max allowable predicates
+        // results in an error and does not crash or hang the system.
         String sql = getQueryForFoo(1800);
-        builder.addStmtProcedure("StmntForStaclOverFlow", sql, null);
+        builder.addStmtProcedure("StmtForStackOverFlow", sql, null);
 
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("max_plus_predicates.jar"));
         assert(!success);

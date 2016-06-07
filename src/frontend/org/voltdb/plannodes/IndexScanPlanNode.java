@@ -43,7 +43,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -950,7 +949,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
             // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
             // bound plans in the cache
-            List<AbstractExpression> pves = expr.findAllSubexpressionsOfClass(ParameterValueExpression.class);
+            List<AbstractExpression> pves = expr.findAllParameterSubexpressions();
             m_bindings.addAll(pves);
         }
     }
@@ -983,16 +982,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_endExpression, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_initialExpression, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_endExpression != null) {
+            collected.addAll(m_endExpression.findAllSubexpressionsOfClass(aeClass));
         }
-        return collected;
+        if (m_initialExpression != null) {
+            collected.addAll(m_initialExpression.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_skip_null_predicate != null) {
+            collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
+        }
     }
 
 }

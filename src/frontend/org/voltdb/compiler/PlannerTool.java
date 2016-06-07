@@ -268,7 +268,8 @@ public class PlannerTool {
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 /*
                  * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
                  * they are at least somewhat expected.
@@ -289,16 +290,7 @@ public class PlannerTool {
             //////////////////////
             // OUTPUT THE RESULT
             //////////////////////
-            CorePlan core = null;
-            try {
-                core = new CorePlan(plan, m_catalogHash);
-            }
-            catch (StackOverflowError error) {
-                //
-                String msg = "Encountered stack overflow error. "
-                           + "Try reducing the number of predicate expressions in the query.";
-                throw new RuntimeException(msg);
-            }
+            CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             // do not put wrong parameter explain query into cache
