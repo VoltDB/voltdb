@@ -271,8 +271,9 @@ public class MpScheduler extends Scheduler
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
-                    m_iv2Masters, message.getStoredProcedureName());
-            m_duplicateCounters.put(mpTxnId, counter);
+                    m_iv2Masters,
+                    message);
+            safeAddToDuplicateCounterMap(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
                         m_iv2Masters);
@@ -529,6 +530,22 @@ public class MpScheduler extends Scheduler
             }
         } else {
             return null;
+        }
+    }
+
+    /**
+     * Just using "put" on the dup counter map is unsafe.
+     * It won't detect the case where keys collide from two different transactions.
+     */
+    void safeAddToDuplicateCounterMap(long dpKey, DuplicateCounter counter) {
+        DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
+        if (existingDC != null) {
+            // this is a collision and is bad
+            existingDC.logWithCollidingDuplicateCounters(counter);
+            VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+        }
+        else {
+            m_duplicateCounters.put(dpKey, counter);
         }
     }
 
