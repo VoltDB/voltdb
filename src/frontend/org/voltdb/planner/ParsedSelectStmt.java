@@ -634,9 +634,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 itr.remove();
 
                 AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
-                left.setLeft(aggExpr.getLeft());
+                left.setLeft((AbstractExpression)aggExpr.getLeft().clone());
                 AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
-                right.setLeft(aggExpr.getLeft());
+                right.setLeft((AbstractExpression)aggExpr.getLeft().clone());
 
                 optimalAvgAggs.add(left);
                 optimalAvgAggs.add(right);
@@ -1960,10 +1960,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_projectSchema != null) {
             m_projectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }
-        // m_having, m_groupByExpressions, m_projectSchema
-        // may contain the aggregation or group by expression that have been
-        // replaced with TVEs already.
-        // So look for the original expression in m_aggResultColumns.
+        // m_having, m_groupByExpressions, or m_projectSchema may no longer contain
+        // the aggregation or group by expression if they have been replaced with
+        // TVEs already and added to m_aggResultColumns.
+        // So, also look for the original expression in m_aggResultColumns.
         addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_aggResultColumns);
 
         if (m_avgPushdownHaving != null &&
@@ -1974,17 +1974,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 exprs.addAll(found);
             }
         }
-        if (m_avgPushdownGroupByColumns != null && m_avgPushdownGroupByColumns != m_groupByColumns) {
+        if (m_avgPushdownGroupByColumns != null &&
+                m_avgPushdownGroupByColumns != m_groupByColumns) {
             addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_avgPushdownGroupByColumns);
         }
-        if (m_avgPushdownProjectSchema != null && m_avgPushdownProjectSchema != m_projectSchema) {
+        if (m_avgPushdownProjectSchema != null &&
+                m_avgPushdownProjectSchema != m_projectSchema) {
             m_avgPushdownProjectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
         }
-        // m_avgPushdownHaving, m_avgPushdownGroupByColumns, m_avgPushdownProjectSchema
-        // may contain the aggregation or group by expression that have been
-        // replaced with TVEs already.
-        // So look for the original expression in m_avgPushdownAggResultColumns.
-        if (m_avgPushdownAggResultColumns != null && m_avgPushdownAggResultColumns != m_aggResultColumns) {
+        // m_avgPushdownHaving, m_avgPushdownGroupByColumns, or m_avgPushdownProjectSchema
+        // may no longer contain the aggregation or group by expression if they have been
+        // replaced with TVEs already and added to m_avgPushdownAggResultColumns.
+        // So, also look for the original expression in m_avgPushdownAggResultColumns.
+        if (m_avgPushdownAggResultColumns != null &&
+                m_avgPushdownAggResultColumns != m_aggResultColumns) {
             addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_avgPushdownAggResultColumns);
         }
         return exprs;

@@ -75,12 +75,9 @@ public class TestAdHocPlans extends AdHocQueryTester {
             runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
             fail("Query was expected to generate stack over flow error");
         }
-        catch (Exception exception) {
-            String expectedMsg;
-            expectedMsg = "Encountered stack overflow error. " +
-                          "Try reducing the number of predicate expressions in the query";
-            boolean foundMsg = exception.getMessage().contains(expectedMsg);
-            assertTrue(foundMsg);
+        catch (StackOverflowError error) {
+            // The test-only interface to the PlannerTool tests at a level below
+            // any StackOverflowError handling, so expect the raw StackOverflowError.
         }
     }
 

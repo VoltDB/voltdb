@@ -32,11 +32,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -190,7 +188,7 @@ public class TestHostMessenger {
         previous.add(3);
         previous.add(4);
         // this should trip partition detection
-        assertTrue(HostMessenger.makePPDDecision(previous, current, true));
+        assertTrue(HostMessenger.makePPDDecision(-1, previous, current, true));
     }
 
     @Test
@@ -207,7 +205,7 @@ public class TestHostMessenger {
         previous.add(0);
         previous.add(1);
         // this should trip partition detection
-        assertTrue(HostMessenger.makePPDDecision(previous, current, true));
+        assertTrue(HostMessenger.makePPDDecision(-1, previous, current, true));
     }
 
     @Test
@@ -224,7 +222,7 @@ public class TestHostMessenger {
         previous.add(2);
         previous.add(3);
         // this should not trip partition detection
-        assertFalse(HostMessenger.makePPDDecision(previous, current, true));
+        assertFalse(HostMessenger.makePPDDecision(-1, previous, current, true));
     }
 
     @Test
