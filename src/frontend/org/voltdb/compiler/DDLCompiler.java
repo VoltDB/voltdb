@@ -2957,11 +2957,11 @@ public class DDLCompiler {
                                              throws VoltCompilerException {
         HashSet<String> tableSet = new HashSet<String>();
         for (Table tbl : tableList) {
-        		if (! tableSet.add(tbl.getTypeName())) {
-        			String errMsg = "Table " + tbl.getTypeName() +
-        					" appeared in table list more than once: materialized view does not support self-join.";
-        			throw compiler.new VoltCompilerException(errMsg);
-        		}
+            if (! tableSet.add(tbl.getTypeName())) {
+                String errMsg = "Table " + tbl.getTypeName() +
+                       " appeared in table list more than once: materialized view does not support self-join.";
+                throw compiler.new VoltCompilerException(errMsg);
+            }
         }
     }
 
