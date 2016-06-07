@@ -127,7 +127,7 @@ public class TestJDBCAutoReconnectOnLoss {
             query.executeQuery(TEST_SQL);
             fail("No connection");
         } catch (SQLException e){
-            assertTrue("Expected exception:" + e.getMessage(), true);
+            assertEquals("Connection failure: 'No connections.'", e.getMessage());
         }
 
         startServer();
@@ -171,7 +171,7 @@ public class TestJDBCAutoReconnectOnLoss {
             query.executeQuery(TEST_SQL);
            fail("No connection");
         } catch (SQLException e){
-            assertTrue("Expected exception:" + e.getMessage(), true);
+            assertEquals("Connection failure: 'No connections.'", e.getMessage());
         }
 
         startServer();
