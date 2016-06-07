@@ -232,9 +232,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (AbstractExpression expr : m_columns.values()) {
-            if (expr != null) {
-                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            if (expr == null) {
+                continue;
             }
+            exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
         }
 
         if (m_subquery != null) {

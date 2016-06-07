@@ -18,14 +18,16 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanningErrorException;
 
 /**
  * This class encapsulates the representation and common operations for
@@ -233,13 +235,13 @@ public class NodeSchema
 
     public NodeSchema replaceTableClone(String tableAlias) {
         NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
+        for (int i = 0; i < m_columns.size(); ++i) {
             SchemaColumn col = m_columns.get(i);
             String colAlias = col.getColumnAlias();
+            int differentiator = col.getDifferentiator();
 
-            TupleValueExpression tve = new TupleValueExpression(tableAlias, tableAlias, colAlias, colAlias, i);
-            tve.setDifferentiator(col.getDifferentiator());
+            TupleValueExpression tve = new TupleValueExpression(
+                    tableAlias, tableAlias, colAlias, colAlias, i, differentiator);
             tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getExpression().getInBytes());
             SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve, col.getDifferentiator());
             copy.addColumn(sc);
@@ -352,6 +354,21 @@ public class NodeSchema
         sb.append("}");
 
         return sb.toString();
+    }
+
+    public void addAllSubexpressionsOfClassFromNodeSchema(Set<AbstractExpression> exprs,
+            Class<? extends AbstractExpression> aeClass) {
+        for (SchemaColumn col : getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
+            if (colExpr == null) {
+                continue;
+            }
+            Collection<AbstractExpression> found = colExpr.findAllSubexpressionsOfClass(aeClass);
+            if (found.isEmpty()) {
+                continue;
+            }
+            exprs.addAll(found);
+        }
     }
 }
 
