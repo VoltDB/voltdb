@@ -70,173 +70,239 @@ class AdminExportTest extends TestBase {
         page.exportbtn.click()
     }
 
-    def "Verify Error messages of Add Configuration for FILE"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("FILE")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.type.value().equals("type")
-            page.overview.nonce.value().equals("nonce")
-            page.overview.outdir.value().equals("outdir")
-            page.overview.typeValue.isDisplayed()
-            page.overview.nonceValue.isDisplayed()
-            page.overview.outdirValue.isDisplayed()
-        }
+    def VerifyErrormessagesofAddConfigurationforFILE() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("FILE")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.type.value().equals("type")
+                page.overview.nonce.value().equals("nonce")
+                page.overview.outdir.value().equals("outdir")
+                page.overview.typeValue.isDisplayed()
+                page.overview.nonceValue.isDisplayed()
+                page.overview.outdirValue.isDisplayed()
+            }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorFileTypeValue.isDisplayed()
-            page.overview.errornonceValue.isDisplayed()
-            page.overview.errorOutdirValue.isDisplayed()
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorFileTypeValue.isDisplayed()
+                page.overview.errornonceValue.isDisplayed()
+                page.overview.errorOutdirValue.isDisplayed()
+            }
         }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+            println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for JDBC"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("JDBC")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.jdbcdriver.value().equals("jdbcdriver")
-            page.overview.jdbcurl.value().equals("jdbcurl")
-            page.overview.jdbcdriverValue.isDisplayed()
-            page.overview.jdbcurlValue.isDisplayed()
+    def VerifyErrorMessagesofAddConfigurationforJDBC() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("JDBC")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.jdbcdriver.value().equals("jdbcdriver")
+                page.overview.jdbcurl.value().equals("jdbcurl")
+                page.overview.jdbcdriverValue.isDisplayed()
+                page.overview.jdbcurlValue.isDisplayed()
+            }
+
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorJdbcDriverValue.isDisplayed()
+                page.overview.errorJdbcUrlValue.isDisplayed()
+            }
         }
-
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorJdbcDriverValue.isDisplayed()
-            page.overview.errorJdbcUrlValue.isDisplayed()
+        else{
+            println("Add Export is not supported in Community Edition")
         }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for KAFKA"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        waitFor(waitTime) {
-            page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.metadatabroker.value().equals("metadata.broker.list")
-            page.overview.metadatabrokerValue.isDisplayed()
+    def VerifyErrormessagesofAddConfigurationforKAFKA() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.metadatabroker.value().equals("metadata.broker.list")
+                page.overview.metadatabrokerValue.isDisplayed()
+            }
+
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorMetadataBrokerListValue.isDisplayed()
+            }
         }
-
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorMetadataBrokerListValue.isDisplayed()
+        else{
+            println("Add Export is not supported in Community Edition")
         }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for HTTP"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("HTTP")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed()
-            page.overview.save.isDisplayed()
-            page.overview.cancel.isDisplayed()
-            page.overview.endpoint.value().equals("endpoint")
-            page.overview.endpointValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforHTTP() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("HTTP")
+            then: 'Check elements'
+            waitFor(waitTime) {
+                page.overview.addProperty.isDisplayed()
+                page.overview.save.isDisplayed()
+                page.overview.cancel.isDisplayed()
+                page.overview.endpoint.value().equals("endpoint")
+                page.overview.endpointValue.isDisplayed()
+            }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) {
-            page.overview.errorStream.isDisplayed()
-            page.overview.errorEndpointValue.isDisplayed()
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) {
+                page.overview.errorStream.isDisplayed()
+                page.overview.errorEndpointValue.isDisplayed()
+            }
         }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for RABBITMQ/Verify Error messages of Add Configuration for RABBITMQ broker.host"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("RABBITMQ")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.rabbitMq.value().equals("broker.host") }
-        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforRABBITMQ() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("RABBITMQ")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.rabbitMq.value().equals("broker.host") }
+            waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for RABBITMQ amqp.uri"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("RABBITMQ")
-        waitFor(waitTime) { page.overview.rabbitMq.isDisplayed() }
-        page.overview.rabbitMq.click()
-        page.overview.rabbitMq.value("amqp.uri")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.rabbitMq.value().equals("amqp.uri") }
-        waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforRABBITMQamqpuri() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("RABBITMQ")
+            waitFor(waitTime) { page.overview.rabbitMq.isDisplayed() }
+            page.overview.rabbitMq.click()
+            page.overview.rabbitMq.value("amqp.uri")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.rabbitMq.value().equals("amqp.uri") }
+            waitFor(waitTime) { page.overview.rabbitMqValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorRabbitMqValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for CUSTOM"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("CUSTOM")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforCUSTOM() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("CUSTOM")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.exportConnectorClass.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorExportConnectorClass.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
-    def "Verify Error messages of Add Configuration for ELASTICSEARCH"() {
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("ELASTICSEARCH")
-        then: 'Check elements'
-        waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
-        waitFor(waitTime) { page.overview.save.isDisplayed() }
-        waitFor(waitTime) { page.overview.cancel.isDisplayed() }
-        waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
-        waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
+    def VerifyErrormessagesofAddConfigurationforELASTICSEARCH() {
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("ELASTICSEARCH")
+            then: 'Check elements'
+            waitFor(waitTime) { page.overview.addProperty.isDisplayed() }
+            waitFor(waitTime) { page.overview.save.isDisplayed() }
+            waitFor(waitTime) { page.overview.cancel.isDisplayed() }
+            waitFor(waitTime) { page.overview.endpointES.value().equals("endpoint") }
+            waitFor(waitTime) { page.overview.endpointESValue.isDisplayed() }
 
-        when: 'Save button is clicked'
-        page.overview.save.click()
-        then: 'Error messages are displayed'
-        waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
-        waitFor(waitTime) { page.overview.errorEndpointESValue.isDisplayed() }
+            when: 'Save button is clicked'
+            page.overview.save.click()
+            then: 'Error messages are displayed'
+            waitFor(waitTime) { page.overview.errorStream.isDisplayed() }
+            waitFor(waitTime) { page.overview.errorEndpointESValue.isDisplayed() }
+        }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
     def VerifyAddConfigurationforFilecreated() {
@@ -468,88 +534,35 @@ class AdminExportTest extends TestBase {
     }
 
     def VerifyAddConfigurationforKafkaCreated() {
-        boolean isPro = false
-        String kafkaTestName = page.overview.getKafkaTestName()
-        String metadataValue = page.overview.getMetadataValue()
+        when:
+        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+            boolean isPro = false
+            String kafkaTestName = page.overview.getKafkaTestName()
+            String metadataValue = page.overview.getMetadataValue()
 
-        when: 'Open Add ConfigurationPopup'
-        page.overview.openAddConfigurationPopup()
-        page.overview.textType.value("KAFKA")
-        then: 'Check elements'
-        page.overview.addProperty.isDisplayed()
-        page.overview.save.isDisplayed()
-        page.overview.cancel.isDisplayed()
-        page.overview.metadatabroker.value().equals("metadata.broker.list")
-        page.overview.metadatabrokerValue.isDisplayed()
+            when: 'Open Add ConfigurationPopup'
+            page.overview.openAddConfigurationPopup()
+            page.overview.textType.value("KAFKA")
+            then: 'Check elements'
+            page.overview.addProperty.isDisplayed()
+            page.overview.save.isDisplayed()
+            page.overview.cancel.isDisplayed()
+            page.overview.metadatabroker.value().equals("metadata.broker.list")
+            page.overview.metadatabrokerValue.isDisplayed()
 
-        when: 'Provide values for add configuration'
-        page.overview.stream.value("kafkaTest")
-        page.overview.metadatabrokerValue.value("metadataValue")
-        int count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.overview.save.click()
-                waitFor(waitTime) { !page.overview.save.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        count = 0
-        while(count<numberOfTrials) {
-            count++
-            try {
-                page.overview.confirmyesbtn.click()
-                waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
-                break
-            } catch(geb.error.RequiredPageContentNotPresent e) {
-            } catch(org.openqa.selenium.StaleElementReferenceException e) {
-            } catch(geb.waiting.WaitTimeoutException e) {
-            }
-        }
-        and: 'Expand export'
-        if (!waitFor(10){updateInnerErrorPopup.isDisplayed()}) {
-            isPro = true
-            count = 0
+            when: 'Provide values for add configuration'
+            page.overview.stream.value("kafkaTest")
+            page.overview.metadatabrokerValue.value("metadataValue")
+            int count = 0
             while (count < numberOfTrials) {
                 count++
                 try {
-                    export.click()
-                    waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                    page.overview.save.click()
+                    waitFor(waitTime) { !page.overview.save.isDisplayed() }
                     break
                 } catch (geb.error.RequiredPageContentNotPresent e) {
-                } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (geb.waiting.WaitTimeoutException e) {
-                }
-            }
-        }
-        then: 'Display the created KAFKA'
-        if(isPro) {
-            waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
-            println("Configuration created")
-        }
 
-        if(isPro) {
-            when: 'Edit button is displayed'
-            waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
-            then: 'Click edit button'
-            page.overview.editExportConfiguration.click()
-
-            when: 'Delete Configuration is displayed'
-            page.overview.deleteConfiguration.isDisplayed()
-            count = 0
-            while (count < numberOfTrials) {
-                count++
-                try {
-                    page.overview.deleteConfiguration.click()
-                    waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
-                    break
-                } catch (geb.error.RequiredPageContentNotPresent e) {
                 } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 } catch (geb.waiting.WaitTimeoutException e) {
                 }
             }
@@ -562,13 +575,74 @@ class AdminExportTest extends TestBase {
                     break
                 } catch (geb.error.RequiredPageContentNotPresent e) {
                 } catch (org.openqa.selenium.StaleElementReferenceException e) {
-                } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 } catch (geb.waiting.WaitTimeoutException e) {
                 }
             }
-            then: 'Print Deleted'
-            println("Deleted Configuration")
+            and: 'Expand export'
+            if (!waitFor(10) { updateInnerErrorPopup.isDisplayed() }) {
+                isPro = true
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        export.click()
+                        waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+            }
+            then: 'Display the created KAFKA'
+            if (isPro) {
+                waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
+                println("Configuration created")
+            }
+
+            if (isPro) {
+                when: 'Edit button is displayed'
+                waitFor(waitTime) { page.overview.editExportConfiguration.isDisplayed() }
+                then: 'Click edit button'
+                page.overview.editExportConfiguration.click()
+
+                when: 'Delete Configuration is displayed'
+                page.overview.deleteConfiguration.isDisplayed()
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.deleteConfiguration.click()
+                        waitFor(waitTime) { !page.overview.deleteConfiguration.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        page.overview.confirmyesbtn.click()
+                        waitFor(waitTime) { !page.overview.confirmyesbtn.isDisplayed() }
+                        break
+                    } catch (geb.error.RequiredPageContentNotPresent e) {
+                    } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                    } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                    }
+                }
+                then: 'Print Deleted'
+                println("Deleted Configuration")
+            }
         }
+        else{
+            println("Add Export is not supported in Community Edition")
+        }
+        then:
+        println("passed")
     }
 
     def VerifyAddConfigurationforHttpCreated() {
