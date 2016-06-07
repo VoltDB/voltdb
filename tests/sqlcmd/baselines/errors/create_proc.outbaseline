@@ -1,7 +1,4 @@
 
-drop table t if exists;
-Command succeeded.
-
 --- Empty Class List -----------------------
 
 

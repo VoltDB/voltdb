@@ -146,8 +146,6 @@ public class DDLCompiler {
     public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
     public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";
     public static String DR_TABLE_NAME_COLUMN_NAME = "TABLE_NAME";
-    public static String DR_CURRENT_CLUSTER_ID_COLUMN_NAME = "CURRENT_CLUSTER_ID";
-    public static String DR_CURRENT_TIMESTAMP_COLUMN_NAME = "CURRENT_TIMESTAMP";
     // The varchar column contains JSON representation of original data
     public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
@@ -161,8 +159,6 @@ public class DDLCompiler {
         {DR_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_DIVERGENCE_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024 BYTES)"},
-        {DR_CURRENT_CLUSTER_ID_COLUMN_NAME, "TINYINT NOT NULL"},
-        {DR_CURRENT_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
 
@@ -2911,11 +2907,11 @@ public class DDLCompiler {
         // Now it safe to parse the expression tree
         AbstractExpression predicate = dummy.parseExpressionTree(predicateXML);
 
-        if (predicate.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }
-        if (predicate.hasAnySubexpressionOfClass(AbstractSubqueryExpression.class)) {
+        if (!predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty()) {
             msg += "with subquery expression(s) is not supported.";
             throw compiler.new VoltCompilerException(msg);
         }

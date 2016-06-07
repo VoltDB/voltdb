@@ -451,6 +451,7 @@ public abstract class AbstractParsedStmt {
         }
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
+        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
 
         // Whether or not this column is the coalesced column produced by a join with a
         // USING predicate.
@@ -469,8 +470,7 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias,
-                columnName, columnAlias, -1, differentiator);
+        expr.setDifferentiator(differentiator);
         // Collect the unique columns used in the plan for a given scan.
 
         // Resolve the tve and add it to the scan's cache of referenced columns
@@ -739,7 +739,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
+            List<AbstractExpression> tves = arg.findBaseTVEs();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -1489,7 +1489,7 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
+            List<AbstractExpression> baseTVEExpressions = expr.findBaseTVEs();
             Set<String> baseTableNames = new HashSet<String>();
             for (AbstractExpression ae : baseTVEExpressions) {
                 assert(ae instanceof TupleValueExpression);
@@ -1721,7 +1721,7 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
@@ -1745,13 +1745,10 @@ public abstract class AbstractParsedStmt {
             return true;
         }
         // Verify expression subqueries
-        return !findSubquerySubexpressions().isEmpty();
+        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
+        return !subqueryExprs.isEmpty();
     }
-
-    protected Set<AbstractExpression> findSubquerySubexpressions() {
-        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
-    }
-
     public abstract boolean isDML();
 
     /**

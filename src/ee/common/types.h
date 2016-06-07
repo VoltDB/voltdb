@@ -566,7 +566,6 @@ enum DRConflictRowType {
     EXISTING_ROW,
     EXPECTED_ROW,
     NEW_ROW,
-    DELETED_ROW,
 };
 
 enum DRRowDecision {

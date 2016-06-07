@@ -264,10 +264,11 @@ public class QueryPlanner {
                     if (plan.extractParamValues(m_paramzInfo)) {
                         return plan;
                     }
-                }
-                else if (m_debuggingStaticModeToRetryOnError) {
-                    compileFromXML(m_paramzInfo.parameterizedXmlSQL,
-                                   m_paramzInfo.paramLiteralValues);
+                } else {
+                    if (m_debuggingStaticModeToRetryOnError) {
+                         plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
+                                               m_paramzInfo.paramLiteralValues);
+                    }
                 }
                 // fall through to try replan without parameterization.
             }
@@ -282,18 +283,27 @@ public class QueryPlanner {
             }
         }
 
-        // if parameterization isn't requested or if it failed, plan here
-        CompiledPlan plan = compileFromXML(m_xmlSQL, null);
-        if (plan == null) {
-            if (m_debuggingStaticModeToRetryOnError) {
-                plan = compileFromXML(m_xmlSQL, null);
+        CompiledPlan plan = null;
+        try {
+            // if parameterization isn't requested or if it failed, plan here
+            plan = compileFromXML(m_xmlSQL, null);
+            if (plan == null) {
+                if (m_debuggingStaticModeToRetryOnError) {
+                    plan = compileFromXML(m_xmlSQL, null);
+                }
+                throw new PlanningErrorException(m_recentErrorMsg);
             }
-            throw new PlanningErrorException(m_recentErrorMsg);
+
+            if (m_isUpsert) {
+                replacePlanForUpsert(plan);
+            }
+        }
+        catch (StackOverflowError error) {
+            String msg = "Encountered stack overflow error. " +
+                         "Try reducing the number of predicate expressions in the query.";
+            throw new PlanningErrorException(msg);
         }
 
-        if (m_isUpsert) {
-            replacePlanForUpsert(plan);
-        }
         return plan;
     }
 

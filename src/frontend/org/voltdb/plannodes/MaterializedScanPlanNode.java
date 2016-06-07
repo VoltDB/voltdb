@@ -17,7 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Set;
+import java.util.Collection;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -27,6 +27,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -157,9 +158,11 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
-        super.findAllExpressionsOfClass(aeClass, collected);
-        collected.addAll(m_tableData.findAllSubexpressionsOfClass(aeClass));
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_tableData, aeClass));
+        return collected;
     }
 
 }

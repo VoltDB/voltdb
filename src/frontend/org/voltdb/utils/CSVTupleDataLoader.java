@@ -30,6 +30,7 @@ import org.voltdb.client.ProcedureCallback;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.ClientResponseImpl;
 
@@ -167,5 +168,12 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     public long getFailedRows()
     {
         return m_failedCount.get();
+    }
+
+    @Override
+    public Map<String, Integer> getNameToColumnMap()
+    {
+        //No op
+        return null;
     }
 }

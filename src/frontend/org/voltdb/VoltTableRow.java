@@ -338,12 +338,8 @@ public abstract class VoltTableRow {
      * @see #wasNull()
      */
     public final long getLong(int columnIndex) {
-        if (columnIndex < 0) {
-            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is negative");
-        }
-        if (columnIndex >= getColumnCount()) {
-            throw new IndexOutOfBoundsException("Column index " + columnIndex +
-                    " is beyond number of columns " + getColumnCount());
+        if ((columnIndex >= getColumnCount()) || (columnIndex < 0)) {
+            throw new IndexOutOfBoundsException("Column index " + columnIndex + " is type greater than the number of columns");
         }
         final VoltType type = getColumnType(columnIndex);
         if (m_activeRowIndex == INVALID_ROW_INDEX)

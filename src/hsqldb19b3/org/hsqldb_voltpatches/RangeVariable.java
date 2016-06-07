@@ -492,21 +492,17 @@ final class RangeVariable {
 
             case OpTypes.GREATER :
             case OpTypes.GREATER_EQUAL :
-            	indexCondition = makeConjunction(indexCondition, e);
+                indexCondition = e;
                 break;
 
             case OpTypes.SMALLER :
             case OpTypes.SMALLER_EQUAL :
-            	indexEndCondition = makeConjunction(indexEndCondition, e);
+                indexEndCondition = e;
                 break;
 
             default :
                 Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
-    }
-
-    private static Expression makeConjunction(Expression existingExpr, Expression newExpr) {
-    	return (existingExpr == null) ? newExpr : new ExpressionLogical(OpTypes.AND, existingExpr, newExpr);
     }
 
     /**
@@ -1261,11 +1257,19 @@ final class RangeVariable {
         if (isJoinIndex == true) {
             joinCond = indexCondition;
             if (indexEndCondition != null) {
-            	joinCond = makeConjunction(joinCond, indexEndCondition);
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, indexEndCondition);
+                } else {
+                    joinCond = indexEndCondition;
+                }
             }
             // then go to the nonIndexJoinCondition
             if (nonIndexJoinCondition != null) {
-            	joinCond = makeConjunction(joinCond, nonIndexJoinCondition);
+                if (joinCond != null) {
+                    joinCond = new ExpressionLogical(OpTypes.AND, joinCond, nonIndexJoinCondition);
+                } else {
+                    joinCond = nonIndexJoinCondition;
+                }
             }
             // then go to the nonIndexWhereCondition
             whereCond = nonIndexWhereCondition;
@@ -1274,11 +1278,19 @@ final class RangeVariable {
 
             whereCond = indexCondition;
             if (indexEndCondition != null) {
-            	whereCond = makeConjunction(whereCond, indexEndCondition);
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, indexEndCondition);
+                } else {
+                    whereCond = indexEndCondition;
+                }
             }
             // then go to the nonIndexWhereCondition
             if (nonIndexWhereCondition != null) {
-            	whereCond = makeConjunction(whereCond, nonIndexWhereCondition);
+                if (whereCond != null) {
+                    whereCond = new ExpressionLogical(OpTypes.AND, whereCond, nonIndexWhereCondition);
+                } else {
+                    whereCond = nonIndexWhereCondition;
+                }
             }
 
         }

@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -782,7 +783,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         int idx = 0;
         List<AbstractExpression> sesTves = new ArrayList<>();
         for (AbstractExpression se : ses) {
-            sesTves.addAll(se.findAllTupleValueSubexpressions());
+            sesTves.addAll(ExpressionUtil.findAllExpressionsOfClass(se, TupleValueExpression.class));
         }
         assertEquals(sortColumnIdx.length, sesTves.size());
         for (AbstractExpression seTve : sesTves) {

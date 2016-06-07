@@ -42,6 +42,7 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -528,7 +529,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
         for (AbstractExpression expr: aggColumns) {
             assert(expr instanceof AggregateExpression);
-            if (expr.hasSubquerySubexpression()) {
+            if (! expr.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
                 throw new PlanningErrorException(
                         "SQL Aggregate with subquery expression is not allowed.");
             }
@@ -604,9 +605,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param tveList
      */
     private void findAllTVEs(AbstractExpression expr, List<TupleValueExpression> tveList) {
-        if (!isNewtoColumnList(m_aggResultColumns, expr)) {
+        if (!isNewtoColumnList(m_aggResultColumns, expr))
             return;
-        }
         if (expr instanceof TupleValueExpression) {
             tveList.add((TupleValueExpression) expr.clone());
             return;
@@ -627,7 +627,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void updateAvgExpressions () {
         List<AbstractExpression> optimalAvgAggs = new ArrayList<AbstractExpression>();
         Iterator<AbstractExpression> itr = m_aggregationList.iterator();
-        while (itr.hasNext()) {
+        while(itr.hasNext()) {
             AbstractExpression aggExpr = itr.next();
             assert(aggExpr instanceof AggregateExpression);
             if (aggExpr.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
@@ -755,7 +755,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableAlias = sve.getSubqueryScan().getTableAlias();
             col.expression = colExpr;
         }
-        else {
+        else
+        {
             col.expression = colExpr;
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = "VOLT_TEMP_TABLE";
@@ -834,14 +835,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // find the matching columns in display list
-        for (ParsedColInfo col : m_displayColumns) {
-            if (! col.expression.equals(groupbyCol.expression)) {
-                continue;
+        for (int i = 0; i < m_displayColumns.size(); ++i) {
+            ParsedColInfo col = m_displayColumns.get(i);
+            if (col.expression.equals(groupbyCol.expression)) {
+                groupbyCol.alias = col.alias;
+                groupbyCol.groupByInDisplay = true;
+
+                col.groupBy = true;
+                break;
             }
-            groupbyCol.alias = col.alias;
-            groupbyCol.groupByInDisplay = true;
-            col.groupBy = true;
-            break;
         }
 
         m_groupByColumns.add(groupbyCol);
@@ -877,7 +879,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(order_exp != null);
 
         // guards against subquery inside of order by clause
-        if (order_exp.hasSubquerySubexpression()) {
+        if (! order_exp.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
             throw new PlanningErrorException(
                     "ORDER BY clause with subquery expression is not allowed.");
         }
@@ -916,7 +918,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(havingNode.children.size() == 1);
         m_having = parseConditionTree(havingNode.children.get(0));
         assert(m_having != null);
-        if (m_having.hasSubquerySubexpression()) {
+        if (! m_having.findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
             throw new PlanningErrorException(
                     "SQL HAVING with subquery expression is not allowed.");
         }
@@ -1783,7 +1785,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orderByAllBaseTVEs.add(orderByExpr);
             } else {
                 orderByNonTVEs.add(orderByExpr);
-                List<AbstractExpression> baseTVEs = orderByExpr.findAllTupleValueSubexpressions();
+                List<AbstractExpression> baseTVEs = orderByExpr.findBaseTVEs();
                 orderByNonTVEBaseTVEs.add(baseTVEs);
                 orderByAllBaseTVEs.addAll(baseTVEs);
             }
@@ -1793,7 +1795,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         for (AbstractExpression candidateExpr : candidateExprHardCases)
         {
-            Collection<AbstractExpression> candidateBases = candidateExpr.findAllTupleValueSubexpressions();
+            Collection<AbstractExpression> candidateBases = candidateExpr.findBaseTVEs();
             if (orderByTVEs.containsAll(candidateBases)) {
                 continue;
             }
@@ -1948,62 +1950,30 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
-
         if (m_having != null) {
-            Collection<AbstractExpression> found =
-                    m_having.findAllSubexpressionsOfClass(aeClass);
-            if (! found.isEmpty()) {
-                exprs.addAll(found);
+            exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
             }
         }
-        addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_groupByColumns);
         if (m_projectSchema != null) {
-            m_projectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
-        }
-        // m_having, m_groupByExpressions, m_projectSchema
-        // may contain the aggregation or group by expression that have been
-        // replaced with TVEs already.
-        // So look for the original expression in m_aggResultColumns.
-        addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_aggResultColumns);
-
-        if (m_avgPushdownHaving != null &&
-                m_avgPushdownHaving != m_having) {
-            Collection<AbstractExpression> found =
-                    m_avgPushdownHaving.findAllSubexpressionsOfClass(aeClass);
-            if (! found.isEmpty()) {
-                exprs.addAll(found);
+            for(SchemaColumn col : m_projectSchema.getColumns()) {
+                if (col.getExpression() != null) {
+                    exprs.addAll(col.getExpression().findAllSubexpressionsOfClass(aeClass));
+                }
             }
         }
-        if (m_avgPushdownGroupByColumns != null && m_avgPushdownGroupByColumns != m_groupByColumns) {
-            addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_avgPushdownGroupByColumns);
-        }
-        if (m_avgPushdownProjectSchema != null && m_avgPushdownProjectSchema != m_projectSchema) {
-            m_avgPushdownProjectSchema.addAllSubexpressionsOfClassFromNodeSchema(exprs, aeClass);
-        }
-        // m_avgPushdownHaving, m_avgPushdownGroupByColumns, m_avgPushdownProjectSchema
-        // may contain the aggregation or group by expression that have been
-        // replaced with TVEs already.
-        // So look for the original expression in m_avgPushdownAggResultColumns.
-        if (m_avgPushdownAggResultColumns != null && m_avgPushdownAggResultColumns != m_aggResultColumns) {
-            addAllSubexpressionsOfClassFromColList(exprs, aeClass, m_avgPushdownAggResultColumns);
+
+        // m_having, m_groupByExpressions, m_projectSchema may contain the aggregation or group by expression that have
+        // been replaced with TVEs already. So check out the repository of the original expression in m_aggResultColumns.
+        for (ParsedColInfo col: m_aggResultColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfClass(aeClass));
+            }
         }
         return exprs;
-
-    }
-
-    private static void addAllSubexpressionsOfClassFromColList(Set<AbstractExpression> exprs,
-            Class<? extends AbstractExpression> aeClass, List<ParsedColInfo> colList) {
-        for (ParsedColInfo col : colList) {
-            AbstractExpression colExpr = col.expression;
-            if (colExpr == null) {
-                continue;
-            }
-            Collection<AbstractExpression> found = colExpr.findAllSubexpressionsOfClass(aeClass);
-            if (found.isEmpty()) {
-                continue;
-            }
-            exprs.addAll(found);
-        }
     }
 
     @Override

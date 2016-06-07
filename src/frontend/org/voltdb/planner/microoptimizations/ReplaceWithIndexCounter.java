@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -84,7 +85,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
             AbstractExpression postPredicate = aggplan.getPostPredicate();
             if (postPredicate != null) {
-                List<AbstractExpression> aggList = postPredicate.findAllAggregateSubexpressions();
+                List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
 
                 boolean allCountStar = true;
                 for (AbstractExpression expr: aggList) {

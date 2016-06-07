@@ -182,7 +182,9 @@ public class PlanNodeTree implements JSONString {
         if (predicate == null) {
             return;
         }
-        List<AbstractExpression> subquerysExprs = predicate.findAllSubquerySubexpressions();
+        List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
+                AbstractSubqueryExpression.class);
+
         for (AbstractExpression expr : subquerysExprs) {
             assert(expr instanceof AbstractSubqueryExpression);
             AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) expr;
@@ -278,7 +280,8 @@ public class PlanNodeTree implements JSONString {
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
         assert(node != null);
-        Collection<AbstractExpression> subexprs = node.findAllSubquerySubexpressions();
+        Collection<AbstractExpression> subexprs =
+                node.findAllExpressionsOfClass(AbstractSubqueryExpression.class);
         for (AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof AbstractSubqueryExpression);
             AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;

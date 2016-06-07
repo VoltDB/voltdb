@@ -613,7 +613,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         String sql = getQueryForLongQueryTable(750);
         try {
             m_client.callProcedure("@AdHoc", sql);
-            fail("Query was expected to generate stack overflow error");
+            fail("Query was expected to generate stack over flow error");
         }
         catch (Exception exception) {
             System.out.println(exception.getMessage());
@@ -621,8 +621,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             expectedMsg = "Encountered stack overflow error. " +
                           "Try reducing the number of predicate expressions in the query.";
             boolean foundMsg = exception.getMessage().contains(expectedMsg);
-            assertTrue("Expected text \"" + expectedMsg + "\" did not appear in exception "
-                    + "\"" + exception.getMessage() + "\"", foundMsg);
+            assert foundMsg : exception.getMessage();
         }
         finally {
             if (m_client != null) {
