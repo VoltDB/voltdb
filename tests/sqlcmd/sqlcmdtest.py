@@ -182,7 +182,7 @@ def clean_output(parent, path):
             [0-9]+                                   # line number digits, replaced with #
             (\))                                     # survives as \g<2>
             """, re.VERBOSE)
-    
+
     for line in outbackin:
         # Note len(cleanedline) here counts 1 EOL character.
         # Preserve blank lines as is -- there's no need to try cleaning them.
