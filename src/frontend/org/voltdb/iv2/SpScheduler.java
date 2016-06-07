@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
@@ -66,39 +67,29 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
     static final VoltLogger tmLog = new VoltLogger("TM");
 
-    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey>
-    {
+    static class DuplicateCounterKey implements Comparable<DuplicateCounterKey> {
         private final long m_txnId;
         private final long m_spHandle;
-        transient final int m_hash;
 
-        DuplicateCounterKey(long txnId, long spHandle)
-        {
+        DuplicateCounterKey(long txnId, long spHandle) {
             m_txnId = txnId;
             m_spHandle = spHandle;
-            m_hash = (37 * (int)(m_txnId ^ (m_txnId >>> 32))) +
-                ((int)(m_spHandle ^ (m_spHandle >>> 32)));
         }
 
         @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) {
-                return true;
+        public boolean equals(Object o) {
+            try {
+                DuplicateCounterKey other = (DuplicateCounterKey) o;
+                return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
             }
-            if (o == null || !(getClass().isInstance(o))) {
+            catch (Exception e) {
                 return false;
             }
-
-            DuplicateCounterKey other = (DuplicateCounterKey)o;
-
-            return (m_txnId == other.m_txnId && m_spHandle == other.m_spHandle);
         }
 
         // Only care about comparing TXN ID part for sorting in updateReplicas
         @Override
-        public int compareTo(DuplicateCounterKey o)
-        {
+        public int compareTo(DuplicateCounterKey o) {
             if (m_txnId < o.m_txnId) {
                 return -1;
             } else if (m_txnId > o.m_txnId) {
@@ -117,14 +108,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         @Override
-        public int hashCode()
-        {
-            return m_hash;
+        public int hashCode() {
+            assert(false) : "Hashing this is unsafe as it can't promise no collisions.";
+            throw new UnsupportedOperationException(
+                    "Hashing this is unsafe as it can't promise no collisions.");
         }
 
         @Override
-        public String toString()
-        {
+        public String toString() {
             return "<" + m_txnId + ", " + m_spHandle + ">";
         }
     };
@@ -143,7 +134,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
-        new HashMap<DuplicateCounterKey, DuplicateCounter>();
+        new TreeMap<DuplicateCounterKey, DuplicateCounter>();
     // MP fragment tasks or completion tasks pending durability
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
         new HashMap<Long, Queue<TransactionTask>>();
@@ -535,10 +526,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
+
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
-                        msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
-                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+                        msg.getTxnId(),
+                        m_replicaHSIds,
+                        msg);
+
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -618,8 +613,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
-                message.getTxnId(), expectedHSIds, message.getStoredProcedureName());
-        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                message.getTxnId(),
+                expectedHSIds,
+                message);
+        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // is local repair necessary?
@@ -648,8 +645,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
-                message.getTxnId(), expectedHSIds, "MP_DETERMINISM_ERROR");
-        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+                message.getTxnId(),
+                expectedHSIds,
+                message);
+        safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
@@ -807,14 +806,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
+                            msg.getTxnId(),
+                            m_replicaHSIds,
+                            message);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
+                            msg.getTxnId(),
+                            m_replicaHSIds,
+                            message);
                 }
-                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+                safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
         }
         else {
@@ -1096,6 +1099,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_tasks.offer(r);
         } else {
             r.run();
+        }
+    }
+
+    /**
+     * Just using "put" on the dup counter map is unsafe.
+     * It won't detect the case where keys collide from two different transactions.
+     */
+    void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
+        DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
+        if (existingDC != null) {
+            // this is a collision and is bad
+            existingDC.logWithCollidingDuplicateCounters(counter);
+            VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+        }
+        else {
+            m_duplicateCounters.put(dpKey, counter);
         }
     }
 
