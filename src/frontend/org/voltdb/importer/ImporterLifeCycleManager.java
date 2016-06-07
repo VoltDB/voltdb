@@ -149,8 +149,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     @Override
     public final void onChange(ImporterChannelAssignment assignment)
     {
-        if (m_stopping) {
-            s_logger.error(String.format("Stopping, ignore the assigment %s", assignment));
+        if (m_stopping && !assignment.getAdded().isEmpty()) {
+            s_logger.warn(String.format("Importer is stopping, ignore the assigment %s", assignment));
             return;
         }
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
