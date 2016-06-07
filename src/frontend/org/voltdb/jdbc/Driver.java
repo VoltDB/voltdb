@@ -133,7 +133,7 @@ public class Driver implements java.sql.Driver
                 String password = "";
                 boolean heavyweight = false;
                 int maxoutstandingtxns = 0;
-                boolean reconnectOnConnectionLoss = true;
+                boolean reconnectOnConnectionLoss = false;
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
                     String key = (String) e.nextElement();
