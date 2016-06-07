@@ -448,4 +448,7 @@ public class VoltBulkLoader {
         return m_mappedColumnTypes.values().toArray(new VoltType[m_mappedColumnTypes.size()]);
     }
 
+    public Map<Integer, String> getColumnNames() {
+        return m_colNames;
+    }
 }

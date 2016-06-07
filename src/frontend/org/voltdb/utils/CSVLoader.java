@@ -109,9 +109,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      */
     public static final boolean DEFAULT_UPSERT_MODE = false;
     /**
+     * First line is column name?
+     */
+    public static final boolean DEFAULT_HEADER = false;
+    /**
      * Used for testing only.
      */
-
     public static boolean testMode = false;
 
     private class ErrorInfoItem {
@@ -299,6 +302,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "Batch Size for processing.")
         public int batch = 200;
 
+        @Option(desc = "First line of csv file is column name.", hasArg = false)
+        boolean header = DEFAULT_HEADER;
+
         /**
          * Table name to insert CSV data into.
          */
@@ -314,6 +320,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
          */
         @Override
         public void validate() {
+            if (header && procedure != "") {
+                exitWithMessageAndUsage("--header and --procedure options are mutually exclusive.");
+            }
             if (maxerrors < 0) {
                 exitWithMessageAndUsage("abortfailurecount must be >=0");
             }
@@ -454,6 +463,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
 
             CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
+
+            //if header option is true, check whether csv first line is valid
+            if (config.header) {
+                if (!csvReader.checkHeader()) {
+                    m_log.error("CSV file '" + config.file + "' header does not match the table");
+                    System.exit(-1);
+                }
+            }
+
             Thread readerThread = new Thread(csvReader);
             readerThread.setName("CSVFileReader");
             readerThread.setDaemon(true);
