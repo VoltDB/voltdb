@@ -28,35 +28,39 @@ class Stats():
     """Provide functions for analyzing jobs, branches, and tests."""
 
     def __init__(self):
-        self.username = None ;
-        self.passwd = None;
+        self.username = None
+        self.passwd = None
+        self.save = None
         self.jhost='http://ci.voltdb.lan'
         self._server = None
 
-    def getOpts(self) :
+    def getOpts(self):
         parser = OptionParser()
-        parser.add_option('-u','--username', dest='username', default=None);
-        parser.add_option('-p','--passwd', dest='passwd', default=None);
-        return parser.parse_args();
+        parser.add_option('-u','--username', dest='username', default=None)
+        parser.add_option('-p','--passwd', dest='passwd', default=None)
+        parser.add_option('-s','--save', action='store_true')
+        return parser.parse_args()
 
+    # TODO: print what filenames data are saved to
     def runCommand(self, command, branch=None, job=None, build=None, build_range=None):
-        cmdHelp = """usage: stats [options] help|history|build-report|build-history
+        cmdHelp = """usage: stats [options] help|job-history|build-report|build-history
         options:
         -u <username> defaults to local user
         -p <passwd>
+        -s save to file. recommened to avoid stdout spam
         commands:
         help - display help
-        history <branch> <job> - displays job history
-        build-report <branch> [build] - displays a report using build number. defaults to last completed build
+        job-history <branch> <job> - displays job history
+        build-report <branch> - displays a report for last completed build
         build-history <branch> <job> <range> - analyze job history for a range of builds, ex: 500-512
         """
         #print("command: "+command);
         if command == 'help':
             print(cmdHelp)
-        elif command == 'history':
-            self.history(branch, job)
+        elif command == 'job-history':
+            self.job_history(branch, job)
         elif command == 'build-report':
-            self.build_report(branch, build)
+            self.build_report(branch)
         elif command == 'build-history':
             self.build_history(branch, job, build_range)
         else:
@@ -79,32 +83,36 @@ class Stats():
         # test it
         # print self._server.jobs_count()
 
-    def history(self, branch, job):
+    def job_history(self, branch, job):
         if branch == None or job == None:
             self.runCommand('help')
             return
 
-        server = self.getServer()
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
         branch_job = eval(urlopen(url).read())
         jobs = branch_job['jobs']
 
         for j in jobs:
             if j['name'] == job:
-                print j['url']
                 job_history = eval(urlopen(j['url'] + 'api/python').read())
-                print(json.dumps(job_history, indent=2))
+                filename = branch + '-' + j['name'] + '.txt'
+                if self.save:
+                    with open(filename, 'w') as outfile:
+                        outfile.write(j['url'])
+                        outfile.write(json.dumps(job_history, indent=2))
+                else:
+                    print(j['url'])
+                    print(json.dumps(job_history, indent=2))
                 return
+
         print('Could not find job %s under branch %s' %(job, branch))
 
-    def build_report(self, branch, build):
+    # TODO: create a summary
+    def build_report(self, branch):
         if branch == None:
             self.runCommand('help')
             return
-        if build == None:
-            build = 'lastCompletedBuild'
 
-        server = self.getServer()
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/api/python'
         branch_job = eval(urlopen(url).read())
         jobs = branch_job['jobs']
@@ -119,34 +127,36 @@ class Stats():
                 all_jobs[job['name']] = 'good'
 
         for job in all_jobs:
-            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + \
-                  build + '%s/api/python'
+            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + 'lastCompletedBuild' \
+                  + '%s/api/python'
 
-            if all_jobs[job] == 'fatal':
-                filename = job.replace('.', '-') + '-fatal.txt'
-            elif all_jobs[job] == 'unstable':
-                filename = job.replace('.', '-') + '-unstable.txt'
-            else:
-                filename = job.replace('.', '-') + '-good.txt'
+            if self.save:
+                if all_jobs[job] == 'fatal':
+                    filename = branch + '-' + job.replace('.', '-') + '-fatal.txt'
+                elif all_jobs[job] == 'unstable':
+                    filename = branch + '-' + job.replace('.', '-') + '-unstable.txt'
+                else:
+                    filename = branch + '-' + job.replace('.', '-') + '-good.txt'
 
             report = {"report":"no info"}
 
             # '/testReport' only works for some jobs depending on plugins installed on Jenkins
             try:
                 test_url = url % '/testReport'
-                print test_url
                 report = eval(urlopen(test_url).read())
             except (HTTPError, URLError) as e:
                 try:
                     test_url = url % ''
-                    print test_url
                     report = eval(urlopen(test_url).read())
                 except (HTTPError, URLError) as e:
                     print(e)
-                    print("Could not retrieve report")
+                    print("Could not retrieve report for " + job)
 
-            with open(filename, 'w') as outfile:
-                outfile.write(json.dumps(report, indent=2))
+            if self.save:
+                with open(filename, 'w') as outfile:
+                    outfile.write(json.dumps(report, indent=2))
+            else:
+                print(json.dumps(report, indent=2))
 
     def build_history(self, branch, job, build_range):
         if branch == None or job == None or build_range == None:
@@ -157,19 +167,23 @@ class Stats():
                 builds = build_range.split('-')
                 build_low = int(builds[0])
                 build_high = int(builds[1])
-                if build_high < build_low: raise Exception('left number must be lesser than or equal to right')
+                if build_high < build_low: raise Exception('Error: Left number must be lesser than or equal to right')
             except:
-                print sys.exc_info()[0]
+                print(sys.exc_info()[1])
                 self.runCommand('help')
                 return
 
-        server = self.getServer()
         test_map = {}
+
+        url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/lastCompletedBuild/api/python'
+        latestBuild = eval(urlopen(url).read())['number']
 
         for build in range(build_low, build_high+1):
             url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '%s/api/python'
 
             report = {"report":"no info"}
+
+            test_url = ''
 
             # '/testReport' only works for some jobs depending on plugins installed
             try:
@@ -186,23 +200,6 @@ class Stats():
                                 test_map[name] = []
                             test_map[name].append(case['status'])
 
-                # for case in all_cases:
-                #     name = test_case['className'] + '.' + test_case['name']
-                #     if test_map.get(name, None) == None:
-                #         test_map[name] = []
-                #     test_map[name].append(test_case['status'])
-
-                # for cases in all_cases:
-                #     print json.dumps(cases, indent=2)
-                #     return
-                #     for test_case in cases:
-                #         print json.dumps(test_case, indent=2)
-                #         return
-                #         name = test_case['className'] + '.' + test_case['name']
-                #         if test_map.get(name, None) == None:
-                #             test_map[name] = []
-                #         test_map[name].append(test_case['status'])
-
             # doesn't have '/testReport' so try to get normal report
             except (HTTPError, URLError) as e:
                 try:
@@ -210,10 +207,14 @@ class Stats():
                     report = eval(urlopen(test_url).read())
                 except (HTTPError, URLError) as e:
                     print(e)
-                    print("Could not retrieve report")
+                    print(test_url)
+                    print('Could not retrieve report because url is invalid. This may be because the build does not '
+                    'exist on Jenkins')
+                    print('Latest build for this job is %d' % latestBuild)
+                    # TODO: actually make test map. Also make test map into helper function
             except AttributeError as e:
-                print('Error retriving test data')
                 print(e)
+                print('Error retriving test data for this particular build: %d' % build)
 
         for test in test_map:
             failure_tally = 0
@@ -230,17 +231,23 @@ class Stats():
                 else:
                     print(status)
                     other_tally += 1
-            with open('temp.txt', 'a') as outfile:
-                outfile.write(json.dumps(
-                {
-                    'build range': build_range,
-                    'test': test,
-                    'failure tally': failure_tally,
-                    'regression tally': regression_tally,
-                    'passed tally': passed_tally,
-                    'other tally': other_tally
-                }, indent=2
-                ))
+
+            test_summary = {
+                'build range': build_range,
+                'test': test,
+                'failure tally': failure_tally,
+                'regression tally': regression_tally,
+                'passed tally': passed_tally,
+                'other tally': other_tally
+            }
+
+            if self.save:
+                filename = 'build-history-' + branch + '-' + build_range + '.txt'
+                with open(filename, 'a') as outfile:
+                    outfile.write(json.dumps(test_summary, indent=2))
+            else:
+                print(json.dumps(test_summary, indent=2))
+
 
 if __name__ == '__main__':
     stats = Stats()
@@ -252,11 +259,9 @@ if __name__ == '__main__':
     command = 'help'
 
     (options,args) = stats.getOpts()
-    if options.username != None:
-        stats.username = options.username;
-
-    if options.passwd != None:
-       stats.passwd = options.passwd
+    stats.username = options.username;
+    stats.passwd = options.passwd
+    stats.save = options.save
 
     if len(args) > 0:
         command = args[0]
