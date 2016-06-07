@@ -640,13 +640,6 @@ public class LocalCluster implements VoltServerConfig {
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
             startOne(i, clearLocalDataDirectories, role, startAction);
-            // thread sleep is temporarily here to sync up localcluster hostid with voltdb hostid
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
