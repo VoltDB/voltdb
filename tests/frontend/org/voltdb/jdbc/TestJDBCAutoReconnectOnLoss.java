@@ -125,7 +125,7 @@ public class TestJDBCAutoReconnectOnLoss {
         try{
             query = CONNECTION.createStatement();
             query.executeQuery(TEST_SQL);
-            assertTrue(false);
+            fail("No connection");
         } catch (SQLException e){
             assertTrue(true);
         }
@@ -139,6 +139,51 @@ public class TestJDBCAutoReconnectOnLoss {
         results.close();
         query.close();
         CONNECTION.close();
+        stopServer();
+    }
+
+    @Test
+    public void testConnectionPool() throws Exception {
+
+        startServer();
+
+        org.apache.tomcat.jdbc.pool.DataSource ds = new org.apache.tomcat.jdbc.pool.DataSource();
+        ds.setDriverClassName("org.voltdb.jdbc.Driver");
+        ds.setUrl(DRIVER_URL);
+        ds.setInitialSize(5);
+        ds.setMaxActive(10);
+        ds.setMaxIdle(5);
+        ds.setMinIdle(2);
+
+        Connection conn = ds.getConnection();
+
+        Statement query = conn.createStatement();
+        ResultSet results = query.executeQuery(TEST_SQL);
+        assertTrue(results.next());
+        results.close();
+        query.close();
+
+        stopServer();
+        Thread.sleep(4000);
+
+        try{
+            query = conn.createStatement();
+            query.executeQuery(TEST_SQL);
+           fail("No connection");
+        } catch (SQLException e){
+            assertTrue(true);
+        }
+
+        startServer();
+
+        query = conn.createStatement();
+        results = query.executeQuery(TEST_SQL);
+        assertTrue(results.next());
+
+        results.close();
+        query.close();
+        conn.close();
+        ds.close();
         tearDown();
     }
 }
