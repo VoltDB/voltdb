@@ -748,7 +748,7 @@ if __name__ == "__main__":
         # numeric-ints "extended" test suites, when running against PostgreSQL
         # (or PostGIS/PostgreSQL); see ENG-10546
         if config_name == 'numeric-decimals' and comparison_database.startswith('Post'):
-            if result["mis"] > 1140:
+            if result["mis"] > 1180:
                 success = False
         elif config_name == 'numeric-ints' and comparison_database.startswith('Post'):
             if result["mis"] > 2820:
