@@ -361,6 +361,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
         long messageCount = 0;
         long skipCount = 0;
+        long jumpCount = 0;
         try {
             //Start with the starting leader.
             resetLeader();
@@ -438,10 +439,15 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
                     long currentOffset = messageAndOffset.offset();
+
                     //if currentOffset is less means we have already pushed it and also check pending queue.
                     if (currentOffset < m_currentOffset.get()) {
                         skipCount++;
                         continue;
+                    }
+
+                    if (currentOffset > m_currentOffset.get()) {
+                        jumpCount++;
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
@@ -482,7 +488,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 commitOffset();
             }
             info(null, "Total MessageAndOffset get " + messageCount
-                    + " Total Skipped Offset " + skipCount);
+                    + " Total Skipped Offset " + skipCount
+                    + " Total jumpped Offset " + jumpCount);
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
