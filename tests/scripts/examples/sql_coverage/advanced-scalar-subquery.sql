@@ -54,7 +54,6 @@ SELECT _variable[#ord]         FROM @fromtables A11 WHERE __[#ord] _symbol[#cmp 
 {_a12cmpsubset |= "<"}
 {_a12cmpsubset |= ">"}
 {_a12cmpsubset |= "<="}
-{_a12cmpsubset |= ">="}
 ---SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
    SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _a12cmpsubset] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
 --- TODO: uncomment, once ENG-8292 (NPE in Hsql for HAVING query, causing sqlCoverage mismatches) is fixed
