@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.sysprocs.AdHocBase;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -225,6 +226,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append(m_invocation.getProcName());
             sb.append("\n  PARAMS: ");
             sb.append(m_invocation.getParams().toString());
+            // print out extra information for adhoc
+            if (m_invocation.getProcName().startsWith("@AdHoc")) {
+                sb.append("\n  ADHOC INFO: ");
+                sb.append(AdHocBase.adHocSQLFromInvocationForDebug(m_invocation));
+            }
+
         } else {
             sb.append("\n NO INVOCATION");
         }

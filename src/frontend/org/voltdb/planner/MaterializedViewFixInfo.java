@@ -34,7 +34,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -397,7 +396,7 @@ public class MaterializedViewFixInfo {
         List<AbstractExpression> exprs = ExpressionUtil.uncombine(filters);
 
         for (AbstractExpression expr: exprs) {
-            ArrayList<AbstractExpression> tves = expr.findBaseTVEs();
+            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 

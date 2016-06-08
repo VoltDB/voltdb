@@ -106,8 +106,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_closed = false;
     private volatile boolean m_mastershipAccepted = false;
     private volatile ListeningExecutorService m_executor;
-    private Integer m_executorLock = new Integer(0);
-    private LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
+    private final Integer m_executorLock = new Integer(0);
+    private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
+    private RunnableWithES m_firstAction = null;
 
     /**
      * Create a new data source.
@@ -589,7 +590,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, false);
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public long getGeneration() {
@@ -616,8 +617,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-
-        return stashOrSubmitTask(runnable, false);
+        //This is a setup task when stashed tasks are run this is run first.
+        return stashOrSubmitTask(runnable, false, true);
     }
 
     private class SyncRunnable implements Runnable {
@@ -643,7 +644,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 new SyncRunnable(nofsync).run();
             }
         };
-        return stashOrSubmitTask(runnable, false);
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<?> close() {
@@ -663,7 +664,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, false);
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
@@ -691,7 +692,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        stashOrSubmitTask(runnable, true);
+        stashOrSubmitTask(runnable, true, false);
         return fut;
     }
 
@@ -798,7 +799,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             };
-            stashOrSubmitTask(runnable, true);
+            stashOrSubmitTask(runnable, true, false);
         }
     }
 
@@ -860,7 +861,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        stashOrSubmitTask(runnable, true);
+        stashOrSubmitTask(runnable, true, false);
     }
 
      private void ackImpl(long uso) {
@@ -925,7 +926,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        stashOrSubmitTask(runnable, true);
+        stashOrSubmitTask(runnable, true, false);
     }
 
     /**
@@ -946,7 +947,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_runEveryWhere = runEveryWhere;
     }
 
-    private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, boolean callExecute) {
+    private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, final boolean callExecute, final boolean setupTask) {
         if (m_executor==null) {
             synchronized (m_executorLock) {
                 if (m_executor==null) {
@@ -957,7 +958,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 " is going beyond 50. Not queueing anymore events");
                         return Futures.immediateFuture(null);
                     }
-                    m_queuedActions.add(runnable);
+                    if (setupTask) {
+                        m_firstAction = runnable;
+                    } else {
+                        m_queuedActions.add(runnable);
+                    }
                     return Futures.immediateFuture(null);
                 }
             }
@@ -987,6 +992,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 ListeningExecutorService es = CoreUtils.getListeningExecutorService(
                             "ExportDataSource gen " + m_generation
                             + " table " + m_tableName + " partition " + m_partitionId, 1);
+                //If we have a truncate task do that first.
+                if (m_firstAction != null) {
+                    exportLog.info("Submitting truncate task for ExportDataSource gen " + m_generation
+                            + " table " + m_tableName + " partition " + m_partitionId);
+                    es.submit(m_firstAction);
+                }
                 if (m_queuedActions.size()>0) {
                     for (RunnableWithES queuedR : m_queuedActions) {
                         queuedR.setExecutorService(es);
