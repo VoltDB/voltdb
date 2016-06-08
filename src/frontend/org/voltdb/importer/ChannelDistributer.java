@@ -430,13 +430,15 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 final ImporterChannelAssignment assignment = itr.next();
                 if (registered.contains(assignment.getImporter())) {
                     final ChannelChangeCallback dispatch = next.get(assignment.getImporter());
-                    m_buses.submit(new DistributerRunnable() {
-                        @Override
-                        public void susceptibleRun() throws Exception {
-                            dispatch.onChange(assignment);
-                        }
-                    });
-                    itr.remove();
+                    if (dispatch.canAcceptAssignments()) {
+                        m_buses.submit(new DistributerRunnable() {
+                            @Override
+                            public void susceptibleRun() throws Exception {
+                                dispatch.onChange(assignment);
+                            }
+                        });
+                        itr.remove();
+                    }
                 }
             }
         }
@@ -493,6 +495,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
         ChannelChangeCallback cb = m_callbacks.getReference().get(assignment.getImporter());
         if (cb != null && !m_done.get()) try {
             cb.onChange(assignment);
+        } catch (IllegalStateException e) {
+            synchronized (m_undispatched) {
+                m_undispatched.add(assignment);
+            }
         } catch (Exception callbackException) {
             throw loggedDistributerException(
                     callbackException,
