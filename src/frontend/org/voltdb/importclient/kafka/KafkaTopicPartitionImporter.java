@@ -460,7 +460,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                                 invocation);
                          if (!callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
-                                 debug(null, "Failed to process Invocation possibly bad data: " + line);
+                                 warn(null, "Failed to process Invocation possibly bad data: " + line);
                                }
                                m_gapTracker.commit(currentOffset);
                          }
