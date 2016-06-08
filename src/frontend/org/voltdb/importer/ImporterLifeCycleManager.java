@@ -141,6 +141,12 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         }
     }
 
+    @Override
+    public boolean canAcceptAssignments()
+    {
+        return !m_stopping;
+    }
+
     /**
      * Callback method used by resource distributer to allocate/deallocate resources.
      * Stop will be called for resources that are removed from assignment list for this node.
@@ -150,8 +156,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     public final void onChange(ImporterChannelAssignment assignment)
     {
         if (m_stopping && !assignment.getAdded().isEmpty()) {
-            s_logger.warn(String.format("Importer is stopping, ignore the assigment %s", assignment));
-            return;
+            String msg = "Received an a channel assignment when the importer is stopping: " + assignment;
+            throw new IllegalStateException(msg);
         }
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
 
