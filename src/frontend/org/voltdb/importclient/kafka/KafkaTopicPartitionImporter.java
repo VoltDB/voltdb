@@ -448,6 +448,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
                     if (currentOffset > m_currentOffset.get()) {
                         jumpCount++;
+                        warn(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
