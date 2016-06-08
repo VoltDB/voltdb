@@ -487,10 +487,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                 }
                 commitOffset();
+                info(null, "Total MessageAndOffset get " + messageCount
+                        + " Total Skipped Offset " + skipCount
+                        + " Total jumpped Offset " + jumpCount);
             }
-            info(null, "Total MessageAndOffset get " + messageCount
-                    + " Total Skipped Offset " + skipCount
-                    + " Total jumpped Offset " + jumpCount);
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
