@@ -59,7 +59,6 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         subTestBooleanLiteralsInQuery(String.format(joinQuery, 1, 2), resultsForOn, client, true); // replicated join replicated.
         subTestBooleanLiteralsInQuery(String.format(joinQuery, 2, 3), resultsForOn, client, true); // replicated join partitioned.
         subTestBooleanLiteralsInQuery(String.format(joinQuery, 3, 2), resultsForOn, client, true); // partitioned join replicated.
-//        subTestBooleanLiteralsInQuery(String.format(joinQuery, 3, 4) + " AND a.AINT=b.AINT", resultsForWhere, client, true); // partitioned join partitioned.
         subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1), resultsForCaseWhen, client, false);
         subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3), resultsForCaseWhen, client, false);
     }

@@ -622,6 +622,7 @@ public class QuerySpecification extends QueryExpression {
         Expression e = orderBy.getLeftNode();
 
         if (e.dataType != null && e.dataType.isBooleanType()) {
+            // Give "invalid ORDER BY expression" error if ORDER BY boolean.
             throw Error.error(ErrorCode.X_42576);
         }
 
@@ -715,6 +716,7 @@ public class QuerySpecification extends QueryExpression {
                     sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, offset, limit0));
                     addSortAndSlice(sortAndSlice);
                 }
+                // Leave out the original WHERE condition no matter it is WHERE true or WHERE false.
                 queryCondition = null;
             }
             else {
