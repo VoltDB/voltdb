@@ -185,37 +185,6 @@ public class DDLCompiler {
         m_classLoader = classLoader;
     }
 
-    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
-        assert(tableNode.name.equals("table"));
-
-        String valueTypeStr;
-        VoltType type;
-        String columnName;
-        boolean typeDetected = false;
-        String separatorStr;
-
-        for (VoltXMLElement subNode : tableNode.children) {
-            if (subNode.name.equals("columns")) {
-                for (VoltXMLElement columnNode : subNode.children) {
-                    if (columnNode.name.equals("column")) {
-                        valueTypeStr = columnNode.attributes.get("valuetype");
-                        columnName = columnNode.attributes.get("name");
-                        type = VoltType.typeFromString(valueTypeStr);
-                        if (lookupType == type) {
-                            if (msg != null) {
-                                separatorStr = (typeDetected == true)? ", " : " ";
-                                msg.append(separatorStr + "column name: '" + columnName + "' type: '" + valueTypeStr + "'");
-                            }
-                            typeDetected = true;
-                        }
-                    }
-                }
-            } // if (subNode.name.equals("columns"))
-        }
-
-        return typeDetected;
-    }
-
     /**
      * Compile a DDL schema from an abstract reader
      * @param reader  abstract DDL reader
@@ -1667,20 +1636,15 @@ public class DDLCompiler {
         table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
-         * Validate that the total size
+         * Validate that each variable-length column is below the max value length,
+         * and that the maximum size for the row is below the max row length.
          */
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if (t.isVariableLength()) {
-                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
-                            " specifies a maximum size of " + c.getSize() + " bytes" +
-                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
-                }
-                maxRowSize += 4 + c.getSize();
-            }
-            else if (t == VoltType.STRING) {
+            if (t == VoltType.STRING && (! c.getInbytes())) {
+                // A VARCHAR column whose size is defined in characters.
+
                 if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
                             " specifies a maximum size of " + c.getSize() + " characters" +
@@ -1690,10 +1654,26 @@ public class DDLCompiler {
                 }
                 maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
             }
+            else if (t.isVariableLength()) {
+                // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
+
+                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
+                }
+                maxRowSize += 4 + c.getSize();
+            }
             else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
+
+        if (maxRowSize > MAX_ROW_SIZE) {
+            throw m_compiler.new VoltCompilerException("Error: Table " + name + " has a maximum row size of " + maxRowSize +
+                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+        }
+
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
         if (query != null) {
@@ -1703,11 +1683,6 @@ public class DDLCompiler {
             // Don't need a real StringBuilder or export state to get the CREATE for a table
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
                     table, query, null);
-        }
-
-        if (maxRowSize > MAX_ROW_SIZE) {
-            throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +
-                    " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
     }
 
