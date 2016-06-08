@@ -6,6 +6,7 @@ import java.util.Random;
 
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.utils.PolygonFactory;
 
 public class SampleGeoRecord extends SampleRecord {
 
@@ -32,15 +33,13 @@ public class SampleGeoRecord extends SampleRecord {
     private static Object nextGeography(Random rand, boolean isNullable, int minLength, int maxLength)
     {
         if (isNullable && rand.nextBoolean()) return null;
-        if (isNullable && rand.nextBoolean()) return null;
-        float pointPart = 91;
-        while ( pointPart > 90.0 || pointPart < -90.0 ) {
-            pointPart = rand.nextFloat()*rand.nextLong();
-        } 
-        // this needs to be a valid polygon where segments don't cross over each other and the
-        // start and end point are equal.
-        String wktPoly = "POLYGON(( 0.0 0.0,"+String.valueOf(pointPart)+ " "+String.valueOf(pointPart)+", 0.0 0.000001,0.0 0.0))";
-        return GeographyValue.fromWKT(wktPoly);
+        // we need to have at least 4 vertices
+        int numVertices = rand.nextInt(6)+4;
+        double sizeOfHole = rand.nextDouble();
+        GeographyPointValue center = GeographyPointValue.fromWKT("POINT(0 0)");
+        GeographyPointValue firstVertex = GeographyPointValue.fromWKT("POINT(1 1)");
+        GeographyValue poly = PolygonFactory.CreateRegularConvex(center, firstVertex, numVertices, sizeOfHole);
+        return poly;
     }
 
     private static Object nextGeographyPoint(Random rand, int minLength, int maxLength)
@@ -53,11 +52,10 @@ public class SampleGeoRecord extends SampleRecord {
     private static Object nextGeographyPoint(Random rand, boolean isNullable, int minLength, int maxLength)
     {
         if (isNullable && rand.nextBoolean()) return null;
-        float pointPart = 91;
-        while ( pointPart > 90.0 || pointPart < -90.0 ) {
-            pointPart = rand.nextFloat()*rand.nextLong();
-        } 
-        String wktPoint = "POINT("+String.valueOf(pointPart)+ " "+String.valueOf(pointPart)+")";
+        int pointX = rand.nextInt(90);
+        int pointY = rand.nextInt(90);
+
+        String wktPoint = "POINT("+String.valueOf(pointX)+ " "+String.valueOf(pointY)+")";
         return GeographyPointValue.fromWKT(wktPoint);
     }
 }    

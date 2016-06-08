@@ -67,7 +67,7 @@ public class JDBCVoltVerifier {
             "EXPORT_REPLICATED_TABLE",
             "EXPORT_SKINNY_PARTITIONED_TABLE"
         };
-
+       
         for (String t: verticaTables) {
             try {
                 System.out.println("JDBC drop table " + t);

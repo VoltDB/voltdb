@@ -1,7 +1,7 @@
 
 file -inlinebatch END_OF_BATCH
 
--- Export Table for Partitioned Data Table deletions
+-- Export Stream with extra Geo columns
 CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
@@ -34,6 +34,8 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 
 );
 
+-- should be an exact copy of the stream. Used for verifiing
+-- export stream contents.
 CREATE TABLE  export_geo_mirror_partitioned_table
 (
   txnid                     BIGINT        NOT NULL
@@ -74,9 +76,11 @@ CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET a
 );
 
 
+-- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
-
-CREATE PROCEDURE SelectGeowithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+-- this is used by the verifier inside JDBCGetData, re-point to the geo tables
+DROP PROCEDURE SelectwithLimit IF EXISTS;
+CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 END_OF_BATCH
