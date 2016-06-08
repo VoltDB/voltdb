@@ -445,7 +445,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             } else if (message.isForDRv1()) {
-                assert false;
+                assert false : "DRv1 is not supported";
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
                 if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
@@ -503,10 +503,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // be the SpHandle (for now)
             // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
             if (SystemProcedureCatalog.listing.get(procedureName) == null ||
-                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
+                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite())
+            {
                 msg.setTxnId(newSpHandle);
                 msg.setUniqueId(uniqueId);
-                    }
+            }
 
             //Don't replicate reads, this really assumes that DML validation
             //is going to be integrated soonish
