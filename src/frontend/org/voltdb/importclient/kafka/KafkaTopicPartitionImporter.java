@@ -481,6 +481,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 commitOffset();
             }
+            info(null, "Total MessageAndOffset get " + messageCount
+                    + " Total Skipped Offset " + skipCount);
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
@@ -497,8 +499,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 + " Last commit point is: " + m_lastCommittedOffset
                 + " Callback Rcvd: " + cbcnt.get()
                 + " Submitted: " + submitCount);
-        info(null, "Total MessageAndOffset get " + messageCount
-                + " Total Skipped Offset " + skipCount);
+
     }
 
     public boolean commitOffset() {
