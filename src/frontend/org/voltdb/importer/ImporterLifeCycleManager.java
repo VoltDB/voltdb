@@ -157,6 +157,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     {
         if (m_stopping && !assignment.getAdded().isEmpty()) {
             String msg = "Received an a channel assignment when the importer is stopping: " + assignment;
+            s_logger.warn(msg);
             throw new IllegalStateException(msg);
         }
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
