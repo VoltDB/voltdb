@@ -2927,25 +2927,6 @@ public class DDLCompiler {
     }
 
     /**
-     * Check the join tree in the view query statement.
-     * Verify only inner join is present in the query.
-     *
-     * @param joinTree The root of the join tree
-     * @param compiler The VoltCompiler
-     * @throws VoltCompilerException
-     */
-    private static void checkViewJoinTree(JoinNode joinTree, VoltCompiler compiler) throws VoltCompilerException {
-        if (joinTree instanceof BranchNode) {
-            BranchNode joinBranch = (BranchNode)joinTree;
-            if (joinBranch.getJoinType() != JoinType.INNER) {
-                throw compiler.new VoltCompilerException("Materialized view only supports INNER JOIN.");
-            }
-            checkViewJoinTree(joinBranch.getLeftNode(), compiler);
-            checkViewJoinTree(joinBranch.getRightNode(), compiler);
-        }
-    }
-
-    /**
      * If the view is defined on joint tables (>1 source table),
      * check if there are self-joins.
      *
@@ -2958,8 +2939,8 @@ public class DDLCompiler {
         HashSet<String> tableSet = new HashSet<String>();
         for (Table tbl : tableList) {
             if (! tableSet.add(tbl.getTypeName())) {
-                String errMsg = "Table " + tbl.getTypeName() +
-                       " appeared in table list more than once: materialized view does not support self-join.";
+                String errMsg = "Table " + tbl.getTypeName() + " appeared in the table list more than once: " +
+                                "materialized view does not support self-join.";
                 throw compiler.new VoltCompilerException(errMsg);
             }
         }
@@ -3062,7 +3043,9 @@ public class DDLCompiler {
             throw compiler.new VoltCompilerException(msg.toString());
         }
 
-        checkViewJoinTree(stmt.m_joinTree, compiler);
+        if (! stmt.m_joinTree.allInnerJoins()) {
+            throw compiler.new VoltCompilerException("Materialized view only supports INNER JOIN.");
+        }
 
         if (stmt.orderByColumns().size() != 0) {
             msg.append("with ORDER BY clause is not supported.");
@@ -3086,7 +3069,9 @@ public class DDLCompiler {
 
         checkViewSources(stmt.m_tableList, compiler);
         if (stmt.m_tableList.size() != 1) {
-            throw compiler.new VoltCompilerException("Materialized views on joint tables are not allowed yet.");
+            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
      }
