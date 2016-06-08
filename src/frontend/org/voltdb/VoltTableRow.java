@@ -897,6 +897,9 @@ public abstract class VoltTableRow {
             if (wasNull()) {
                 js.value(null);
             }
+            else if (dvalue != dvalue) {
+                js.value("NaN");
+            }
             else {
                 js.value(dvalue);
             }

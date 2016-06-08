@@ -1668,6 +1668,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         else
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
                         break;
+                    case FLOAT:
+                        if (row[j] instanceof String) {
+                            String dval = (String) row[j];
+                            if (dval.compareToIgnoreCase("NaN") == 0)
+                                row[j] = Double.NaN;
+                        }
+                        break;
                     default:
                         // empty fallthrough to make the warning go away
                     }
