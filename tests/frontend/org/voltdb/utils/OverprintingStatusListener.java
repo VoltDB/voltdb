@@ -45,7 +45,7 @@ public class OverprintingStatusListener extends ClientStatusListenerExt {
      */
     @Override
     public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-        System.err.printf("Client %s lost connection to %s:%d (%d connections left) for reason: %s.",
+        System.err.printf("Client %s lost connection to %s:%d (%d connections left) for reason: %s.\n",
                 clientId, hostname, port, connectionsLeft, cause.toString());
     }
 
@@ -54,7 +54,7 @@ public class OverprintingStatusListener extends ClientStatusListenerExt {
      */
     @Override
     public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
-        System.err.printf("Client %s got an Uncaught Exception for response: \n%s",
+        System.err.printf("Client %s got an Uncaught Exception for response: \n%s\n",
                 clientId, ((ClientResponseImpl) r).toJSONString());
         e.printStackTrace();
     }
@@ -64,7 +64,7 @@ public class OverprintingStatusListener extends ClientStatusListenerExt {
      */
     @Override
     public void lateProcedureResponse(ClientResponse r, String hostname, int port) {
-        System.err.printf("Client %s got a late response from %s:%d: \n%s",
+        System.err.printf("Client %s got a late response from %s:%d: \n%s\n",
                 clientId, hostname, port, ((ClientResponseImpl) r).toJSONString());
     }
 }
