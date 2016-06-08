@@ -66,5 +66,5 @@ public interface CSVDataLoader {
      */
     public void flush() throws ExecutionException, InterruptedException;
 
-    public Map<String, Integer> getNameToColumnMap();
+    public Map<Integer, String> getColumnNames();
 }

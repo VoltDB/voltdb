@@ -172,9 +172,9 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public Map<String, Integer> getNameToColumnMap()
+    public Map<Integer, String> getColumnNames()
     {
-        //No op
+        //No operation.
         return null;
     }
 }
