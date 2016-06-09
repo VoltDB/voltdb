@@ -439,7 +439,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         });
                         itr.remove();
                     } else {
-                        LOG.warn("importer " + dispatch + " is stopping, not sending the assigment " + assignment);
+                        LOG.debug("importer " + dispatch + " is stopping, not sending the assigment " + assignment);
                     }
                 }
             }
