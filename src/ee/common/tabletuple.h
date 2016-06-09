@@ -421,7 +421,6 @@ public:
                        int colOffset, uint8_t *nullArray);
 
     void freeObjectColumns() const;
-    void collectObjects(std::vector<char*> *objects) const;
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
 
@@ -1064,21 +1063,16 @@ inline size_t TableTuple::hashCode() const {
  * Release to the heap any memory allocated for any uninlined columns.
  */
 inline void TableTuple::freeObjectColumns() const {
-    std::vector<char*> oldObjects;
-    collectObjects(&oldObjects);
-    NValue::freeObjectsFromTupleStorage(oldObjects);
-}
-
-inline void TableTuple::collectObjects(std::vector<char*> *objects) const {
     const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
+    std::vector<char*> oldObjects;
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {
         int idx = m_schema->getUninlinedObjectColumnInfoIndex(ii);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         char** dataPtr = reinterpret_cast<char**>(getWritableDataPtr(columnInfo));
-        objects->push_back(*dataPtr);
+        oldObjects.push_back(*dataPtr);
     }
+    NValue::freeObjectsFromTupleStorage(oldObjects);
 }
-
 
 /**
  * Hasher for use with boost::unordered_map and similar

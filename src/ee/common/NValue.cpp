@@ -500,13 +500,6 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     }
 }
 
-void NValue::freeObjectsFromTupleStorageOptimally(std::vector<char*> &oldObjects)
-{
-    //std::sort(oldObjects.begin(), oldObjects.end(), StringRef::compareForEfficientDelete);
-    //std::reverse(oldObjects.begin(), oldObjects.end());
-    freeObjectsFromTupleStorage(oldObjects);
-}
-
 void NValue::streamTimestamp(std::stringstream& value) const
 {
     int64_t epoch_micros = getTimestamp();
