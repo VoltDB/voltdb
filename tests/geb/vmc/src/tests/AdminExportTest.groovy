@@ -534,8 +534,8 @@ class AdminExportTest extends TestBase {
     }
 
     def VerifyAddConfigurationforKafkaCreated() {
-        when:
-        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
+//        when:
+//        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
             boolean isPro = false
             String kafkaTestName = page.overview.getKafkaTestName()
             String metadataValue = page.overview.getMetadataValue()
@@ -579,7 +579,7 @@ class AdminExportTest extends TestBase {
                 }
             }
             and: 'Expand export'
-            if (!waitFor(10) { updateInnerErrorPopup.isDisplayed() }) {
+            if (!waitFor(15){updateInnerErrorPopup.isDisplayed()}) {
                 isPro = true
                 count = 0
                 while (count < numberOfTrials) {
@@ -637,12 +637,12 @@ class AdminExportTest extends TestBase {
                 then: 'Print Deleted'
                 println("Deleted Configuration")
             }
-        }
-        else{
-            println("Add Export is not supported in Community Edition")
-        }
-        then:
-        println("passed")
+//        }
+//        else{
+//            println("Add Export is not supported in Community Edition")
+//        }
+//        then:
+//        println("passed")
     }
 
     def VerifyAddConfigurationforHttpCreated() {

@@ -800,12 +800,11 @@ class AdminAdvancedTest extends TestBase {
         when:"Open Edit Disk Limit"
 
         println("Opening Disk Limit Popup")
-        page.overview.openEditDiskLimitPopup()
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
-        waitFor(30){page.overview.lnkAddNewFeature.isDisplayed()}
+        waitFor(40){page.overview.lnkAddNewFeature.isDisplayed()}
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -856,7 +855,7 @@ class AdminAdvancedTest extends TestBase {
 
     }
 
-    def "Verify Add Disk Limit for COMMANDLOG feature"(){
+    def VerifyAddDiskLimitforCOMMANDLOGfeature(){
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
@@ -1306,158 +1305,158 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def cleanupSpec() {
-        int count = 0
-        if (!(page instanceof VoltDBManagementCenterPage)) {
-            when: 'Open VMC page'
-            ensureOnVoltDBManagementCenterPage()
-            then: 'to be on VMC page'
-            at VoltDBManagementCenterPage
-        }
-
-        page.loginIfNeeded()
-
-        when: 'click the Admin link (if needed)'
-        page.openAdminPage()
-        then: 'should be on Admin page'
-        at AdminPage
-
-        String initialPrefix    = "DEFAULT"
-        String initialFreq      = "10"
-        String initialFreqUnit  = "Hrs"
-        String initialRetained  = "10"
-
-        String initialHeartTimeout = "10"
-        String initialQueryTimeout = "10"
-
-        // heartbeat timeout revert
-
-        if (revertHeartTimeout==false) {
-            when:
-            page.advanced.click()
-            then:
-            waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
-
-            when:
-            waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
-            then:
-            waitFor(waitTime) {
-                page.overview.heartTimeoutField.isDisplayed()
-                page.overview.heartTimeoutOk.isDisplayed()
-                page.overview.heartTimeoutCancel.isDisplayed()
-            }
-
-            when:
-            page.overview.heartTimeoutField.value(initialHeartTimeout)
-            waitFor(waitTime) {
-                page.overview.heartTimeoutOk.click()
-            }
-            then:
-            waitFor(waitTime) {
-                page.overview.heartTimeoutPopupOk.isDisplayed()
-                page.overview.heartTimeoutPopupCancel.isDisplayed()
-            }
-
-
-            waitFor(waitTime) {
-                try {
-                    page.overview.heartTimeoutPopupOk.click()
-                } catch (org.openqa.selenium.ElementNotVisibleException e) {
-                    println("retrying")
-                }
-
-                page.overview.heartTimeoutEdit.isDisplayed()
-                page.overview.heartTimeoutValue.text().equals(initialHeartTimeout)
-                !page.overview.heartTimeoutPopupOk.isDisplayed()
-                !page.overview.heartTimeoutPopupCancel.isDisplayed()
-            }
-        }
-
-        // query timeout revert
-
-        if (revertQueryTimeout==false) {
-            when:
-            page.advanced.click()
-            then:
-            waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
-
-            when:
-            waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
-            then:
-            waitFor(waitTime) {
-                page.overview.queryTimeoutField.isDisplayed()
-                page.overview.queryTimeoutOk.isDisplayed()
-                page.overview.queryTimeoutCancel.isDisplayed()
-            }
-
-            when:
-            page.overview.queryTimeoutField.value(initialQueryTimeout)
-            waitFor(waitTime) {
-                page.overview.queryTimeoutOk.click()
-            }
-            then:
-            waitFor(waitTime) {
-                page.overview.queryTimeoutPopupOk.isDisplayed()
-                page.overview.queryTimeoutPopupCancel.isDisplayed()
-            }
-
-
-            waitFor(waitTime) {
-                try {
-                    page.overview.queryTimeoutPopupOk.click()
-                } catch (org.openqa.selenium.ElementNotVisibleException e) {
-                    println("retrying")
-                }
-
-                page.overview.queryTimeoutEdit.isDisplayed()
-                page.overview.queryTimeoutValue.text().equals(initialQueryTimeout)
-                !page.overview.queryTimeoutPopupOk.isDisplayed()
-                !page.overview.queryTimeoutPopupCancel.isDisplayed()
-            }
-        }
-
-        //memory limit revert
-        if(revertMemorySize == true){
-            when:
-            page.advanced.click()
-            then:
-            waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
-
-            when:
-            waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
-            then:
-            waitFor(waitTime) {
-                page.overview.memoryLimitField.isDisplayed()
-                page.overview.memoryLimitOk.isDisplayed()
-                page.overview.memoryLimitCancel.isDisplayed()
-            }
-
-            when:
-            if(initialMemoryLimit == "Not Enforced") {
-                if(page.overview.memoryLimitDelete.isDisplayed()) {
-                    count = 0
-                    while(count<numberOfTrials) {
-                        count++
-                        try {
-                            page.overview.memoryLimitDelete.click()
-                            waitFor(waitTime) { page.overview.btnDelPopupMemoryLimitOk.isDisplayed() }
-                            break
-                        } catch(geb.waiting.WaitTimeoutException e) {
-                        }
-                    }
-
-                    count = 0
-                    while(count<numberOfTrials) {
-                        count++
-                        try {
-                            page.overview.btnDelPopupMemoryLimitOk.click()
-                            waitFor(waitTime) { page.overview.memoryLimitSizeValue.isDisplayed() }
-                            break
-                        } catch(geb.waiting.WaitTimeoutException e) {
-                        }
-                    }
-                }
-            }
-        }
-    }
+//    def cleanupSpec() {
+//        int count = 0
+//        if (!(page instanceof VoltDBManagementCenterPage)) {
+//            when: 'Open VMC page'
+//            ensureOnVoltDBManagementCenterPage()
+//            then: 'to be on VMC page'
+//            at VoltDBManagementCenterPage
+//        }
+//
+//        page.loginIfNeeded()
+//
+//        when: 'click the Admin link (if needed)'
+//        page.openAdminPage()
+//        then: 'should be on Admin page'
+//        at AdminPage
+//
+//        String initialPrefix    = "DEFAULT"
+//        String initialFreq      = "10"
+//        String initialFreqUnit  = "Hrs"
+//        String initialRetained  = "10"
+//
+//        String initialHeartTimeout = "10"
+//        String initialQueryTimeout = "10"
+//
+//        // heartbeat timeout revert
+//
+//        if (revertHeartTimeout==false) {
+//            when:
+//            page.advanced.click()
+//            then:
+//            waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+//
+//            when:
+//            waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+//            then:
+//            waitFor(waitTime) {
+//                page.overview.heartTimeoutField.isDisplayed()
+//                page.overview.heartTimeoutOk.isDisplayed()
+//                page.overview.heartTimeoutCancel.isDisplayed()
+//            }
+//
+//            when:
+//            page.overview.heartTimeoutField.value(initialHeartTimeout)
+//            waitFor(waitTime) {
+//                page.overview.heartTimeoutOk.click()
+//            }
+//            then:
+//            waitFor(waitTime) {
+//                page.overview.heartTimeoutPopupOk.isDisplayed()
+//                page.overview.heartTimeoutPopupCancel.isDisplayed()
+//            }
+//
+//
+//            waitFor(waitTime) {
+//                try {
+//                    page.overview.heartTimeoutPopupOk.click()
+//                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+//                    println("retrying")
+//                }
+//
+//                page.overview.heartTimeoutEdit.isDisplayed()
+//                page.overview.heartTimeoutValue.text().equals(initialHeartTimeout)
+//                !page.overview.heartTimeoutPopupOk.isDisplayed()
+//                !page.overview.heartTimeoutPopupCancel.isDisplayed()
+//            }
+//        }
+//
+//        // query timeout revert
+//
+//        if (revertQueryTimeout==false) {
+//            when:
+//            page.advanced.click()
+//            then:
+//            waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+//
+//            when:
+//            waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+//            then:
+//            waitFor(waitTime) {
+//                page.overview.queryTimeoutField.isDisplayed()
+//                page.overview.queryTimeoutOk.isDisplayed()
+//                page.overview.queryTimeoutCancel.isDisplayed()
+//            }
+//
+//            when:
+//            page.overview.queryTimeoutField.value(initialQueryTimeout)
+//            waitFor(waitTime) {
+//                page.overview.queryTimeoutOk.click()
+//            }
+//            then:
+//            waitFor(waitTime) {
+//                page.overview.queryTimeoutPopupOk.isDisplayed()
+//                page.overview.queryTimeoutPopupCancel.isDisplayed()
+//            }
+//
+//
+//            waitFor(waitTime) {
+//                try {
+//                    page.overview.queryTimeoutPopupOk.click()
+//                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+//                    println("retrying")
+//                }
+//
+//                page.overview.queryTimeoutEdit.isDisplayed()
+//                page.overview.queryTimeoutValue.text().equals(initialQueryTimeout)
+//                !page.overview.queryTimeoutPopupOk.isDisplayed()
+//                !page.overview.queryTimeoutPopupCancel.isDisplayed()
+//            }
+//        }
+//
+//        //memory limit revert
+//        if(revertMemorySize == true){
+//            when:
+//            page.advanced.click()
+//            then:
+//            waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+//
+//            when:
+//            waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+//            then:
+//            waitFor(waitTime) {
+//                page.overview.memoryLimitField.isDisplayed()
+//                page.overview.memoryLimitOk.isDisplayed()
+//                page.overview.memoryLimitCancel.isDisplayed()
+//            }
+//
+//            when:
+//            if(initialMemoryLimit == "Not Enforced") {
+//                if(page.overview.memoryLimitDelete.isDisplayed()) {
+//                    count = 0
+//                    while(count<numberOfTrials) {
+//                        count++
+//                        try {
+//                            page.overview.memoryLimitDelete.click()
+//                            waitFor(waitTime) { page.overview.btnDelPopupMemoryLimitOk.isDisplayed() }
+//                            break
+//                        } catch(geb.waiting.WaitTimeoutException e) {
+//                        }
+//                    }
+//
+//                    count = 0
+//                    while(count<numberOfTrials) {
+//                        count++
+//                        try {
+//                            page.overview.btnDelPopupMemoryLimitOk.click()
+//                            waitFor(waitTime) { page.overview.memoryLimitSizeValue.isDisplayed() }
+//                            break
+//                        } catch(geb.waiting.WaitTimeoutException e) {
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 }
