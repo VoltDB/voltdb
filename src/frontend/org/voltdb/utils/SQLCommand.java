@@ -967,7 +967,7 @@ public class SQLCommand
     {
         final Client client = ClientFactory.createClient(config);
 
-        // ENG-10483: Only fail if we can't connect to any servers
+        // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
 
         for (String server : servers) {
@@ -982,7 +982,7 @@ public class SQLCommand
             }
         }
 
-        if(!connectedAnyServer) {
+        if (!connectedAnyServer) {
             throw new IOException("Unable to connect to VoltDB cluster");
         }
         return client;
