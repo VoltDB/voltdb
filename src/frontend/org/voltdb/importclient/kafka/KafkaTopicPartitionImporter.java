@@ -28,16 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltcore.logging.Level;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
-
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
@@ -59,6 +49,16 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
+
+import org.voltcore.logging.Level;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importer.AbstractImporter;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -359,6 +359,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
         Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+        long messageCount = 0;
+        long skipCount = 0;
+        long jumpCount = 0;
         try {
             //Start with the starting leader.
             resetLeader();
@@ -432,12 +435,20 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 sleepCounter = 1;
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
+                    messageCount++;
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
                     long currentOffset = messageAndOffset.offset();
+
                     //if currentOffset is less means we have already pushed it and also check pending queue.
                     if (currentOffset < m_currentOffset.get()) {
+                        skipCount++;
                         continue;
+                    }
+
+                    if (currentOffset > m_currentOffset.get()) {
+                        jumpCount++;
+                        warn(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
@@ -451,11 +462,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                                }
+                               warn(null, "Failed to process Invocation possibly bad data: " + line);
                                m_gapTracker.commit(currentOffset);
                          }
                      } catch (FormatException e){
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
-                        messageAndOffset.nextOffset();
+                        // messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);
                     }
                     submitCount++;
@@ -476,6 +488,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                 }
                 commitOffset();
+                info(null, "Total MessageAndOffset get " + messageCount
+                        + " Total Skipped Offset " + skipCount
+                        + " Total jumpped Offset " + jumpCount);
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
@@ -493,6 +508,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 + " Last commit point is: " + m_lastCommittedOffset
                 + " Callback Rcvd: " + cbcnt.get()
                 + " Submitted: " + submitCount);
+
     }
 
     public boolean commitOffset() {

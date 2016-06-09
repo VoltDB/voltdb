@@ -255,6 +255,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 final int serializedSize = ds.getSerializedSize();
                 if (serializedSize <= 0) {
                     //Bad ignored transacton.
+                    m_logger.warn("Failed to enqueue. serializedSize " + serializedSize + " < 0.");
                     return;
                 }
                 buf = ByteBuffer.allocate(serializedSize);
