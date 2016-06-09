@@ -41,7 +41,7 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         }
     }
 
-    public void testBooleanLiteralsInWhere() throws Exception {
+    public void testBooleanLiteralsInQueries() throws Exception {
         String sqlBody;
         Client client = getClient();
         for (int i=1; i<=4; i++) {
