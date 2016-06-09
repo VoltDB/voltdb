@@ -129,7 +129,8 @@ public class ExpressionOp extends Expression {
         this.alias = e.alias;
     }
 
-    public String getSQL() {
+    @Override
+	public String getSQL() {
 
         StringBuffer sb    = new StringBuffer(64);
         String       left  = getContextSQL(nodes.length > 0 ? nodes[LEFT]
@@ -198,7 +199,8 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
-    protected String describe(Session session, int blanks) {
+    @Override
+	protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
 
@@ -236,13 +238,13 @@ public class ExpressionOp extends Expression {
                 break;
         }
 
-        if (nodes[LEFT] != null) {
+        if (LEFT < nodes.length && nodes[LEFT] != null) {
             sb.append(" arg1=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
 
-        if (nodes[RIGHT] != null) {
+        if (RIGHT < nodes.length && nodes[RIGHT] != null) {
             sb.append(" arg2=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
@@ -251,7 +253,8 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
-    public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
+    @Override
+	public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
         if (opType == OpTypes.VALUE) {
@@ -277,7 +280,8 @@ public class ExpressionOp extends Expression {
         return unresolvedSet;
     }
 
-    public void resolveTypes(Session session, Expression parent) {
+    @Override
+	public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -429,7 +433,8 @@ public class ExpressionOp extends Expression {
         }
     }
 
-    public Object getValue(Session session) {
+    @Override
+	public Object getValue(Session session) {
 
         switch (opType) {
 
@@ -438,8 +443,8 @@ public class ExpressionOp extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+				    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
