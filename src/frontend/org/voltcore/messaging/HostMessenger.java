@@ -35,8 +35,10 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -67,7 +69,6 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -325,7 +326,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * post-fault cluster, determine whether or not we think a network partition may have happened.
      * ALSO NOTE: not private so it may be unit-tested.
      */
-    public static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts, boolean pdEnabled) {
+    public static boolean makePPDDecision(int thisHostId, Set<Integer> previousHosts, Set<Integer> currentHosts, boolean pdEnabled) {
+
+        String logLine = String.format("Partition Detection at host %d code sees current hosts [%s] and previous hosts [%s]",
+                thisHostId,
+                StringUtils.join(currentHosts, ','),
+                StringUtils.join(previousHosts, ','));
+        m_tmLog.info(logLine);
 
         // A strict, viable minority is always a partition.
         if ((currentHosts.size() * 2) < previousHosts.size()) {
@@ -375,6 +382,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         + "Continuing because network partition detection is disabled, "
                         + "but there is significant danger that multiple copies of the "
                         + "database are running independently.");
+                return false; // partition detection not triggered
             }
         }
 
@@ -404,7 +412,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         // decide if we're partitioned
         // this will print out warnings if we are
-        if (makePPDDecision(previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
+        if (makePPDDecision(m_localHostId, previousHosts, currentHosts, m_partitionDetectionEnabled.get())) {
             // record here so we can ensure this only happens once for this node
             m_partitionDetected = true;
             VoltDB.crashGlobalVoltDB("Partition detection logic will stop this process to ensure against split brains.",
