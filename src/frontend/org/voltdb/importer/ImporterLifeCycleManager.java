@@ -94,6 +94,9 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     {
         m_starting.compareAndSet(false, true);
         if (!m_factory.isImporterRunEveryWhere()) {
+            if (m_stopping) {
+                s_logger.warn("Try to registerCallback while stoping, assigment will be ignored");
+            }
             m_distributer.registerCallback(m_factory.getTypeName(), this);
         }
 
