@@ -558,8 +558,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } finally {
                 m_bufferPushPermits.release();
             }
-            exportLog.warn(
-                "Push export buffer called before the generation is active. This push will be ignored");
+            exportLog.warn("Push export buffer called before the generation is active.");
             return;
         }
 
@@ -573,7 +572,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, endOfStream, true);
+                            //Since we are part of active generation we poll too
+                            pushExportBufferImpl(uso, buffer, sync, endOfStream, true /* poll */);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
