@@ -3,24 +3,18 @@
 # This file is part of VoltDB.
 # Copyright (C) 2008-2016 VoltDB Inc.
 
-# A command line tool for getting job statistics via jenkins REST API
-# usage:  stats help
+# A command line tool for getting junit job statistics from CI
+# usage:  junit-stats help
 
-import jenkins
-import inspect
 import re
 import json
 import sys
-import getopt
 import time
 import getpass
-import os
 import mysql.connector
-from six.moves.http_client import BadStatusLine
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
-from six.moves.urllib.parse import quote, urlencode, urljoin, urlparse
-from six.moves.urllib.request import Request, urlopen
+from six.moves.urllib.request import urlopen
 import httplib
 from optparse import OptionParser
 
@@ -32,6 +26,7 @@ class Stats():
         self.username = None
         self.passwd = None
         self.jhost='http://ci.voltdb.lan'
+        self.dbhost='volt2.voltdb.lan'
         self._server = None
 
     def getOpts(self):
@@ -48,14 +43,14 @@ class Stats():
         -p <passwd>
         commands:
         help - display help
-        job-history <branch> <job> - displays job history
+        job-detail <branch> <job> - displays job details
         last-build-report <branch> - displays a report for last completed build
-        build-history <branch> <job> <range> - analyze job history for a range of builds, ex: 500-512
+        build-history <branch> <job> <range> - analyze job history for a range of builds, ex: 500-512, 434-434
         """
         #print("command: "+command);
         if command == 'help':
             print(cmdHelp)
-        elif command == 'job-history':
+        elif command == 'job-detail':
             self.job_history(branch, job)
         elif command == 'last-build-report':
             self.last_build_report(branch)
@@ -65,23 +60,10 @@ class Stats():
             print(cmdHelp);
             exit(0)
 
-    def getServer(self):
-        if self._server is None:
-            self.connect()
-        return self._server
-
-    def connect(self):
-        # check if we can log in with kerberos
-        # sudo pip install kerberos
-        #self._server = jenkins.Jenkins(self.jhost)
-
-        if self._server is None:
-            self._server = jenkins.Jenkins(self.jhost, username=self.username, password=self.passwd)
-
-        # test it
-        # print self._server.jobs_count()
-
     def read_url(self, url):
+        """
+        Open a url and evaluate it. Return it as (hopefully) as JSON.
+        """
         data = None
         try:
             data = eval(urlopen(url).read())
@@ -95,7 +77,10 @@ class Stats():
             print
         return data
 
-    def job_history(self, branch, job):
+    def job_detail(self, branch, job):
+        """
+        Display job detail which shows if the job is failing or not, and the target of the failure.
+        """
         if branch is None or job is None:
             self.runCommand('help')
             return
@@ -126,6 +111,12 @@ class Stats():
 
     # TODO: create a summary
     def last_build_report(self, branch):
+        """
+        Create a report of the last build (for each job) on a branch. Creates file for each job. Indicates whether or
+        not the job has passed or failed. Contents of file includes name, # of failures, # of passes, # of tests, and
+        failure rate.
+        For a report of a job on a particular build, ex: 213, do `build-history <branch> <job> 213-213`
+        """
         if branch is None:
             self.runCommand('help')
             return
@@ -173,6 +164,10 @@ class Stats():
                 outfile.write(json.dumps(report, indent=2))
 
     def build_history(self, branch, job, build_range):
+        """
+        Displays build history for a job on a branch. Can specify an inclusive build range.
+        For every build specified on the branch, prints the full test results of the
+        """
         if branch is None or job is None or build_range is None:
             self.runCommand('help')
             return
@@ -199,7 +194,7 @@ class Stats():
 
         filename = 'build-history-' + branch + '-' + build_range + '.txt'
 
-        db = mysql.connector.connect(host='volt2.voltdb.lan', user='oolukoya', password='oolukoya', database='qa')
+        db = mysql.connector.connect(host=self.dbhost, user='oolukoya', password='oolukoya', database='qa')
         cursor = db.cursor()
 
         for build in range(build_low, build_high+1):
@@ -240,7 +235,6 @@ class Stats():
 
                             cursor.execute(add_test, test_data)
                             db.commit()
-                            # cursor.execute('INSERT INTO junit-failures (name, job, status, stamp, url, build, host) VALUES ("foo", "foo", "foo", "2016-06-06T15:04:03", "foo", "2", "foo")')
 
                             if test_map.get(name, None) is None:
                                 test_map[name] = []
@@ -265,7 +259,7 @@ class Stats():
                     test_summary['_passes'] += 1
                 else:
                     test_summary['_failures'] += 1
-                # test_summary['data'].append(test_data)
+                test_summary['data'].append(test_data)
 
             with open(filename, 'a') as outfile:
                 outfile.write(json.dumps(test_summary, indent=2, sort_keys=True))
