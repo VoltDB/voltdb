@@ -1670,10 +1670,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         break;
                     case FLOAT:
                         if (row[j] instanceof String) {
-                            String dval = (String) row[j];
-                            if (dval.compareToIgnoreCase("NaN") == 0)
-                                row[j] = Double.NaN;
+                            row[j] = Double.parseDouble((String) row[j]);
                         }
+                        assert(row[j] instanceof Number);
                         break;
                     default:
                         // empty fallthrough to make the warning go away
