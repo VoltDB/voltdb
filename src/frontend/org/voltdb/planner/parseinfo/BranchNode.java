@@ -439,7 +439,7 @@ public class BranchNode extends JoinNode {
     @Override
     public boolean allInnerJoins() {
         return m_joinType == JoinType.INNER &&
-               (m_leftNode == null ? true : m_leftNode.allInnerJoins()) &&
-               (m_rightNode == null ? true : m_rightNode.allInnerJoins());
+               (m_leftNode == null || m_leftNode.allInnerJoins()) &&
+               (m_rightNode == null || m_rightNode.allInnerJoins());
     }
 }
