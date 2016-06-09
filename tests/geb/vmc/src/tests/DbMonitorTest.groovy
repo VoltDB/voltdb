@@ -39,10 +39,10 @@ class DbMonitorTest extends TestBase {
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         int count = 0
-		
-		while(count<numberOfTrials) {
-			try {
-			    when: 'click the DB Monitor link (if needed)'
+
+        while(count<numberOfTrials) {
+            try {
+                when: 'click the DB Monitor link (if needed)'
                 page.openDbMonitorPage()
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
@@ -83,11 +83,11 @@ class DbMonitorTest extends TestBase {
 
 
                 break
-			} catch (org.openqa.selenium.ElementNotVisibleException e) {
-				println("ElementNotVisibleException: Unable to Start the test")
-				println("Retrying")
-			}
-		}
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
     }
 
     def openAndCloseGraphArea() {
@@ -586,186 +586,186 @@ class DbMonitorTest extends TestBase {
 
     def "check if Row Count is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click row count'
-			page.clickRowcount()
+        when: 'click row count'
+            page.clickRowcount()
         then: 'check if row count is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click row count'
-			page.clickRowcount()
-		then: 'check if row count is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click row count'
+            page.clickRowcount()
+        then: 'check if row count is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
     def "check if Max Rows is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click max rows'
-			page.clickMaxRows()
+        when: 'click max rows'
+            page.clickMaxRows()
         then: 'check if max rows is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click max rows'
-			page.clickMaxRows()
-		then: 'check if max rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click max rows'
+            page.clickMaxRows()
+        then: 'check if max rows is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
     def "check if Min Rows is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click min rows'
-			page.clickMinRows()
+        when: 'click min rows'
+            page.clickMinRows()
         then: 'check if min rows is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click min rows'
-			page.clickMinRows()
-		then: 'check if min rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click min rows'
+            page.clickMinRows()
+        then: 'check if min rows is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
     def "check if Avg Rows is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click avg rows'
-			page.clickAvgRows()
+        when: 'click avg rows'
+            page.clickAvgRows()
         then: 'check if avg rows is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click avg rows'
-			page.clickAvgRows()
-		then: 'check if avg rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click avg rows'
+            page.clickAvgRows()
+        then: 'check if avg rows is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
     def "check if Type is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click type'
-			page.clickTabletype()
+        when: 'click type'
+            page.clickTabletype()
         then: 'check if type is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click type'
-			page.clickTabletype()
-		then: 'check if type is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click type'
+            page.clickTabletype()
+        then: 'check if type is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
-	// stored procedure ascending descending
+    // stored procedure ascending descending
 
-	    def "check if stored procedure is clickable"() {
+        def "check if stored procedure is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click stored procedure'
-		    try {
+        when: 'click stored procedure'
+            try {
                 page.tableInAscendingOrder()
                 before = "ascending"
             } catch(geb.error.RequiredPageContentNotPresent e) {
-				before = "descending"
-		    }
-			waitFor(30) { page.clickStoredProcedure() }
+                before = "descending"
+            }
+            waitFor(30) { page.clickStoredProcedure() }
         then: 'check if table is in ascending'
             try {
                 page.tableInAscendingOrder()
                 before = "ascending"
             } catch(geb.error.RequiredPageContentNotPresent e) {
-				before = "descending"
-		    }
+                before = "descending"
+            }
 
-			if ( !before.equals(after)  )
-				assert true
-			else
-				assert false
+            if ( !before.equals(after)  )
+                assert true
+            else
+                assert false
     }
 
     def "check if Invocations is clickable"() {
         String before = ""
-		String after  = ""
+        String after  = ""
 
-		when: 'click row count'
-			page.clickInvocations()
+        when: 'click row count'
+            page.clickInvocations()
         then: 'check if row count is in ascending'
             if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
+                before = "ascending"
+            else
+                before = "descending"
 
-		when: 'click row count'
-			page.clickInvocations()
-		then: 'check if row count is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
+        when: 'click row count'
+            page.clickInvocations()
+        then: 'check if row count is in descending'
+            if ( page.tableInDescendingOrder() )
+                after = "descending"
+            else
+                after = "ascending"
 
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
+            if ( before.equals("ascending") && after.equals("descending") )
+                assert true
+            else
+                assert false
     }
 
 
@@ -816,43 +816,43 @@ class DbMonitorTest extends TestBase {
 
    // ALERT
 
-	def "set alert and replace trigger alert"() {
-		int count = 0
+    def "set alert and replace trigger alert"() {
+        int count = 0
 
-		when: 'set alert threshold to zero'
-	    page.setAlertThreshold(00)
-		then: 'check at least one alert'
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) { page.alertCount.isDisplayed() }
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		    }
-		}
+        when: 'set alert threshold to zero'
+        page.setAlertThreshold(00)
+        then: 'check at least one alert'
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) { page.alertCount.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
 
-		int alert = page.getAlert()
+        int alert = page.getAlert()
 
-		if ( alert != 0 ) {
-			println("PASS:There is at least one server on alert")
-		}
-		else {
-			println("FAIL:There are no server on alert")
-			assert false
-		}
+        if ( alert != 0 ) {
+            println("PASS:There is at least one server on alert")
+        }
+        else {
+            println("FAIL:There are no server on alert")
+            assert false
+        }
 
-		when: 'set alert threshold to hundred'
-		page.setAlertThreshold(100)
-		then: 'check no alert'
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) { !page.alertCount.isDisplayed() }
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		    }
-		}
-	}
+        when: 'set alert threshold to hundred'
+        page.setAlertThreshold(100)
+        then: 'check no alert'
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) { !page.alertCount.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
+    }
 
     // server search
     def "check server search on dbmonitor matched"(){
@@ -910,58 +910,58 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
         println(intDateMax)
         println(intDateMin)
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The minimum value is " + stringMin + " and the time is in Days")
-		    }
-		    else {
-		        printsln("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The minimum value is " + stringMin + " and the time is in Days")
+            }
+            else {
+                printsln("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check max value in server cpu days"(){
@@ -975,57 +975,57 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The maximum value is " + stringMax + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The maximum value is " + stringMax + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check min value in server cpu minutes"(){
@@ -1039,36 +1039,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check max value in server cpu minutes"(){
@@ -1082,36 +1082,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check min value in server cpu seconds"(){
@@ -1125,36 +1125,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check max value in server cpu seconds"(){
@@ -1168,36 +1168,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.servercpumax.isDisplayed()
-		        }
-		        stringMax = page.servercpumax.text()
-		        stringMin = page.servercpumin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.servercpumax.isDisplayed()
+                }
+                stringMax = page.servercpumax.text()
+                stringMin = page.servercpumin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     //for server ram
@@ -1212,57 +1212,57 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The minimum value is " + stringMin + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The minimum value is " + stringMin + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check max value in server ram days"(){
@@ -1276,57 +1276,57 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
-		int intDateMax = Integer.parseInt(dateMax)
+        int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The maximum value is " + stringMax + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The maximum value is " + stringMax + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check min value in server ram minutes"(){
@@ -1340,36 +1340,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check max value in server ram minutes"(){
@@ -1383,36 +1383,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check min value in server ram seconds"(){
@@ -1426,36 +1426,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check max value in server ram seconds"(){
@@ -1469,36 +1469,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.serverrammax.isDisplayed()
-		        }
-		        stringMax = page.serverrammax.text()
-		        stringMin = page.serverrammin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.serverrammax.isDisplayed()
+                }
+                stringMax = page.serverrammax.text()
+                stringMin = page.serverrammin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
 
@@ -1533,56 +1533,56 @@ class DbMonitorTest extends TestBase {
 //            println("Cluster Latency is not Displayed")
 //            assert true
 //        }
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The minimum value is " + stringMin + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The minimum value is " + stringMin + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check max value in cluster latency days"(){
@@ -1596,62 +1596,62 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The maximum value is " + stringMax + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The maximum value is " + stringMax + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check min value in cluster latency minutes"(){
-		int count = 0
-		when:
+        int count = 0
+        when:
         // This loop is used to gain time.
         while(count<numberOfTrials) {
             count++
@@ -1659,36 +1659,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check max value in cluster latency minutes"(){
@@ -1701,36 +1701,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check min value in cluster latency seconds"(){
@@ -1744,36 +1744,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check max value in cluster latency seconds"(){
@@ -1787,36 +1787,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clusterlatencymax.isDisplayed()
-		        }
-		        stringMax = page.clusterlatencymax.text()
-		        stringMin = page.clusterlatencymin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clusterlatencymax.isDisplayed()
+                }
+                stringMax = page.clusterlatencymax.text()
+                stringMin = page.clusterlatencymin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     //cluster transaction
@@ -1833,62 +1833,62 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
-		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clustertransactionmax.isDisplayed()
+                }
+                stringMax = page.clustertransactionmax.text()
+                stringMin = page.clustertransactionmin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        if(stringMax.length()<10 || stringMax.length()<10) {
-		            println("Not fixed")
-		            continue
-		        }
+                if(stringMax.length()<10 || stringMax.length()<10) {
+                    println("Not fixed")
+                    continue
+                }
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The minimum value is " + stringMin + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The minimum value is " + stringMin + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check max value in cluster transaction days"(){
@@ -1897,14 +1897,14 @@ class DbMonitorTest extends TestBase {
         when:
         // This loop is used to gain time.
 
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    while(smallCount<numberOfTrials) {
+        while(count<numberOfTrials) {
+            count++
+            while(smallCount<numberOfTrials) {
                 smallCount++
                 page.chooseGraphView("Seconds")
                 page.chooseGraphView("Seconds")
@@ -1912,56 +1912,56 @@ class DbMonitorTest extends TestBase {
                 if(graphView.text().equals("")) {
                     break
                 }
-		    }
+            }
 
-		    try {
-		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
-		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
+            try {
+                waitFor(waitTime) {
+                    page.clustertransactionmax.isDisplayed()
+                }
+                stringMax = page.clustertransactionmax.text()
+                stringMin = page.clustertransactionmin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        if(stringMax.length()<10 || stringMax.length()<10) {
-		            println("Not fixed")
-		            continue
-		        }
+                if(stringMax.length()<10 || stringMax.length()<10) {
+                    println("Not fixed")
+                    continue
+                }
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The maximum value is " + stringMax + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The maximum value is " + stringMax + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check min value in cluster transaction minutes"(){
@@ -1970,12 +1970,12 @@ class DbMonitorTest extends TestBase {
         when:
         // This loop is used to gain time.
         String stringMax
-		String stringMin
+        String stringMin
         int bigCount = 0
 
-		then:
-		while(bigCount<numberOfTrials) {
-		    bigCount++
+        then:
+        while(bigCount<numberOfTrials) {
+            bigCount++
             while(count<numberOfTrials) {
                 count++
                 page.chooseGraphView("Seconds")
@@ -1984,35 +1984,35 @@ class DbMonitorTest extends TestBase {
                 if(graphView.text().equals("")) {
                     break
                 }
-		    }
-		    count = 0
-		    while(count<numberOfTrials) {
-		        count++
-		        try {
-		            waitFor(waitTime) {
-		                page.clustertransactionmax.isDisplayed()
-		            }
-		            stringMax = page.clustertransactionmax.text()
-		            stringMin = page.clustertransactionmin.text()
-		            break
-		        } catch(geb.waiting.WaitTimeoutException e) {
-		            println("WaitTimeoutException")
-		        }
-		    }
+            }
+            count = 0
+            while(count<numberOfTrials) {
+                count++
+                try {
+                    waitFor(waitTime) {
+                        page.clustertransactionmax.isDisplayed()
+                    }
+                    stringMax = page.clustertransactionmax.text()
+                    stringMin = page.clustertransactionmin.text()
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("WaitTimeoutException")
+                }
+            }
 
-		    String result = page.compareTime(stringMax, stringMin)
-		    println(result + " " + stringMax + " " + stringMin)
-		    try {
-		        waitFor(waitTime) {
-		            result.equals("minutes")
-		        }
-		        println("The minimum value is " + stringMin + " and the time is in " + result )
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("AJA BHAKOXAINA")
-		    }
+            String result = page.compareTime(stringMax, stringMin)
+            println(result + " " + stringMax + " " + stringMin)
+            try {
+                waitFor(waitTime) {
+                    result.equals("minutes")
+                }
+                println("The minimum value is " + stringMin + " and the time is in " + result )
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("AJA BHAKOXAINA")
+            }
 
-		}
+        }
     }
 
     def "check max value in cluster transaction minutes"(){
@@ -2021,11 +2021,11 @@ class DbMonitorTest extends TestBase {
         when:
         // This loop is used to gain time.
         String stringMax
-		String stringMin
-		int bigCount = 0
+        String stringMin
+        int bigCount = 0
 
-		then:
-		while(bigCount<numberOfTrials) {
+        then:
+        while(bigCount<numberOfTrials) {
             while(count<numberOfTrials) {
                 count++
                 page.chooseGraphView("Seconds")
@@ -2034,37 +2034,37 @@ class DbMonitorTest extends TestBase {
                 if(graphView.text().equals("")) {
                     break
                 }
-		    }
-		    count = 0
-		    bigCount++
-		    while(count<numberOfTrials) {
-		        count++
-		        try {
-		            waitFor(waitTime) {
-		                page.clustertransactionmax.isDisplayed()
-		            }
-		            stringMax = page.clustertransactionmax.text()
-		            stringMin = page.clustertransactionmin.text()
-		            break
-		        } catch(geb.waiting.WaitTimeoutException e) {
-		            println("WaitTimeoutException")
-		        }
-		    }
+            }
+            count = 0
+            bigCount++
+            while(count<numberOfTrials) {
+                count++
+                try {
+                    waitFor(waitTime) {
+                        page.clustertransactionmax.isDisplayed()
+                    }
+                    stringMax = page.clustertransactionmax.text()
+                    stringMin = page.clustertransactionmin.text()
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("WaitTimeoutException")
+                }
+            }
 
-		    String result = page.compareTime(stringMax, stringMin)
-		    println(result + " " + stringMax + " " + stringMin)
+            String result = page.compareTime(stringMax, stringMin)
+            println(result + " " + stringMax + " " + stringMin)
 
-		    try {
-		        waitFor(waitTime) {
-		            result.equals("minutes")
-		        }
-		        println("The maximum value is " + stringMax + " and the time is in " + result )
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("AJA BHAKOXAINA")
-		    }
+            try {
+                waitFor(waitTime) {
+                    result.equals("minutes")
+                }
+                println("The maximum value is " + stringMax + " and the time is in " + result )
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("AJA BHAKOXAINA")
+            }
 
-		}
+        }
     }
 
     def "check min value in cluster transaction seconds"(){
@@ -2080,36 +2080,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
-		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clustertransactionmax.isDisplayed()
+                }
+                stringMax = page.clustertransactionmax.text()
+                stringMin = page.clustertransactionmin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check max value in cluster transaction seconds"(){
@@ -2125,36 +2125,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.clustertransactionmax.isDisplayed()
-		        }
-		        stringMax = page.clustertransactionmax.text()
-		        stringMin = page.clustertransactionmin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.clustertransactionmax.isDisplayed()
+                }
+                stringMax = page.clustertransactionmax.text()
+                stringMin = page.clustertransactionmin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     // for partition idle graph
@@ -2169,36 +2169,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check max value in Partition Idle graph with respect to seconds"(){
@@ -2212,38 +2212,38 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
-		        println(stringMax)
-		        println(stringMin)
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
+                println(stringMax)
+                println(stringMin)
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("seconds")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in seconds")
-		    assert false
-		}
+        if(result.equals("seconds")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in seconds")
+            assert false
+        }
     }
 
     def "check min value in cluster Partition Idle graph with respect to minutes"(){
@@ -2257,36 +2257,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The minimum value is " + stringMin + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The minimum value is " + stringMin + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check max value in cluster Partition Idle graph with respect to minutes"(){
@@ -2300,36 +2300,36 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax
-		String stringMin
+        }
+        count = 0
+        then:
+        String stringMax
+        String stringMin
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String result = page.compareTime(stringMax, stringMin)
+        String result = page.compareTime(stringMax, stringMin)
 
-		if(result.equals("minutes")) {
-		    println("The maximum value is " + stringMax + " and the time is in " + result )
-		    assert true
-		}
-		else {
-		    println("FAIL: It is not in minutes")
-		    assert false
-		}
+        if(result.equals("minutes")) {
+            println("The maximum value is " + stringMax + " and the time is in " + result )
+            assert true
+        }
+        else {
+            println("FAIL: It is not in minutes")
+            assert false
+        }
     }
 
     def "check min value in cluster Partition Idle graph with respect to days"(){
@@ -2343,57 +2343,57 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The minimum value is " + stringMin + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The minimum value is " + stringMin + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "check max value in cluster Partition Idle graph with respect to days"(){
@@ -2407,35 +2407,35 @@ class DbMonitorTest extends TestBase {
             if(graphView.text().equals("")) {
                 break
             }
-		}
-		count = 0
-		then:
-		String stringMax = ""
-		String stringMin = ""
+        }
+        count = 0
+        then:
+        String stringMax = ""
+        String stringMin = ""
 
-		while(count<numberOfTrials) {
-		    count++
-		    try {
-		        waitFor(waitTime) {
-		            page.partitiongraphmax.isDisplayed()
-		        }
-		        stringMax = page.partitiongraphmax.text()
-		        stringMin = page.partitiongraphmin.text()
+        while(count<numberOfTrials) {
+            count++
+            try {
+                waitFor(waitTime) {
+                    page.partitiongraphmax.isDisplayed()
+                }
+                stringMax = page.partitiongraphmax.text()
+                stringMin = page.partitiongraphmin.text()
 
-		        println(stringMax)
-		        println(stringMin)
+                println(stringMax)
+                println(stringMin)
 
-		        break
-		    } catch(geb.waiting.WaitTimeoutException e) {
-		        println("WaitTimeoutException")
-		    }
-		}
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("WaitTimeoutException")
+            }
+        }
 
-		String monthMax = page.changeToMonth(stringMax)
-		String monthMin = page.changeToMonth(stringMin)
+        String monthMax = page.changeToMonth(stringMax)
+        String monthMin = page.changeToMonth(stringMin)
 
-		String dateMax = page.changeToDate(stringMax)
-		String dateMin = page.changeToDate(stringMin)
+        String dateMax = page.changeToDate(stringMax)
+        String dateMin = page.changeToDate(stringMin)
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
@@ -2443,24 +2443,24 @@ class DbMonitorTest extends TestBase {
         println(intDateMax)
         println(intDateMin)
 
-		if(monthMax.equals(monthMin)) {
-		    if(intDateMax > intDateMin) {
-		        println("The maximum value is " + stringMax + " and the time is in Days")
-		    }
-		    else {
-		        println("FAIL: Date of Max is less than that of date of Min for same month")
-		        assert false
-		    }
-		}
-		else {
-		    if (intDateMax < intDateMin) {
-		        println("Success")
-		    }
-		    else {
-		        println("FAIL: Date of Max is more than that of date of Min for new month")
-		        assert false
-		    }
-		}
+        if(monthMax.equals(monthMin)) {
+            if(intDateMax > intDateMin) {
+                println("The maximum value is " + stringMax + " and the time is in Days")
+            }
+            else {
+                println("FAIL: Date of Max is less than that of date of Min for same month")
+                assert false
+            }
+        }
+        else {
+            if (intDateMax < intDateMin) {
+                println("Success")
+            }
+            else {
+                println("FAIL: Date of Max is more than that of date of Min for new month")
+                assert false
+            }
+        }
     }
 
     def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
@@ -2515,7 +2515,7 @@ class DbMonitorTest extends TestBase {
         // for testing , 4 server legends are visible
 
         when: 'server partition legends is visible'
-        waitFor(10){	page.localpartition.isDisplayed()
+        waitFor(10){    page.localpartition.isDisplayed()
             page.clusterwide.isDisplayed()
             page.multipartition.isDisplayed()
         }

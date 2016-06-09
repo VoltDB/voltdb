@@ -23,6 +23,9 @@
 
 package txnIdSelfCheck;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,9 +44,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -514,6 +514,7 @@ public class Benchmark {
     }
 
     public static Thread.UncaughtExceptionHandler h = new UncaughtExceptionHandler() {
+        @Override
         public void uncaughtException(Thread th, Throwable ex) {
         log.error("Uncaught exception: " + ex.getMessage(), ex);
         printJStack();

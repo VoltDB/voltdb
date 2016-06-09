@@ -49,6 +49,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -150,7 +151,7 @@ public class VoltCompiler {
     private String m_currentFilename = NO_FILENAME;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
     String[] m_addedClasses = null;
-    String[] m_importLines = null;
+    Set<String> m_importLines = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -525,6 +526,11 @@ public class VoltCompiler {
         // Keep the two calls in synch to allow debugging under the same exact conditions.
         Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
                 autogenReaderList, autoGenJarOutput);
+        if (autoGenCatalog == null) {
+            Log.info("Did not verify catalog because it could not be compiled.");
+            return;
+        }
+
         FilteredCatalogDiffEngine diffEng =
                 new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, false);
         String diffCmds = diffEng.commands();
@@ -661,11 +667,12 @@ public class VoltCompiler {
         }
 
         // Build DDL from Catalog Data
-        m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
         try {
-            m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
+            m_report = ReportMaker.report(m_catalog, m_warnings, ddlWithBatchSupport);
             m_reportPath = null;
             File file = null;
 
@@ -694,7 +701,8 @@ public class VoltCompiler {
                 fw.close();
                 m_reportPath = file.getAbsolutePath();
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return null;
         }
@@ -1214,7 +1222,7 @@ public class VoltCompiler {
                             break;
                         default:
                             msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                            "Partition columns must be an integer or varchar type.";
+                            "Partition columns must be an integer, varchar or varbinary type.";
                             throw new VoltCompilerException(msg);
                     }
 
@@ -1251,7 +1259,7 @@ public class VoltCompiler {
                 addExportTableToConnector(targetName, tableName, db);
             }
         }
-
+        ddlcompiler.processMaterializedViewWarnings(db);
         // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
@@ -1278,7 +1286,7 @@ public class VoltCompiler {
         m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
         // Also, grab the IMPORT CLASS lines so we can add them to the
         // generated DDL
-        m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
+        m_importLines = ImmutableSet.copyOf(voltDdlTracker.m_importLines);
         addExtraClasses(jarOutput);
 
         compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
@@ -1690,21 +1698,41 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         }
-        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
-            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
-                    "for a materialized view. Export only tables do not support views.");
-            throw new VoltCompilerException("Export table configured with materialized view.");
+
+        // streams cannot have tuple limits
+        if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
+            throw new VoltCompilerException("Streams cannot have row limits configured");
+        }
+        Column pc = tableref.getPartitioncolumn();
+        //Get views
+        List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
+        if (pc == null && tlist.size() != 0) {
+            compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
+                    "for a materialized view. Streams support views as long as partitioned column is part of the view.");
+            throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
+        }
+        if (pc != null && pc.getName() != null && tlist.size() != 0) {
+            for (Table t : tlist) {
+                if (t.getColumns().get(pc.getName()) == null) {
+                    compilerLog.error("While configuring export, table " + t + " is a source table " +
+                            "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+                    throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
+                } else {
+                    //Set partition column of view table to partition column of stream
+                    t.setPartitioncolumn(t.getColumns().get(pc.getName()));
+                }
+            }
         }
         if (tableref.getMaterializer() != null)
         {
-            compilerLog.error("While configuring export, table " + tableName + " is a " +
-                                        "materialized view.  A view cannot be an export table.");
-            throw new VoltCompilerException("View configured as an export table");
+            compilerLog.error("While configuring export, " + tableName + " is a " +
+                                        "materialized view.  A view cannot be export source.");
+            throw new VoltCompilerException("View configured as export source");
         }
         if (tableref.getIndexes().size() > 0) {
-            compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
-                    "Export tables can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Table with indexes configured as an export table");
+            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
+                    "Streams can't have indexes (including primary keys).");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
         }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make
@@ -2252,10 +2280,16 @@ public class VoltCompiler {
             m_classLoader = originalClassLoader;
 
             if (canonicalDDLReader != null) {
-                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    canonicalDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
             if (newDDLReader != null) {
-                try { newDDLReader.close(); } catch (IOException ioe) {}
+                try {
+                    newDDLReader.close();
+                }
+                catch (IOException ioe) {}
             }
         }
     }

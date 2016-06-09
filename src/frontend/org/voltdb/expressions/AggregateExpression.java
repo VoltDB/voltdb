@@ -69,6 +69,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_COUNT_STAR:
         case AGGREGATE_APPROX_COUNT_DISTINCT:
         case AGGREGATE_HYPERLOGLOGS_TO_CARD:
+        case AGGREGATE_RANK:
             //
             // Always an integer
             //

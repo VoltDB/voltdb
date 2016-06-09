@@ -242,6 +242,24 @@ do { \
 #define ASSERT_TRUE(value) ASSERT_TRUE_WITH_MESSAGE(value, "Expected true; " #value " is false")
 #define ASSERT_FALSE(value) ASSERT_TRUE_WITH_MESSAGE(!(value), "Expected false; " #value " is true")
 
+#define ASSERT_FATAL_EXCEPTION(msgFragment, expr)                       \
+    do {                                                                \
+        try {                                                           \
+            expr;                                                       \
+            fail(__FILE__, __LINE__,                                    \
+                 "expected FatalException that did not occur");         \
+        }                                                               \
+        catch (FatalException& exc) {                                   \
+            std::ostringstream oss;                                     \
+            oss << "did not find \""                                    \
+                << (msgFragment) << "\" in \""                          \
+                << exc.m_reason << "\"";                                \
+            ASSERT_TRUE_WITH_MESSAGE(exc.m_reason.find(msgFragment) != std::string::npos, \
+                                     oss.str().c_str());                \
+        }                                                               \
+    } while(false)
+
+
 namespace stupidunit {
 
 enum ExpectDeathStatus {

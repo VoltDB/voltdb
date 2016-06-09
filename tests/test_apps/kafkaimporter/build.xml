@@ -28,11 +28,16 @@
            <!-- <include name="voltdbclient*.jar"/> -->
          <include name="voltdb*.jar"/>
        </fileset>
+       <fileset dir="${basedir}/../../../lib">
+           <!-- <include name="voltdbclient*.jar"/> -->
+           <!-- <include name="kafka-clients-0.8.2.1.jar"/> -->
+           <include name="*.jar"/>
+       </fileset>
     </path>
 
     <target name="client-compile">
         <mkdir dir="${clientclasses.dir}"/>
-        <javac target="1.7" source="1.7" debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
+        <javac debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
             <classpath refid="build-classpath"/>
         </javac>
     </target>
@@ -45,7 +50,7 @@
 
     <target name="procedures-compile">
         <mkdir dir="${proceduresclasses.dir}"/>
-        <javac target="1.7" source="1.7" debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}" >
+        <javac debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}" >
             <classpath refid="build-classpath"/>
         </javac>
     </target>

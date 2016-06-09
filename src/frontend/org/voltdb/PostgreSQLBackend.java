@@ -20,7 +20,10 @@ package org.voltdb;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,12 +59,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("int8", "BIGINT");
         m_PostgreSQLTypeNames.put("float8", "FLOAT");
         m_PostgreSQLTypeNames.put("numeric", "DECIMAL");
+        m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
         m_PostgreSQLTypeNames.put("varbit", "VARBINARY");
         m_PostgreSQLTypeNames.put("char", "CHARACTER");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
+        m_PostgreSQLTypeNames.put("geography", "GEOGRAPHY");
+        // NOTE: what VoltDB calls "GEOGRAPHY_POINT" would also be called
+        // "geography" by PostgreSQL, so this mapping is imperfect; however,
+        // so far this has not been a problem
     }
-    // Captures up to 6 order-by columns; beyond those will be ignored
-    // (similar to tests/scripts/examples/sql_coverage/StandardNormalzer.py)
+
+    // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
+    // those will be ignored (similar to
+    // voltdb/tests/scripts/examples/sql_coverage/StandardNormalzer.py)
     private static final Pattern orderByQuery = Pattern.compile(
             "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
             + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
@@ -70,28 +80,210 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
             + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
             Pattern.CASE_INSENSITIVE);
-    // Captures the use of EXTRACT(DAY_OF_WEEK FROM ...), which PostgreSQL
-    // does not support
+    // Modifies a query containing an ORDER BY clause, by adding (for each
+    // order-by column) either NULLS FIRST or (after "DESC") NULL LAST, so
+    // that PostgreSQL results will match VoltDB results
+    private static final QueryTransformer orderByQueryTransformer
+            = new QueryTransformer(orderByQuery)
+            .initialText("ORDER BY").suffix(" NULLS FIRST")
+            .alternateSuffix("DESC", " NULLS LAST")
+            .groups("column1", "column2", "column3", "column4", "column5", "column6");
+
+    // Captures the use of EXTRACT(DAY_OF_WEEK FROM ...)
     private static final Pattern dayOfWeekQuery = Pattern.compile(
             "EXTRACT\\s*\\(\\s*DAY_OF_WEEK\\s+FROM(?<column>\\s+\\w+\\s*)\\)",
             Pattern.CASE_INSENSITIVE);
-    // Captures the use of EXTRACT(DAY_OF_YEAR FROM ...), which PostgreSQL
-    // does not support
+    // Modifies a query containing an EXTRACT(DAY_OF_WEEK FROM ...)
+    // function, which PostgreSQL does not support, and replaces it with
+    // EXTRACT(DOW FROM ...)+1, which is an equivalent that PostgreSQL does
+    // support. (The '+1' is because PostgreSQL counts Sunday as 0 and Saturday
+    // as 6, etc., whereas VoltDB counts Sunday as 1 and Saturday as 7, etc.)
+    private static final QueryTransformer dayOfWeekQueryTransformer
+            = new QueryTransformer(dayOfWeekQuery)
+            .initialText("EXTRACT ( ").prefix("DOW FROM").suffix(")+1").groups("column");
+
+    // Captures the use of EXTRACT(DAY_OF_YEAR FROM ...)
     private static final Pattern dayOfYearQuery = Pattern.compile(
             "EXTRACT\\s*\\(\\s*DAY_OF_YEAR\\s+FROM(?<column>\\s+\\w+\\s*)\\)",
             Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing an EXTRACT(DAY_OF_YEAR FROM ...)
+    // function, which PostgreSQL does not support, and replaces it with
+    // EXTRACT(DOY FROM ...), which is an equivalent that PostgreSQL does
+    // support
+    private static final QueryTransformer dayOfYearQueryTransformer
+            = new QueryTransformer(dayOfYearQuery)
+            .initialText("EXTRACT ( ").prefix("DOY FROM").suffix(")").groups("column");
+
     // Captures the use of AVG(columnName), which PostgreSQL handles
     // differently, when the columnName is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
             "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+(AS|FROM)\\s+\\w+)?)*\\s*\\)",
             Pattern.CASE_INSENSITIVE);
-    // Captures the use of CEILING(columnName) or FLOOR(columnName), which PostgreSQL
-    // handles differently, when the columnName is of one of the integer types
+    // Modifies a query containing an AVG(columnName) function, where
+    // <i>columnName</i> is of an integer type, for which PostgreSQL returns
+    // a numeric (non-integer) value, unlike VoltDB, which returns an integer;
+    // so change it to: TRUNC ( AVG(columnName) )
+    private static final QueryTransformer avgQueryTransformer
+            = new QueryTransformer(avgQuery)
+            .prefix("TRUNC ( ").suffix(" )").groups("column")
+            .useWholeMatch().columnType(ColumnType.INTEGER);
+
+    // Captures the use of CEILING(columnName) or FLOOR(columnName)
     private static final Pattern ceilingOrFloorQuery = Pattern.compile(
             "(CEILING|FLOOR)\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+(AS|FROM)\\s+\\w+)?)*\\s*\\)",
             Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a CEILING(columnName) or FLOOR(columnName)
+    // function, where <i>columnName</i> is of an integer type, for which
+    // PostgreSQL returns a numeric (non-integer) value, unlike VoltDB, which
+    // returns an integer; so change it to:
+    // CAST ( CEILING(columnName) as INTEGER ), or
+    // CAST ( FLOOR(columnName) as INTEGER ), respectively.
+    private static final QueryTransformer ceilingOrFloorQueryTransformer
+            = new QueryTransformer(ceilingOrFloorQuery)
+            .prefix("CAST ( ").suffix(" as INTEGER )").groups("column")
+            .useWholeMatch().columnType(ColumnType.INTEGER);
+
+    // Used in both versions, below, of an UPSERT statement: an
+    // UPSERT INTO VALUES or an UPSERT INTO SELECT
+    private static final String UPSERT_QUERY_START = "(?<upsert>UPSERT)\\s+INTO\\s+(?<table>\\w+)\\s+"
+            + "(\\(\\s*(?<columns>\\w+\\s*(,\\s*\\w+\\s*)*)\\)\\s+)?";
+    // Used below (twice), for an UPSERT INTO SELECT statement
+    private static final String SORT_KEYWORDS = "GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET";
+
+    // Captures the use of an UPSERT INTO VALUES statement, for example:
+    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
+    // where the column list, here "(C1, C2, C3)", is optional; the values
+    // list, here "(1, 'abc', 12.34)", can include arbitrary values; and both
+    // can include any number of items. (Though, for a valid UPSERT, the number
+    // of values must match the number of columns, when included, or else the
+    // number of columns defined in table T1; and the types must also match.)
+    private static final Pattern upsertValuesQuery = Pattern.compile(
+            UPSERT_QUERY_START + "VALUES\\s+\\(\\s*(?<values>.+)\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies an UPSERT INTO VALUES statement, as described above, such as:
+    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
+    // which PostgreSQL does not support, and replaces it with an INSERT
+    // statement using ON CONFLICT DO UPDATE, such as:
+    //     INSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34) ON CONFLICT (C1)
+    //         DO UPDATE SET (C2, C3) = ('abc', 12.34)
+    // which is an equivalent that PostgreSQL does support. (This example
+    // assumes that the C1 column is the primary key.)
+    private static final QueryTransformer upsertValuesQueryTransformer
+            = new QueryTransformer(upsertValuesQuery)
+            .groups("upsert", "table", "columns", "values")
+            .groupReplacementText("INSERT").useWholeMatch()
+            .suffix(" ON CONFLICT ({columns:pk}) DO UPDATE SET ({columns:npk}) = ({values:npk})");
+
+    // Captures the use of an UPSERT INTO VALUES statement, for example:
+    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
+    // where the column list, here "(C1, C2, C3)", is optional; the values
+    // list, here "(1, 'abc', 12.34)", can include arbitrary values; and both
+    // can include any number of items. (Though, for a valid UPSERT, the number
+    // of values must match the number of columns, when included, or else the
+    // number of columns defined in table T1; and the types must also match.)
+    private static final Pattern upsertSelectQuery = Pattern.compile(
+            UPSERT_QUERY_START + "SELECT\\s+(?<values>[+\\-*\\/%|'\\s\\w]+(,\\s*[+\\-*\\/%|'\\s\\w]+)*)\\s+"
+                    + "FROM\\s+(?<selecttables>\\w+(\\s+AS\\s+\\w+)?((\\s*,\\s*|\\s+JOIN\\s+)\\w+(\\s+AS\\s+\\w+)?)*)\\s+"
+                    + "(?<where>WHERE\\s+((?!"+SORT_KEYWORDS+").)+)?"
+                    + "(?<sort>("+SORT_KEYWORDS+").+)?",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies an UPSERT INTO VALUES statement, as described above, such as:
+    //     UPSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34)
+    // which PostgreSQL does not support, and replaces it with an INSERT
+    // statement using ON CONFLICT DO UPDATE, such as:
+    //     INSERT INTO T1 (C1, C2, C3) VALUES (1, 'abc', 12.34) ON CONFLICT (C1)
+    //         DO UPDATE SET (C2, C3) = ('abc', 12.34)
+    // which is an equivalent that PostgreSQL does support. (This example
+    // assumes that the C1 column is the primary key.)
+    private static final QueryTransformer upsertSelectQueryTransformer
+            = new QueryTransformer(upsertSelectQuery)
+            .groups("upsert", "table", "columns", "values", "selecttables", "where", "sort")
+            .groupReplacementText("INSERT", "{table} AS _TMP").useWholeMatch()
+            .suffix(" ON CONFLICT ({columns:pk}) DO UPDATE SET ({columns:npk}) = "
+                    + "(SELECT {values:npk} FROM {selecttables} {where:pk} {sort})");
+
+    // Captures the use of string concatenation using a plus sign (+), e.g.:
+    //     'str' + VCHAR
+    // or, in the reverse order:
+    //     VCHAR + 'str'
+    // Note that this would not capture the concatenation of two VARCHAR
+    // columns using a plus sign, e.g. VCHAR1 + VCHAR2, but there is no simple
+    // way (without querying meta-data) to distinguish that from addition of
+    // two numeric columns, which we would not want to change; so far, this
+    // has not been a problem.
+    private static final Pattern stringConcatQuery = Pattern.compile(
+            "'\\w+'\\s*(?<plus>\\+)|(?<plus2>\\+)\\s*'\\w+'",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing 'FOO' + ..., which PostgreSQL does not
+    // support, and replaces it with 'FOO' || ..., which is an equivalent
+    // that PostgreSQL does support
+    private static final QueryTransformer stringConcatQueryTransformer
+            = new QueryTransformer(stringConcatQuery)
+            .replacementText("||").useWholeMatch().groups("plus", "plus2");
+
+    // Captures the use of a VARBINARY constant, e.g. x'12AF'
+    private static final Pattern varbinaryConstant = Pattern.compile(
+            "x'(?<bytes>[0-9A-Fa-f]+)'",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a query containing a VARBINARY constant, e.g. x'12AF', which
+    // PostgreSQL does not support in that format, and replaces it with a
+    // VARBINARY constant in the format it does support, e.g. E'\\x12AF'
+    // (with lots of extra backslashes, for escaping at various levels)
+    private static final QueryTransformer varbinaryConstantTransformer
+            = new QueryTransformer(varbinaryConstant)
+            .prefix("E'\\\\\\\\x").suffix("'").groups("bytes");
+
+    // Captures the use of VARCHAR(n BYTES) (in DDL)
+    private static final Pattern varcharBytesDdl = Pattern.compile(
+            "VARCHAR\\s*\\(\\s*(?<numBytes>\\w+)\\s+BYTES\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing VARCHAR(n BYTES), which PostgreSQL
+    // does not support, and replaces it with VARCHAR(m), where m = n / 4
+    // (but m is always at least 14, since many SQLCoverage tests use strings
+    // of that length), which it does support
+    private static final QueryTransformer varcharBytesDdlTransformer
+            = new QueryTransformer(varcharBytesDdl)
+            .prefix("VARCHAR(").suffix(")").multiplier(0.50).minimum(14)
+            .groups("numBytes");
+
+    // Captures the use of VARBINARY(n); however, this does not capture the use
+    // of just VARBINARY, without a number of bytes in parentheses, although
+    // VoltDB supports that syntax, because that would also capture some DDL
+    // that should not be changed, such as table names R_VARBINARY_TABLE and
+    // P_VARBINARY_TABLE
+    private static final Pattern varbinaryDdl = Pattern.compile(
+            "VARBINARY\\s*\\(\\s*\\d+\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing VARBINARY(n), which PostgreSQL does
+    // not support, and replaces it with BYTEA, which it does support
+    private static final QueryTransformer varbinaryDdlTransformer
+            = new QueryTransformer(varbinaryDdl)
+            .replacementText("BYTEA").useWholeMatch();
+
+    // Captures the use of TINYINT (in DDL)
+    private static final Pattern tinyintDdl = Pattern.compile(
+            "TINYINT", Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing TINYINT, which PostgreSQL does not
+    // support, and replaces it with SMALLINT, which is an equivalent that
+    // PostGIS does support
+    private static final QueryTransformer tinyintDdlTransformer
+            = new QueryTransformer(tinyintDdl)
+            .replacementText("SMALLINT").useWholeMatch();
+
+    // Captures the use of ASSUMEUNIQUE (in DDL)
+    private static final Pattern assumeUniqueDdl = Pattern.compile(
+            "ASSUMEUNIQUE", Pattern.CASE_INSENSITIVE);
+    // Modifies a DDL statement containing ASSUMEUNIQUE, which PostgreSQL does
+    // not support, and replaces it with UNIQUE, which is an equivalent that
+    // PostGIS does support
+    private static final QueryTransformer assumeUniqueDdlTransformer
+            = new QueryTransformer(assumeUniqueDdl)
+            .replacementText("UNIQUE").useWholeMatch();
+
     // Captures up to 6 table names, for each FROM clause used in the query
-    // TODO: fix/finish this! (Use for AVG, CEILING, FLOOR queries)
+    // TODO: we may want to fix & finish this, in order to actually check the
+    // column types, rather than just go by the column names (ENG-9945); this
+    // would be used for for AVG, CEILING, FLOOR, and CAST queries
 //    private static final Pattern tableNames = Pattern.compile(
 //              "FROM\\s*\\(?<table1>\\w+)\\s*"
 //            + "(\\s*,s*\\(?<table2>\\w+)\\s*)?"
@@ -100,19 +292,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 //            + "(\\s*,s*\\(?<table5>\\w+)\\s*)?"
 //            + "(\\s*,s*\\(?<table6>\\w+)\\s*)?",
 //            Pattern.CASE_INSENSITIVE);
-    // Captures the use of string concatenation using 'str' + ..., which
-    // PostgreSQL does not support
-    private static final Pattern stringConcatQuery = Pattern.compile(
-            "'\\w+'\\s*(?<plus>\\+)", Pattern.CASE_INSENSITIVE);
-    // Captures the use of VARCHAR(n BYTES), which PostgreSQL does not support
-    private static final Pattern varcharBytesDdl = Pattern.compile(
-            "VARCHAR\\s*\\(\\s*(?<numBytes>\\w+)\\s+BYTES\\s*\\)",
-            Pattern.CASE_INSENSITIVE);
-    // Captures the use of VARBINARY(n), which PostgreSQL does not support
-    private static final Pattern varbinaryDdl = Pattern.compile(
-            "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
-            Pattern.CASE_INSENSITIVE);
-    private static final boolean DEBUG = false;
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -174,386 +353,32 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         super(dbconn);
     }
 
-    /** Returns true if the input string is an integer constant; false otherwise. */
-    static private boolean isIntegerConstant(String str) {
-        try {
-            Integer.parseInt(str);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    /** Returns true if the <i>columnName</i> is an integer column; false otherwise. */
-    static private boolean isIntegerColumn(String columnName, String... tableNames) {
-        // TODO: Temporary method, which will mostly work, for now:
-        if (DEBUG) {
-            System.out.println("In PostgreSQLBackend.isIntegerColumn, with columnName: '" + columnName + "'");
-        }
-        if (columnName == null) {
-            return false;
-        }
-        String columnNameUpper = columnName.trim().toUpperCase();
-        return  columnNameUpper.equals("ID")   || columnNameUpper.equals("NUM") ||
-                columnNameUpper.equals("TINY") || columnNameUpper.equals("SMALL") ||
-                columnNameUpper.equals("BIG")  || columnNameUpper.equals("POINTS") ||
-                columnNameUpper.equals("WAGE") || columnNameUpper.equals("DEPT") ||
-                columnNameUpper.equals("AGE")  || columnNameUpper.equals("RENT") ||
-                columnNameUpper.equals("A1")   || columnNameUpper.equals("A2") ||
-                columnNameUpper.equals("A3")   || columnNameUpper.equals("A4") ||
-                columnNameUpper.equals("V_G1") || columnNameUpper.equals("V_CNT") ||
-                columnNameUpper.equals("V_G2") || columnNameUpper.equals("V_SUM_AGE") ||
-                columnNameUpper.equals("V_SUM_RENT");
-    }
-
-    /** Returns true if the <i>columnName</i> is an integer constant or column; false otherwise. */
-    @SuppressWarnings("unused")
-    static private boolean isInteger(String columnName, String... tableNames) {
-        return isIntegerConstant(columnName) || isIntegerColumn(columnName, tableNames);
-    }
-
-    /** Returns the number of occurrence of the specified character in the specified String. */
-    static private int numOccurencesOfCharIn(String str, char ch) {
-        int num = 0;
-        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
-            num++;
-        }
-        return num;
-    }
-
-    /** Returns the Nth occurrence of the specified character in the specified String. */
-    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
-        int index = -1;
-        for (int i=0; i < n; i++) {
-            index = str.indexOf(ch, index+1);
-            if (index < 0) {
-                return -1;
-            }
-        }
-        return index;
-    }
-
-    /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
-     *  and <i>suffix</i> concatenated (in that order), but being careful not
-     *  to include more close-parentheses than open-parentheses; if the group
-     *  does contain more close-parens than open-parens, the <i>suffix</i> is
-     *  inserted before the extra close-parens, instead of at the very end. */
-    static private String handleParens(String group, String prefix, String suffix) {
-        int numOpenParens  = numOccurencesOfCharIn(group, '(');
-        int numCloseParens = numOccurencesOfCharIn(group, ')');
-        if (numOpenParens >= numCloseParens) {
-            return (prefix + group + suffix);
-        } else {  // numOpenParens < numCloseParens
-            int index;
-            if (numOpenParens == 0) {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', 1) - 1;
-            } else {
-                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens);
-            }
-            return (prefix + group.substring(0, index+1) + suffix + group.substring(index+1));
-        }
-    }
-
-    /**
-     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
-     * such a way that PostgreSQL results will match VoltDB results, generally
-     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
-     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
-     * as a whole.
-     *
-     * @param query - the query text (DDL, DML or DQL) to be transformed.
-     * @param queryPattern - the Pattern to be detected and modified, within
-     * the query.
-     * @param initText - an initial string with which to begin the replacement
-     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
-     * @param prefix - a string to appear before each group, or before the
-     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
-     * but not <b>null</b>.
-     * @param suffix - a string to appear after each group, or after the
-     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
-     * but not <b>null</b>.
-     * @param altEnding - when a matching group ends with this text (e.g. "DESC"),
-     * the <i>altText</i> will be used, instead of <i>suffix</i>; may be <b>null</b>.
-     * @param altText - when <i>altEnding</i> is not null, the alternate suffix,
-     * to be used when the group ends with <i>altEnding</i> (e.g. " NULLS LAST");
-     * when <i>altEnding</i> is null, the text to be used to replace each group,
-     * within the whole match (e.g. "||"); may be <b>null</b>, in which case the
-     * group is not replaced.
-     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
-     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
-     * they will be applied to each group.
-     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
-     * modified if the group is an integer-valued column.
-     * @param multiplier - a value to be multiplied by the (int-valued) group,
-     * in the transformed query (e.g. 8.0, to convert from bytes to bits); may
-     * be <b>null</b>, in which case it is ignored.
-     * @param minimum - a minimum value for the result of multiplying the
-     * (int-valued) group by the <i>multiplier</i>; may be <b>null</b>, in
-     * which case it is ignored.
-     * @param groups - zero or more groups found within the <i>queryPattern</i>
-     * (e.g. "column").
-     * @return the <i>query</i>, transformed in the specified ways (possibly
-     * unchanged).
-     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
-     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
-     */
-    @SuppressWarnings("unused")
-    static protected String transformQuery(String query, Pattern queryPattern, String initText,
-            String prefix, String suffix, String altEnding, String altText,
-            boolean useWhole, boolean intOnly, Double multiplier, Integer minimum,
-            String ... groups) {
-        StringBuffer modified_query = new StringBuffer();
-        Matcher matcher = queryPattern.matcher(query);
-        while (matcher.find()) {
-            StringBuffer replaceText = new StringBuffer(initText);
-            String wholeMatch = null, group = null;
-            wholeMatch = matcher.group();
-            for (String groupName : groups) {
-                group = null;
-                try {
-                    group = matcher.group(groupName);
-                } catch (IllegalArgumentException e) {
-                    // do nothing: group remains null
-                }
-                if (DEBUG) {
-                    System.out.println("In PostgreSQLBackend.transformQuery,\n  with query    : " + query);
-                    System.out.println("  queryPattern: " + queryPattern);
-                    System.out.println("  initText, prefix, suffix, altEnding, altText:\n    '"
-                            + initText + "', '" + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altText
-                            + "'\n  useWhole, intOnly, multiplier, minimum; groups:\n    '"
-                            + useWhole + ", " + intOnly + ", " + multiplier + ", " + minimum + "\n" + groups);
-                    System.out.println("  wholeMatch: " + wholeMatch);
-                    System.out.println("  group     : " + group);
-                }
-                if (group == null) {
-                    break;
-                } else if (!useWhole) {
-                    String groupValue = group, suffixValue = suffix;
-                    // Check for the case where a multiplier & minimum are used
-                    if (multiplier != null && minimum != null) {
-                        groupValue = Long.toString(Math.round(Math.max(Integer.parseInt(group) * multiplier, minimum)));
-                    }
-                    // Check for the ending that indicates to use the alternate suffix
-                    if (altText != null && group.toUpperCase().endsWith(altEnding)) {
-                        suffixValue = altText;
-                    }
-                    // Make sure not to swallow up extra ')', in this group
-                    replaceText.append(handleParens(groupValue, prefix, suffixValue));
-                }
-            }
-            if (useWhole) {
-                if (intOnly && !isIntegerColumn(group)) {
-                    // Make no changes to query
-                    replaceText.append(wholeMatch);
-                } else {
-                    // Check for the case where the group is to be replaced with altText
-                    if (altText != null && altEnding == null) {
-                        wholeMatch = wholeMatch.replace(group, altText);
-                    }
-                    // Make sure not to swallow up extra ')', in whole match
-                    replaceText.append(handleParens(wholeMatch, prefix, suffix));
-                }
-            }
-            matcher.appendReplacement(modified_query, replaceText.toString());
-        }
-        matcher.appendTail(modified_query);
-        if (DEBUG && !query.equalsIgnoreCase(modified_query.toString())) {
-            System.out.println("In PostgreSQLBackend.transformQuery,\n  with query    : " + query);
-            System.out.println("  modified_query: " + modified_query);
-        }
-        return modified_query.toString();
-    }
-
-    /**
-     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
-     * such a way that PostgreSQL results will match VoltDB results, generally
-     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
-     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
-     * as a whole.<p>
-     * This simpler version leaves out the arguments that are usually not
-     * needed, and just calls the complete version with those arguments set
-     * to <b>null</b>.
-     *
-     * @param query - the query text (DDL, DML or DQL) to be transformed.
-     * @param queryPattern - the Pattern to be detected and modified, within
-     * the query.
-     * @param initText - an initial string with which to begin the replacement
-     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
-     * @param prefix - a string to appear before each group, or before the
-     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
-     * but not <b>null</b>.
-     * @param suffix - a string to appear after each group, or after the
-     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
-     * but not <b>null</b>.
-     * @param altText - the text to be used to replace each group, within the
-     * whole match (e.g. "||"); may be <b>null</b>, in which case the group is
-     * not replaced.
-     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
-     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
-     * they will be applied to each group.
-     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
-     * modified if the group is an integer-valued column.
-     * @param groups - zero or more groups found within the <i>queryPattern</i>
-     * (e.g. "column").
-     * @return the <i>query</i>, transformed in the specified ways (possibly
-     * unchanged).
-     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
-     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
-     */
-    static protected String transformQuery(String query, Pattern queryPattern,
-            String initText, String prefix, String suffix, String altText,
-            boolean useWhole, boolean intOnly, String ... groups) {
-        return transformQuery(query, queryPattern, initText,
-                prefix, suffix, null, altText,
-                useWhole, intOnly, null, null,
-                groups);
-    }
-
-    /**
-     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
-     * such a way that PostgreSQL results will match VoltDB results, generally
-     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
-     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
-     * as a whole.<p>
-     * This version includes the <i>multiplier</i> and <i>minimum</i> arguments,
-     * but leaves out the ones that are usually not needed with those, and then
-     * calls the complete version with the latter set to <b>null</b>.
-     *
-     * @param query - the query text (DDL, DML or DQL) to be transformed.
-     * @param queryPattern - the Pattern to be detected and modified, within
-     * the query.
-     * @param initText - an initial string with which to begin the replacement
-     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
-     * @param prefix - a string to appear before each group, or before the
-     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
-     * but not <b>null</b>.
-     * @param suffix - a string to appear after each group, or after the
-     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
-     * but not <b>null</b>.
-     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
-     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
-     * they will be applied to each group.
-     * @param multiplier - a value to be multiplied by the (int-valued) group,
-     * in the transformed query (e.g. 8.0, to convert from bytes to bits); may
-     * be <b>null</b>, in which case it is ignored.
-     * @param minimum - a minimum value for the result of multiplying the
-     * (int-valued) group by the <i>multiplier</i>; may be <b>null</b>, in
-     * which case it is ignored.
-     * @param groups - zero or more groups found within the <i>queryPattern</i>
-     * (e.g. "column").
-     * @return the <i>query</i>, transformed in the specified ways (possibly
-     * unchanged).
-     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
-     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
-     */
-    static protected String transformQuery(String query, Pattern queryPattern,
-            String initText, String prefix, String suffix,
-            boolean useWhole, Double multiplier, Integer minimum,
-            String ... groups) {
-        return transformQuery(query, queryPattern,
-                initText, prefix, suffix, null, null,
-                useWhole, false, multiplier, minimum,
-                groups);
-    }
-
-    /** Modify a query containing an ORDER BY clause, in such a way that
-     *  PostgreSQL results will match VoltDB results, generally by adding
-     *  NULLS FIRST or (after "DESC") NULLS LAST. */
-    static private String transformOrderByQuery(String dml) {
-        return transformQuery(dml, orderByQuery, "ORDER BY",
-                "", " NULLS FIRST", "DESC", " NULLS LAST", false, false, null, null,
-                "column1", "column2", "column3", "column4", "column5", "column6");
-    }
-
-    /** Modify a query containing an EXTRACT(DAY_OF_WEEK FROM ...) function,
-     *  which PostgreSQL does not support, and replace it with
-     *  EXTRACT(DOW FROM ...)+1, which is an equivalent that PostgreSQL
-     *  does support. (The '+1' is because PostgreSQL counts Sunday as 0 and
-     *  Saturday as 6, etc., whereas VoltDB counts Sunday as 1 and Saturday
-     *  as 7, etc.) */
-    static private String transformDayOfWeekQuery(String dml) {
-        return transformQuery(dml, dayOfWeekQuery, "EXTRACT ( ",
-                "DOW FROM", ")+1", null, false, false, "column");
-    }
-
-    /** Modify a query containing an EXTRACT(DAY_OF_YEAR FROM ...) function,
-     *  which PostgreSQL does not support, and replace it with
-     *  EXTRACT(DOY FROM ...), which is an equivalent that PostgreSQL
-     *  does support. */
-    static private String transformDayOfYearQuery(String dml) {
-        return transformQuery(dml, dayOfYearQuery, "EXTRACT ( ",
-                "DOY FROM", ")", null, false, false, "column");
-    }
-
-    /** Modify a query containing an AVG(columnName), where <i>columnName</i>
-     *  is of an integer type, for which PostgreSQL returns a numeric
-     *  (non-integer) value, unlike VoltDB, which returns an integer;
-     *  so change it to: TRUNC ( AVG(columnName) ). */
-    static private String transformAvgOfIntegerQuery(String dml) {
-        return transformQuery(dml, avgQuery, "",
-                "TRUNC ( ", " )", null, true, true, "column");
-    }
-
-    /** Modify a query containing a CEILING(columnName) or FLOOR(columnName),
-     *  where <i>columnName</i> is of an integer type, for which PostgreSQL
-     *  returns a numeric (non-integer) value, unlike VoltDB, which returns
-     *  an integer; so change it to: CAST ( CEILING(columnName) as INTEGER ),
-     *  or CAST ( FLOOR(columnName) as INTEGER ), respectively. */
-    static private String transformCeilingOrFloorOfIntegerQuery(String dml) {
-        return transformQuery(dml, ceilingOrFloorQuery, "",
-                "CAST ( ", " as INTEGER )", null, true, true, "column");
-    }
-
-    /** Modify a query containing 'FOO' + ..., which PostgreSQL does not
-     *  support, and replace it with 'FOO' || ..., which is an equivalent
-     *  that PostgreSQL does support. */
-    static private String transformStringConcatQuery(String dml) {
-        return transformQuery(dml, stringConcatQuery, "",
-                "", "", "||", true, false, "plus");
-    }
-
-    /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
-     *  support, and replace it with VARCHAR(m), where m = n / 4 (but m is
-     *  always at least 14, since many SQLCoverage tests use strings of that
-     *  length), which it does support. */
-    static private String transformVarcharOfBytes(String ddl) {
-        return transformQuery(ddl, varcharBytesDdl, "",
-                "VARCHAR(", ")", false, 0.25, 14, "numBytes");
-    }
-
-    /** Modify DDL containing VARBINARY(n), which PostgreSQL does not support,
-     *  and replace it with BIT VARYING(m), where m = n * 8 (i.e., converting
-     *  from bytes to bits), which it does support. */
-    static private String transformVarbinary(String ddl) {
-        return transformQuery(ddl, varbinaryDdl, "",
-                "BIT VARYING(", ")", false, 8.0, 8, "numBytes");
-    }
-
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
      *  PostgreSQL with other, similar terms. */
-    static public String transformDDL(String ddl) {
-        return transformVarcharOfBytes(transformVarbinary(ddl))
-                .replace("TINYINT", "SMALLINT")
-                .replace("ASSUMEUNIQUE", "UNIQUE");
+    public String transformDDL(String ddl) {
+        return transformQuery(ddl, tinyintDdlTransformer,
+                varcharBytesDdlTransformer, varbinaryDdlTransformer,
+                assumeUniqueDdlTransformer);
     }
 
-    /** For a SQL query, replace keywords not supported by PostgreSQL, or
-     *  which behave differently in PostgreSQL than in VoltDB, with other,
+    /** For a SQL query, replace (VoltDB) keywords not supported by PostgreSQL,
+     *  or which behave differently in PostgreSQL than in VoltDB, with other,
      *  similar terms, so that the results will match. */
-    static public String transformDML(String dml) {
-        return transformStringConcatQuery(
-                transformDayOfWeekQuery(
-                    transformDayOfYearQuery(
-                        transformCeilingOrFloorOfIntegerQuery(
-                            transformAvgOfIntegerQuery(
-                                transformOrderByQuery(dml) )))));
+    public String transformDML(String dml) {
+        return transformQuery(dml, orderByQueryTransformer,
+                avgQueryTransformer, ceilingOrFloorQueryTransformer,
+                dayOfWeekQueryTransformer, dayOfYearQueryTransformer,
+                stringConcatQueryTransformer, varbinaryConstantTransformer,
+                upsertValuesQueryTransformer, upsertSelectQueryTransformer);
     }
 
     /** Optionally, modifies DDL statements in such a way that PostgreSQL
      *  results will match VoltDB results; and then passes the remaining
      *  work to the base class version. */
     protected void runDDL(String ddl, boolean transformDdl) {
-        super.runDDL((transformDdl ? transformDDL(ddl) : ddl));
+        String modifiedDdl = (transformDdl ? transformDDL(ddl) : ddl);
+        printTransformedSql(ddl, modifiedDdl);
+        super.runDDL(modifiedDdl);
     }
 
     /** Modifies DDL statements in such a way that PostgreSQL results will
@@ -564,24 +389,222 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         runDDL(ddl, true);
     }
 
+    /** Returns the column type name, in VoltDB, corresponding to the specified
+     *  column type name in PostgreSQL. */
+    @Override
+    protected String getVoltColumnTypeName(String columnTypeName) {
+        String equivalentTypeName = m_PostgreSQLTypeNames.get(columnTypeName);
+        return (equivalentTypeName == null) ? columnTypeName : equivalentTypeName;
+    }
+
     /**
      * Returns a VoltTable.ColumnInfo of appropriate type, based on a
-     * <i>typeName</i> and <i>colName</i> (both Strings).
+     * <i>columnTypeName</i> and <i>colName</i> (both Strings).
      * This version checks for column types used only by PostgreSQL,
      * and then passes the remaining work to the base class version.
      */
     @Override
-    protected VoltTable.ColumnInfo getColumnInfo(String typeName, String colName) {
-        String equivalentTypeName = m_PostgreSQLTypeNames.get(typeName);
-        equivalentTypeName = (equivalentTypeName == null) ? typeName : equivalentTypeName;
-        return super.getColumnInfo(equivalentTypeName, colName);
+    protected VoltTable.ColumnInfo getColumnInfo(String columnTypeName, String colName) {
+        return super.getColumnInfo(getVoltColumnTypeName(columnTypeName), colName);
+    }
+
+    /** Returns the specified String, after replacing certain "variables", such
+     *  as {table} or {column:pk} (the ":pk" means primary keys only; ":npk"
+     *  means non-primary-keys), in a QueryTransformer's prefix, suffix, or
+     *  (group) replacement text, for which a corresponding group value will
+     *  be substituted. In particular, this version makes substitutions to
+     *  enable the transformation of VoltDB's UPSERT statements (both UPSERT
+     *  INTO ... VALUES and UPSERT INTO ... SELECT) into PostgreSQL's equivalent,
+     *  INSERT statements with an ON CONFLICT ... DO UPDATE clause, via the use
+     *  of these variables, used in <i>upsertValuesQueryTransformer</i> and
+     *  <i>upsertSelectQueryTransformer</i> (see above):
+     *    {columns:pk}   : the primary key columns for the (main) table
+     *    {columns:npk}  : the non-primary-key columns for the (main) table
+     *    {values:npk}   : the corresponding values, or (for UPSERT INTO SELECT)
+     *                     column names or expressions, to which those columns
+     *                     in {columns:npk} should be set
+     *    {table}        : the main table, into which data should be "upserted"
+     *    {selecttables} : the table(s) in the SELECT clause
+     *    {where:pk}     : the WHERE clause in the SELECT, involving primary
+     *                     keys, which must replace any existing WHERE clause,
+     *                     in order to transform the query for PostgreSQL
+     *    {sort}         : the GROUP BY, HAVING, ORDER BY, LIMIT, and OFFSET
+     *                     clauses (if any), at the end of the SELECT
+     *  The first 2 select from among the columns in the UPSERT (after the main
+     *  table name), if they were specified; otherwise, they select from all
+     *  the columns of the (main) table. The last 3 only apply to an UPSERT
+     *  INTO ... SELECT statement. */
+    @Override
+    protected String replaceGroupNameVariables(String str, List<String> groupNames, List<String> groupValues) {
+        // If any of the inputs are null or empty, then never mind - just
+        // return the original String (str)
+        if (str == null || groupNames == null || groupValues == null ||
+                str.isEmpty() || groupNames.isEmpty() || groupValues.isEmpty()) {
+            return str;
+        }
+
+        // If a table was specified & found, use that; otherwise, never mind
+        // (Note: this table represents the main table in an UPSERT statement,
+        // e.g., "T1", in: UPSERT INTO T1 ...)
+        String table = null;
+        int index = groupNames.indexOf("table");
+        if (index > -1 && index < groupValues.size()) {
+            table = groupValues.get(index);
+        } else {
+            return str;
+        }
+
+        // If column values were specified & found, use those; otherwise, never
+        // mind (Note: these column values may represent actual column values
+        // specified in an UPSERT INTO VALUES statement; or column names or
+        // expressions specified in an UPSERT INTO SELECT statement)
+        List<String> columnValues = null;
+        index = groupNames.indexOf("values");
+        if (index > -1 && index < groupValues.size()) {
+            columnValues = new ArrayList<String>(Arrays.asList(groupValues.get(index).split(",")));
+        } else {
+            return str;
+        }
+
+        // Get the primary key column names, and the non-primary-key column
+        // names, and all column names, for the specified table
+        List<String> primaryKeyColumns = getPrimaryKeys(table);
+        List<String> nonPrimaryKeyColumns = getNonPrimaryKeyColumns(table);
+        List<String> allColumns = getAllColumns(table);
+
+        // If one or more "select tables" was specified & found (that is, tables
+        // used in the SELECT part of an UPSERT INTO T1 SELECT... statement),
+        // use those; otherwise, this probably won't be needed, but use the main
+        // (UPSERT INTO) table we already found, just in case
+        List<String> selectTables = null;
+        index = groupNames.indexOf("selecttables");
+        if (index > -1 && index < groupValues.size()) {
+            String selectTablesStr = groupValues.get(index).toUpperCase();
+            if (selectTablesStr.contains(" JOIN ")) {
+                selectTables = new ArrayList<String>(Arrays.asList(selectTablesStr.split(" JOIN ")));
+            } else {
+                selectTables = new ArrayList<String>(Arrays.asList(groupValues.get(index).split(",")));
+            }
+        } else {
+            selectTables = Arrays.asList(table);
+        }
+
+        // If particular columns were specified, use only those; otherwise use
+        // all columns (primary keys and non-primary-keys), as found above
+        List<String> columns = null;
+        index = groupNames.indexOf("columns");
+        if (index > -1 && index < groupValues.size() && groupValues.get(index) != null) {
+            columns = Arrays.asList(groupValues.get(index).split(","));
+            // Lower-case table and column names are required for PostgreSQL;
+            // we might need to alter this if we use another comparison
+            // database (besides HSQL) someday
+            for (int i=0; i < columns.size(); i++) {
+                columns.set(i, columns.get(i).trim().toLowerCase());
+            }
+            // Retain only those primary key columns that are in the specified
+            // list of columns - in the specified column list order
+            List<String> temp = new ArrayList<String>(columns);
+            temp.retainAll(primaryKeyColumns);
+            primaryKeyColumns = temp;
+            // Retain only those non-primary-key columns that are in the specified
+            // list of columns - in the specified column list order
+            temp = new ArrayList<String>(columns);
+            temp.retainAll(nonPrimaryKeyColumns);
+            nonPrimaryKeyColumns = temp;
+        } else {
+            columns = getAllColumns(table);
+        }
+
+        // Handle the special case of UPSERT INTO ... SELECT *, i.e., when one
+        // (or more??) of the "columnValues" is equal to "*"; go in reverse
+        // order, to avoid messing up the list
+        for (int i = columnValues.size() - 1; i >= 0; i--) {
+            if (columnValues.get(i).trim().equals("*")) {
+                columnValues.remove(i);
+                for (int t = selectTables.size() - 1; t >= 0; t--) {
+                    columnValues.addAll(i, getAllColumns(selectTables.get(t).trim()));
+                }
+            }
+        }
+
+        // Remove elements from the "columnValues" list that correspond to
+        // primary key columns, since those values do not need to be set in an
+        // INSERT statement's ON CONFLICT ... DO UPDATE clause; but add them to
+        // a separate list (which is needed only for an UPSERT INTO SELECT
+        // statement); go in reverse order, to avoid messing up the list; the
+        // "columnValues" and "columns" lists should have the same size here,
+        // but just in case use the minimum
+        List<String> pkColumnValues = new ArrayList<String>();
+        for (int i = Math.min(columnValues.size(), columns.size()) - 1; i >= 0; i--) {
+            if (primaryKeyColumns.contains(columns.get(i))) {
+                pkColumnValues.add(0, columnValues.get(i));
+                columnValues.remove(i);
+            }
+        }
+
+        // If "where" was included in the "groupNames" (which it would be for an
+        // UPSERT INTO SELECT statement), prepare a WHERE clause, setting primary
+        // keys equal to their equivalent values in the main (_TMP) table, e.g.:
+        //     "WHERE id=_TMP.id AND foo=_TMP.blah AND bar=_TMP.yada "
+        String pkWhereClause = "EMPTY";
+        if (groupNames.indexOf("where") > -1 && pkColumnValues.size() > 0
+                && primaryKeyColumns.size() > 0) {
+            pkWhereClause = "WHERE " + pkColumnValues.get(0)+"=_TMP."+primaryKeyColumns.get(0)+" ";
+            for (int i=1; i < pkColumnValues.size(); i++) {
+                pkWhereClause += "AND " + pkColumnValues.get(i)+"=_TMP."+primaryKeyColumns.get(i)+" ";
+            }
+        }
+
+        // Replace the groupName "variables" with their corresponding
+        // groupValues, processing special cases involving columnType
+        // "pk" or "npk", as needed
+        StringBuffer modified_str = new StringBuffer();
+        Matcher matcher = groupNameVariables.matcher(str);
+        while (matcher.find()) {
+            String groupName = matcher.group("groupName");
+            String columnType = matcher.group("columnType");
+            // Filter this "variable" to only include primary key columns
+            if ("pk".equalsIgnoreCase(columnType)) {
+                if ("columns".equalsIgnoreCase(groupName)) {
+                    matcher.appendReplacement(modified_str, String.join(", ", primaryKeyColumns));
+                } else if ("where".equalsIgnoreCase(groupName)) {
+                    matcher.appendReplacement(modified_str, pkWhereClause);
+                } else {
+                    // No match: give up on this "variable"
+                    matcher.appendReplacement(modified_str, "{"+groupName+":pk}");
+                }
+            // Filter this "variable" to only include non-primary-key columns
+            } else if ("npk".equalsIgnoreCase(columnType)) {
+                if ("columns".equalsIgnoreCase(groupName)) {
+                    matcher.appendReplacement(modified_str, String.join(", ", nonPrimaryKeyColumns));
+                } else if ("values".equalsIgnoreCase(groupName)) {
+                    matcher.appendReplacement(modified_str, String.join(", ", columnValues));
+                } else {
+                    // No match: give up on this "variable"
+                    matcher.appendReplacement(modified_str, "{"+groupName+":npk}");
+                }
+            // Simply return the value of this "variable"
+            } else {
+                index = groupNames.indexOf(groupName);
+                if (index > -1 && index < groupValues.size()) {
+                    matcher.appendReplacement(modified_str, groupValues.get(index));
+                } else {
+                    // No match: give up on this "variable"
+                    matcher.appendReplacement(modified_str, "{"+groupName+"}");
+                }
+            }
+        }
+        matcher.appendTail(modified_str);
+        return modified_str.toString();
     }
 
     /** Optionally, modifies queries in such a way that PostgreSQL results will
      *  match VoltDB results; and then passes the remaining work to the base
      *  class version. */
     protected VoltTable runDML(String dml, boolean transformDml) {
-        return super.runDML((transformDml ? transformDML(dml) : dml));
+        String modifiedDml = (transformDml ? transformDML(dml) : dml);
+        printTransformedSql(dml, modifiedDml);
+        return super.runDML(modifiedDml);
     }
 
     /** Modifies queries in such a way that PostgreSQL results will match VoltDB
@@ -607,6 +630,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } catch (SQLException ex) {
                 System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
                 ex.printStackTrace();
+            }
+            if (transformedSqlFileWriter != null) {
+                transformedSqlFileWriter.close();
+                transformedSqlFileWriter = null;
             }
         } catch (Exception e) {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);

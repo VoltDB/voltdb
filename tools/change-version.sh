@@ -53,8 +53,4 @@ file="tools/kit_tools/verify_kits.py"
 $SED "s/version = \".*\"/version = \"${version}\"/" $file
 showchange
 
-# Change mainui.js
-file="src/frontend/org/voltdb/studio/js/mainui.js"
-$SED "s/var \$volt_version = '.*'/var \$volt_version = '${version}'/" $file
-showchange
 

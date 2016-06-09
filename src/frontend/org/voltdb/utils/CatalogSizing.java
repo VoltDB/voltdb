@@ -211,23 +211,38 @@ public abstract class CatalogSizing {
         return bufferSize;
     }
 
-    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex) {
+    private static int getVariableColumnSize(VoltType type, int capacity, int dataSize, boolean forIndex, boolean isNullable) {
         assert(capacity >= 0);
         assert(dataSize >= 0);
         // Smaller capacities get fully consumed (plus 1 byte).
         if (capacity < 64) {
             return capacity + 1;
         }
+
         // Indexes get 8 byte pointers rather than replicate large data.
         if (forIndex) {
+            if (type != VoltType.GEOGRAPHY) {
+                return 8;
+            }
+            else {
+                // Instances of GEOGRAPHY are not stored in indices.
+                // Geospatial indexes decompose them into cells, which
+                // are accounted for separately in the indexes that contain them.
+                return 0;
+            }
+        }
+
+        // For Nullable
+        if (isNullable) {
             return 8;
         }
+
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
         // The rounded buffer size includes an object length of 4 bytes and
         // an 8-byte backpointer used in compaction.
         int content = 4 + 8 + dataSize;
-        int bufferSize = roundedAllocationSize(64, content);
+        int bufferSize = roundedAllocationSize(8, content);
         // There is also has an 8-byte pointer in the tuple
         // and an 8-byte StringRef indirection pointer.
         return bufferSize + 8 + 8;
@@ -247,7 +262,7 @@ public abstract class CatalogSizing {
         // result of allocation rounding.
         // See the comments in getVariableColumnSize for the significance of
         // these adjustments.
-        return getVariableColumnSize(64, dataSize, false) - 8 - 8;
+        return getVariableColumnSize(VoltType.VARBINARY, 64, dataSize, false, false) - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
@@ -255,6 +270,7 @@ public abstract class CatalogSizing {
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
             VoltType ctype = VoltType.get((byte)column.getType());
+            boolean isNullable = column.getNullable();
             if (ctype.isVariableLength()) {
                 int capacity = column.getSize();
 
@@ -262,8 +278,8 @@ public abstract class CatalogSizing {
                     capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
                 }
 
-                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
-                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
+                csize.widthMin += getVariableColumnSize(ctype, capacity, 0, forIndex, isNullable);
+                csize.widthMax += getVariableColumnSize(ctype, capacity, capacity, forIndex, false);
             }
             else {
                 // Fixed type - use the fixed size.
@@ -281,6 +297,11 @@ public abstract class CatalogSizing {
     }
 
     private static CatalogItemSizeBase getIndexSize(Index index) {
+
+        // this is sizeof(CompactingMap::TreeNode), not counting template parameter KeyValuePair.
+        final long TREE_MAP_ENTRY_OVERHEAD = 32;
+        final long TUPLE_PTR_SIZE = 8;
+
         // All index types consume the space taken by the column data,
         // except that 8 byte pointers references replace large var... data.
         // Additional overhead is determined by the index type.
@@ -301,10 +322,33 @@ public abstract class CatalogSizing {
             isize.widthMin += 48;
             isize.widthMax += 48;
         }
+        else if (index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
+            // Covering cell indexes are implemented in the EE with two maps:
+            //
+            // [1 entry per table row] tuple address -> fixed-size array of 8 cell ids
+            // [1-8 entries per table row]   cell id -> tuple address
+            //
+            // The polygon value is not referenced at all in the index, just the tuple address.
+            // The call to getColumnsSize above purposely omits the size of the pointer to
+            // the geography value for this reason.
+            //
+            // Other columns in the index are included, so if in the future we decide to support
+            // multi-component geospatial indexes to optimize predicates like
+            // "WHERE id = 10 and contains(geog, ?)", then this code would not need to change.
+
+            final long MIN_CELLS = 1;
+            final long MAX_CELLS = 8;
+            final long CELL_SIZE = 8;
+            final long TUPLE_MAP_ENTRY = TREE_MAP_ENTRY_OVERHEAD + TUPLE_PTR_SIZE + MAX_CELLS * CELL_SIZE;
+            final long CELL_MAP_ENTRY = TREE_MAP_ENTRY_OVERHEAD + CELL_SIZE + TUPLE_PTR_SIZE;
+
+            isize.widthMin += TUPLE_MAP_ENTRY + MIN_CELLS * CELL_MAP_ENTRY;
+            isize.widthMax += TUPLE_MAP_ENTRY + MAX_CELLS * CELL_MAP_ENTRY;
+        }
         else {
             // Tree indexes have a 40 byte overhead per row.
-            isize.widthMin += 40;
-            isize.widthMax += 40;
+            isize.widthMin += TREE_MAP_ENTRY_OVERHEAD + TUPLE_PTR_SIZE;
+            isize.widthMax += TREE_MAP_ENTRY_OVERHEAD + TUPLE_PTR_SIZE;
         }
 
         return isize;

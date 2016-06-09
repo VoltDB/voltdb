@@ -269,8 +269,10 @@ struct IntsKey
         }
     }
 
-    IntsKey(const TableTuple *tuple, const std::vector<int> &indices,
-            const std::vector<AbstractExpression*> &indexed_expressions, const TupleSchema *keySchema) {
+    IntsKey(const TableTuple *tuple,
+            const std::vector<int> &indices,
+            const std::vector<AbstractExpression*> &indexed_expressions,
+            const TupleSchema *keySchema) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
         const int columnCount = keySchema->columnCount();
         int keyOffset = 0;
@@ -843,6 +845,11 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
 template <typename KeyType>
 inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) { k.setValue(v); }
 
+// PointerKeyValuePair is the entry type for multimaps that implement
+// non-unique indexes, to speed up deletion of entries.  When rows are
+// deleted, they are deleted by a pointer to the tuple.  In order to
+// find all the rows that need to be deleted quickly, the pointer to
+// the tuple is the last component of the key.
 template < typename KeyType, typename DataType = const void*>
 class PointerKeyValuePair {
 public:
@@ -853,12 +860,18 @@ public:
     // the caller has to make sure the key has already contained the value
     // the signatures are to be consist with the general template
     PointerKeyValuePair() {}
+    // TODO: For safety, post-assert that (value == k.getValue()).
     PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
 
     const first_type& getKey() const { return k; }
     const second_type& getValue() const { return k.getValue(); }
     void setKey(const first_type &key) { k = key; }
     void setValue(const second_type &value) { k.setValue(value); }
+    // TODO: Optimize to take advantage of how k/key contain both
+    //       the "key proper" AND the value, so k.setValue should be redundant?
+    //       For safety, post-assert that (value == k.getValue()).
+    void setKeyValuePair(const first_type &key, const second_type &value)
+    { k = key; k.setValue(value); }
 
     // set the tuple pointer to the new value, and return the old value
     const void *setPointerValue(const void *value) {

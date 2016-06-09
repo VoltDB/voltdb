@@ -572,7 +572,7 @@ public class MyTPCC
 
     @Override
     public void callPaymentByName(short w_id, byte d_id, double h_amount,
-            short c_w_id, byte c_d_id, byte[] c_last, TimestampType now) throws IOException
+            short c_w_id, byte c_d_id, String c_last, TimestampType now) throws IOException
     {
         try
         {

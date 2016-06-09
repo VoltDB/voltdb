@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
@@ -44,6 +43,17 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
+    public static AbstractExpression cloneAndCombinePredicates(List<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
+            return null;
+        }
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (AbstractExpression expr : exps) {
+            stack.add((AbstractExpression)expr.clone());
+        }
+        return combineStack(stack);
+    }
+
     /**
      *
      * @param exps
@@ -55,6 +65,10 @@ public abstract class ExpressionUtil {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
+        return combineStack(stack);
+    }
+
+    private static AbstractExpression combineStack(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.
@@ -267,18 +281,6 @@ public abstract class ExpressionUtil {
     }
 
     /**
-     * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
-     * Recursively walk an expression and return a list of all the expressions
-     * of a given type it contains.
-     */
-    public static List<AbstractExpression> findAllExpressionsOfClass(AbstractExpression input, Class< ? extends AbstractExpression> aeClass) {
-        if (input == null) {
-            return new ArrayList<AbstractExpression>();
-        }
-        return input.findAllSubexpressionsOfClass(aeClass);
-    }
-
-    /**
      * Method to simplify an expression by eliminating identical subexpressions (same id)
      * If the expression is a logical conjunction of the form e1 AND e2 AND e3 AND e4,
      * and subexpression e1 is identical to the subexpression e2 the simplified expression is
@@ -435,40 +437,6 @@ public abstract class ExpressionUtil {
         return false;
     }
 
-    /**
-     * Resolve the column indexes from all subqueries that are part of this expression
-     * @param expr
-     * @param db
-     */
-    public static void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        if (subqueryExpressions.isEmpty()) {
-            return;
-        }
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).resolveColumnIndexes();
-        }
-    }
-
-    /**
-     * Generate the output schemas for the subquery expression nodes
-     * @param expr
-     * @param db
-     */
-    public static void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
-        }
-    }
     /**
      * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
      * in a ScalarValueExpression if its parent is not one of:

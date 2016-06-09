@@ -28,8 +28,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
@@ -95,7 +93,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway nodeDRGateway,
-                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
@@ -120,7 +117,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, drGateway, mpPDRG, consumerDRGateway);
+                coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();
 
@@ -142,7 +139,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            long localSpUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -161,12 +157,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                DRLogSegmentId drLogInfo = null;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    drLogInfo = res.m_binaryLogInfo;
-                    localSpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -182,11 +175,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-
-                    // If we are a DR replica, inform that subsystem of any remote data we've seen
-                    if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localSpUniqueId);
-                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during

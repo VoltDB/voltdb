@@ -956,7 +956,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // check the catalog update with query timeout
         String key = "querytimeout";
-        checkDeploymentPropertyValue(client, key, "0"); // check default value
+        checkDeploymentPropertyValue(client, key, "10000"); // check default value
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml");
@@ -980,7 +980,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
-        checkDeploymentPropertyValue(client, key, "0"); // check default value
+        checkDeploymentPropertyValue(client, key, "10000"); // check default value
 
         // check the catalog update with elastic duration and throughput
         String duration = "elasticduration", throughput = "elasticthroughput";

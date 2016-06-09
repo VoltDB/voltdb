@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<deployment>
+<users>
+<user name="abc" password="test" plaintext="true" roles="User" userid="1"/>
+<user name="xyz" password="test" plaintext="true" roles="User" userid="2"/>
+</users>
+<snapshot enabled="true" frequency="24h" prefix="AUTOSNAP" retain="2"/>
+<paths>
+<snapshots path="snapshots1"/>
+<commandlogsnapshot path="command_log_snapshot2"/>
+<voltdbroot path="voltdbroot3"/>
+<exportoverflow path="export_overflow3"/>
+<droverflow path="dr_overflow4"/>
+<commandlog path="command_log"/>
+</paths>
+<httpd enabled="true" port="8080">
+<jsonapi enabled="true"/>
+</httpd>
+<systemsettings>
+<query timeout="10000"/>
+<temptables maxsize="100"/>
+<snapshot priority="6"/>
+<elastic duration="50" throughput="2"/>
+<resourcemonitor>
+<memorylimit size="80%"/>
+<disklimit>
+<feature name="snapshots" size="66"/>
+<feature name="commandlog" size="22"/>
+</disklimit>
+</resourcemonitor>
+</systemsettings>
+<commandlog enabled="true" logsize="1024" synchronous="false">
+<frequency time="200" transactions="2147483647"/>
+</commandlog>
+<cluster elastic="enabled" hostcount="1" kfactor="2" schema="ddl" sitesperhost="1"/>
+<export>
+<configuration enabled="true" exportconnectorclass="" stream="test" type="kafka">
+<property name="metadata.broker.list">1</property>
+</configuration>
+</export>
+<heartbeat timeout="90"/>
+<import>
+<configuration enabled="true" format="test" module="test" type="kafka">
+<property name="metadata.broker.list">2</property>
+</configuration>
+</import>
+<security enabled="true" provider="hash"/>
+<partition-detection enabled="true">
+    <snapshot prefix="voltdb_partition_detection"/>
+</partition-detection>
+<dr id="6" listen="true" port="12112">
+<connection source="uuuu"/>
+</dr>
+<admin-mode adminstartup="false" port="21211"/>
+</deployment>

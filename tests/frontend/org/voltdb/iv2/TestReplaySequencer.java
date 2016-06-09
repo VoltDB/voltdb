@@ -200,7 +200,7 @@ public class TestReplaySequencer {
         dut.offer(1L, frag1);
         dut.offer(1L, cmpl1);
         Assert.assertEquals(frag1, dut.poll());
-        Assert.assertEquals(cmpl1, dut.poll());
+        // CompleteTxn will not be queued, it always forwards to scheduler directly.
         Assert.assertEquals(sp1a, dut.poll());
         Assert.assertEquals(sp1b, dut.poll());
         Assert.assertEquals(sp1c, dut.poll());
@@ -212,7 +212,7 @@ public class TestReplaySequencer {
         dut.offer(2L, frag2);
         dut.offer(2L, cmpl2);
         Assert.assertEquals(frag2, dut.poll());
-        Assert.assertEquals(cmpl2, dut.poll());
+        // CompleteTxn will not be queued, it always forwards to scheduler directly.
         Assert.assertEquals(sp2a, dut.poll());
         Assert.assertEquals(sp2b, dut.poll());
         Assert.assertEquals(sp2c, dut.poll());
@@ -250,21 +250,20 @@ public class TestReplaySequencer {
         dut.offer(1L, frag1);
         dut.offer(1L, cmpl1);
         Assert.assertEquals(frag1, dut.poll());
-        Assert.assertEquals(cmpl1, dut.poll());
+        // CompleteTxn will not be queued, it always forwards to scheduler directly.
         Assert.assertEquals(null, dut.poll());
         Assert.assertNull(dut.drain());
 
-        // Offer the second fragment to free up the second half
+        // Offer the second fragment to free up the second half and SPs being queued
         dut.offer(2L, frag2);
         Assert.assertEquals(frag2, dut.poll());
-        Assert.assertEquals(null, dut.poll());
-
-        // Completed the second mp to free up the rests
-        dut.offer(2L, cmpl2);
-
         Assert.assertEquals(sp2a, dut.poll());
         Assert.assertEquals(sp2b, dut.poll());
         Assert.assertEquals(null, dut.poll());
+
+        // Completed the second mp
+        dut.offer(2L, cmpl2);
+
         Assert.assertNull(dut.drain());
     }
 
@@ -343,8 +342,9 @@ public class TestReplaySequencer {
         Assert.assertNull(dut.poll());
         Assert.assertNull(dut.drain());
 
+        // CompleteTxn will not be queued, it always forwards to scheduler directly.
         result = dut.offer(1L, complete);
-        Assert.assertTrue(result);
+        Assert.assertFalse(result);
         Assert.assertNull(dut.poll());
         Assert.assertNull(dut.drain());
 
@@ -356,7 +356,6 @@ public class TestReplaySequencer {
         Assert.assertTrue(dut.offer(1L, makeSentinel(1L)));
 
         Assert.assertEquals(frag, dut.poll());
-        Assert.assertEquals(complete, dut.poll());
         Assert.assertNull(dut.poll());
 
         Assert.assertTrue(dut.offer(2L, makeSentinel(2L)));
@@ -478,11 +477,10 @@ public class TestReplaySequencer {
         // Offering the fragment and the complete releases init2 and init3
         Assert.assertTrue(dut.offer(1L, frag1));
         Assert.assertEquals(frag1, dut.poll());
-        Assert.assertNull(dut.poll());
-        Assert.assertFalse(dut.offer(1L, complete1));
         Assert.assertEquals(init2, dut.poll());
         Assert.assertEquals(init3, dut.poll());
         Assert.assertNull(dut.poll());
+        Assert.assertFalse(dut.offer(1L, complete1));
         Assert.assertNull(dut.drain());
 
         // Move us to drain() mode
@@ -628,17 +626,15 @@ public class TestReplaySequencer {
         TransactionInfoBaseMessage complete2 = makeCompleteTxn(2L);
 
         Assert.assertTrue(dut.offer(1L, frag1));
-        Assert.assertTrue(dut.offer(1L, complete1));
+        Assert.assertFalse(dut.offer(1L, complete1));
         Assert.assertTrue(dut.offer(2L, frag2));
-        Assert.assertTrue(dut.offer(2L, complete2));
+        Assert.assertFalse(dut.offer(2L, complete2));
         // We get a really early MPI EOL before we have any of our partition's sentinels
         Assert.assertTrue(dut.offer(0L, makeMPIEOL()));
         Assert.assertTrue(dut.offer(1L, sentinel1));
         Assert.assertEquals(frag1, dut.poll());
-        Assert.assertEquals(complete1, dut.poll());
         Assert.assertTrue(dut.offer(2L, sentinel2));
         Assert.assertEquals(frag2, dut.poll());
-        Assert.assertEquals(complete2, dut.poll());
         Assert.assertNull(dut.poll());
         Assert.assertNull(dut.drain());
     }
@@ -741,11 +737,10 @@ public class TestReplaySequencer {
         // a restart complete arrives before the first fragment
         Assert.assertFalse(dut.offer(1L, cmpl));
         Assert.assertTrue(dut.offer(1L, frag));
-        // this one should be queued
-        Assert.assertTrue(dut.offer(1L, cmpl));
+        // CompleteTxn will not be queued, it always forwards to scheduler directly.
+        Assert.assertFalse(dut.offer(1L, cmpl));
 
         Assert.assertEquals(frag, dut.poll());
-        Assert.assertEquals(cmpl, dut.poll());
         Assert.assertNull(dut.poll());
     }
 }

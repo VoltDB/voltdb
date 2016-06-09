@@ -119,7 +119,7 @@ public class VoltTableUtil {
                    }
                 }
                 else if (type == VoltType.GEOGRAPHY_POINT) {
-                    final GeographyPointValue pt = vt.getPoint(ii);
+                    final GeographyPointValue pt = vt.getGeographyPointValue(ii);
                     if (vt.wasNull()) {
                         fields[ii] = Constants.CSV_NULL;
                     }

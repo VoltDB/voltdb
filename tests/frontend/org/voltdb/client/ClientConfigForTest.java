@@ -89,7 +89,7 @@ public class ClientConfigForTest extends ClientConfig {
         super(user, password, new LoggingCSL());
     }
 
-    public ClientConfigForTest(String user, String password, ClientAuthHashScheme scheme) {
+    public ClientConfigForTest(String user, String password, ClientAuthScheme scheme) {
         super(user, password, new LoggingCSL(), scheme);
     }
 }

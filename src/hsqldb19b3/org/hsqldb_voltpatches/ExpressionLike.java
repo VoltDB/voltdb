@@ -74,10 +74,12 @@ public final class ExpressionLike extends ExpressionLogical {
         this.likeObject = other.likeObject;
     }
 
+    @Override
     void collectObjectNames(Set set) {
         super.collectObjectNames(set);
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -91,6 +93,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return unresolvedSet;
     }
 
+    @Override
     public Object getValue(Session session) {
 
         if (opType != OpTypes.LIKE) {
@@ -125,6 +128,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return likeObject.compare(session, leftValue);
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -135,7 +139,7 @@ public final class ExpressionLike extends ExpressionLogical {
 
         boolean isEscapeFixedConstant = true;
 
-        if (nodes[ESCAPE] != null) {
+        if (TERNARY <= nodes.length && nodes[ESCAPE] != null) {
             if (nodes[ESCAPE].isParam) {
                 throw Error.error(ErrorCode.X_42567);
             }
@@ -192,7 +196,7 @@ public final class ExpressionLike extends ExpressionLogical {
 
         if (nodes[LEFT].dataType.isCharacterType()
                 && nodes[RIGHT].dataType.isCharacterType()
-                && (nodes[ESCAPE] == null
+                && (nodes.length <= TERNARY || nodes[ESCAPE] == null
                     || nodes[ESCAPE].dataType.isCharacterType())) {
             boolean ignoreCase =
                 nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
@@ -204,7 +208,12 @@ public final class ExpressionLike extends ExpressionLogical {
                    && (nodes[ESCAPE] == null
                        || nodes[ESCAPE].dataType.isBinaryType())) {
             likeObject.isBinary = true;
-        } else {
+        } else if (false == (nodes[LEFT].dataType.isBooleanType()
+                              && nodes[RIGHT].dataType.isBooleanType())
+                              && dataType.isBooleanType()) {
+            // If both argument nodes are boolean we have resolved
+            // this before.  So, this is ok.  Otherwise, this is not
+            // properly typed.
             throw Error.error(ErrorCode.X_42565);
         }
 
@@ -212,14 +221,16 @@ public final class ExpressionLike extends ExpressionLogical {
         /*
          * Remove the unused escape node
          */
-        if (nodes[ESCAPE] == null) {
+        if (TERNARY <= nodes.length && nodes[ESCAPE] == null) {
             Expression oldNodes[] = nodes;
             nodes = new Expression[BINARY];
             nodes[LEFT] = oldNodes[LEFT];
             nodes[RIGHT] = oldNodes[RIGHT];
         }
 // End of VoltDB extension
-        likeObject.dataType = nodes[LEFT].dataType;
+        if (likeObject != null) {
+            likeObject.dataType = nodes[LEFT].dataType;
+        }
 
         boolean isRightArgFixedConstant = nodes[RIGHT].opType == OpTypes.VALUE;
 
@@ -233,7 +244,9 @@ public final class ExpressionLike extends ExpressionLogical {
         }
 
         if (isRightArgFixedConstant && isEscapeFixedConstant) {
-            likeObject.isVariable = false;
+            if (likeObject != null) {
+                likeObject.isVariable = false;
+            }
         } else {
 // A VoltDB extension to disable LIKE pattern escape characters
             /*
@@ -390,6 +403,7 @@ public final class ExpressionLike extends ExpressionLogical {
         }
     }
 
+    @Override
     public String getSQL() {
 
         String       left  = getContextSQL(nodes[LEFT]);
@@ -409,6 +423,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();

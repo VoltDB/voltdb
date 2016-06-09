@@ -114,6 +114,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 0,
+                                64*1024,
                                 100,
                                 50,
                                 new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
@@ -134,6 +135,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 "",
                                 0,
+                                64*1024,
                                 100,
                                 50,
                                 new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));

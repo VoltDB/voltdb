@@ -5,4 +5,7 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <systemsettings>
+        <query timeout="90000"/>
+    </systemsettings>
 </deployment>

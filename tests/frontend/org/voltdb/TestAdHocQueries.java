@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
@@ -430,10 +431,74 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
+
+            // test wasNull asScalarLong
+            long value;
+            boolean wasNull;
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as tinyInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_TINYINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as smallInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_SMALLINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as integer) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_INTEGER, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as bigint) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_BIGINT, value);
+            assertEquals(true, wasNull);
         }
         finally {
             env.tearDown();
             System.out.println("Ending testSimple");
+        }
+    }
+
+    @Test
+    public void testAdHocLengthLimit() throws Exception {
+        System.out.println("Starting testAdHocLengthLimit");
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+
+        env.setUp();
+        // by pass valgrind due to ENG-7843
+        if (env.isValgrind() || env.isMemcheckDefined()) {
+            env.tearDown();
+            System.out.println("Skipped testAdHocLengthLimit");
+            return;
+        }
+
+        try {
+            StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
+            int i = 0;
+            while (adHocQueryTemp.length() <= Short.MAX_VALUE*10) {
+                String randPhone = RandomStringUtils.randomNumeric(10);
+                VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
+                assertEquals(1, result.getRowCount());
+                adHocQueryTemp.append(randPhone);
+                adHocQueryTemp.append(", ");
+                i++;
+            }
+            adHocQueryTemp.replace(adHocQueryTemp.length()-2, adHocQueryTemp.length(), ");");
+            // assure that adhoc query text can exceed 2^15 length, but the literals still cannot exceed 2^15
+            assert(adHocQueryTemp.length() > Short.MAX_VALUE);
+            assert(i < Short.MAX_VALUE);
+            VoltTable result = env.m_client.callProcedure("@AdHoc", adHocQueryTemp.toString()).getResults()[0];
+            assertEquals(i, result.getRowCount());
+        }
+         finally {
+            env.tearDown();
+            System.out.println("Ending testAdHocLengthLimit");
         }
     }
 
@@ -530,6 +595,46 @@ public class TestAdHocQueries extends AdHocQueryTester {
         finally {
             env.tearDown();
             System.out.println("Ending testAdHocWithParams");
+        }
+    }
+
+    @Test
+    public void testAdHocQueryForStackOverFlowCondition() throws IOException, Exception {
+        System.out.println("Starting testLongAdHocQuery");
+
+        VoltDB.Configuration config = setUpSPDB();
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        m_client = ClientFactory.createClient();
+        m_client.createConnection("localhost", config.m_port);
+
+        String sql = getQueryForLongQueryTable(750);
+        try {
+            m_client.callProcedure("@AdHoc", sql);
+            fail("Query was expected to generate stack overflow error");
+        }
+        catch (Exception exception) {
+            System.out.println(exception.getMessage());
+            String expectedMsg;
+            expectedMsg = "Encountered stack overflow error. " +
+                          "Try reducing the number of predicate expressions in the query.";
+            boolean foundMsg = exception.getMessage().contains(expectedMsg);
+            assertTrue("Expected text \"" + expectedMsg + "\" did not appear in exception "
+                    + "\"" + exception.getMessage() + "\"", foundMsg);
+        }
+        finally {
+            if (m_client != null) {
+                m_client.close();
+            }
+            m_client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
         }
     }
 
@@ -758,7 +863,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
+                assertTrue(pcex.getMessage().indexOf("does not support constant Boolean values, like TRUE or FALSE") > 0);
             }
             adHocQuery = "ROLLBACK;";
             try {
@@ -902,6 +1007,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             }
 
             m_builder = new VoltProjectBuilder();
+            //Increase query tmeout as long literal queries taking long time.
+            m_builder.setQueryTimeout(60000);
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
                                            "IVAL bigint default 0 not null, " +
@@ -966,6 +1073,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                            "CREATE TABLE INTS\n" +
                                            "  (INT1      SMALLINT NOT NULL,\n" +
                                            "   INT2      SMALLINT NOT NULL);\n" +
+                                           "CREATE TABLE VOTES\n" +
+                                           "  (PHONE_NUMBER BIGINT NOT NULL,\n" +
+                                           "   STATE     VARCHAR(2) NOT NULL,\n" +
+                                           "   CONTESTANT_NUMBER  INTEGER NOT NULL);\n" +
+                                           "\n" +
                                            "CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
                                            "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
                                            "CREATE PROCEDURE InsertWithDate AS \n" +
@@ -1041,6 +1153,16 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             // no clue how helpful this is
             System.gc();
+        }
+
+        boolean isValgrind() {
+            if (m_cluster != null)
+                return m_cluster.isValgrind();
+            return true;
+        }
+
+        boolean isMemcheckDefined() {
+            return (m_cluster != null) ? m_cluster.isMemcheckDefined() : true;
         }
     }
 

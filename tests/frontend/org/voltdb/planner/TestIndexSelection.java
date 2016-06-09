@@ -50,6 +50,159 @@ public class TestIndexSelection extends PlannerTestCase {
                     planForSinglePartitionFalse);
     }
 
+    public void testGeoIndex()
+    {
+        AbstractPlanNode pn;
+        IndexScanPlanNode indexScan;
+        String jsonicIdxScan;
+
+        pn = compile(
+                "select polys.point " +
+                "from polypoints polys " +
+                "where contains(polys.poly, ?);");
+        pn = pn.getChild(0);
+        /* enable to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof IndexScanPlanNode);
+        indexScan = (IndexScanPlanNode)pn;
+        assertEquals(IndexLookupType.GEO_CONTAINS, indexScan.getLookupType());
+        jsonicIdxScan = indexScan.toJSONString();
+        /* enable to debug */ System.out.println("DEBUG: " + jsonicIdxScan);
+        assertTrue(jsonicIdxScan.contains("\"TARGET_INDEX_NAME\":\"POLYPOINTSPOLY\""));
+        // Expecting one index search key expression
+        // that is a parameter (31) of type GEOGRAPHY_POINT (26).
+        assertEquals(1, indexScan.getSearchKeyExpressions().size());
+        assertTrue(jsonicIdxScan.contains(
+                "\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":31,\"VALUE_TYPE\":26"));
+
+        pn = compile(
+                "select polys.poly, points.point " +
+                "from polypoints polys, polypoints points " +
+                "where contains(polys.poly, points.point);");
+        pn = pn.getChild(0);
+        pn = pn.getChild(0);
+        /* enable to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.GEO_CONTAINS, indexScan.getLookupType());
+        jsonicIdxScan = indexScan.toJSONString();
+        assertTrue(jsonicIdxScan.contains("\"TARGET_INDEX_NAME\":\"POLYPOINTSPOLY\""));
+        // Expecting one index search key expression
+        // that is a TVE (32) of type GEOGRAPHY_POINT (26).
+        assertEquals(1, indexScan.getSearchKeyExpressions().size());
+        assertTrue(jsonicIdxScan.contains(
+                "\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":32,\"VALUE_TYPE\":26"));
+        pn = pn.getChild(0);
+        // A non-geography index scan over a unique key for the
+        // outer scan of "points" gets injected strictly for determinism.
+        assertTrue(pn instanceof IndexScanPlanNode);
+        indexScan = (IndexScanPlanNode)pn;
+        assertEquals(IndexLookupType.GTE, indexScan.getLookupType());
+
+        pn = compile(
+                "select polys.point " +
+                "from polypoints polys " +
+                "where contains(polys.poly, ?);");
+        pn = pn.getChild(0);
+        //* enable to debug */ System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof IndexScanPlanNode);
+        indexScan = (IndexScanPlanNode)pn;
+        assertEquals(IndexLookupType.GEO_CONTAINS, indexScan.getLookupType());
+        jsonicIdxScan = indexScan.toJSONString();
+        //* enable to debug */ System.out.println("DEBUG: " + jsonicIdxScan);
+        assertTrue(jsonicIdxScan.contains("\"TARGET_INDEX_NAME\":\"POLYPOINTSPOLY\""));
+        // Expecting one index search key expression
+        // that is a parameter (31) of type GEOGRAPHY_POINT (26).
+        assertEquals(1, indexScan.getSearchKeyExpressions().size());
+        assertTrue(jsonicIdxScan.contains(
+                "\"SEARCHKEY_EXPRESSIONS\":[{\"TYPE\":31,\"VALUE_TYPE\":26"));
+    }
+
+    public void testHeadToHeadFilters() {
+        // Each pair of strings contains an indexable query filter and a pattern that
+        // its index optimization's plan will contain in its "explain" output.
+        // The pairs are sorted in preference order, so we can generally expect to find
+        // the pattern after planning a query with the filter by itself or in combination
+        // with any filter listed later. There are currently exceptions, which are
+        // counted below as "surprises", which we hope will not regress (increase)
+        // as we evolve the cost calculations. The current costing does some particularly
+        // surprising things with the relative costing of plans for predicates that
+        // generally combine use of single and/or double-ended range filters
+        // with unique and/or non-unique index filters, especially for compound indexes.
+        String head_to_head_filters[][] = {
+                {"uniquehashable = ?", "HASHUNIQUEHASH" },
+                {"component1 = ? and component2unique = ?", "COMPOUNDUNIQUE"},
+                {"primarykey = ?", "its primary" },
+                // These commented out entries tend to cause too many non-deterministic
+                // plan choices based on the order of planning same-cost plans.
+                //TODO: In some or all of these cases, we may want to think about adding
+                // tie-breaker criteria to the cost calculations, BUT this COULD cause
+                // backward incompatible plan choices that, in actual effect,
+                // could result in accidental performance regressions for existing
+                // applications that were already (empirically) tuned to rely on lucky
+                // breaks rather than deterministic costing.
+                // Long term, the particular "tie" between unique key filtering and primary key
+                // filtering MAY OR MAY NOT be something we want to change:
+                // e.g. should "primary key" be favored over a "unique key" for exact
+                // equality filters, but "unique key" preferred for non-equality
+                // filters? Should this preference be reversed when the unique key index
+                // is a hash index which must have been defined especially for equality
+                // filtering?
+                //
+                //{"uniquekey = ?", "POLYPOINTS_UNIQUEKEY" },
+                {"contains(poly, ?)", "POINTSPOLY"},
+                {"component1 = ? and component2non = ?","COMPOUNDNON" },
+                {"nonuniquekey = ?", "NONUNIQUE" },
+                {"component1 = ? and component2unique between ? and ?", "COMPOUNDUNIQUE" },
+                //{"primarykey between ? and ?", "its primary" },
+                {"uniquekey between ? and ?", "POLYPOINTS_UNIQUEKEY" },
+                //{"component1 = ? and component2non between ? and ?", "" },
+                {"nonuniquekey between ? and ?", "" },
+                {"component1 = ? and component2unique > ?", "" },
+                {"component1 = ? and component2non > ?", "COMPOUNDNON" },
+                {"primarykey > ?", "" },
+                {"uniquekey > ?", "UNIQUEKEY" },
+                {"nonuniquekey > ?", "" },
+        };
+        // Some number of "surprises" are deemed acceptable at least for now.
+        // The number was determined empirically as of V6.1.
+        final int ACCEPTABLE_SURPRISES = 5;
+        int surprises = 0;
+        StringBuffer surpriseDetails = new StringBuffer();
+        for (int ii = 0; ii < head_to_head_filters.length; ++ii) {
+            String[] filter1 = head_to_head_filters[ii];
+            for (int jj = ii+1; jj < head_to_head_filters.length; ++jj) {
+                String[] filter2 = head_to_head_filters[jj];
+
+                AbstractPlanNode pn = compile(
+                        "select polys.point from polypoints polys " +
+                        "where " + filter1[0] + " and " + filter2[0] + " ;");
+                if (pn.toExplainPlanString().contains(filter1[1])) {
+                    /* enable to debug */System.out.println();
+                }
+                else {
+                    String detail = "The query filtered by " + filter1[0] + " AND " + filter2[0] + " is not using " + filter1[1] + " index.";
+                    surpriseDetails.append(detail).append("\n");
+                    /* enable to debug */ System.out.println("WARNING: " + ii + " vs. " + jj + " " + detail);
+                    //* enable to debug */ System.out.println("DEBUG: " + ii + " vs. " + jj + " " + pn.toExplainPlanString());
+                    ++surprises;
+                }
+            }
+        }
+        if (surprises != ACCEPTABLE_SURPRISES) {
+            // Only report all of the surprise details when the number of surprises changes.
+            System.out.println("DEBUG: total plan surprises: " + surprises + " out of "
+                    + (head_to_head_filters.length * (head_to_head_filters.length-1)/2) + ".");
+            System.out.println(surpriseDetails);
+            if (surprises < ACCEPTABLE_SURPRISES) {
+                System.out.println("DEBUG: consider further constraining the baseline number to:");
+                System.out.println("        final int ACCEPTABLE_SURPRISES = " + surprises + ";");
+            }
+            // Only fail the test when the number of surprises goes up.
+            assertTrue(surprises < ACCEPTABLE_SURPRISES);
+        }
+
+    }
+
     // This tests recognition of a complex expression value
     // -- an addition -- used as an indexable join key's search key value.
     // Some time ago, this would throw a casting error in the planner.

@@ -84,6 +84,7 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
 
+                "create table long_query_table (id INTEGER NOT NULL, NAME VARCHAR(16));" +
                 "";
 
         builder.addLiteralSchema(schema);
@@ -256,13 +257,26 @@ public abstract class AdHocQueryTester extends TestCase {
         try {
             runQueryTest(String.format("SELECT * FROM PARTED1 A LEFT JOIN PARTED2 B ON A.PARTVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, NOT_VALIDATING_SP_RESULT);
         } catch (Exception pce) {
-            assertTrue(pce.toString().contains("insufficient join criteria"));
+            String msg = pce.toString();
+            assertTrue(msg.contains("This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition."));
         }
 
         // spPartialCount = runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableA, 0, 2, NOT_VALIDATING_SP_RESULT);
         // runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableB, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
 
         // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
+    }
+
+    protected static String getQueryForLongQueryTable(int numberOfPredicates) {
+        StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
+        if (numberOfPredicates > 0) {
+            string.append("WHERE ID = 123 ");
+            for (int i = 1; i < numberOfPredicates; i++) {
+                string.append("AND ID > 100 ");
+            }
+        }
+        string.append(";");
+        return string.toString();
     }
 
 }

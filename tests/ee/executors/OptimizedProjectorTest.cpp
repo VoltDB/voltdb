@@ -384,7 +384,7 @@ TEST_F(OptimizedProjectorTest, ProjectTupleValueExpressions)
     // Describe a way to move fields from one tuple to another
     std::vector<boost::shared_ptr<TupleValueExpression> > exprs(NUM_COLS);
     for (int i = 0; i < NUM_COLS; ++i) {
-        exprs[i] = boost::make_shared<TupleValueExpression>(0, i);
+        exprs[i].reset(new TupleValueExpression(0, i));
     }
 
     OptimizedProjector projector;

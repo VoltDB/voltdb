@@ -16,9 +16,9 @@
 
 package com.google_voltpatches.common.collect;
 
-import java.util.AbstractMap;
+import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
+
 import java.util.Iterator;
-import java.util.Map;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.NoSuchElementException;
@@ -32,7 +32,8 @@ import javax.annotation_voltpatches.Nullable;
  * 
  * @author Louis Wasserman
  */
-abstract class AbstractNavigableMap<K, V> extends AbstractMap<K, V> implements NavigableMap<K, V> {
+abstract class AbstractNavigableMap<K, V> extends IteratorBasedAbstractMap<K, V>
+    implements NavigableMap<K, V> {
 
   @Override
   @Nullable
@@ -126,8 +127,6 @@ abstract class AbstractNavigableMap<K, V> extends AbstractMap<K, V> implements N
     return Maps.keyOrNull(higherEntry(key));
   }
 
-  abstract Iterator<Entry<K, V>> entryIterator();
-
   abstract Iterator<Entry<K, V>> descendingEntryIterator();
 
   @Override
@@ -156,24 +155,6 @@ abstract class AbstractNavigableMap<K, V> extends AbstractMap<K, V> implements N
   }
 
   @Override
-  public abstract int size();
-
-  @Override
-  public Set<Entry<K, V>> entrySet() {
-    return new Maps.EntrySet<K, V>() {
-      @Override
-      Map<K, V> map() {
-        return AbstractNavigableMap.this;
-      }
-
-      @Override
-      public Iterator<Entry<K, V>> iterator() {
-        return entryIterator();
-      }
-    };
-  }
-
-  @Override
   public NavigableSet<K> descendingKeySet() {
     return descendingMap().navigableKeySet();
   }
@@ -194,5 +175,4 @@ abstract class AbstractNavigableMap<K, V> extends AbstractMap<K, V> implements N
       return descendingEntryIterator();
     }
   }
-
 }

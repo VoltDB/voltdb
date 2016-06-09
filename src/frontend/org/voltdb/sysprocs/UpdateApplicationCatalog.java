@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.lang.Class;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.StatsSelector;
@@ -51,7 +51,6 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
@@ -160,8 +159,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     public static class JavaClassForTest {
-        public Class forName(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException {
-            return Class.forName(name, initialize, loader);
+        public Class<?> forName(String name, boolean initialize, ClassLoader jarfileLoader) throws ClassNotFoundException {
+            return CatalogContext.classForProcedure(name, jarfileLoader);
         }
     }
 
@@ -278,13 +277,16 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
-                        getVoltPrivateRealTransactionIdDontUseMe(),
+                        DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
-                context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
+                long uniqueId = m_runner.getUniqueId();
+                long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                context.updateCatalog(commands, p.getFirst(), p.getSecond(),
+                        requiresSnapshotIsolation, uniqueId, spHandle);
 
                 log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                         CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
@@ -388,6 +390,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @param expectedCatalogVersion
      * @return Standard STATUS table.
      */
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
                            byte[] catalogHash,
@@ -452,7 +455,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogUtil.updateCatalogToZK(
                 zk,
                 expectedCatalogVersion + 1,
-                getVoltPrivateRealTransactionIdDontUseMe(),
+                DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 getUniqueId(),
                 catalogBytes,
                 deploymentBytes);

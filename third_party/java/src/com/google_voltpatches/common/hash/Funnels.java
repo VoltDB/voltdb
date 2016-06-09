@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -30,6 +31,7 @@ import javax.annotation_voltpatches.Nullable;
  * @since 11.0
  */
 @Beta
+@CheckReturnValue
 public final class Funnels {
   private Funnels() {}
 
@@ -47,7 +49,8 @@ public final class Funnels {
       into.putBytes(from);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.byteArrayFunnel()";
     }
   }
@@ -70,7 +73,8 @@ public final class Funnels {
       into.putUnencodedChars(from);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.unencodedCharsFunnel()";
     }
   }
@@ -96,11 +100,13 @@ public final class Funnels {
       into.putString(from, charset);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.stringFunnel(" + charset.name() + ")";
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof StringCharsetFunnel) {
         StringCharsetFunnel funnel = (StringCharsetFunnel) o;
         return this.charset.equals(funnel.charset);
@@ -108,7 +114,8 @@ public final class Funnels {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return StringCharsetFunnel.class.hashCode() ^ charset.hashCode();
     }
 
@@ -147,7 +154,8 @@ public final class Funnels {
       into.putInt(from);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.integerFunnel()";
     }
   }
@@ -175,11 +183,13 @@ public final class Funnels {
       }
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.sequentialFunnel(" + elementFunnel + ")";
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof SequentialFunnel) {
         SequentialFunnel<?> funnel = (SequentialFunnel<?>) o;
         return elementFunnel.equals(funnel.elementFunnel);
@@ -187,7 +197,8 @@ public final class Funnels {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return SequentialFunnel.class.hashCode() ^ elementFunnel.hashCode();
     }
   }
@@ -208,7 +219,8 @@ public final class Funnels {
       into.putLong(from);
     }
     
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.longFunnel()";
     }
   }
@@ -229,23 +241,28 @@ public final class Funnels {
   
   private static class SinkAsStream extends OutputStream {
     final PrimitiveSink sink;
+
     SinkAsStream(PrimitiveSink sink) {
       this.sink = Preconditions.checkNotNull(sink);
     }
     
-    @Override public void write(int b) {
+    @Override
+    public void write(int b) {
       sink.putByte((byte) b);
     }
 
-    @Override public void write(byte[] bytes) {
+    @Override
+    public void write(byte[] bytes) {
       sink.putBytes(bytes);
     }
 
-    @Override public void write(byte[] bytes, int off, int len) {
+    @Override
+    public void write(byte[] bytes, int off, int len) {
       sink.putBytes(bytes, off, len);
     }
     
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Funnels.asOutputStream(" + sink + ")";
     }
   }

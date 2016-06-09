@@ -147,14 +147,14 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
   /// two loops cross.
   for (int i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-      VMLOG(2, msg) << "Loop " << i << " encloses more than half the sphere";
+      VMLOG(2, msg) << "Ring " << i << " encloses more than half the sphere";
       return false;
     }
     for (int j = i + 1; j < loops.size(); ++j) {
       /// This test not only checks for edge crossings, it also detects
       /// cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
-        VMLOG(2, msg) << "Loop " << i << " crosses loop " << j;
+        VMLOG(2, msg) << "Ring " << i << " crosses ring " << j;
         return false;
       }
     }

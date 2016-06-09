@@ -43,6 +43,8 @@ vector<string> IndexStats::generateIndexStatsColumnNames() {
     return columnNames;
 }
 
+// make sure to update schema in frontend sources (like IndexStats.java) and tests when updating
+// the index-stats schema in here.
 void IndexStats::populateIndexStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
@@ -87,8 +89,8 @@ void IndexStats::populateIndexStatsSchema(
     inBytes.push_back(false);
 
     // memory usage
-    types.push_back(VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
     inBytes.push_back(false);
 }
@@ -183,11 +185,6 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
         m_lastMemEstimate = m_index->getMemoryEstimate();
     }
 
-    if (mem_estimate_kb > INT32_MAX)
-    {
-        mem_estimate_kb = -1;
-    }
-
     tuple->setNValue(
             StatsSource::m_columnName2Index["IS_UNIQUE"],
             ValueFactory::getTinyIntValue(m_isUnique));
@@ -198,7 +195,7 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
             ValueFactory::getBigIntValue(count));
     tuple->setNValue(StatsSource::m_columnName2Index["MEMORY_ESTIMATE"],
                      ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(mem_estimate_kb)));
+                     getBigIntValue(mem_estimate_kb));
 }
 
 /**

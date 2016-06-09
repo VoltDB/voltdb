@@ -32,7 +32,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -91,7 +91,7 @@ public class TestSecuritySuite extends RegressionSuite {
         this.m_password = "wrongpassword";
         boolean exceptionThrown = false;
         try {
-            getClient(ClientAuthHashScheme.HASH_SHA1);
+            getClient(ClientAuthScheme.HASH_SHA1);
         } catch (IOException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -106,7 +106,7 @@ public class TestSecuritySuite extends RegressionSuite {
         this.m_username = "wronguser";
         exceptionThrown = false;
         try {
-            getClient(ClientAuthHashScheme.HASH_SHA1);
+            getClient(ClientAuthScheme.HASH_SHA1);
         } catch (IOException e) {
             e.printStackTrace();
             exceptionThrown = true;

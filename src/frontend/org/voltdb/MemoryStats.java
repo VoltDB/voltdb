@@ -29,10 +29,10 @@ import org.voltdb.utils.SystemStatsCollector;
 public class MemoryStats extends StatsSource {
     static class PartitionMemRow {
         long tupleCount = 0;
-        int tupleDataMem = 0;
-        int tupleAllocatedMem = 0;
-        int indexMem = 0;
-        int stringMem = 0;
+        long tupleDataMem = 0;
+        long tupleAllocatedMem = 0;
+        long indexMem = 0;
+        long stringMem = 0;
         long pooledMem = 0;
     }
     Map<Long, PartitionMemRow> m_memoryStats = new TreeMap<Long, PartitionMemRow>();
@@ -74,10 +74,10 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("RSS", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUSED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUNUSED", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
@@ -124,10 +124,10 @@ public class MemoryStats extends StatsSource {
 
     public synchronized void eeUpdateMemStats(long siteId,
                                               long tupleCount,
-                                              int tupleDataMem,
-                                              int tupleAllocatedMem,
-                                              int indexMem,
-                                              int stringMem,
+                                              long tupleDataMem,
+                                              long tupleAllocatedMem,
+                                              long indexMem,
+                                              long stringMem,
                                               long pooledMemory) {
         PartitionMemRow pmr = new PartitionMemRow();
         pmr.tupleCount = tupleCount;

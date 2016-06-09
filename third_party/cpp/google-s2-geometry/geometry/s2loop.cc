@@ -134,11 +134,7 @@ bool S2Loop::IsValid(std::stringstream *msg) const {
         crosses = crosser.RobustCrossing(&vertex(ai+1)) > 0;
         previous_index = ai + 1;
         if (crosses) {
-		  VMLOG(2, msg) << "Edges " << i << " and " << ai << " cross" << std::endl
-	                    << "Edge locations in degrees: "
-					    << S2LatLng(vertex(i)) << "-" << S2LatLng(vertex(i+1))
-					    << " and "
-					    << S2LatLng(vertex(ai)) << "-" << S2LatLng(vertex(ai+1));
+		  VMLOG(2, msg) << "Edges " << i << " and " << ai << " cross";
           break;
         }
       }
@@ -284,7 +280,7 @@ bool S2Loop::IsNormalized(std::stringstream *msg) const {
   /// that it does not require its input loops to be normalized.
   double turningAngle = GetTurningAngle();
   if (turningAngle < -1e-14 && msg) {
-      (*msg) << "Polygons cannot be larger than a hemisphere." << std::endl;
+      (*msg) << "Polygons cannot be larger than a hemisphere";
   }
 
   return turningAngle >= -1e-14;

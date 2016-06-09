@@ -161,12 +161,12 @@ abstract public class Scheduler implements InitiatorMessageHandler
     }
 
     /**
-     * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
+     * Update last seen uniqueIds in the replay sequencer. This is used on MPI repair.
      * @param message
      */
-    public void updateLastSeenTxnIds(VoltMessage message)
+    public void updateLastSeenUniqueIds(VoltMessage message)
     {
-        long sequenceWithTxnId = Long.MIN_VALUE;
+        long sequenceWithUniqueId = Long.MIN_VALUE;
 
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
@@ -181,17 +181,19 @@ abstract public class Scheduler implements InitiatorMessageHandler
         assert(!(commandLog && drV1));
 
         if (commandLog || sentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
         }
         else if (drV1) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            // should be dead path, mark for future removal
+            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
+            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 
         if (replay) {
             // Update last seen and last polled txnId for replicas
-            m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+            m_replaySequencer.updateLastSeenUniqueId(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
-            m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+            m_replaySequencer.updateLastPolledUniqueId(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);
         }
     }

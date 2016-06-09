@@ -164,6 +164,10 @@ final public class TxnEgo {
         return retval.toString();
     }
 
+    public static String txnIdSeqToString(long txnId) {
+        return Long.toString(TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO);
+    }
+
     public static String txnIdToString(long txnId)
     {
         return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +

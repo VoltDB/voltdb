@@ -1,5 +1,4 @@
-Windowing Example Using DDL
-==============
+# Windowing Example Using DDL
 
 This app is a modified form of the "windowing" app, also in the examples directory.  It does the following on a single-table schema:
 
@@ -16,9 +15,11 @@ Quickstart
 VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create" to start an empty, single-node VoltDB server.
-3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
+3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
 4. Type "./run.sh client" to run the client code.
+
+You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
 
 The default settings for the client have it running for 2 minutes, and inserting at rows at a rate such that the table can comfortably hold 30s of tuples without any inserts hitting the row limit and failing.
 
@@ -26,28 +27,40 @@ Note that the downloaded VoltDB kits include pre-compiled stored procedures and 
 
 
 Other run.sh Actions
---------------
+---------------------------
 - *run.sh* : start the server
 - *run.sh server* : start the server
-- *run.sh init* : load the schema and stored procedures
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
 - *run.sh jars* : compile all Java clients and stored procedures into two Java jarfiles
-- *run.sh client* : start the client
+- *run.sh client* : start the client, more than 1 client is permitted
 - *run.sh clean* : remove compilation and runtime artifacts
 - *run.sh cleanall* : remove compilation and runtime artifacts *and* the two included jarfiles
 
+If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-run.sh Client Options
---------------
-Near the bottom of the run.sh bash script is the section run when you type `run.sh client`. In that section is the actual shell command to run the client code, reproduced below:
+Client Behavior Options
+---------------------------
+You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
 
-    java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        ddlwindowing.WindowingApp \
-        --displayinterval=5 \              # how often to print the report
-        --duration=120 \                   # how long to run for
-        --servers=localhost:21212 \        # servers to connect to
-        --ratelimit=20000                  # rate limit for random inserts
+**Speed & Duration:**
 
-Changing these settings changes the behavior of the app.
+    --displayinterval=5           (seconds between status reports)
+    --warmup=5                    (how long to warm up before measuring
+                                   benchmark performance.)
+    --duration=120                (benchmark duration in seconds)
+    --ratelimit=20000             (run up to this rate of requests/second)
+
+**Cluster Info:**
+
+    --servers=$SERVERS            (host(s) client connect to, e.g.
+                                   =localhost
+                                   =localhost:21212
+                                   =volt9a,volt9b,volt9c
+                                   =foo.example.com:21212,bar.example.com:21212)
+
+Customizing this Example
+---------------------------
+See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
 
 
 How does the EXECUTE action of a LIMIT PARTITION ROWS constraint work?
@@ -91,7 +104,7 @@ When the insertion rate is slow, there may be stale data in the table.  Older da
 
 When the insertion rate becomes faster than is appropriate for the current row limit, two things may happen, depending on deletion criteria.  If only old rows are deleted, then inserts may begin to fail with a constraint violation if space cannot be made for new rows---new data arrives, but none of the existing tuples are yet old enough to be aged out.  If we make the delete less selective, such that it just deletes some fixed number of the oldest rows (without requiring them to be older than a certain age), then we may age out rows that are younger than the time window that we care about.
 
-The database administrator has a couple options when this happens.  He or she can increase the per-partition row limit for the table (and accept the increased memory cost that this implies).  In version 5.0, this can be done on a running database by executing the `ALTER TABLE ... ADD CONSTRAINT` command.  Alternatively, the adminstrator could expand the cluster by adding new nodes, as more partitions means fewer rows per partition.  Elastically expanding a cluster can also be done online, without shutting down the database.
+The database administrator has a couple options when this happens.  He or she can increase the per-partition row limit for the table (and accept the increased memory cost that this implies).  In version 5.0, this can be done on a running database by executing the `ALTER TABLE ... ADD CONSTRAINT` command.  Alternatively, the administrator could expand the cluster by adding new nodes, as more partitions means fewer rows per partition.  Elastically expanding a cluster can also be done online, without shutting down the database.
 
 To see how insertion rate affects the performance of this example app, try playing with the `--ratelimit` setting in the client.
 

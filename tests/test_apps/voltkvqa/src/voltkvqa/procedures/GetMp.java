@@ -27,11 +27,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo
-(
-    singlePartition = false
-)
-
 public class GetMp extends VoltProcedure
 {
     // Selects a key/value pair's value

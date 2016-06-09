@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -671,6 +672,7 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
+    @Override
     public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
@@ -1219,6 +1221,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1330,36 +1333,40 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_MOD : {
                 if (nodes[0].dataType == null) {
-                    nodes[1].dataType = nodes[0].dataType;
+                    if (nodes[1].dataType == null) {
+                        throw Error.error(ErrorCode.X_42567);
+                    }
+                    if (nodes[0].dataType.isIntegralType()) {
+                        nodes[0].dataType = Type.SQL_BIGINT;
+                    }
+                    else {
+                        nodes[0].dataType = nodes[1].dataType;
+                    }
                 }
 
                 if (nodes[1].dataType == null) {
-                    nodes[0].dataType = nodes[1].dataType;
+                    nodes[1].dataType = nodes[0].dataType;
                 }
 
-                if (nodes[0].dataType == null) {
-                    throw Error.error(ErrorCode.X_42567);
-                }
-
-                if (!nodes[0].dataType.isNumberType()
-                        || !nodes[1].dataType.isNumberType()) {
+                // Only allow integral (standard) and decimal
+                // (actually a non-standard extension when
+                // "scale != 0", supported by customer request).
+                if (!(nodes[0].dataType.isIntegralType() || nodes[0].dataType.typeCode == Types.SQL_DECIMAL)) {
                     throw Error.error(ErrorCode.X_42565);
                 }
-                // A VoltDB extension
-                if (!nodes[0].dataType.isIntegralType() || !nodes[1].dataType.isIntegralType()) {
-                    throw new RuntimeException("unsupported non-integral type for SQL MOD function");
+
+                if (!(nodes[1].dataType.isIntegralType() || nodes[1].dataType.typeCode == Types.SQL_DECIMAL)) {
+                    throw Error.error(ErrorCode.X_42565);
                 }
-                // End of VoltDB extension
 
-                nodes[0].dataType =
-                    ((NumberType) nodes[0].dataType).getIntegralType();
-                nodes[1].dataType =
-                    ((NumberType) nodes[1].dataType).getIntegralType();
-                dataType = nodes[1].dataType;
-                // A VoltDB extension to customize the SQL function set support
+                // Don't allow mixing of integral and decimal types
+                // (by the decision of the requesting customer).
+                if (nodes[0].dataType.isIntegralType() != nodes[1].dataType.isIntegralType()) {
+                    throw Error.error(ErrorCode.X_42565);
+                }
+
                 parameterArg = 1;
-                // End of VoltDB extension
-
+                dataType = nodes[1].dataType;
                 break;
             }
             case FUNC_POWER : {
@@ -1789,6 +1796,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -2078,6 +2086,7 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
@@ -2088,6 +2097,7 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return opType + funcType;
     }
@@ -2095,6 +2105,7 @@ public class FunctionSQL extends Expression {
     /**
      * Returns a String representation of this object. <p>
      */
+    @Override
     public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -2429,7 +2440,26 @@ public class FunctionSQL extends Expression {
             }
             else {
                 exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT));
+            }
+            return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN:
+            Type firstArgType = nodes[0].dataType;
+            Type secondArgType = nodes[1].dataType;
+            Type thirdArgType = nodes[2].dataType;
+
+            // valid first and second arguments are geo types
+            // third argument, distance, is a numeric type
+            // resolveTypes() has logic to perform the type-validity for arguments
+            assert(firstArgType.isGeographyType() || firstArgType.isGeographyPointType());
+            assert(secondArgType.isGeographyPointType());
+            assert(thirdArgType.isNumberType());
+
+            if (firstArgType.isGeographyType()) {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN_POLYGON_POINT));
+            }
+            else {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DWITHIN_POINT_POINT));
             }
             return exp;
 
@@ -2502,7 +2532,7 @@ public class FunctionSQL extends Expression {
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
-            
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);

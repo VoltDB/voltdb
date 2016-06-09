@@ -198,7 +198,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,  -663.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -652.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -641.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,  -630.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -618.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -607.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -596.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -214,7 +214,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,  -483.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -472.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -461.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,  -450.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -438.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -427.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -416.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -230,7 +230,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,  -303.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -292.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -281.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,  -270.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -258.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -247.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -236.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -246,7 +246,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,  -123.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -112.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,  -101.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,   -90.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   -78.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   -67.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   -56.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -262,7 +262,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,    56.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,    67.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,    78.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,    90.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   101.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   112.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   123.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -278,7 +278,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,   236.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   247.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   258.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,   270.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   281.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   292.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   303.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -294,7 +294,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,   416.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   427.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   438.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,   450.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   461.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   472.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   483.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -310,7 +310,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -708.7500,   596.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   607.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   618.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -708.7500,   630.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -708.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   641.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   652.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -708.7500,   663.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -329,7 +329,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,  -663.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -652.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -641.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,  -630.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -618.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -607.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -596.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -345,7 +345,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,  -483.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -472.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -461.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,  -450.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -438.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -427.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -416.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -361,7 +361,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,  -303.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -292.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -281.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,  -270.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -258.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -247.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -236.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -377,7 +377,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,  -123.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -112.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,  -101.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,   -90.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   -78.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   -67.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   -56.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -393,7 +393,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,    56.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,    67.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,    78.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,    90.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   101.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   112.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   123.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -409,7 +409,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,   236.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   247.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   258.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,   270.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   281.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   292.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   303.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -425,7 +425,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,   416.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   427.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   438.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,   450.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   461.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   472.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   483.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -441,7 +441,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -697.5000,   596.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   607.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   618.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -697.5000,   630.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -697.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   641.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   652.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -697.5000,   663.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -460,7 +460,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,  -663.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -652.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -641.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,  -630.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -618.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -607.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -596.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -476,7 +476,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,  -483.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -472.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -461.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,  -450.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -438.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -427.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -416.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -492,7 +492,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,  -303.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -292.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -281.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,  -270.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -258.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -247.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -236.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -508,7 +508,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,  -123.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -112.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,  -101.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,   -90.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   -78.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   -67.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   -56.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -524,7 +524,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,    56.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,    67.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,    78.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,    90.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   101.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   112.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   123.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -540,7 +540,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,   236.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   247.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   258.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,   270.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   281.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   292.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   303.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -556,7 +556,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,   416.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   427.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   438.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,   450.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   461.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   472.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   483.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -572,7 +572,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -686.2500,   596.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   607.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   618.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -686.2500,   630.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -686.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   641.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   652.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -686.2500,   663.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -591,7 +591,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,  -663.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -652.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -641.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,  -630.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -618.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -607.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -596.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -607,7 +607,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,  -483.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -472.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -461.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,  -450.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -438.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -427.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -416.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -623,7 +623,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,  -303.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -292.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -281.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,  -270.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -258.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -247.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -236.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -639,7 +639,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,  -123.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -112.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,  -101.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,   -90.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   -78.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   -67.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   -56.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -655,7 +655,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,    56.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,    67.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,    78.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,    90.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   101.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   112.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   123.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -671,7 +671,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,   236.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   247.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   258.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,   270.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   281.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   292.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   303.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -687,7 +687,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,   416.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   427.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   438.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,   450.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   461.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   472.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   483.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -703,7 +703,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -675.0000,   596.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   607.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   618.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -675.0000,   630.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -675.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   641.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   652.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -675.0000,   663.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -722,7 +722,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,  -663.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -652.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -641.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,  -630.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -618.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -607.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -596.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -738,7 +738,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,  -483.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -472.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -461.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,  -450.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -438.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -427.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -416.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -754,7 +754,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,  -303.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -292.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -281.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,  -270.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -258.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -247.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -236.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -770,7 +770,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,  -123.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -112.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,  -101.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,   -90.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   -78.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   -67.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   -56.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -786,7 +786,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,    56.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,    67.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,    78.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,    90.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   101.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   112.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   123.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -802,7 +802,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,   236.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   247.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   258.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,   270.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   281.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   292.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   303.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -818,7 +818,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,   416.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   427.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   438.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,   450.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   461.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   472.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   483.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -834,7 +834,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -663.7500,   596.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   607.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   618.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -663.7500,   630.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -663.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   641.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   652.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -663.7500,   663.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -853,7 +853,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,  -663.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -652.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -641.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,  -630.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -618.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -607.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -596.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -869,7 +869,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,  -483.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -472.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -461.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,  -450.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -438.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -427.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -416.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -885,7 +885,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,  -303.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -292.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -281.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,  -270.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -258.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -247.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -236.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -901,7 +901,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,  -123.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -112.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,  -101.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,   -90.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   -78.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   -67.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   -56.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -917,7 +917,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,    56.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,    67.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,    78.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,    90.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   101.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   112.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   123.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -933,7 +933,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,   236.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   247.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   258.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,   270.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   281.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   292.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   303.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -949,7 +949,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,   416.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   427.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   438.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,   450.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   461.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   472.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   483.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -965,7 +965,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -652.5000,   596.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   607.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   618.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -652.5000,   630.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -652.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   641.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   652.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -652.5000,   663.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -984,7 +984,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,  -663.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -652.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -641.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,  -630.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -618.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -607.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -596.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -1000,7 +1000,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,  -483.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -472.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -461.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,  -450.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -438.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -427.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -416.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -1016,7 +1016,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,  -303.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -292.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -281.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,  -270.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -258.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -247.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -236.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -1032,7 +1032,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,  -123.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -112.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,  -101.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,   -90.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   -78.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   -67.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   -56.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -1048,7 +1048,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,    56.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,    67.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,    78.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,    90.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   101.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   112.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   123.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -1064,7 +1064,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,   236.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   247.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   258.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,   270.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   281.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   292.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   303.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -1080,7 +1080,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,   416.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   427.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   438.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,   450.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   461.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   472.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   483.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -1096,7 +1096,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -641.2500,   596.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   607.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   618.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -641.2500,   630.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -641.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   641.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   652.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -641.2500,   663.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -1115,7 +1115,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,  -663.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -652.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -641.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,  -630.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -618.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -607.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -596.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -1131,7 +1131,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,  -483.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -472.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -461.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,  -450.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -438.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -427.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -416.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -1147,7 +1147,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,  -303.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -292.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -281.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,  -270.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -258.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -247.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -236.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -1163,7 +1163,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,  -123.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -112.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,  -101.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,   -90.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   -78.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   -67.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   -56.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -1179,7 +1179,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,    56.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,    67.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,    78.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,    90.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   101.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   112.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   123.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -1195,7 +1195,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,   236.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   247.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   258.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,   270.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   281.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   292.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   303.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -1211,7 +1211,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,   416.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   427.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   438.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,   450.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   461.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   472.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   483.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -1227,7 +1227,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -630.0000,   596.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   607.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   618.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -630.0000,   630.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -630.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   641.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   652.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -630.0000,   663.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -1246,7 +1246,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,  -663.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -652.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -641.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,  -630.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -618.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -607.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -596.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -1262,7 +1262,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,  -483.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -472.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -461.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,  -450.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -438.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -427.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -416.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -1278,7 +1278,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,  -303.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -292.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -281.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,  -270.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -258.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -247.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -236.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -1294,7 +1294,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,  -123.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -112.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,  -101.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,   -90.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   -78.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   -67.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   -56.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -1310,7 +1310,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,    56.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,    67.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,    78.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,    90.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   101.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   112.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   123.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -1326,7 +1326,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,   236.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   247.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   258.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,   270.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   281.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   292.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   303.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -1342,7 +1342,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,   416.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   427.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   438.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,   450.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   461.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   472.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   483.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -1358,7 +1358,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -618.7500,   596.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   607.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   618.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -618.7500,   630.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -618.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   641.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   652.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -618.7500,   663.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -1377,7 +1377,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,  -663.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -652.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -641.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,  -630.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -618.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -607.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -596.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -1393,7 +1393,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,  -483.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -472.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -461.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,  -450.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -438.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -427.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -416.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -1409,7 +1409,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,  -303.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -292.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -281.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,  -270.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -258.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -247.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -236.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -1425,7 +1425,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,  -123.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -112.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,  -101.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,   -90.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   -78.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   -67.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   -56.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -1441,7 +1441,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,    56.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,    67.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,    78.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,    90.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   101.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   112.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   123.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -1457,7 +1457,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,   236.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   247.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   258.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,   270.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   281.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   292.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   303.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -1473,7 +1473,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,   416.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   427.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   438.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,   450.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   461.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   472.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   483.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -1489,7 +1489,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -607.5000,   596.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   607.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   618.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -607.5000,   630.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -607.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   641.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   652.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -607.5000,   663.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -1508,7 +1508,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,  -663.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -652.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -641.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,  -630.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -618.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -607.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -596.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -1524,7 +1524,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,  -483.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -472.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -461.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,  -450.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -438.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -427.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -416.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -1540,7 +1540,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,  -303.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -292.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -281.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,  -270.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -258.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -247.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -236.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -1556,7 +1556,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,  -123.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -112.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,  -101.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,   -90.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   -78.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   -67.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   -56.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -1572,7 +1572,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,    56.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,    67.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,    78.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,    90.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   101.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   112.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   123.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -1588,7 +1588,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,   236.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   247.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   258.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,   270.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   281.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   292.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   303.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -1604,7 +1604,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,   416.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   427.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   438.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,   450.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   461.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   472.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   483.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -1620,7 +1620,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -596.2500,   596.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   607.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   618.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -596.2500,   630.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -596.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   641.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   652.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -596.2500,   663.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -1639,7 +1639,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,  -663.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -652.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -641.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,  -630.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -618.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -607.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -596.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -1655,7 +1655,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,  -483.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -472.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -461.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,  -450.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -438.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -427.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -416.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -1671,7 +1671,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,  -303.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -292.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -281.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,  -270.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -258.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -247.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -236.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -1687,7 +1687,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,  -123.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -112.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,  -101.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,   -90.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   -78.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   -67.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   -56.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -1703,7 +1703,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,    56.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,    67.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,    78.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,    90.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   101.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   112.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   123.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -1719,7 +1719,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,   236.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   247.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   258.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,   270.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   281.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   292.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   303.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -1735,7 +1735,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,   416.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   427.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   438.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,   450.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   461.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   472.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   483.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -1751,7 +1751,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -585.0000,   596.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   607.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   618.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -585.0000,   630.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -585.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   641.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   652.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -585.0000,   663.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -1770,7 +1770,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,  -663.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -652.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -641.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,  -630.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -618.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -607.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -596.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -1786,7 +1786,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,  -483.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -472.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -461.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,  -450.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -438.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -427.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -416.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -1802,7 +1802,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,  -303.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -292.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -281.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,  -270.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -258.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -247.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -236.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -1818,7 +1818,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,  -123.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -112.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,  -101.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,   -90.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   -78.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   -67.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   -56.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -1834,7 +1834,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,    56.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,    67.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,    78.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,    90.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   101.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   112.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   123.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -1850,7 +1850,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,   236.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   247.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   258.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,   270.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   281.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   292.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   303.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -1866,7 +1866,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,   416.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   427.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   438.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,   450.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   461.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   472.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   483.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -1882,7 +1882,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -573.7500,   596.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   607.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   618.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -573.7500,   630.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -573.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   641.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   652.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -573.7500,   663.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -1901,7 +1901,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,  -663.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -652.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -641.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,  -630.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -618.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -607.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -596.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -1917,7 +1917,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,  -483.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -472.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -461.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,  -450.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -438.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -427.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -416.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -1933,7 +1933,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,  -303.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -292.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -281.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,  -270.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -258.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -247.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -236.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -1949,7 +1949,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,  -123.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -112.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,  -101.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,   -90.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   -78.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   -67.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   -56.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -1965,7 +1965,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,    56.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,    67.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,    78.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,    90.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   101.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   112.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   123.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -1981,7 +1981,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,   236.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   247.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   258.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,   270.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   281.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   292.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   303.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -1997,7 +1997,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,   416.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   427.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   438.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,   450.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   461.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   472.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   483.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -2013,7 +2013,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -562.5000,   596.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   607.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   618.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -562.5000,   630.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -562.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   641.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   652.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -562.5000,   663.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -2032,7 +2032,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,  -663.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -652.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -641.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,  -630.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -618.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -607.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -596.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -2048,7 +2048,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,  -483.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -472.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -461.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,  -450.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -438.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -427.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -416.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -2064,7 +2064,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,  -303.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -292.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -281.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,  -270.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -258.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -247.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -236.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -2080,7 +2080,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,  -123.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -112.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,  -101.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,   -90.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   -78.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   -67.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   -56.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -2096,7 +2096,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,    56.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,    67.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,    78.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,    90.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   101.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   112.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   123.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -2112,7 +2112,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,   236.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   247.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   258.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,   270.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   281.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   292.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   303.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -2128,7 +2128,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,   416.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   427.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   438.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,   450.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   461.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   472.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   483.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -2144,7 +2144,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,   596.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   607.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   618.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -551.2500,   630.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -551.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   641.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   652.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -551.2500,   663.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -2155,15 +2155,15 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -551.2500,   720.0000, 1.0,   168.7500,     0.0000, EPSILON);
     }
     public void testGeographyNormalizeLntLat16() throws Exception {
-        checkGeographyNormalizeLngLat( -540.0000,  -720.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -708.7500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -697.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -686.2500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -675.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -663.7500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -652.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -641.2500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -630.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -720.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -708.7500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -697.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -686.2500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -675.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -663.7500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -652.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -641.2500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -618.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -607.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -596.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -2179,23 +2179,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -540.0000,  -483.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -472.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -461.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -450.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -438.7500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -427.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -416.2500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -405.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -393.7500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -382.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -371.2500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -360.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -348.7500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -337.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -326.2500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -315.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -303.7500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -292.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -281.2500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,  -270.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -438.7500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -427.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -416.2500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -405.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -393.7500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -382.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -371.2500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -360.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -348.7500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -337.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -326.2500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -315.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -303.7500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -292.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -281.2500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -258.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -247.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -236.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -2211,23 +2211,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -540.0000,  -123.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -112.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,  -101.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -90.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -78.7500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -67.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -56.2500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -45.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -33.7500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -22.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   -11.2500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,     0.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    11.2500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    22.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    33.7500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    45.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    56.2500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    67.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    78.7500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,    90.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -78.7500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -67.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -56.2500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -45.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -33.7500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -22.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   -11.2500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,     0.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    11.2500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    22.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    33.7500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    45.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    56.2500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    67.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    78.7500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   101.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   112.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   123.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -2243,23 +2243,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -540.0000,   236.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   247.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   258.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   270.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   281.2500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   292.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   303.7500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   315.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   326.2500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   337.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   348.7500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   360.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   371.2500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   382.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   393.7500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   405.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   416.2500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   427.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   438.7500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   450.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   281.2500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   292.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   303.7500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   315.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   326.2500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   337.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   348.7500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   360.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   371.2500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   382.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   393.7500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   405.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   416.2500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   427.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   438.7500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   461.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   472.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   483.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -2275,15 +2275,15 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -540.0000,   596.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   607.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -540.0000,   618.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   630.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   641.2500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   652.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   663.7500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   675.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   686.2500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   697.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   708.7500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -540.0000,   720.0000, 1.0,  -180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   641.2500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   652.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   663.7500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   675.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   686.2500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   697.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   708.7500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -540.0000,   720.0000, 1.0,   180.0000,     0.0000, EPSILON);
     }
     public void testGeographyNormalizeLntLat17() throws Exception {
         checkGeographyNormalizeLngLat( -528.7500,  -720.0000, 1.0,  -168.7500,     0.0000, EPSILON);
@@ -2294,7 +2294,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,  -663.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -652.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -641.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,  -630.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -618.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -607.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -596.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -2310,7 +2310,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,  -483.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -472.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -461.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,  -450.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -438.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -427.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -416.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -2326,7 +2326,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,  -303.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -292.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -281.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,  -270.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -258.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -247.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -236.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -2342,7 +2342,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,  -123.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -112.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,  -101.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,   -90.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   -78.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   -67.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   -56.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -2358,7 +2358,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,    56.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,    67.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,    78.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,    90.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   101.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   112.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   123.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -2374,7 +2374,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,   236.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   247.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   258.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,   270.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   281.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   292.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   303.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -2390,7 +2390,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,   416.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   427.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   438.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,   450.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   461.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   472.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   483.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -2406,7 +2406,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -528.7500,   596.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   607.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   618.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -528.7500,   630.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -528.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   641.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   652.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -528.7500,   663.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -2425,7 +2425,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,  -663.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -652.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -641.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,  -630.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -618.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -607.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -596.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -2441,7 +2441,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,  -483.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -472.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -461.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,  -450.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -438.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -427.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -416.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -2457,7 +2457,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,  -303.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -292.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -281.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,  -270.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -258.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -247.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -236.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -2473,7 +2473,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,  -123.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -112.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,  -101.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,   -90.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   -78.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   -67.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   -56.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -2489,7 +2489,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,    56.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,    67.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,    78.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,    90.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   101.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   112.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   123.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -2505,7 +2505,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,   236.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   247.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   258.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,   270.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   281.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   292.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   303.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -2521,7 +2521,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,   416.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   427.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   438.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,   450.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   461.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   472.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   483.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -2537,7 +2537,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -517.5000,   596.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   607.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   618.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -517.5000,   630.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -517.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   641.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   652.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -517.5000,   663.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -2556,7 +2556,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,  -663.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -652.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -641.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,  -630.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -618.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -607.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -596.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -2572,7 +2572,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,  -483.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -472.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -461.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,  -450.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -438.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -427.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -416.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -2588,7 +2588,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,  -303.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -292.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -281.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,  -270.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -258.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -247.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -236.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -2604,7 +2604,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,  -123.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -112.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,  -101.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,   -90.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   -78.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   -67.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   -56.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -2620,7 +2620,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,    56.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,    67.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,    78.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,    90.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   101.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   112.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   123.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -2636,7 +2636,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,   236.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   247.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   258.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,   270.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   281.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   292.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   303.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -2652,7 +2652,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,   416.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   427.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   438.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,   450.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   461.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   472.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   483.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -2668,7 +2668,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -506.2500,   596.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   607.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   618.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -506.2500,   630.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -506.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   641.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   652.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -506.2500,   663.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -2687,7 +2687,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,  -663.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -652.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -641.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,  -630.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -618.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -607.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -596.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -2703,7 +2703,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,  -483.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -472.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -461.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,  -450.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -438.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -427.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -416.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -2719,7 +2719,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,  -303.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -292.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -281.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,  -270.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -258.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -247.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -236.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -2735,7 +2735,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,  -123.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -112.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,  -101.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,   -90.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   -78.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   -67.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   -56.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -2751,7 +2751,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,    56.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,    67.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,    78.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,    90.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   101.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   112.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   123.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -2767,7 +2767,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,   236.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   247.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   258.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,   270.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   281.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   292.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   303.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -2783,7 +2783,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,   416.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   427.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   438.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,   450.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   461.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   472.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   483.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -2799,7 +2799,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -495.0000,   596.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   607.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   618.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -495.0000,   630.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -495.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   641.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   652.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -495.0000,   663.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -2818,7 +2818,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,  -663.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -652.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -641.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,  -630.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -618.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -607.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -596.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -2834,7 +2834,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,  -483.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -472.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -461.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,  -450.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -438.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -427.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -416.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -2850,7 +2850,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,  -303.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -292.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -281.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,  -270.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -258.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -247.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -236.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -2866,7 +2866,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,  -123.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -112.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,  -101.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,   -90.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   -78.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   -67.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   -56.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -2882,7 +2882,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,    56.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,    67.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,    78.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,    90.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   101.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   112.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   123.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -2898,7 +2898,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,   236.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   247.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   258.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,   270.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   281.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   292.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   303.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -2914,7 +2914,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,   416.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   427.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   438.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,   450.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   461.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   472.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   483.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -2930,7 +2930,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -483.7500,   596.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   607.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   618.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -483.7500,   630.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -483.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   641.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   652.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -483.7500,   663.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -2949,7 +2949,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,  -663.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -652.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -641.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,  -630.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -618.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -607.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -596.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -2965,7 +2965,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,  -483.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -472.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -461.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,  -450.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -438.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -427.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -416.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -2981,7 +2981,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,  -303.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -292.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -281.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,  -270.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -258.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -247.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -236.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -2997,7 +2997,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,  -123.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -112.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,  -101.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,   -90.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   -78.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   -67.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   -56.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -3013,7 +3013,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,    56.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,    67.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,    78.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,    90.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   101.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   112.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   123.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -3029,7 +3029,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,   236.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   247.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   258.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,   270.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   281.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   292.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   303.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -3045,7 +3045,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,   416.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   427.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   438.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,   450.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   461.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   472.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   483.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -3061,7 +3061,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -472.5000,   596.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   607.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   618.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -472.5000,   630.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -472.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   641.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   652.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -472.5000,   663.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -3080,7 +3080,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,  -663.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -652.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -641.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,  -630.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -618.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -607.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -596.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -3096,7 +3096,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,  -483.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -472.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -461.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,  -450.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -438.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -427.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -416.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -3112,7 +3112,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,  -303.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -292.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -281.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,  -270.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -258.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -247.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -236.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -3128,7 +3128,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,  -123.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -112.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,  -101.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,   -90.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   -78.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   -67.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   -56.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -3144,7 +3144,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,    56.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,    67.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,    78.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,    90.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   101.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   112.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   123.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -3160,7 +3160,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,   236.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   247.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   258.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,   270.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   281.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   292.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   303.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -3176,7 +3176,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,   416.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   427.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   438.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,   450.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   461.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   472.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   483.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -3192,7 +3192,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -461.2500,   596.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   607.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   618.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -461.2500,   630.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -461.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   641.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   652.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -461.2500,   663.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -3211,7 +3211,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,  -663.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -652.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -641.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,  -630.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -618.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -607.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -596.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -3227,7 +3227,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,  -483.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -472.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -461.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,  -450.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -438.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -427.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -416.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -3243,7 +3243,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,  -303.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -292.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -281.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,  -270.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -258.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -247.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -236.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -3259,7 +3259,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,  -123.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -112.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,  -101.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,   -90.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   -78.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   -67.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   -56.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -3275,7 +3275,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,    56.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,    67.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,    78.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,    90.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   101.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   112.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   123.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -3291,7 +3291,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,   236.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   247.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   258.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,   270.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   281.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   292.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   303.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -3307,7 +3307,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,   416.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   427.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   438.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,   450.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   461.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   472.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   483.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -3323,7 +3323,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -450.0000,   596.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   607.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   618.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -450.0000,   630.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -450.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   641.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   652.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -450.0000,   663.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -3342,7 +3342,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,  -663.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -652.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -641.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,  -630.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -618.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -607.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -596.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -3358,7 +3358,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,  -483.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -472.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -461.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,  -450.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -438.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -427.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -416.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -3374,7 +3374,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,  -303.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -292.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -281.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,  -270.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -258.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -247.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -236.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -3390,7 +3390,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,  -123.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -112.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,  -101.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,   -90.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   -78.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   -67.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   -56.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -3406,7 +3406,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,    56.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,    67.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,    78.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,    90.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   101.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   112.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   123.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -3422,7 +3422,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,   236.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   247.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   258.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,   270.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   281.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   292.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   303.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -3438,7 +3438,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,   416.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   427.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   438.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,   450.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   461.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   472.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   483.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -3454,7 +3454,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -438.7500,   596.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   607.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   618.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -438.7500,   630.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -438.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   641.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   652.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -438.7500,   663.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -3473,7 +3473,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,  -663.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -652.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -641.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,  -630.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -618.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -607.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -596.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -3489,7 +3489,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,  -483.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -472.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -461.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,  -450.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -438.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -427.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -416.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -3505,7 +3505,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,  -303.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -292.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -281.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,  -270.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -258.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -247.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -236.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -3521,7 +3521,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,  -123.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -112.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,  -101.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,   -90.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   -78.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   -67.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   -56.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -3537,7 +3537,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,    56.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,    67.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,    78.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,    90.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   101.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   112.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   123.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -3553,7 +3553,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,   236.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   247.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   258.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,   270.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   281.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   292.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   303.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -3569,7 +3569,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,   416.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   427.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   438.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,   450.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   461.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   472.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   483.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -3585,7 +3585,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -427.5000,   596.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   607.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   618.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -427.5000,   630.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -427.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   641.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   652.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -427.5000,   663.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -3604,7 +3604,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,  -663.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -652.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -641.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,  -630.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -618.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -607.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -596.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -3620,7 +3620,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,  -483.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -472.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -461.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,  -450.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -438.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -427.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -416.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -3636,7 +3636,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,  -303.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -292.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -281.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,  -270.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -258.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -247.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -236.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -3652,7 +3652,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,  -123.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -112.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,  -101.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,   -90.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   -78.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   -67.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   -56.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -3668,7 +3668,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,    56.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,    67.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,    78.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,    90.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   101.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   112.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   123.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -3684,7 +3684,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,   236.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   247.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   258.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,   270.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   281.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   292.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   303.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -3700,7 +3700,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,   416.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   427.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   438.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,   450.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   461.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   472.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   483.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -3716,7 +3716,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -416.2500,   596.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   607.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   618.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -416.2500,   630.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -416.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   641.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   652.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -416.2500,   663.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -3735,7 +3735,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,  -663.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -652.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -641.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,  -630.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -618.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -607.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -596.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -3751,7 +3751,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,  -483.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -472.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -461.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,  -450.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -438.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -427.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -416.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -3767,7 +3767,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,  -303.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -292.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -281.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,  -270.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -258.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -247.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -236.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -3783,7 +3783,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,  -123.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -112.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,  -101.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,   -90.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   -78.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   -67.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   -56.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -3799,7 +3799,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,    56.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,    67.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,    78.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,    90.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   101.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   112.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   123.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -3815,7 +3815,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,   236.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   247.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   258.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,   270.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   281.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   292.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   303.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -3831,7 +3831,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,   416.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   427.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   438.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,   450.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   461.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   472.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   483.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -3847,7 +3847,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -405.0000,   596.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   607.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   618.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -405.0000,   630.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -405.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   641.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   652.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -405.0000,   663.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -3866,7 +3866,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,  -663.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -652.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -641.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,  -630.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -618.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -607.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -596.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -3882,7 +3882,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,  -483.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -472.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -461.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,  -450.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -438.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -427.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -416.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -3898,7 +3898,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,  -303.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -292.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -281.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,  -270.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -258.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -247.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -236.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -3914,7 +3914,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,  -123.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -112.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,  -101.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,   -90.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   -78.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   -67.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   -56.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -3930,7 +3930,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,    56.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,    67.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,    78.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,    90.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   101.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   112.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   123.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -3946,7 +3946,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,   236.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   247.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   258.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,   270.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   281.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   292.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   303.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -3962,7 +3962,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,   416.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   427.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   438.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,   450.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   461.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   472.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   483.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -3978,7 +3978,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -393.7500,   596.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   607.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   618.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -393.7500,   630.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -393.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   641.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   652.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -393.7500,   663.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -3997,7 +3997,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,  -663.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -652.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -641.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,  -630.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -618.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -607.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -596.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -4013,7 +4013,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,  -483.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -472.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -461.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,  -450.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -438.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -427.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -416.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -4029,7 +4029,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,  -303.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -292.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -281.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,  -270.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -258.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -247.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -236.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -4045,7 +4045,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,  -123.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -112.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,  -101.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,   -90.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   -78.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   -67.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   -56.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -4061,7 +4061,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,    56.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,    67.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,    78.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,    90.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   101.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   112.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   123.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -4077,7 +4077,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,   236.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   247.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   258.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,   270.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   281.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   292.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   303.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -4093,7 +4093,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,   416.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   427.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   438.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,   450.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   461.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   472.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   483.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -4109,7 +4109,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -382.5000,   596.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   607.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   618.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -382.5000,   630.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -382.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   641.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   652.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -382.5000,   663.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -4128,7 +4128,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,  -663.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -652.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -641.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,  -630.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -618.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -607.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -596.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -4144,7 +4144,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,  -483.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -472.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -461.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,  -450.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -438.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -427.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -416.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -4160,7 +4160,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,  -303.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -292.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -281.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,  -270.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -258.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -247.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -236.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -4176,7 +4176,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,  -123.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -112.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,  -101.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,   -90.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   -78.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   -67.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   -56.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -4192,7 +4192,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,    56.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,    67.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,    78.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,    90.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   101.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   112.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   123.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -4208,7 +4208,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,   236.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   247.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   258.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,   270.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   281.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   292.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   303.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -4224,7 +4224,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,   416.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   427.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   438.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,   450.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   461.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   472.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   483.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -4240,7 +4240,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -371.2500,   596.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   607.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   618.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -371.2500,   630.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -371.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   641.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   652.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -371.2500,   663.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -4390,7 +4390,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,  -663.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -652.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -641.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,  -630.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -618.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -607.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -596.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -4406,7 +4406,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,  -483.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -472.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -461.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,  -450.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -438.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -427.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -416.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -4422,7 +4422,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,  -303.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -292.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -281.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,  -270.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -258.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -247.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -236.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -4438,7 +4438,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,  -123.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -112.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,  -101.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,   -90.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   -78.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   -67.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   -56.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -4454,7 +4454,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,    56.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,    67.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,    78.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,    90.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   101.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   112.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   123.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -4470,7 +4470,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,   236.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   247.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   258.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,   270.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   281.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   292.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   303.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -4486,7 +4486,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,   416.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   427.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   438.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,   450.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   461.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   472.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   483.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -4502,7 +4502,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -348.7500,   596.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   607.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   618.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -348.7500,   630.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -348.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   641.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   652.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -348.7500,   663.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -4521,7 +4521,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,  -663.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -652.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -641.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,  -630.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -618.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -607.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -596.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -4537,7 +4537,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,  -483.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -472.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -461.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,  -450.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -438.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -427.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -416.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -4553,7 +4553,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,  -303.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -292.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -281.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,  -270.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -258.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -247.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -236.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -4569,7 +4569,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,  -123.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -112.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,  -101.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,   -90.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   -78.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   -67.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   -56.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -4585,7 +4585,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,    56.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,    67.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,    78.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,    90.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   101.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   112.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   123.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -4601,7 +4601,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,   236.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   247.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   258.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,   270.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   281.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   292.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   303.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -4617,7 +4617,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,   416.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   427.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   438.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,   450.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   461.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   472.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   483.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -4633,7 +4633,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -337.5000,   596.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   607.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   618.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -337.5000,   630.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -337.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   641.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   652.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -337.5000,   663.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -4652,7 +4652,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,  -663.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -652.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -641.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,  -630.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -618.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -607.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -596.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -4668,7 +4668,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,  -483.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -472.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -461.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,  -450.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -438.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -427.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -416.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -4684,7 +4684,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,  -303.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -292.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -281.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,  -270.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -258.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -247.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -236.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -4700,7 +4700,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,  -123.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -112.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,  -101.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,   -90.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   -78.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   -67.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   -56.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -4716,7 +4716,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,    56.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,    67.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,    78.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,    90.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   101.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   112.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   123.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -4732,7 +4732,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,   236.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   247.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   258.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,   270.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   281.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   292.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   303.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -4748,7 +4748,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,   416.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   427.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   438.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,   450.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   461.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   472.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   483.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -4764,7 +4764,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -326.2500,   596.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   607.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   618.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -326.2500,   630.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -326.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   641.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   652.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -326.2500,   663.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -4783,7 +4783,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,  -663.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -652.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -641.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,  -630.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -618.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -607.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -596.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -4799,7 +4799,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,  -483.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -472.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -461.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,  -450.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -438.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -427.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -416.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -4815,7 +4815,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,  -303.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -292.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -281.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,  -270.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -258.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -247.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -236.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -4831,7 +4831,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,  -123.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -112.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,  -101.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,   -90.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   -78.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   -67.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   -56.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -4847,7 +4847,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,    56.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,    67.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,    78.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,    90.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   101.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   112.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   123.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -4863,7 +4863,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,   236.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   247.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   258.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,   270.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   281.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   292.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   303.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -4879,7 +4879,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,   416.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   427.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   438.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,   450.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   461.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   472.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   483.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -4895,7 +4895,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -315.0000,   596.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   607.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   618.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -315.0000,   630.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -315.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   641.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   652.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -315.0000,   663.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -4914,7 +4914,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,  -663.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -652.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -641.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,  -630.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -618.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -607.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -596.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -4930,7 +4930,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,  -483.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -472.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -461.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,  -450.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -438.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -427.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -416.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -4946,7 +4946,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,  -303.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -292.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -281.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,  -270.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -258.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -247.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -236.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -4962,7 +4962,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,  -123.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -112.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,  -101.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,   -90.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   -78.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   -67.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   -56.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -4978,7 +4978,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,    56.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,    67.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,    78.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,    90.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   101.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   112.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   123.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -4994,7 +4994,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,   236.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   247.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   258.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,   270.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   281.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   292.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   303.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -5010,7 +5010,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,   416.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   427.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   438.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,   450.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   461.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   472.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   483.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -5026,7 +5026,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -303.7500,   596.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   607.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   618.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -303.7500,   630.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -303.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   641.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   652.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -303.7500,   663.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -5045,7 +5045,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,  -663.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -652.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -641.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,  -630.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -618.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -607.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -596.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -5061,7 +5061,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,  -483.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -472.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -461.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,  -450.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -438.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -427.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -416.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -5077,7 +5077,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,  -303.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -292.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -281.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,  -270.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -258.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -247.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -236.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -5093,7 +5093,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,  -123.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -112.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,  -101.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,   -90.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   -78.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   -67.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   -56.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -5109,7 +5109,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,    56.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,    67.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,    78.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,    90.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   101.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   112.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   123.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -5125,7 +5125,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,   236.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   247.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   258.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,   270.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   281.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   292.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   303.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -5141,7 +5141,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,   416.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   427.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   438.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,   450.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   461.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   472.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   483.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -5157,7 +5157,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -292.5000,   596.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   607.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   618.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -292.5000,   630.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -292.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   641.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   652.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -292.5000,   663.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -5176,7 +5176,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,  -663.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -652.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -641.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,  -630.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -618.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -607.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -596.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -5192,7 +5192,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,  -483.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -472.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -461.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,  -450.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -438.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -427.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -416.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -5208,7 +5208,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,  -303.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -292.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -281.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,  -270.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -258.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -247.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -236.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -5224,7 +5224,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,  -123.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -112.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,  -101.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,   -90.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   -78.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   -67.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   -56.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -5240,7 +5240,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,    56.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,    67.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,    78.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,    90.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   101.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   112.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   123.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -5256,7 +5256,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,   236.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   247.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   258.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,   270.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   281.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   292.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   303.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -5272,7 +5272,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,   416.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   427.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   438.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,   450.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   461.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   472.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   483.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -5288,7 +5288,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -281.2500,   596.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   607.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   618.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -281.2500,   630.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -281.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   641.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   652.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -281.2500,   663.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -5307,7 +5307,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,  -663.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -652.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -641.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,  -630.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -618.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -607.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -596.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -5323,7 +5323,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,  -483.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -472.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -461.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,  -450.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -438.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -427.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -416.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -5339,7 +5339,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,  -303.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -292.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -281.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,  -270.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -258.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -247.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -236.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -5355,7 +5355,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,  -123.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -112.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,  -101.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,   -90.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   -78.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   -67.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   -56.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -5371,7 +5371,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,    56.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,    67.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,    78.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,    90.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   101.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   112.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   123.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -5387,7 +5387,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,   236.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   247.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   258.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,   270.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   281.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   292.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   303.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -5403,7 +5403,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,   416.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   427.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   438.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,   450.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   461.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   472.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   483.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -5419,7 +5419,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -270.0000,   596.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   607.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   618.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -270.0000,   630.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -270.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   641.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   652.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -270.0000,   663.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -5438,7 +5438,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,  -663.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -652.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -641.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,  -630.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -618.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -607.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -596.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -5454,7 +5454,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,  -483.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -472.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -461.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,  -450.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -438.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -427.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -416.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -5470,7 +5470,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,  -303.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -292.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -281.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,  -270.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -258.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -247.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -236.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -5486,7 +5486,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,  -123.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -112.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,  -101.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,   -90.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   -78.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   -67.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   -56.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -5502,7 +5502,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,    56.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,    67.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,    78.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,    90.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   101.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   112.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   123.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -5518,7 +5518,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,   236.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   247.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   258.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,   270.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   281.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   292.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   303.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -5534,7 +5534,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,   416.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   427.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   438.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,   450.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   461.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   472.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   483.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -5550,7 +5550,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -258.7500,   596.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   607.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   618.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -258.7500,   630.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -258.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   641.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   652.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -258.7500,   663.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -5569,7 +5569,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,  -663.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -652.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -641.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,  -630.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -618.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -607.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -596.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -5585,7 +5585,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,  -483.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -472.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -461.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,  -450.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -438.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -427.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -416.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -5601,7 +5601,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,  -303.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -292.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -281.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,  -270.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -258.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -247.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -236.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -5617,7 +5617,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,  -123.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -112.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,  -101.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,   -90.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   -78.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   -67.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   -56.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -5633,7 +5633,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,    56.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,    67.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,    78.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,    90.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   101.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   112.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   123.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -5649,7 +5649,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,   236.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   247.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   258.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,   270.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   281.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   292.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   303.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -5665,7 +5665,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,   416.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   427.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   438.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,   450.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   461.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   472.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   483.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -5681,7 +5681,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -247.5000,   596.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   607.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   618.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -247.5000,   630.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -247.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   641.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   652.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -247.5000,   663.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -5700,7 +5700,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,  -663.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -652.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -641.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,  -630.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -618.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -607.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -596.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -5716,7 +5716,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,  -483.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -472.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -461.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,  -450.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -438.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -427.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -416.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -5732,7 +5732,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,  -303.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -292.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -281.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,  -270.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -258.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -247.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -236.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -5748,7 +5748,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,  -123.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -112.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,  -101.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,   -90.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   -78.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   -67.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   -56.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -5764,7 +5764,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,    56.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,    67.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,    78.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,    90.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   101.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   112.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   123.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -5780,7 +5780,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,   236.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   247.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   258.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,   270.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   281.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   292.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   303.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -5796,7 +5796,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,   416.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   427.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   438.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,   450.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   461.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   472.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   483.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -5812,7 +5812,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -236.2500,   596.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   607.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   618.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -236.2500,   630.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -236.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   641.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   652.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -236.2500,   663.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -5831,7 +5831,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,  -663.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -652.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -641.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,  -630.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -618.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -607.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -596.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -5847,7 +5847,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,  -483.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -472.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -461.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,  -450.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -438.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -427.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -416.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -5863,7 +5863,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,  -303.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -292.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -281.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,  -270.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -258.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -247.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -236.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -5879,7 +5879,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,  -123.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -112.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,  -101.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,   -90.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   -78.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   -67.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   -56.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -5895,7 +5895,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,    56.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,    67.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,    78.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,    90.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   101.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   112.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   123.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -5911,7 +5911,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,   236.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   247.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   258.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,   270.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   281.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   292.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   303.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -5927,7 +5927,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,   416.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   427.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   438.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,   450.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   461.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   472.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   483.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -5943,7 +5943,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -225.0000,   596.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   607.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   618.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -225.0000,   630.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -225.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   641.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   652.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -225.0000,   663.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -5962,7 +5962,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,  -663.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -652.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -641.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,  -630.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -618.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -607.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -596.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -5978,7 +5978,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,  -483.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -472.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -461.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,  -450.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -438.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -427.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -416.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -5994,7 +5994,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,  -303.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -292.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -281.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,  -270.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -258.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -247.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -236.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -6010,7 +6010,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,  -123.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -112.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,  -101.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,   -90.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   -78.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   -67.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   -56.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -6026,7 +6026,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,    56.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,    67.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,    78.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,    90.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   101.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   112.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   123.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -6042,7 +6042,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,   236.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   247.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   258.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,   270.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   281.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   292.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   303.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -6058,7 +6058,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,   416.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   427.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   438.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,   450.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   461.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   472.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   483.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -6074,7 +6074,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -213.7500,   596.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   607.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   618.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -213.7500,   630.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -213.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   641.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   652.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -213.7500,   663.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -6093,7 +6093,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,  -663.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -652.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -641.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,  -630.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -618.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -607.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -596.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -6109,7 +6109,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,  -483.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -472.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -461.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,  -450.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -438.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -427.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -416.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -6125,7 +6125,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,  -303.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -292.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -281.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,  -270.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -258.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -247.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -236.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -6141,7 +6141,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,  -123.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -112.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,  -101.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,   -90.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   -78.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   -67.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   -56.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -6157,7 +6157,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,    56.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,    67.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,    78.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,    90.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   101.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   112.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   123.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -6173,7 +6173,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,   236.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   247.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   258.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,   270.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   281.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   292.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   303.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -6189,7 +6189,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,   416.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   427.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   438.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,   450.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   461.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   472.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   483.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -6205,7 +6205,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -202.5000,   596.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   607.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   618.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -202.5000,   630.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -202.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   641.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   652.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -202.5000,   663.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -6224,7 +6224,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,  -663.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -652.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -641.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,  -630.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -618.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -607.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -596.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -6240,7 +6240,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,  -483.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -472.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -461.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,  -450.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -438.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -427.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -416.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -6256,7 +6256,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,  -303.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -292.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -281.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,  -270.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -258.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -247.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -236.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -6272,7 +6272,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,  -123.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -112.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,  -101.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,   -90.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   -78.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   -67.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   -56.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -6288,7 +6288,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,    56.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,    67.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,    78.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,    90.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   101.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   112.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   123.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -6304,7 +6304,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,   236.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   247.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   258.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,   270.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   281.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   292.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   303.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -6320,7 +6320,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,   416.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   427.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   438.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,   450.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   461.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   472.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   483.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -6336,7 +6336,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,   596.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   607.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   618.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -191.2500,   630.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -191.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   641.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   652.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -191.2500,   663.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -6347,15 +6347,15 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -191.2500,   720.0000, 1.0,   168.7500,     0.0000, EPSILON);
     }
     public void testGeographyNormalizeLntLat48() throws Exception {
-        checkGeographyNormalizeLngLat( -180.0000,  -720.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -708.7500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -697.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -686.2500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -675.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -663.7500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -652.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -641.2500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -630.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -720.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -708.7500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -697.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -686.2500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -675.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -663.7500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -652.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -641.2500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -618.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -607.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -596.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -6371,23 +6371,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -180.0000,  -483.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -472.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -461.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -450.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -438.7500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -427.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -416.2500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -405.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -393.7500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -382.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -371.2500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -360.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -348.7500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -337.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -326.2500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -315.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -303.7500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -292.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -281.2500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,  -270.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -438.7500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -427.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -416.2500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -405.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -393.7500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -382.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -371.2500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -360.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -348.7500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -337.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -326.2500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -315.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -303.7500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -292.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -281.2500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -258.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -247.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -236.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -6403,23 +6403,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -180.0000,  -123.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -112.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,  -101.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -90.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -78.7500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -67.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -56.2500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -45.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -33.7500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -22.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   -11.2500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,     0.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    11.2500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    22.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    33.7500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    45.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    56.2500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    67.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    78.7500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,    90.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -78.7500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -67.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -56.2500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -45.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -33.7500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -22.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   -11.2500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,     0.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    11.2500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    22.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    33.7500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    45.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    56.2500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    67.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    78.7500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   101.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   112.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   123.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -6435,23 +6435,23 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -180.0000,   236.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   247.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   258.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   270.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   281.2500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   292.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   303.7500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   315.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   326.2500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   337.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   348.7500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   360.0000, 1.0,  -180.0000,     0.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   371.2500, 1.0,  -180.0000,    11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   382.5000, 1.0,  -180.0000,    22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   393.7500, 1.0,  -180.0000,    33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   405.0000, 1.0,  -180.0000,    45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   416.2500, 1.0,  -180.0000,    56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   427.5000, 1.0,  -180.0000,    67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   438.7500, 1.0,  -180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   450.0000, 1.0,  -180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   281.2500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   292.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   303.7500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   315.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   326.2500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   337.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   348.7500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   360.0000, 1.0,   180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   371.2500, 1.0,   180.0000,    11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   382.5000, 1.0,   180.0000,    22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   393.7500, 1.0,   180.0000,    33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   405.0000, 1.0,   180.0000,    45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   416.2500, 1.0,   180.0000,    56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   427.5000, 1.0,   180.0000,    67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   438.7500, 1.0,   180.0000,    78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   461.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   472.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   483.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -6467,15 +6467,15 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -180.0000,   596.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   607.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -180.0000,   618.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   630.0000, 1.0,  -180.0000,   -90.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   641.2500, 1.0,  -180.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   652.5000, 1.0,  -180.0000,   -67.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   663.7500, 1.0,  -180.0000,   -56.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   675.0000, 1.0,  -180.0000,   -45.0000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   686.2500, 1.0,  -180.0000,   -33.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   697.5000, 1.0,  -180.0000,   -22.5000, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   708.7500, 1.0,  -180.0000,   -11.2500, EPSILON);
-        checkGeographyNormalizeLngLat( -180.0000,   720.0000, 1.0,  -180.0000,     0.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   641.2500, 1.0,   180.0000,   -78.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   652.5000, 1.0,   180.0000,   -67.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   663.7500, 1.0,   180.0000,   -56.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   675.0000, 1.0,   180.0000,   -45.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   686.2500, 1.0,   180.0000,   -33.7500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   697.5000, 1.0,   180.0000,   -22.5000, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   708.7500, 1.0,   180.0000,   -11.2500, EPSILON);
+        checkGeographyNormalizeLngLat( -180.0000,   720.0000, 1.0,   180.0000,     0.0000, EPSILON);
     }
     public void testGeographyNormalizeLntLat49() throws Exception {
         checkGeographyNormalizeLngLat( -168.7500,  -720.0000, 1.0,  -168.7500,     0.0000, EPSILON);
@@ -6486,7 +6486,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,  -663.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -652.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -641.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,  -630.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -618.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -607.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -596.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -6502,7 +6502,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,  -483.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -472.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -461.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,  -450.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -438.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -427.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -416.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -6518,7 +6518,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,  -303.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -292.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -281.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,  -270.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -258.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -247.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -236.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -6534,7 +6534,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,  -123.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -112.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,  -101.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,   -90.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   -78.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   -67.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   -56.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -6550,7 +6550,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,    56.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,    67.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,    78.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,    90.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   101.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   112.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   123.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -6566,7 +6566,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,   236.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   247.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   258.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,   270.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   281.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   292.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   303.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -6582,7 +6582,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,   416.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   427.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   438.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,   450.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   461.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   472.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   483.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -6598,7 +6598,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -168.7500,   596.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   607.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   618.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -168.7500,   630.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -168.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   641.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   652.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -168.7500,   663.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -6617,7 +6617,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,  -663.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -652.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -641.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,  -630.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -618.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -607.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -596.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -6633,7 +6633,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,  -483.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -472.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -461.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,  -450.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -438.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -427.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -416.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -6649,7 +6649,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,  -303.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -292.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -281.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,  -270.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -258.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -247.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -236.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -6665,7 +6665,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,  -123.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -112.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,  -101.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,   -90.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   -78.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   -67.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   -56.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -6681,7 +6681,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,    56.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,    67.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,    78.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,    90.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   101.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   112.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   123.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -6697,7 +6697,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,   236.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   247.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   258.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,   270.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   281.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   292.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   303.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -6713,7 +6713,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,   416.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   427.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   438.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,   450.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   461.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   472.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   483.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -6729,7 +6729,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -157.5000,   596.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   607.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   618.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -157.5000,   630.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -157.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   641.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   652.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -157.5000,   663.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -6748,7 +6748,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,  -663.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -652.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -641.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,  -630.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -618.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -607.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -596.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -6764,7 +6764,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,  -483.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -472.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -461.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,  -450.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -438.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -427.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -416.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -6780,7 +6780,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,  -303.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -292.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -281.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,  -270.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -258.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -247.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -236.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -6796,7 +6796,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,  -123.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -112.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,  -101.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,   -90.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   -78.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   -67.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   -56.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -6812,7 +6812,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,    56.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,    67.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,    78.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,    90.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   101.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   112.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   123.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -6828,7 +6828,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,   236.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   247.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   258.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,   270.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   281.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   292.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   303.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -6844,7 +6844,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,   416.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   427.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   438.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,   450.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   461.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   472.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   483.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -6860,7 +6860,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -146.2500,   596.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   607.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   618.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -146.2500,   630.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -146.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   641.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   652.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -146.2500,   663.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -6879,7 +6879,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,  -663.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -652.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -641.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,  -630.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -618.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -607.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -596.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -6895,7 +6895,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,  -483.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -472.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -461.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,  -450.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -438.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -427.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -416.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -6911,7 +6911,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,  -303.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -292.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -281.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,  -270.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -258.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -247.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -236.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -6927,7 +6927,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,  -123.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -112.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,  -101.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,   -90.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   -78.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   -67.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   -56.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -6943,7 +6943,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,    56.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,    67.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,    78.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,    90.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   101.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   112.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   123.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -6959,7 +6959,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,   236.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   247.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   258.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,   270.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   281.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   292.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   303.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -6975,7 +6975,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,   416.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   427.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   438.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,   450.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   461.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   472.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   483.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -6991,7 +6991,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -135.0000,   596.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   607.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   618.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -135.0000,   630.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -135.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   641.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   652.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -135.0000,   663.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -7010,7 +7010,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,  -663.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -652.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -641.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,  -630.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -618.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -607.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -596.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -7026,7 +7026,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,  -483.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -472.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -461.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,  -450.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -438.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -427.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -416.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -7042,7 +7042,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,  -303.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -292.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -281.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,  -270.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -258.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -247.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -236.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -7058,7 +7058,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,  -123.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -112.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,  -101.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,   -90.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   -78.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   -67.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   -56.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -7074,7 +7074,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,    56.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,    67.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,    78.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,    90.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   101.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   112.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   123.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -7090,7 +7090,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,   236.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   247.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   258.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,   270.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   281.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   292.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   303.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -7106,7 +7106,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,   416.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   427.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   438.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,   450.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   461.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   472.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   483.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -7122,7 +7122,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -123.7500,   596.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   607.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   618.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -123.7500,   630.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -123.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   641.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   652.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -123.7500,   663.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -7141,7 +7141,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,  -663.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -652.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -641.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,  -630.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -618.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -607.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -596.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -7157,7 +7157,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,  -483.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -472.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -461.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,  -450.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -438.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -427.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -416.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -7173,7 +7173,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,  -303.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -292.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -281.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,  -270.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -258.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -247.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -236.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -7189,7 +7189,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,  -123.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -112.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,  -101.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,   -90.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   -78.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   -67.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   -56.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -7205,7 +7205,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,    56.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,    67.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,    78.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,    90.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   101.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   112.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   123.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -7221,7 +7221,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,   236.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   247.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   258.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,   270.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   281.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   292.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   303.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -7237,7 +7237,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,   416.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   427.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   438.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,   450.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   461.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   472.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   483.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -7253,7 +7253,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -112.5000,   596.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   607.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   618.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -112.5000,   630.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -112.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   641.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   652.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -112.5000,   663.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -7272,7 +7272,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,  -663.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -652.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -641.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,  -630.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -618.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -607.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -596.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -7288,7 +7288,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,  -483.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -472.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -461.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,  -450.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -438.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -427.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -416.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -7304,7 +7304,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,  -303.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -292.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -281.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,  -270.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -258.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -247.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -236.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -7320,7 +7320,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,  -123.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -112.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,  -101.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,   -90.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   -78.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   -67.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   -56.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -7336,7 +7336,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,    56.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,    67.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,    78.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,    90.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   101.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   112.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   123.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -7352,7 +7352,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,   236.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   247.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   258.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,   270.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   281.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   292.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   303.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -7368,7 +7368,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,   416.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   427.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   438.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,   450.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   461.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   472.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   483.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -7384,7 +7384,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat( -101.2500,   596.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   607.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   618.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat( -101.2500,   630.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat( -101.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   641.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   652.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat( -101.2500,   663.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -7403,7 +7403,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,  -663.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -652.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -641.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,  -630.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -618.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -607.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -596.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -7419,7 +7419,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,  -483.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -472.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -461.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,  -450.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -438.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -427.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -416.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -7435,7 +7435,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,  -303.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -292.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -281.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,  -270.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -258.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -247.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -236.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -7451,7 +7451,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,  -123.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -112.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,  -101.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,   -90.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   -78.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   -67.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   -56.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -7467,7 +7467,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,    56.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,    67.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,    78.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,    90.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   101.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   112.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   123.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -7483,7 +7483,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,   236.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   247.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   258.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,   270.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   281.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   292.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   303.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -7499,7 +7499,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,   416.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   427.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   438.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,   450.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   461.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   472.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   483.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -7515,7 +7515,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -90.0000,   596.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   607.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   618.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -90.0000,   630.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -90.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   641.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   652.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -90.0000,   663.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -7534,7 +7534,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,  -663.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -652.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -641.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,  -630.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -618.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -607.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -596.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -7550,7 +7550,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,  -483.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -472.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -461.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,  -450.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -438.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -427.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -416.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -7566,7 +7566,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,  -303.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -292.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -281.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,  -270.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -258.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -247.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -236.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -7582,7 +7582,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,  -123.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -112.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,  -101.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,   -90.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   -78.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   -67.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   -56.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -7598,7 +7598,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,    56.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,    67.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,    78.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,    90.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   101.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   112.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   123.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -7614,7 +7614,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,   236.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   247.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   258.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,   270.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   281.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   292.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   303.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -7630,7 +7630,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,   416.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   427.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   438.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,   450.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   461.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   472.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   483.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -7646,7 +7646,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -78.7500,   596.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   607.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   618.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -78.7500,   630.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -78.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   641.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   652.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -78.7500,   663.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -7665,7 +7665,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,  -663.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -652.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -641.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,  -630.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -618.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -607.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -596.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -7681,7 +7681,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,  -483.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -472.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -461.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,  -450.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -438.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -427.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -416.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -7697,7 +7697,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,  -303.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -292.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -281.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,  -270.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -258.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -247.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -236.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -7713,7 +7713,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,  -123.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -112.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,  -101.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,   -90.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   -78.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   -67.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   -56.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -7729,7 +7729,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,    56.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,    67.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,    78.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,    90.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   101.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   112.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   123.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -7745,7 +7745,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,   236.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   247.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   258.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,   270.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   281.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   292.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   303.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -7761,7 +7761,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,   416.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   427.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   438.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,   450.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   461.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   472.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   483.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -7777,7 +7777,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -67.5000,   596.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   607.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   618.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -67.5000,   630.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -67.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   641.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   652.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -67.5000,   663.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -7796,7 +7796,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,  -663.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -652.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -641.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,  -630.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -618.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -607.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -596.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -7812,7 +7812,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,  -483.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -472.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -461.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,  -450.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -438.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -427.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -416.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -7828,7 +7828,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,  -303.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -292.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -281.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,  -270.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -258.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -247.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -236.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -7844,7 +7844,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,  -123.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -112.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,  -101.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,   -90.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   -78.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   -67.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   -56.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -7860,7 +7860,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,    56.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,    67.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,    78.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,    90.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   101.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   112.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   123.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -7876,7 +7876,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,   236.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   247.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   258.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,   270.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   281.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   292.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   303.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -7892,7 +7892,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,   416.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   427.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   438.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,   450.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   461.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   472.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   483.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -7908,7 +7908,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -56.2500,   596.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   607.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   618.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -56.2500,   630.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -56.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   641.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   652.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -56.2500,   663.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -7927,7 +7927,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,  -663.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -652.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -641.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,  -630.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -618.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -607.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -596.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -7943,7 +7943,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,  -483.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -472.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -461.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,  -450.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -438.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -427.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -416.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -7959,7 +7959,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,  -303.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -292.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -281.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,  -270.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -258.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -247.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -236.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -7975,7 +7975,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,  -123.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -112.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,  -101.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,   -90.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   -78.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   -67.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   -56.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -7991,7 +7991,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,    56.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,    67.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,    78.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,    90.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   101.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   112.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   123.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -8007,7 +8007,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,   236.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   247.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   258.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,   270.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   281.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   292.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   303.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -8023,7 +8023,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,   416.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   427.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   438.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,   450.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   461.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   472.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   483.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -8039,7 +8039,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -45.0000,   596.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   607.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   618.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -45.0000,   630.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -45.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   641.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   652.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -45.0000,   663.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -8058,7 +8058,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,  -663.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -652.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -641.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,  -630.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -618.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -607.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -596.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -8074,7 +8074,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,  -483.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -472.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -461.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,  -450.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -438.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -427.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -416.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -8090,7 +8090,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,  -303.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -292.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -281.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,  -270.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -258.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -247.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -236.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -8106,7 +8106,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,  -123.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -112.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,  -101.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,   -90.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   -78.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   -67.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   -56.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -8122,7 +8122,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,    56.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,    67.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,    78.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,    90.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   101.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   112.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   123.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -8138,7 +8138,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,   236.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   247.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   258.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,   270.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   281.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   292.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   303.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -8154,7 +8154,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,   416.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   427.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   438.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,   450.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   461.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   472.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   483.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -8170,7 +8170,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -33.7500,   596.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   607.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   618.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -33.7500,   630.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -33.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   641.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   652.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -33.7500,   663.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -8189,7 +8189,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,  -663.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -652.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -641.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,  -630.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -618.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -607.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -596.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -8205,7 +8205,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,  -483.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -472.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -461.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,  -450.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -438.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -427.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -416.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -8221,7 +8221,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,  -303.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -292.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -281.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,  -270.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -258.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -247.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -236.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -8237,7 +8237,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,  -123.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -112.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,  -101.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,   -90.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   -78.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   -67.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   -56.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -8253,7 +8253,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,    56.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,    67.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,    78.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,    90.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   101.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   112.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   123.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -8269,7 +8269,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,   236.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   247.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   258.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,   270.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   281.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   292.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   303.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -8285,7 +8285,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,   416.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   427.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   438.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,   450.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   461.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   472.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   483.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -8301,7 +8301,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -22.5000,   596.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   607.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   618.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -22.5000,   630.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -22.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   641.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   652.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -22.5000,   663.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -8320,7 +8320,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,  -663.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -652.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -641.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,  -630.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -618.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -607.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -596.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -8336,7 +8336,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,  -483.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -472.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -461.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,  -450.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -438.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -427.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -416.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -8352,7 +8352,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,  -303.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -292.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -281.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,  -270.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -258.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -247.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -236.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -8368,7 +8368,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,  -123.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -112.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,  -101.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,   -90.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   -78.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   -67.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   -56.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -8384,7 +8384,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,    56.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,    67.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,    78.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,    90.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   101.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   112.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   123.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -8400,7 +8400,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,   236.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   247.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   258.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,   270.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   281.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   292.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   303.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -8416,7 +8416,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,   416.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   427.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   438.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,   450.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   461.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   472.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   483.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -8432,7 +8432,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  -11.2500,   596.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   607.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   618.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  -11.2500,   630.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  -11.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   641.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   652.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  -11.2500,   663.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -8582,7 +8582,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,  -663.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -652.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -641.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,  -630.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -618.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -607.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -596.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -8598,7 +8598,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,  -483.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -472.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -461.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,  -450.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -438.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -427.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -416.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -8614,7 +8614,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,  -303.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -292.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -281.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,  -270.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -258.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -247.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -236.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -8630,7 +8630,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,  -123.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -112.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,  -101.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,   -90.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   -78.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   -67.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   -56.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -8646,7 +8646,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,    56.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,    67.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,    78.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,    90.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   101.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   112.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   123.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -8662,7 +8662,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,   236.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   247.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   258.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,   270.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   281.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   292.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   303.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -8678,7 +8678,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,   416.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   427.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   438.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,   450.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   461.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   472.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   483.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -8694,7 +8694,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   11.2500,   596.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   607.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   618.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   11.2500,   630.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   11.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   641.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   652.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   11.2500,   663.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -8713,7 +8713,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,  -663.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -652.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -641.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,  -630.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -618.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -607.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -596.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -8729,7 +8729,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,  -483.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -472.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -461.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,  -450.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -438.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -427.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -416.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -8745,7 +8745,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,  -303.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -292.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -281.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,  -270.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -258.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -247.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -236.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -8761,7 +8761,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,  -123.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -112.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,  -101.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,   -90.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   -78.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   -67.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   -56.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -8777,7 +8777,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,    56.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,    67.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,    78.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,    90.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   101.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   112.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   123.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -8793,7 +8793,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,   236.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   247.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   258.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,   270.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   281.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   292.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   303.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -8809,7 +8809,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,   416.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   427.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   438.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,   450.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   461.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   472.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   483.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -8825,7 +8825,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   22.5000,   596.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   607.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   618.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   22.5000,   630.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   22.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   641.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   652.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   22.5000,   663.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -8844,7 +8844,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,  -663.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -652.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -641.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,  -630.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -618.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -607.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -596.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -8860,7 +8860,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,  -483.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -472.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -461.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,  -450.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -438.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -427.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -416.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -8876,7 +8876,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,  -303.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -292.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -281.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,  -270.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -258.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -247.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -236.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -8892,7 +8892,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,  -123.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -112.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,  -101.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,   -90.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   -78.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   -67.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   -56.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -8908,7 +8908,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,    56.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,    67.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,    78.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,    90.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   101.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   112.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   123.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -8924,7 +8924,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,   236.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   247.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   258.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,   270.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   281.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   292.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   303.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -8940,7 +8940,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,   416.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   427.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   438.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,   450.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   461.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   472.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   483.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -8956,7 +8956,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   33.7500,   596.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   607.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   618.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   33.7500,   630.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   33.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   641.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   652.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   33.7500,   663.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -8975,7 +8975,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,  -663.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -652.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -641.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,  -630.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -618.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -607.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -596.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -8991,7 +8991,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,  -483.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -472.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -461.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,  -450.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -438.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -427.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -416.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -9007,7 +9007,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,  -303.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -292.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -281.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,  -270.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -258.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -247.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -236.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -9023,7 +9023,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,  -123.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -112.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,  -101.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,   -90.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   -78.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   -67.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   -56.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -9039,7 +9039,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,    56.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,    67.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,    78.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,    90.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   101.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   112.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   123.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -9055,7 +9055,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,   236.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   247.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   258.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,   270.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   281.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   292.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   303.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -9071,7 +9071,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,   416.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   427.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   438.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,   450.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   461.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   472.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   483.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -9087,7 +9087,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   45.0000,   596.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   607.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   618.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   45.0000,   630.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   45.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   641.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   652.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   45.0000,   663.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -9106,7 +9106,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,  -663.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -652.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -641.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,  -630.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -618.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -607.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -596.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -9122,7 +9122,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,  -483.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -472.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -461.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,  -450.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -438.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -427.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -416.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -9138,7 +9138,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,  -303.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -292.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -281.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,  -270.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -258.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -247.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -236.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -9154,7 +9154,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,  -123.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -112.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,  -101.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,   -90.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   -78.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   -67.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   -56.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -9170,7 +9170,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,    56.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,    67.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,    78.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,    90.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   101.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   112.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   123.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -9186,7 +9186,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,   236.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   247.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   258.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,   270.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   281.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   292.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   303.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -9202,7 +9202,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,   416.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   427.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   438.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,   450.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   461.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   472.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   483.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -9218,7 +9218,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   56.2500,   596.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   607.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   618.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   56.2500,   630.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   56.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   641.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   652.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   56.2500,   663.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -9237,7 +9237,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,  -663.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -652.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -641.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,  -630.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -618.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -607.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -596.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -9253,7 +9253,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,  -483.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -472.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -461.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,  -450.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -438.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -427.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -416.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -9269,7 +9269,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,  -303.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -292.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -281.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,  -270.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -258.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -247.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -236.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -9285,7 +9285,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,  -123.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -112.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,  -101.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,   -90.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   -78.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   -67.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   -56.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -9301,7 +9301,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,    56.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,    67.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,    78.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,    90.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   101.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   112.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   123.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -9317,7 +9317,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,   236.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   247.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   258.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,   270.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   281.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   292.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   303.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -9333,7 +9333,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,   416.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   427.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   438.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,   450.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   461.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   472.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   483.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -9349,7 +9349,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   67.5000,   596.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   607.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   618.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   67.5000,   630.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   67.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   641.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   652.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   67.5000,   663.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -9368,7 +9368,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,  -663.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -652.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -641.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,  -630.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -618.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -607.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -596.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -9384,7 +9384,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,  -483.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -472.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -461.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,  -450.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -438.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -427.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -416.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -9400,7 +9400,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,  -303.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -292.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -281.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,  -270.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -258.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -247.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -236.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -9416,7 +9416,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,  -123.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -112.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,  -101.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,   -90.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   -78.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   -67.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   -56.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -9432,7 +9432,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,    56.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,    67.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,    78.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,    90.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   101.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   112.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   123.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -9448,7 +9448,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,   236.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   247.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   258.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,   270.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   281.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   292.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   303.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -9464,7 +9464,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,   416.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   427.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   438.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,   450.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   461.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   472.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   483.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -9480,7 +9480,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   78.7500,   596.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   607.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   618.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   78.7500,   630.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   78.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   641.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   652.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   78.7500,   663.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -9499,7 +9499,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,  -663.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -652.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -641.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,  -630.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -618.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -607.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -596.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -9515,7 +9515,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,  -483.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -472.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -461.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,  -450.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -438.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -427.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -416.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -9531,7 +9531,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,  -303.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -292.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -281.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,  -270.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -258.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -247.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -236.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -9547,7 +9547,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,  -123.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -112.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,  -101.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,   -90.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   -78.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   -67.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   -56.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -9563,7 +9563,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,    56.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,    67.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,    78.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,    90.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   101.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   112.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   123.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -9579,7 +9579,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,   236.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   247.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   258.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,   270.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   281.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   292.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   303.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -9595,7 +9595,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,   416.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   427.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   438.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,   450.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   461.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   472.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   483.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -9611,7 +9611,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(   90.0000,   596.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   607.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   618.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(   90.0000,   630.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(   90.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   641.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   652.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(   90.0000,   663.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -9630,7 +9630,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,  -663.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -652.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -641.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,  -630.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -618.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -607.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -596.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -9646,7 +9646,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,  -483.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -472.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -461.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,  -450.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -438.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -427.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -416.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -9662,7 +9662,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,  -303.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -292.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -281.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,  -270.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -258.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -247.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -236.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -9678,7 +9678,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,  -123.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -112.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,  -101.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,   -90.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   -78.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   -67.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   -56.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -9694,7 +9694,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,    56.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,    67.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,    78.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,    90.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   101.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   112.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   123.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -9710,7 +9710,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,   236.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   247.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   258.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,   270.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   281.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   292.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   303.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -9726,7 +9726,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,   416.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   427.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   438.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,   450.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   461.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   472.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   483.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -9742,7 +9742,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  101.2500,   596.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   607.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   618.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  101.2500,   630.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  101.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   641.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   652.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  101.2500,   663.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -9761,7 +9761,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,  -663.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -652.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -641.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,  -630.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -618.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -607.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -596.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -9777,7 +9777,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,  -483.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -472.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -461.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,  -450.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -438.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -427.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -416.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -9793,7 +9793,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,  -303.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -292.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -281.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,  -270.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -258.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -247.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -236.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -9809,7 +9809,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,  -123.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -112.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,  -101.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,   -90.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   -78.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   -67.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   -56.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -9825,7 +9825,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,    56.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,    67.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,    78.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,    90.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   101.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   112.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   123.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -9841,7 +9841,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,   236.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   247.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   258.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,   270.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   281.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   292.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   303.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -9857,7 +9857,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,   416.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   427.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   438.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,   450.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   461.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   472.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   483.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -9873,7 +9873,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  112.5000,   596.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   607.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   618.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  112.5000,   630.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  112.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   641.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   652.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  112.5000,   663.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -9892,7 +9892,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,  -663.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -652.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -641.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,  -630.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -618.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -607.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -596.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -9908,7 +9908,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,  -483.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -472.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -461.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,  -450.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -438.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -427.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -416.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -9924,7 +9924,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,  -303.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -292.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -281.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,  -270.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -258.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -247.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -236.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -9940,7 +9940,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,  -123.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -112.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,  -101.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,   -90.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   -78.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   -67.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   -56.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -9956,7 +9956,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,    56.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,    67.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,    78.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,    90.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   101.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   112.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   123.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -9972,7 +9972,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,   236.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   247.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   258.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,   270.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   281.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   292.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   303.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -9988,7 +9988,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,   416.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   427.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   438.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,   450.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   461.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   472.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   483.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -10004,7 +10004,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  123.7500,   596.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   607.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   618.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  123.7500,   630.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  123.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   641.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   652.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  123.7500,   663.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -10023,7 +10023,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,  -663.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -652.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -641.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,  -630.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -618.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -607.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -596.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -10039,7 +10039,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,  -483.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -472.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -461.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,  -450.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -438.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -427.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -416.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -10055,7 +10055,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,  -303.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -292.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -281.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,  -270.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -258.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -247.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -236.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -10071,7 +10071,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,  -123.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -112.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,  -101.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,   -90.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   -78.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   -67.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   -56.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -10087,7 +10087,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,    56.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,    67.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,    78.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,    90.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   101.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   112.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   123.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -10103,7 +10103,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,   236.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   247.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   258.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,   270.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   281.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   292.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   303.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -10119,7 +10119,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,   416.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   427.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   438.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,   450.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   461.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   472.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   483.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -10135,7 +10135,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  135.0000,   596.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   607.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   618.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  135.0000,   630.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  135.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   641.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   652.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  135.0000,   663.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -10154,7 +10154,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,  -663.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -652.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -641.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,  -630.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -618.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -607.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -596.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -10170,7 +10170,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,  -483.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -472.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -461.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,  -450.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -438.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -427.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -416.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -10186,7 +10186,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,  -303.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -292.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -281.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,  -270.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -258.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -247.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -236.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -10202,7 +10202,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,  -123.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -112.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,  -101.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,   -90.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   -78.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   -67.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   -56.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -10218,7 +10218,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,    56.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,    67.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,    78.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,    90.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   101.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   112.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   123.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -10234,7 +10234,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,   236.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   247.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   258.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,   270.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   281.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   292.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   303.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -10250,7 +10250,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,   416.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   427.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   438.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,   450.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   461.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   472.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   483.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -10266,7 +10266,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  146.2500,   596.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   607.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   618.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  146.2500,   630.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  146.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   641.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   652.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  146.2500,   663.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -10285,7 +10285,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,  -663.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -652.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -641.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,  -630.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -618.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -607.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -596.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -10301,7 +10301,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,  -483.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -472.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -461.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,  -450.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -438.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -427.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -416.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -10317,7 +10317,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,  -303.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -292.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -281.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,  -270.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -258.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -247.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -236.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -10333,7 +10333,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,  -123.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -112.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,  -101.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,   -90.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   -78.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   -67.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   -56.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -10349,7 +10349,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,    56.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,    67.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,    78.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,    90.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   101.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   112.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   123.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -10365,7 +10365,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,   236.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   247.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   258.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,   270.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   281.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   292.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   303.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -10381,7 +10381,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,   416.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   427.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   438.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,   450.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   461.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   472.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   483.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -10397,7 +10397,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  157.5000,   596.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   607.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   618.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  157.5000,   630.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  157.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   641.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   652.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  157.5000,   663.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -10416,7 +10416,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,  -663.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -652.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -641.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,  -630.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -618.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -607.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -596.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -10432,7 +10432,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,  -483.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -472.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -461.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,  -450.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -438.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -427.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -416.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -10448,7 +10448,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,  -303.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -292.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -281.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,  -270.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -258.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -247.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -236.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -10464,7 +10464,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,  -123.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -112.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,  -101.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,   -90.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   -78.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   -67.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   -56.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -10480,7 +10480,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,    56.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,    67.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,    78.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,    90.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   101.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   112.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   123.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -10496,7 +10496,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,   236.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   247.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   258.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,   270.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   281.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   292.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   303.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -10512,7 +10512,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,   416.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   427.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   438.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,   450.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   461.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   472.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   483.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -10528,7 +10528,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  168.7500,   596.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   607.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   618.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  168.7500,   630.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  168.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   641.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   652.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  168.7500,   663.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -10547,7 +10547,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,  -663.7500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -652.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -641.2500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,  -630.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -618.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -607.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -596.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -10563,7 +10563,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,  -483.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -472.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -461.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,  -450.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -438.7500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -427.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -416.2500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -10579,7 +10579,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,  -303.7500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -292.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -281.2500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,  -270.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -258.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -247.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -236.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -10595,7 +10595,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,  -123.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -112.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,  -101.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,   -90.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   -78.7500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   -67.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   -56.2500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -10611,7 +10611,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,    56.2500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,    67.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,    78.7500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,    90.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   101.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   112.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   123.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -10627,7 +10627,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,   236.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   247.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   258.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,   270.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   281.2500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   292.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   303.7500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -10643,7 +10643,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,   416.2500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   427.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   438.7500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,   450.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   461.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   472.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   483.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -10659,7 +10659,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  180.0000,   596.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   607.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   618.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  180.0000,   630.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  180.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   641.2500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   652.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  180.0000,   663.7500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -10678,7 +10678,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,  -663.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -652.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -641.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,  -630.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -618.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -607.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -596.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -10694,7 +10694,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,  -483.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -472.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -461.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,  -450.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -438.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -427.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -416.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -10710,7 +10710,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,  -303.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -292.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -281.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,  -270.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -258.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -247.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -236.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -10726,7 +10726,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,  -123.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -112.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,  -101.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,   -90.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   -78.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   -67.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   -56.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -10742,7 +10742,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,    56.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,    67.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,    78.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,    90.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   101.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   112.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   123.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -10758,7 +10758,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,   236.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   247.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   258.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,   270.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   281.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   292.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   303.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -10774,7 +10774,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,   416.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   427.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   438.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,   450.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   461.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   472.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   483.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -10790,7 +10790,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  191.2500,   596.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   607.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   618.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  191.2500,   630.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  191.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   641.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   652.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  191.2500,   663.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -10809,7 +10809,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,  -663.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -652.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -641.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,  -630.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -618.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -607.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -596.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -10825,7 +10825,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,  -483.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -472.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -461.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,  -450.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -438.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -427.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -416.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -10841,7 +10841,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,  -303.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -292.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -281.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,  -270.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -258.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -247.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -236.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -10857,7 +10857,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,  -123.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -112.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,  -101.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,   -90.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   -78.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   -67.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   -56.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -10873,7 +10873,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,    56.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,    67.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,    78.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,    90.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   101.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   112.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   123.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -10889,7 +10889,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,   236.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   247.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   258.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,   270.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   281.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   292.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   303.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -10905,7 +10905,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,   416.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   427.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   438.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,   450.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   461.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   472.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   483.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -10921,7 +10921,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  202.5000,   596.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   607.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   618.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  202.5000,   630.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  202.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   641.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   652.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  202.5000,   663.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -10940,7 +10940,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,  -663.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -652.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -641.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,  -630.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -618.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -607.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -596.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -10956,7 +10956,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,  -483.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -472.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -461.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,  -450.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -438.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -427.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -416.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -10972,7 +10972,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,  -303.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -292.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -281.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,  -270.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -258.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -247.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -236.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -10988,7 +10988,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,  -123.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -112.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,  -101.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,   -90.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   -78.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   -67.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   -56.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -11004,7 +11004,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,    56.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,    67.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,    78.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,    90.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   101.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   112.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   123.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -11020,7 +11020,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,   236.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   247.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   258.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,   270.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   281.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   292.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   303.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -11036,7 +11036,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,   416.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   427.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   438.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,   450.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   461.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   472.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   483.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -11052,7 +11052,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  213.7500,   596.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   607.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   618.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  213.7500,   630.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  213.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   641.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   652.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  213.7500,   663.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -11071,7 +11071,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,  -663.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -652.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -641.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,  -630.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -618.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -607.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -596.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -11087,7 +11087,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,  -483.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -472.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -461.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,  -450.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -438.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -427.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -416.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -11103,7 +11103,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,  -303.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -292.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -281.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,  -270.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -258.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -247.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -236.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -11119,7 +11119,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,  -123.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -112.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,  -101.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,   -90.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   -78.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   -67.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   -56.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -11135,7 +11135,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,    56.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,    67.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,    78.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,    90.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   101.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   112.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   123.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -11151,7 +11151,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,   236.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   247.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   258.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,   270.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   281.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   292.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   303.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -11167,7 +11167,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,   416.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   427.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   438.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,   450.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   461.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   472.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   483.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -11183,7 +11183,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  225.0000,   596.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   607.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   618.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  225.0000,   630.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  225.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   641.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   652.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  225.0000,   663.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -11202,7 +11202,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,  -663.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -652.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -641.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,  -630.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -618.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -607.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -596.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -11218,7 +11218,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,  -483.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -472.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -461.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,  -450.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -438.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -427.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -416.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -11234,7 +11234,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,  -303.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -292.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -281.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,  -270.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -258.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -247.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -236.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -11250,7 +11250,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,  -123.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -112.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,  -101.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,   -90.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   -78.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   -67.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   -56.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -11266,7 +11266,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,    56.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,    67.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,    78.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,    90.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   101.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   112.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   123.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -11282,7 +11282,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,   236.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   247.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   258.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,   270.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   281.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   292.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   303.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -11298,7 +11298,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,   416.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   427.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   438.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,   450.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   461.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   472.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   483.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -11314,7 +11314,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  236.2500,   596.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   607.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   618.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  236.2500,   630.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  236.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   641.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   652.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  236.2500,   663.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -11333,7 +11333,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,  -663.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -652.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -641.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,  -630.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -618.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -607.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -596.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -11349,7 +11349,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,  -483.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -472.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -461.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,  -450.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -438.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -427.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -416.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -11365,7 +11365,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,  -303.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -292.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -281.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,  -270.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -258.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -247.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -236.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -11381,7 +11381,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,  -123.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -112.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,  -101.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,   -90.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   -78.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   -67.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   -56.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -11397,7 +11397,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,    56.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,    67.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,    78.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,    90.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   101.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   112.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   123.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -11413,7 +11413,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,   236.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   247.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   258.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,   270.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   281.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   292.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   303.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -11429,7 +11429,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,   416.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   427.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   438.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,   450.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   461.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   472.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   483.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -11445,7 +11445,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  247.5000,   596.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   607.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   618.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  247.5000,   630.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  247.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   641.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   652.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  247.5000,   663.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -11464,7 +11464,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,  -663.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -652.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -641.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,  -630.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -618.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -607.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -596.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -11480,7 +11480,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,  -483.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -472.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -461.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,  -450.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -438.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -427.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -416.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -11496,7 +11496,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,  -303.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -292.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -281.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,  -270.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -258.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -247.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -236.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -11512,7 +11512,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,  -123.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -112.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,  -101.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,   -90.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   -78.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   -67.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   -56.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -11528,7 +11528,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,    56.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,    67.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,    78.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,    90.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   101.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   112.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   123.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -11544,7 +11544,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,   236.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   247.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   258.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,   270.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   281.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   292.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   303.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -11560,7 +11560,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,   416.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   427.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   438.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,   450.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   461.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   472.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   483.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -11576,7 +11576,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  258.7500,   596.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   607.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   618.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  258.7500,   630.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  258.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   641.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   652.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  258.7500,   663.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -11595,7 +11595,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,  -663.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -652.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -641.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,  -630.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -618.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -607.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -596.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -11611,7 +11611,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,  -483.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -472.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -461.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,  -450.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -438.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -427.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -416.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -11627,7 +11627,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,  -303.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -292.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -281.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,  -270.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -258.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -247.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -236.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -11643,7 +11643,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,  -123.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -112.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,  -101.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,   -90.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   -78.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   -67.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   -56.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -11659,7 +11659,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,    56.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,    67.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,    78.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,    90.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   101.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   112.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   123.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -11675,7 +11675,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,   236.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   247.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   258.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,   270.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   281.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   292.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   303.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -11691,7 +11691,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,   416.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   427.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   438.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,   450.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   461.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   472.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   483.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -11707,7 +11707,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  270.0000,   596.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   607.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   618.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  270.0000,   630.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  270.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   641.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   652.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  270.0000,   663.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -11726,7 +11726,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,  -663.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -652.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -641.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,  -630.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -618.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -607.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -596.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -11742,7 +11742,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,  -483.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -472.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -461.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,  -450.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -438.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -427.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -416.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -11758,7 +11758,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,  -303.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -292.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -281.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,  -270.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -258.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -247.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -236.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -11774,7 +11774,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,  -123.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -112.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,  -101.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,   -90.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   -78.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   -67.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   -56.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -11790,7 +11790,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,    56.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,    67.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,    78.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,    90.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   101.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   112.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   123.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -11806,7 +11806,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,   236.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   247.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   258.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,   270.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   281.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   292.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   303.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -11822,7 +11822,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,   416.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   427.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   438.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,   450.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   461.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   472.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   483.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -11838,7 +11838,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  281.2500,   596.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   607.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   618.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  281.2500,   630.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  281.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   641.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   652.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  281.2500,   663.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -11857,7 +11857,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,  -663.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -652.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -641.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,  -630.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -618.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -607.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -596.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -11873,7 +11873,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,  -483.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -472.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -461.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,  -450.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -438.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -427.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -416.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -11889,7 +11889,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,  -303.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -292.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -281.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,  -270.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -258.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -247.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -236.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -11905,7 +11905,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,  -123.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -112.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,  -101.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,   -90.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   -78.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   -67.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   -56.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -11921,7 +11921,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,    56.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,    67.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,    78.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,    90.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   101.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   112.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   123.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -11937,7 +11937,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,   236.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   247.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   258.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,   270.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   281.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   292.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   303.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -11953,7 +11953,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,   416.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   427.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   438.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,   450.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   461.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   472.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   483.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -11969,7 +11969,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  292.5000,   596.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   607.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   618.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  292.5000,   630.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  292.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   641.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   652.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  292.5000,   663.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -11988,7 +11988,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,  -663.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -652.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -641.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,  -630.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -618.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -607.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -596.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -12004,7 +12004,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,  -483.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -472.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -461.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,  -450.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -438.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -427.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -416.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -12020,7 +12020,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,  -303.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -292.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -281.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,  -270.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -258.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -247.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -236.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -12036,7 +12036,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,  -123.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -112.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,  -101.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,   -90.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   -78.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   -67.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   -56.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -12052,7 +12052,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,    56.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,    67.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,    78.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,    90.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   101.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   112.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   123.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -12068,7 +12068,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,   236.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   247.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   258.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,   270.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   281.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   292.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   303.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -12084,7 +12084,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,   416.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   427.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   438.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,   450.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   461.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   472.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   483.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -12100,7 +12100,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  303.7500,   596.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   607.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   618.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  303.7500,   630.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  303.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   641.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   652.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  303.7500,   663.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -12119,7 +12119,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,  -663.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -652.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -641.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,  -630.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -618.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -607.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -596.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -12135,7 +12135,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,  -483.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -472.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -461.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,  -450.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -438.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -427.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -416.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -12151,7 +12151,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,  -303.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -292.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -281.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,  -270.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -258.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -247.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -236.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -12167,7 +12167,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,  -123.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -112.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,  -101.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,   -90.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   -78.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   -67.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   -56.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -12183,7 +12183,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,    56.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,    67.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,    78.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,    90.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   101.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   112.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   123.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -12199,7 +12199,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,   236.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   247.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   258.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,   270.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   281.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   292.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   303.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -12215,7 +12215,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,   416.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   427.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   438.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,   450.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   461.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   472.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   483.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -12231,7 +12231,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  315.0000,   596.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   607.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   618.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  315.0000,   630.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  315.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   641.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   652.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  315.0000,   663.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -12250,7 +12250,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,  -663.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -652.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -641.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,  -630.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -618.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -607.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -596.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -12266,7 +12266,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,  -483.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -472.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -461.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,  -450.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -438.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -427.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -416.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -12282,7 +12282,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,  -303.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -292.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -281.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,  -270.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -258.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -247.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -236.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -12298,7 +12298,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,  -123.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -112.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,  -101.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,   -90.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   -78.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   -67.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   -56.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -12314,7 +12314,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,    56.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,    67.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,    78.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,    90.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   101.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   112.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   123.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -12330,7 +12330,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,   236.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   247.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   258.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,   270.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   281.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   292.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   303.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -12346,7 +12346,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,   416.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   427.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   438.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,   450.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   461.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   472.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   483.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -12362,7 +12362,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  326.2500,   596.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   607.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   618.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  326.2500,   630.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  326.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   641.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   652.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  326.2500,   663.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -12381,7 +12381,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,  -663.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -652.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -641.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,  -630.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -618.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -607.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -596.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -12397,7 +12397,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,  -483.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -472.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -461.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,  -450.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -438.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -427.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -416.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -12413,7 +12413,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,  -303.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -292.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -281.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,  -270.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -258.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -247.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -236.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -12429,7 +12429,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,  -123.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -112.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,  -101.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,   -90.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   -78.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   -67.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   -56.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -12445,7 +12445,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,    56.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,    67.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,    78.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,    90.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   101.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   112.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   123.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -12461,7 +12461,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,   236.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   247.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   258.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,   270.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   281.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   292.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   303.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -12477,7 +12477,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,   416.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   427.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   438.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,   450.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   461.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   472.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   483.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -12493,7 +12493,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  337.5000,   596.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   607.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   618.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  337.5000,   630.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  337.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   641.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   652.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  337.5000,   663.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -12512,7 +12512,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,  -663.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -652.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -641.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,  -630.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -618.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -607.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -596.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -12528,7 +12528,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,  -483.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -472.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -461.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,  -450.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -438.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -427.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -416.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -12544,7 +12544,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,  -303.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -292.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -281.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,  -270.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -258.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -247.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -236.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -12560,7 +12560,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,  -123.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -112.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,  -101.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,   -90.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   -78.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   -67.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   -56.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -12576,7 +12576,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,    56.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,    67.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,    78.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,    90.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   101.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   112.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   123.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -12592,7 +12592,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,   236.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   247.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   258.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,   270.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   281.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   292.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   303.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -12608,7 +12608,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,   416.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   427.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   438.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,   450.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   461.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   472.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   483.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -12624,7 +12624,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  348.7500,   596.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   607.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   618.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  348.7500,   630.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  348.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   641.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   652.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  348.7500,   663.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -12774,7 +12774,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,  -663.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -652.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -641.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,  -630.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -618.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -607.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -596.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -12790,7 +12790,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,  -483.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -472.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -461.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,  -450.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -438.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -427.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -416.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -12806,7 +12806,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,  -303.7500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -292.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -281.2500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,  -270.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -258.7500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -247.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -236.2500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -12822,7 +12822,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,  -123.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -112.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,  -101.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,   -90.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   -78.7500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   -67.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   -56.2500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -12838,7 +12838,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,    56.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,    67.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,    78.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,    90.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   101.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   112.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   123.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -12854,7 +12854,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,   236.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   247.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   258.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,   270.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   281.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   292.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   303.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -12870,7 +12870,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,   416.2500, 1.0,    11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   427.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   438.7500, 1.0,    11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,   450.0000, 1.0,    11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   461.2500, 1.0,  -168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   472.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   483.7500, 1.0,  -168.7500,    56.2500, EPSILON);
@@ -12886,7 +12886,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  371.2500,   596.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   607.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   618.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  371.2500,   630.0000, 1.0,    11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  371.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   641.2500, 1.0,    11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   652.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  371.2500,   663.7500, 1.0,    11.2500,   -56.2500, EPSILON);
@@ -12905,7 +12905,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,  -663.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -652.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -641.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,  -630.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -618.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -607.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -596.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -12921,7 +12921,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,  -483.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -472.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -461.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,  -450.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -438.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -427.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -416.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -12937,7 +12937,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,  -303.7500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -292.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -281.2500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,  -270.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -258.7500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -247.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -236.2500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -12953,7 +12953,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,  -123.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -112.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,  -101.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,   -90.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   -78.7500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   -67.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   -56.2500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -12969,7 +12969,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,    56.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,    67.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,    78.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,    90.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   101.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   112.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   123.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -12985,7 +12985,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,   236.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   247.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   258.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,   270.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   281.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   292.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   303.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -13001,7 +13001,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,   416.2500, 1.0,    22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   427.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   438.7500, 1.0,    22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,   450.0000, 1.0,    22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   461.2500, 1.0,  -157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   472.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   483.7500, 1.0,  -157.5000,    56.2500, EPSILON);
@@ -13017,7 +13017,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  382.5000,   596.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   607.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   618.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  382.5000,   630.0000, 1.0,    22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  382.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   641.2500, 1.0,    22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   652.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  382.5000,   663.7500, 1.0,    22.5000,   -56.2500, EPSILON);
@@ -13036,7 +13036,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,  -663.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -652.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -641.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,  -630.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -618.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -607.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -596.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -13052,7 +13052,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,  -483.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -472.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -461.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,  -450.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -438.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -427.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -416.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -13068,7 +13068,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,  -303.7500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -292.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -281.2500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,  -270.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -258.7500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -247.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -236.2500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -13084,7 +13084,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,  -123.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -112.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,  -101.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,   -90.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   -78.7500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   -67.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   -56.2500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -13100,7 +13100,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,    56.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,    67.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,    78.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,    90.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   101.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   112.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   123.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -13116,7 +13116,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,   236.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   247.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   258.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,   270.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   281.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   292.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   303.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -13132,7 +13132,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,   416.2500, 1.0,    33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   427.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   438.7500, 1.0,    33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,   450.0000, 1.0,    33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   461.2500, 1.0,  -146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   472.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   483.7500, 1.0,  -146.2500,    56.2500, EPSILON);
@@ -13148,7 +13148,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  393.7500,   596.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   607.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   618.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  393.7500,   630.0000, 1.0,    33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  393.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   641.2500, 1.0,    33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   652.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  393.7500,   663.7500, 1.0,    33.7500,   -56.2500, EPSILON);
@@ -13167,7 +13167,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,  -663.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -652.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -641.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,  -630.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -618.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -607.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -596.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -13183,7 +13183,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,  -483.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -472.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -461.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,  -450.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -438.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -427.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -416.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -13199,7 +13199,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,  -303.7500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -292.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -281.2500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,  -270.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -258.7500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -247.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -236.2500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -13215,7 +13215,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,  -123.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -112.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,  -101.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,   -90.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   -78.7500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   -67.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   -56.2500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -13231,7 +13231,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,    56.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,    67.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,    78.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,    90.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   101.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   112.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   123.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -13247,7 +13247,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,   236.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   247.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   258.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,   270.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   281.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   292.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   303.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -13263,7 +13263,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,   416.2500, 1.0,    45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   427.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   438.7500, 1.0,    45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,   450.0000, 1.0,    45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   461.2500, 1.0,  -135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   472.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   483.7500, 1.0,  -135.0000,    56.2500, EPSILON);
@@ -13279,7 +13279,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  405.0000,   596.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   607.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   618.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  405.0000,   630.0000, 1.0,    45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  405.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   641.2500, 1.0,    45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   652.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  405.0000,   663.7500, 1.0,    45.0000,   -56.2500, EPSILON);
@@ -13298,7 +13298,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,  -663.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -652.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -641.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,  -630.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -618.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -607.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -596.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -13314,7 +13314,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,  -483.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -472.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -461.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,  -450.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -438.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -427.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -416.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -13330,7 +13330,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,  -303.7500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -292.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -281.2500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,  -270.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -258.7500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -247.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -236.2500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -13346,7 +13346,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,  -123.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -112.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,  -101.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,   -90.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   -78.7500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   -67.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   -56.2500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -13362,7 +13362,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,    56.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,    67.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,    78.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,    90.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   101.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   112.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   123.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -13378,7 +13378,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,   236.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   247.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   258.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,   270.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   281.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   292.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   303.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -13394,7 +13394,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,   416.2500, 1.0,    56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   427.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   438.7500, 1.0,    56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,   450.0000, 1.0,    56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   461.2500, 1.0,  -123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   472.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   483.7500, 1.0,  -123.7500,    56.2500, EPSILON);
@@ -13410,7 +13410,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  416.2500,   596.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   607.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   618.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  416.2500,   630.0000, 1.0,    56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  416.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   641.2500, 1.0,    56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   652.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  416.2500,   663.7500, 1.0,    56.2500,   -56.2500, EPSILON);
@@ -13429,7 +13429,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,  -663.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -652.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -641.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,  -630.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -618.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -607.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -596.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -13445,7 +13445,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,  -483.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -472.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -461.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,  -450.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -438.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -427.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -416.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -13461,7 +13461,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,  -303.7500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -292.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -281.2500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,  -270.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -258.7500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -247.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -236.2500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -13477,7 +13477,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,  -123.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -112.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,  -101.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,   -90.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   -78.7500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   -67.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   -56.2500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -13493,7 +13493,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,    56.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,    67.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,    78.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,    90.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   101.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   112.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   123.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -13509,7 +13509,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,   236.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   247.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   258.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,   270.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   281.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   292.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   303.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -13525,7 +13525,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,   416.2500, 1.0,    67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   427.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   438.7500, 1.0,    67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,   450.0000, 1.0,    67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   461.2500, 1.0,  -112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   472.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   483.7500, 1.0,  -112.5000,    56.2500, EPSILON);
@@ -13541,7 +13541,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  427.5000,   596.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   607.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   618.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  427.5000,   630.0000, 1.0,    67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  427.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   641.2500, 1.0,    67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   652.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  427.5000,   663.7500, 1.0,    67.5000,   -56.2500, EPSILON);
@@ -13560,7 +13560,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,  -663.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -652.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -641.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,  -630.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -618.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -607.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -596.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -13576,7 +13576,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,  -483.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -472.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -461.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,  -450.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -438.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -427.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -416.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -13592,7 +13592,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,  -303.7500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -292.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -281.2500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,  -270.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -258.7500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -247.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -236.2500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -13608,7 +13608,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,  -123.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -112.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,  -101.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,   -90.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   -78.7500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   -67.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   -56.2500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -13624,7 +13624,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,    56.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,    67.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,    78.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,    90.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   101.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   112.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   123.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -13640,7 +13640,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,   236.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   247.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   258.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,   270.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   281.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   292.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   303.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -13656,7 +13656,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,   416.2500, 1.0,    78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   427.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   438.7500, 1.0,    78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,   450.0000, 1.0,    78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   461.2500, 1.0,  -101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   472.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   483.7500, 1.0,  -101.2500,    56.2500, EPSILON);
@@ -13672,7 +13672,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  438.7500,   596.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   607.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   618.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  438.7500,   630.0000, 1.0,    78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  438.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   641.2500, 1.0,    78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   652.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  438.7500,   663.7500, 1.0,    78.7500,   -56.2500, EPSILON);
@@ -13691,7 +13691,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,  -663.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -652.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -641.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,  -630.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -618.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -607.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -596.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -13707,7 +13707,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,  -483.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -472.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -461.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,  -450.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -438.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -427.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -416.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -13723,7 +13723,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,  -303.7500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -292.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -281.2500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,  -270.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -258.7500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -247.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -236.2500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -13739,7 +13739,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,  -123.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -112.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,  -101.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,   -90.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   -78.7500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   -67.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   -56.2500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -13755,7 +13755,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,    56.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,    67.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,    78.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,    90.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   101.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   112.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   123.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -13771,7 +13771,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,   236.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   247.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   258.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,   270.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   281.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   292.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   303.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -13787,7 +13787,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,   416.2500, 1.0,    90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   427.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   438.7500, 1.0,    90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,   450.0000, 1.0,    90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   461.2500, 1.0,   -90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   472.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   483.7500, 1.0,   -90.0000,    56.2500, EPSILON);
@@ -13803,7 +13803,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  450.0000,   596.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   607.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   618.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  450.0000,   630.0000, 1.0,    90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  450.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   641.2500, 1.0,    90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   652.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  450.0000,   663.7500, 1.0,    90.0000,   -56.2500, EPSILON);
@@ -13822,7 +13822,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,  -663.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -652.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -641.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,  -630.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -618.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -607.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -596.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -13838,7 +13838,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,  -483.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -472.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -461.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,  -450.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -438.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -427.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -416.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -13854,7 +13854,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,  -303.7500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -292.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -281.2500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,  -270.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -258.7500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -247.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -236.2500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -13870,7 +13870,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,  -123.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -112.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,  -101.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,   -90.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   -78.7500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   -67.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   -56.2500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -13886,7 +13886,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,    56.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,    67.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,    78.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,    90.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   101.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   112.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   123.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -13902,7 +13902,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,   236.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   247.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   258.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,   270.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   281.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   292.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   303.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -13918,7 +13918,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,   416.2500, 1.0,   101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   427.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   438.7500, 1.0,   101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,   450.0000, 1.0,   101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   461.2500, 1.0,   -78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   472.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   483.7500, 1.0,   -78.7500,    56.2500, EPSILON);
@@ -13934,7 +13934,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  461.2500,   596.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   607.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   618.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  461.2500,   630.0000, 1.0,   101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  461.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   641.2500, 1.0,   101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   652.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  461.2500,   663.7500, 1.0,   101.2500,   -56.2500, EPSILON);
@@ -13953,7 +13953,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,  -663.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -652.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -641.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,  -630.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -618.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -607.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -596.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -13969,7 +13969,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,  -483.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -472.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -461.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,  -450.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -438.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -427.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -416.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -13985,7 +13985,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,  -303.7500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -292.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -281.2500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,  -270.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -258.7500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -247.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -236.2500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -14001,7 +14001,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,  -123.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -112.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,  -101.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,   -90.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   -78.7500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   -67.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   -56.2500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -14017,7 +14017,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,    56.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,    67.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,    78.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,    90.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   101.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   112.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   123.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -14033,7 +14033,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,   236.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   247.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   258.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,   270.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   281.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   292.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   303.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -14049,7 +14049,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,   416.2500, 1.0,   112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   427.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   438.7500, 1.0,   112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,   450.0000, 1.0,   112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   461.2500, 1.0,   -67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   472.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   483.7500, 1.0,   -67.5000,    56.2500, EPSILON);
@@ -14065,7 +14065,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  472.5000,   596.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   607.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   618.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  472.5000,   630.0000, 1.0,   112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  472.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   641.2500, 1.0,   112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   652.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  472.5000,   663.7500, 1.0,   112.5000,   -56.2500, EPSILON);
@@ -14084,7 +14084,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,  -663.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -652.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -641.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,  -630.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -618.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -607.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -596.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -14100,7 +14100,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,  -483.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -472.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -461.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,  -450.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -438.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -427.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -416.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -14116,7 +14116,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,  -303.7500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -292.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -281.2500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,  -270.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -258.7500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -247.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -236.2500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -14132,7 +14132,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,  -123.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -112.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,  -101.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,   -90.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   -78.7500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   -67.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   -56.2500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -14148,7 +14148,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,    56.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,    67.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,    78.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,    90.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   101.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   112.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   123.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -14164,7 +14164,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,   236.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   247.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   258.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,   270.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   281.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   292.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   303.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -14180,7 +14180,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,   416.2500, 1.0,   123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   427.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   438.7500, 1.0,   123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,   450.0000, 1.0,   123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   461.2500, 1.0,   -56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   472.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   483.7500, 1.0,   -56.2500,    56.2500, EPSILON);
@@ -14196,7 +14196,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  483.7500,   596.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   607.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   618.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  483.7500,   630.0000, 1.0,   123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  483.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   641.2500, 1.0,   123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   652.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  483.7500,   663.7500, 1.0,   123.7500,   -56.2500, EPSILON);
@@ -14215,7 +14215,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,  -663.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -652.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -641.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,  -630.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -618.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -607.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -596.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -14231,7 +14231,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,  -483.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -472.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -461.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,  -450.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -438.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -427.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -416.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -14247,7 +14247,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,  -303.7500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -292.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -281.2500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,  -270.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -258.7500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -247.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -236.2500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -14263,7 +14263,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,  -123.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -112.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,  -101.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,   -90.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   -78.7500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   -67.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   -56.2500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -14279,7 +14279,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,    56.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,    67.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,    78.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,    90.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   101.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   112.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   123.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -14295,7 +14295,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,   236.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   247.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   258.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,   270.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   281.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   292.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   303.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -14311,7 +14311,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,   416.2500, 1.0,   135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   427.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   438.7500, 1.0,   135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,   450.0000, 1.0,   135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   461.2500, 1.0,   -45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   472.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   483.7500, 1.0,   -45.0000,    56.2500, EPSILON);
@@ -14327,7 +14327,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  495.0000,   596.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   607.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   618.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  495.0000,   630.0000, 1.0,   135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  495.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   641.2500, 1.0,   135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   652.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  495.0000,   663.7500, 1.0,   135.0000,   -56.2500, EPSILON);
@@ -14346,7 +14346,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,  -663.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -652.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -641.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,  -630.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -618.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -607.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -596.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -14362,7 +14362,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,  -483.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -472.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -461.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,  -450.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -438.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -427.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -416.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -14378,7 +14378,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,  -303.7500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -292.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -281.2500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,  -270.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -258.7500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -247.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -236.2500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -14394,7 +14394,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,  -123.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -112.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,  -101.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,   -90.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   -78.7500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   -67.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   -56.2500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -14410,7 +14410,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,    56.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,    67.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,    78.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,    90.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   101.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   112.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   123.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -14426,7 +14426,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,   236.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   247.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   258.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,   270.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   281.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   292.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   303.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -14442,7 +14442,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,   416.2500, 1.0,   146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   427.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   438.7500, 1.0,   146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,   450.0000, 1.0,   146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   461.2500, 1.0,   -33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   472.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   483.7500, 1.0,   -33.7500,    56.2500, EPSILON);
@@ -14458,7 +14458,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  506.2500,   596.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   607.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   618.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  506.2500,   630.0000, 1.0,   146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  506.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   641.2500, 1.0,   146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   652.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  506.2500,   663.7500, 1.0,   146.2500,   -56.2500, EPSILON);
@@ -14477,7 +14477,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,  -663.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -652.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -641.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,  -630.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -618.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -607.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -596.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -14493,7 +14493,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,  -483.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -472.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -461.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,  -450.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -438.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -427.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -416.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -14509,7 +14509,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,  -303.7500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -292.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -281.2500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,  -270.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -258.7500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -247.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -236.2500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -14525,7 +14525,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,  -123.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -112.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,  -101.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,   -90.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   -78.7500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   -67.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   -56.2500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -14541,7 +14541,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,    56.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,    67.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,    78.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,    90.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   101.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   112.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   123.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -14557,7 +14557,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,   236.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   247.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   258.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,   270.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   281.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   292.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   303.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -14573,7 +14573,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,   416.2500, 1.0,   157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   427.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   438.7500, 1.0,   157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,   450.0000, 1.0,   157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   461.2500, 1.0,   -22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   472.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   483.7500, 1.0,   -22.5000,    56.2500, EPSILON);
@@ -14589,7 +14589,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  517.5000,   596.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   607.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   618.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  517.5000,   630.0000, 1.0,   157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  517.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   641.2500, 1.0,   157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   652.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  517.5000,   663.7500, 1.0,   157.5000,   -56.2500, EPSILON);
@@ -14608,7 +14608,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,  -663.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -652.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -641.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,  -630.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -618.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -607.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -596.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -14624,7 +14624,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,  -483.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -472.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -461.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,  -450.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -438.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -427.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -416.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -14640,7 +14640,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,  -303.7500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -292.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -281.2500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,  -270.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -258.7500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -247.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -236.2500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -14656,7 +14656,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,  -123.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -112.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,  -101.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,   -90.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   -78.7500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   -67.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   -56.2500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -14672,7 +14672,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,    56.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,    67.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,    78.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,    90.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   101.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   112.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   123.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -14688,7 +14688,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,   236.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   247.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   258.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,   270.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   281.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   292.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   303.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -14704,7 +14704,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,   416.2500, 1.0,   168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   427.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   438.7500, 1.0,   168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,   450.0000, 1.0,   168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   461.2500, 1.0,   -11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   472.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   483.7500, 1.0,   -11.2500,    56.2500, EPSILON);
@@ -14720,7 +14720,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  528.7500,   596.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   607.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   618.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  528.7500,   630.0000, 1.0,   168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  528.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   641.2500, 1.0,   168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   652.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  528.7500,   663.7500, 1.0,   168.7500,   -56.2500, EPSILON);
@@ -14739,7 +14739,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,  -663.7500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -652.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -641.2500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,  -630.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -618.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -607.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -596.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -14755,7 +14755,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,  -483.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -472.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -461.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,  -450.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -438.7500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -427.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -416.2500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -14771,7 +14771,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,  -303.7500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -292.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -281.2500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,  -270.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -258.7500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -247.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -236.2500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -14787,7 +14787,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,  -123.7500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -112.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,  -101.2500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,   -90.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   -78.7500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   -67.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   -56.2500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -14803,7 +14803,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,    56.2500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,    67.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,    78.7500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,    90.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   101.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   112.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   123.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -14819,7 +14819,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,   236.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   247.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   258.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,   270.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   281.2500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   292.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   303.7500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -14835,7 +14835,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,   416.2500, 1.0,   180.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   427.5000, 1.0,   180.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   438.7500, 1.0,   180.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,   450.0000, 1.0,   180.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   461.2500, 1.0,     0.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   472.5000, 1.0,     0.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   483.7500, 1.0,     0.0000,    56.2500, EPSILON);
@@ -14851,7 +14851,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  540.0000,   596.2500, 1.0,     0.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   607.5000, 1.0,     0.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   618.7500, 1.0,     0.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  540.0000,   630.0000, 1.0,   180.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  540.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   641.2500, 1.0,   180.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   652.5000, 1.0,   180.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  540.0000,   663.7500, 1.0,   180.0000,   -56.2500, EPSILON);
@@ -14870,7 +14870,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,  -663.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -652.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -641.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,  -630.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -618.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -607.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -596.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -14886,7 +14886,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,  -483.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -472.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -461.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,  -450.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -438.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -427.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -416.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -14902,7 +14902,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,  -303.7500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -292.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -281.2500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,  -270.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -258.7500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -247.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -236.2500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -14918,7 +14918,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,  -123.7500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -112.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,  -101.2500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,   -90.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   -78.7500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   -67.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   -56.2500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -14934,7 +14934,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,    56.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,    67.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,    78.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,    90.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   101.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   112.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   123.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -14950,7 +14950,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,   236.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   247.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   258.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,   270.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   281.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   292.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   303.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -14966,7 +14966,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,   416.2500, 1.0,  -168.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   427.5000, 1.0,  -168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   438.7500, 1.0,  -168.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,   450.0000, 1.0,  -168.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   461.2500, 1.0,    11.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   472.5000, 1.0,    11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   483.7500, 1.0,    11.2500,    56.2500, EPSILON);
@@ -14982,7 +14982,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  551.2500,   596.2500, 1.0,    11.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   607.5000, 1.0,    11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   618.7500, 1.0,    11.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  551.2500,   630.0000, 1.0,  -168.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  551.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   641.2500, 1.0,  -168.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   652.5000, 1.0,  -168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  551.2500,   663.7500, 1.0,  -168.7500,   -56.2500, EPSILON);
@@ -15001,7 +15001,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,  -663.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -652.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -641.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,  -630.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -618.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -607.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -596.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -15017,7 +15017,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,  -483.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -472.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -461.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,  -450.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -438.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -427.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -416.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -15033,7 +15033,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,  -303.7500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -292.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -281.2500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,  -270.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -258.7500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -247.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -236.2500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -15049,7 +15049,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,  -123.7500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -112.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,  -101.2500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,   -90.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   -78.7500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   -67.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   -56.2500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -15065,7 +15065,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,    56.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,    67.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,    78.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,    90.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   101.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   112.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   123.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -15081,7 +15081,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,   236.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   247.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   258.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,   270.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   281.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   292.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   303.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -15097,7 +15097,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,   416.2500, 1.0,  -157.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   427.5000, 1.0,  -157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   438.7500, 1.0,  -157.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,   450.0000, 1.0,  -157.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   461.2500, 1.0,    22.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   472.5000, 1.0,    22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   483.7500, 1.0,    22.5000,    56.2500, EPSILON);
@@ -15113,7 +15113,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  562.5000,   596.2500, 1.0,    22.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   607.5000, 1.0,    22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   618.7500, 1.0,    22.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  562.5000,   630.0000, 1.0,  -157.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  562.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   641.2500, 1.0,  -157.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   652.5000, 1.0,  -157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  562.5000,   663.7500, 1.0,  -157.5000,   -56.2500, EPSILON);
@@ -15132,7 +15132,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,  -663.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -652.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -641.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,  -630.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -618.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -607.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -596.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -15148,7 +15148,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,  -483.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -472.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -461.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,  -450.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -438.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -427.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -416.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -15164,7 +15164,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,  -303.7500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -292.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -281.2500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,  -270.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -258.7500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -247.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -236.2500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -15180,7 +15180,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,  -123.7500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -112.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,  -101.2500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,   -90.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   -78.7500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   -67.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   -56.2500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -15196,7 +15196,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,    56.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,    67.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,    78.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,    90.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   101.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   112.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   123.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -15212,7 +15212,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,   236.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   247.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   258.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,   270.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   281.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   292.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   303.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -15228,7 +15228,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,   416.2500, 1.0,  -146.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   427.5000, 1.0,  -146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   438.7500, 1.0,  -146.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,   450.0000, 1.0,  -146.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   461.2500, 1.0,    33.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   472.5000, 1.0,    33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   483.7500, 1.0,    33.7500,    56.2500, EPSILON);
@@ -15244,7 +15244,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  573.7500,   596.2500, 1.0,    33.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   607.5000, 1.0,    33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   618.7500, 1.0,    33.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  573.7500,   630.0000, 1.0,  -146.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  573.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   641.2500, 1.0,  -146.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   652.5000, 1.0,  -146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  573.7500,   663.7500, 1.0,  -146.2500,   -56.2500, EPSILON);
@@ -15263,7 +15263,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,  -663.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -652.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -641.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,  -630.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -618.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -607.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -596.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -15279,7 +15279,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,  -483.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -472.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -461.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,  -450.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -438.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -427.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -416.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -15295,7 +15295,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,  -303.7500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -292.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -281.2500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,  -270.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -258.7500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -247.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -236.2500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -15311,7 +15311,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,  -123.7500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -112.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,  -101.2500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,   -90.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   -78.7500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   -67.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   -56.2500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -15327,7 +15327,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,    56.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,    67.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,    78.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,    90.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   101.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   112.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   123.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -15343,7 +15343,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,   236.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   247.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   258.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,   270.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   281.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   292.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   303.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -15359,7 +15359,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,   416.2500, 1.0,  -135.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   427.5000, 1.0,  -135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   438.7500, 1.0,  -135.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,   450.0000, 1.0,  -135.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   461.2500, 1.0,    45.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   472.5000, 1.0,    45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   483.7500, 1.0,    45.0000,    56.2500, EPSILON);
@@ -15375,7 +15375,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  585.0000,   596.2500, 1.0,    45.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   607.5000, 1.0,    45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   618.7500, 1.0,    45.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  585.0000,   630.0000, 1.0,  -135.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  585.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   641.2500, 1.0,  -135.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   652.5000, 1.0,  -135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  585.0000,   663.7500, 1.0,  -135.0000,   -56.2500, EPSILON);
@@ -15394,7 +15394,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,  -663.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -652.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -641.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,  -630.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -618.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -607.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -596.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -15410,7 +15410,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,  -483.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -472.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -461.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,  -450.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -438.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -427.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -416.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -15426,7 +15426,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,  -303.7500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -292.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -281.2500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,  -270.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -258.7500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -247.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -236.2500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -15442,7 +15442,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,  -123.7500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -112.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,  -101.2500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,   -90.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   -78.7500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   -67.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   -56.2500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -15458,7 +15458,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,    56.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,    67.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,    78.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,    90.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   101.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   112.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   123.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -15474,7 +15474,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,   236.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   247.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   258.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,   270.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   281.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   292.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   303.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -15490,7 +15490,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,   416.2500, 1.0,  -123.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   427.5000, 1.0,  -123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   438.7500, 1.0,  -123.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,   450.0000, 1.0,  -123.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   461.2500, 1.0,    56.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   472.5000, 1.0,    56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   483.7500, 1.0,    56.2500,    56.2500, EPSILON);
@@ -15506,7 +15506,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  596.2500,   596.2500, 1.0,    56.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   607.5000, 1.0,    56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   618.7500, 1.0,    56.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  596.2500,   630.0000, 1.0,  -123.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  596.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   641.2500, 1.0,  -123.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   652.5000, 1.0,  -123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  596.2500,   663.7500, 1.0,  -123.7500,   -56.2500, EPSILON);
@@ -15525,7 +15525,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,  -663.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -652.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -641.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,  -630.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -618.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -607.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -596.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -15541,7 +15541,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,  -483.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -472.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -461.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,  -450.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -438.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -427.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -416.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -15557,7 +15557,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,  -303.7500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -292.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -281.2500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,  -270.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -258.7500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -247.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -236.2500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -15573,7 +15573,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,  -123.7500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -112.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,  -101.2500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,   -90.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   -78.7500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   -67.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   -56.2500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -15589,7 +15589,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,    56.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,    67.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,    78.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,    90.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   101.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   112.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   123.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -15605,7 +15605,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,   236.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   247.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   258.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,   270.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   281.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   292.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   303.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -15621,7 +15621,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,   416.2500, 1.0,  -112.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   427.5000, 1.0,  -112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   438.7500, 1.0,  -112.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,   450.0000, 1.0,  -112.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   461.2500, 1.0,    67.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   472.5000, 1.0,    67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   483.7500, 1.0,    67.5000,    56.2500, EPSILON);
@@ -15637,7 +15637,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  607.5000,   596.2500, 1.0,    67.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   607.5000, 1.0,    67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   618.7500, 1.0,    67.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  607.5000,   630.0000, 1.0,  -112.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  607.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   641.2500, 1.0,  -112.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   652.5000, 1.0,  -112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  607.5000,   663.7500, 1.0,  -112.5000,   -56.2500, EPSILON);
@@ -15656,7 +15656,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,  -663.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -652.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -641.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,  -630.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -618.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -607.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -596.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -15672,7 +15672,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,  -483.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -472.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -461.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,  -450.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -438.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -427.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -416.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -15688,7 +15688,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,  -303.7500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -292.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -281.2500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,  -270.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -258.7500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -247.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -236.2500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -15704,7 +15704,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,  -123.7500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -112.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,  -101.2500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,   -90.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   -78.7500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   -67.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   -56.2500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -15720,7 +15720,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,    56.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,    67.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,    78.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,    90.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   101.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   112.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   123.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -15736,7 +15736,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,   236.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   247.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   258.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,   270.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   281.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   292.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   303.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -15752,7 +15752,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,   416.2500, 1.0,  -101.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   427.5000, 1.0,  -101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   438.7500, 1.0,  -101.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,   450.0000, 1.0,  -101.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   461.2500, 1.0,    78.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   472.5000, 1.0,    78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   483.7500, 1.0,    78.7500,    56.2500, EPSILON);
@@ -15768,7 +15768,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  618.7500,   596.2500, 1.0,    78.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   607.5000, 1.0,    78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   618.7500, 1.0,    78.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  618.7500,   630.0000, 1.0,  -101.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  618.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   641.2500, 1.0,  -101.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   652.5000, 1.0,  -101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  618.7500,   663.7500, 1.0,  -101.2500,   -56.2500, EPSILON);
@@ -15787,7 +15787,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,  -663.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -652.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -641.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,  -630.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -618.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -607.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -596.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -15803,7 +15803,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,  -483.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -472.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -461.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,  -450.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -438.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -427.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -416.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -15819,7 +15819,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,  -303.7500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -292.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -281.2500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,  -270.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -258.7500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -247.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -236.2500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -15835,7 +15835,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,  -123.7500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -112.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,  -101.2500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,   -90.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   -78.7500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   -67.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   -56.2500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -15851,7 +15851,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,    56.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,    67.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,    78.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,    90.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   101.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   112.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   123.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -15867,7 +15867,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,   236.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   247.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   258.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,   270.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   281.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   292.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   303.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -15883,7 +15883,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,   416.2500, 1.0,   -90.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   427.5000, 1.0,   -90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   438.7500, 1.0,   -90.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,   450.0000, 1.0,   -90.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   461.2500, 1.0,    90.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   472.5000, 1.0,    90.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   483.7500, 1.0,    90.0000,    56.2500, EPSILON);
@@ -15899,7 +15899,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  630.0000,   596.2500, 1.0,    90.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   607.5000, 1.0,    90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   618.7500, 1.0,    90.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  630.0000,   630.0000, 1.0,   -90.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  630.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   641.2500, 1.0,   -90.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   652.5000, 1.0,   -90.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  630.0000,   663.7500, 1.0,   -90.0000,   -56.2500, EPSILON);
@@ -15918,7 +15918,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,  -663.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -652.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -641.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,  -630.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -618.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -607.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -596.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -15934,7 +15934,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,  -483.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -472.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -461.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,  -450.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -438.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -427.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -416.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -15950,7 +15950,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,  -303.7500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -292.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -281.2500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,  -270.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -258.7500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -247.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -236.2500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -15966,7 +15966,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,  -123.7500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -112.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,  -101.2500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,   -90.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   -78.7500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   -67.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   -56.2500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -15982,7 +15982,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,    56.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,    67.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,    78.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,    90.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   101.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   112.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   123.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -15998,7 +15998,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,   236.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   247.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   258.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,   270.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   281.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   292.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   303.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -16014,7 +16014,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,   416.2500, 1.0,   -78.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   427.5000, 1.0,   -78.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   438.7500, 1.0,   -78.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,   450.0000, 1.0,   -78.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   461.2500, 1.0,   101.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   472.5000, 1.0,   101.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   483.7500, 1.0,   101.2500,    56.2500, EPSILON);
@@ -16030,7 +16030,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  641.2500,   596.2500, 1.0,   101.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   607.5000, 1.0,   101.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   618.7500, 1.0,   101.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  641.2500,   630.0000, 1.0,   -78.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  641.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   641.2500, 1.0,   -78.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   652.5000, 1.0,   -78.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  641.2500,   663.7500, 1.0,   -78.7500,   -56.2500, EPSILON);
@@ -16049,7 +16049,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,  -663.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -652.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -641.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,  -630.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -618.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -607.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -596.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -16065,7 +16065,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,  -483.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -472.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -461.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,  -450.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -438.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -427.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -416.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -16081,7 +16081,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,  -303.7500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -292.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -281.2500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,  -270.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -258.7500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -247.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -236.2500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -16097,7 +16097,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,  -123.7500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -112.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,  -101.2500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,   -90.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   -78.7500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   -67.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   -56.2500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -16113,7 +16113,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,    56.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,    67.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,    78.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,    90.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   101.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   112.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   123.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -16129,7 +16129,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,   236.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   247.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   258.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,   270.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   281.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   292.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   303.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -16145,7 +16145,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,   416.2500, 1.0,   -67.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   427.5000, 1.0,   -67.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   438.7500, 1.0,   -67.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,   450.0000, 1.0,   -67.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   461.2500, 1.0,   112.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   472.5000, 1.0,   112.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   483.7500, 1.0,   112.5000,    56.2500, EPSILON);
@@ -16161,7 +16161,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  652.5000,   596.2500, 1.0,   112.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   607.5000, 1.0,   112.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   618.7500, 1.0,   112.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  652.5000,   630.0000, 1.0,   -67.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  652.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   641.2500, 1.0,   -67.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   652.5000, 1.0,   -67.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  652.5000,   663.7500, 1.0,   -67.5000,   -56.2500, EPSILON);
@@ -16180,7 +16180,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,  -663.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -652.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -641.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,  -630.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -618.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -607.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -596.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -16196,7 +16196,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,  -483.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -472.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -461.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,  -450.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -438.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -427.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -416.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -16212,7 +16212,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,  -303.7500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -292.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -281.2500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,  -270.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -258.7500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -247.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -236.2500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -16228,7 +16228,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,  -123.7500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -112.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,  -101.2500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,   -90.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   -78.7500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   -67.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   -56.2500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -16244,7 +16244,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,    56.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,    67.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,    78.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,    90.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   101.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   112.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   123.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -16260,7 +16260,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,   236.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   247.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   258.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,   270.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   281.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   292.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   303.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -16276,7 +16276,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,   416.2500, 1.0,   -56.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   427.5000, 1.0,   -56.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   438.7500, 1.0,   -56.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,   450.0000, 1.0,   -56.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   461.2500, 1.0,   123.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   472.5000, 1.0,   123.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   483.7500, 1.0,   123.7500,    56.2500, EPSILON);
@@ -16292,7 +16292,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  663.7500,   596.2500, 1.0,   123.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   607.5000, 1.0,   123.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   618.7500, 1.0,   123.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  663.7500,   630.0000, 1.0,   -56.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  663.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   641.2500, 1.0,   -56.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   652.5000, 1.0,   -56.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  663.7500,   663.7500, 1.0,   -56.2500,   -56.2500, EPSILON);
@@ -16311,7 +16311,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,  -663.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -652.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -641.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,  -630.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -618.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -607.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -596.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -16327,7 +16327,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,  -483.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -472.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -461.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,  -450.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -438.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -427.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -416.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -16343,7 +16343,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,  -303.7500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -292.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -281.2500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,  -270.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -258.7500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -247.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -236.2500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -16359,7 +16359,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,  -123.7500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -112.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,  -101.2500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,   -90.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   -78.7500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   -67.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   -56.2500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -16375,7 +16375,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,    56.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,    67.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,    78.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,    90.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   101.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   112.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   123.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -16391,7 +16391,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,   236.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   247.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   258.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,   270.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   281.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   292.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   303.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -16407,7 +16407,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,   416.2500, 1.0,   -45.0000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   427.5000, 1.0,   -45.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   438.7500, 1.0,   -45.0000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,   450.0000, 1.0,   -45.0000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   461.2500, 1.0,   135.0000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   472.5000, 1.0,   135.0000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   483.7500, 1.0,   135.0000,    56.2500, EPSILON);
@@ -16423,7 +16423,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  675.0000,   596.2500, 1.0,   135.0000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   607.5000, 1.0,   135.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   618.7500, 1.0,   135.0000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  675.0000,   630.0000, 1.0,   -45.0000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  675.0000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   641.2500, 1.0,   -45.0000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   652.5000, 1.0,   -45.0000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  675.0000,   663.7500, 1.0,   -45.0000,   -56.2500, EPSILON);
@@ -16442,7 +16442,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,  -663.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -652.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -641.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,  -630.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -618.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -607.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -596.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -16458,7 +16458,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,  -483.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -472.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -461.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,  -450.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -438.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -427.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -416.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -16474,7 +16474,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,  -303.7500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -292.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -281.2500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,  -270.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -258.7500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -247.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -236.2500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -16490,7 +16490,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,  -123.7500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -112.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,  -101.2500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,   -90.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   -78.7500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   -67.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   -56.2500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -16506,7 +16506,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,    56.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,    67.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,    78.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,    90.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   101.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   112.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   123.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -16522,7 +16522,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,   236.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   247.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   258.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,   270.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   281.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   292.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   303.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -16538,7 +16538,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,   416.2500, 1.0,   -33.7500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   427.5000, 1.0,   -33.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   438.7500, 1.0,   -33.7500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,   450.0000, 1.0,   -33.7500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   461.2500, 1.0,   146.2500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   472.5000, 1.0,   146.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   483.7500, 1.0,   146.2500,    56.2500, EPSILON);
@@ -16554,7 +16554,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  686.2500,   596.2500, 1.0,   146.2500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   607.5000, 1.0,   146.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   618.7500, 1.0,   146.2500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  686.2500,   630.0000, 1.0,   -33.7500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  686.2500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   641.2500, 1.0,   -33.7500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   652.5000, 1.0,   -33.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  686.2500,   663.7500, 1.0,   -33.7500,   -56.2500, EPSILON);
@@ -16573,7 +16573,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,  -663.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -652.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -641.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,  -630.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -618.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -607.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -596.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -16589,7 +16589,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,  -483.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -472.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -461.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,  -450.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -438.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -427.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -416.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -16605,7 +16605,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,  -303.7500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -292.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -281.2500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,  -270.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -258.7500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -247.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -236.2500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -16621,7 +16621,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,  -123.7500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -112.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,  -101.2500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,   -90.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   -78.7500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   -67.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   -56.2500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -16637,7 +16637,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,    56.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,    67.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,    78.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,    90.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   101.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   112.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   123.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -16653,7 +16653,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,   236.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   247.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   258.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,   270.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   281.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   292.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   303.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -16669,7 +16669,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,   416.2500, 1.0,   -22.5000,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   427.5000, 1.0,   -22.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   438.7500, 1.0,   -22.5000,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,   450.0000, 1.0,   -22.5000,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   461.2500, 1.0,   157.5000,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   472.5000, 1.0,   157.5000,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   483.7500, 1.0,   157.5000,    56.2500, EPSILON);
@@ -16685,7 +16685,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  697.5000,   596.2500, 1.0,   157.5000,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   607.5000, 1.0,   157.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   618.7500, 1.0,   157.5000,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  697.5000,   630.0000, 1.0,   -22.5000,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  697.5000,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   641.2500, 1.0,   -22.5000,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   652.5000, 1.0,   -22.5000,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  697.5000,   663.7500, 1.0,   -22.5000,   -56.2500, EPSILON);
@@ -16704,7 +16704,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,  -663.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -652.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -641.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,  -630.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,  -630.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -618.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -607.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -596.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -16720,7 +16720,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,  -483.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -472.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -461.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,  -450.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,  -450.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -438.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -427.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -416.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -16736,7 +16736,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,  -303.7500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -292.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -281.2500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,  -270.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,  -270.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -258.7500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -247.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -236.2500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -16752,7 +16752,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,  -123.7500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -112.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,  -101.2500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,   -90.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,   -90.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   -78.7500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   -67.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   -56.2500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -16768,7 +16768,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,    56.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,    67.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,    78.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,    90.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,    90.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   101.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   112.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   123.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -16784,7 +16784,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,   236.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   247.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   258.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,   270.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,   270.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   281.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   292.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   303.7500, 1.0,   -11.2500,   -56.2500, EPSILON);
@@ -16800,7 +16800,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,   416.2500, 1.0,   -11.2500,    56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   427.5000, 1.0,   -11.2500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   438.7500, 1.0,   -11.2500,    78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,   450.0000, 1.0,   -11.2500,    90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,   450.0000, 1.0,     0.0000,    90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   461.2500, 1.0,   168.7500,    78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   472.5000, 1.0,   168.7500,    67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   483.7500, 1.0,   168.7500,    56.2500, EPSILON);
@@ -16816,7 +16816,7 @@ public class TestGeographyPointValueNormalization extends TestCase {
         checkGeographyNormalizeLngLat(  708.7500,   596.2500, 1.0,   168.7500,   -56.2500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   607.5000, 1.0,   168.7500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   618.7500, 1.0,   168.7500,   -78.7500, EPSILON);
-        checkGeographyNormalizeLngLat(  708.7500,   630.0000, 1.0,   -11.2500,   -90.0000, EPSILON);
+        checkGeographyNormalizeLngLat(  708.7500,   630.0000, 1.0,     0.0000,   -90.0000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   641.2500, 1.0,   -11.2500,   -78.7500, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   652.5000, 1.0,   -11.2500,   -67.5000, EPSILON);
         checkGeographyNormalizeLngLat(  708.7500,   663.7500, 1.0,   -11.2500,   -56.2500, EPSILON);

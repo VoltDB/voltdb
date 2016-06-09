@@ -33,11 +33,11 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -74,6 +74,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
@@ -124,7 +125,7 @@ public class PlanAssembler {
     private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
-    private PlanSelector m_planSelector;
+    private final PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -179,9 +180,10 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one matview.
      */
-    private static boolean tableListIncludesView(List<Table> tableList) {
+    private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null) {
+            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
                 return true;
             }
         }
@@ -278,7 +280,7 @@ public class PlanAssembler {
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
                 throw new PlanningErrorException(
-                "Illegal to read an export table.");
+                "Illegal to read a stream.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
@@ -310,7 +312,7 @@ public class PlanAssembler {
         // @TODO
         // Need to use StmtTableScan instead
         // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.m_tableList)) {
+        if (tableListIncludesReadOnlyView(parsedStmt.m_tableList)) {
             throw new PlanningErrorException("Illegal to modify a materialized view.");
         }
 
@@ -339,12 +341,12 @@ public class PlanAssembler {
 
         if (parsedStmt instanceof ParsedUpdateStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to update an export table.");
+                throw new PlanningErrorException("Illegal to update a stream.");
             }
             m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
         } else if (parsedStmt instanceof ParsedDeleteStmt) {
             if (tableListIncludesExportOnly(parsedStmt.m_tableList)) {
-                throw new PlanningErrorException("Illegal to delete from an export table.");
+                throw new PlanningErrorException("Illegal to delete from a stream.");
             }
             m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
         } else {
@@ -448,8 +450,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        Set<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
-                SelectSubqueryExpression.class);
+        Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
                 m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
@@ -458,15 +459,11 @@ public class PlanAssembler {
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
-                // no partition tables in parent query
-                for (Table tb: parsedStmt.m_tableList) {
-                    if (! tb.getIsreplicated()) {
-                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                        return null;
-                    }
-                }
-
-                // no partition tables in subqueries
+                // Don't allow partitioned tables in subqueries.
+                // This restriction stems from the lack of confidence that the
+                // planner can reliably identify all cases of adequate and
+                // inadequate partition key join criteria across different
+                // levels of correlated subqueries.
                 for (AbstractExpression e: subqueryExprs) {
                     assert(e instanceof SelectSubqueryExpression);
                     SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
@@ -475,7 +472,7 @@ public class PlanAssembler {
                         return null;
                     }
                 }
-             }
+            }
 
             if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
                 // There was at least one sub-query and we should have a compiled plan for it
@@ -494,8 +491,9 @@ public class PlanAssembler {
             rawplan = getNextPlan();
 
             // stop this while loop when no more plans are generated
-            if (rawplan == null)
+            if (rawplan == null) {
                 break;
+            }
             // Update the best cost plan so far
             m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
@@ -602,9 +600,9 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
+            assert(expr instanceof SelectSubqueryExpression);
             if (!(expr instanceof SelectSubqueryExpression)) {
-                // it can be IN (values)
-                continue;
+                continue; // DEAD CODE?
             }
             SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
@@ -938,12 +936,10 @@ public class PlanAssembler {
         HashAggregatePlanNode mvReAggTemplate = m_parsedSelect.m_mvFixInfo.getReAggregationPlanNode();
         if (mvReAggTemplate != null) {
             reAggNode = new HashAggregatePlanNode(mvReAggTemplate);
-            List<AbstractExpression> subqueryExprs =
-                    ExpressionUtil.findAllExpressionsOfClass(reAggNode.getPostPredicate(),
-                    AbstractSubqueryExpression.class);
-            if ( ! subqueryExprs.isEmpty()) {
+            AbstractExpression postPredicate = reAggNode.getPostPredicate();
+            if (postPredicate != null && postPredicate.hasSubquerySubexpression()) {
                 // For now, this is just a special case violation of the limitation on
-                // use of expression subqueries in MP queries on partitioned data.
+                // use of subquery expressions in MP queries on partitioned data.
                 // That special case was going undetected when we didn't flag it here.
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                 return null;
@@ -1457,11 +1453,51 @@ public class PlanAssembler {
         retval.setReadOnly(false);
 
         // Iterate over each column in the table we're inserting into:
-        //   - Make sure we're supplying values for columns that require it
-        //   - Set partitioning expressions for VALUES (...) case
+        //   - Make sure we're supplying values for columns that require it.
+        //     For a normal INSERT, these are the usual non-nullable values that
+        //     don't have a default value.
+        //     For an UPSERT, the (only) required values are the primary key
+        //     components. Other required values can be supplied from the
+        //     existing row in "UPDATE mode". If some other value is required
+        //     for an INSERT, UPSERT's "INSERT mode" will throw a runtime
+        //     constraint violation as the INSERT operation tries to set the
+        //     non-nullable column to null.
+        //   - Set partitioning expressions for VALUES (...) case.
+        //     TODO: it would be good someday to do the same kind of processing
+        //      for the INSERT ... SELECT ... case, by analyzing the subquery.
+        if (m_parsedInsert.m_isUpsert) {
+            boolean hasPrimaryKey = false;
+            for (Constraint constraint : targetTable.getConstraints()) {
+                if (constraint.getType() != ConstraintType.PRIMARY_KEY.getValue()) {
+                    continue;
+                }
+                hasPrimaryKey = true;
+                boolean targetsPrimaryKey = false;
+                for (ColumnRef colRef : constraint.getIndex().getColumns()) {
+                    int primary = colRef.getColumn().getIndex();
+                    for (Column targetCol : m_parsedInsert.m_columns.keySet()) {
+                        if (targetCol.getIndex() == primary) {
+                            targetsPrimaryKey = true;
+                            break;
+                        }
+                    }
+                    if (! targetsPrimaryKey) {
+                        throw new PlanningErrorException("UPSERT on table \"" +
+                                targetTable.getTypeName() +
+                                "\" must specify a value for primary key \"" +
+                                colRef.getColumn().getTypeName() + "\".");
+                    }
+                }
+            }
+            if (! hasPrimaryKey) {
+                throw new PlanningErrorException("UPSERT is not allowed on table \"" +
+                        targetTable.getTypeName() + "\" that has no primary key.");
+            }
+        }
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
         for (Column col : targetTableColumns) {
-            boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
+            boolean needsValue = (!m_parsedInsert.m_isUpsert) &&
+                    (col.getNullable() == false) && (col.getDefaulttype() == 0);
             if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
                 // This check could be done during parsing?
                 throw new PlanningErrorException("Column " + col.getName()
@@ -1631,6 +1667,16 @@ public class PlanAssembler {
 
         // Build the output schema for the projection based on the display columns
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
+        List<TupleValueExpression> allTves =  new ArrayList<>();
+        for (SchemaColumn col : proj_schema.getColumns()) {
+            allTves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+        }
+
+        // Adjust the differentiator fields of TVEs, since they need to reflect
+        // the inlined projection node in scan nodes.
+        for (TupleValueExpression tve : allTves) {
+            tve.setDifferentiator(rootNode.adjustDifferentiatorField(tve.getColumnIndex()));
+        }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
         // if the projection can be done inline...
@@ -2607,7 +2653,7 @@ public class PlanAssembler {
         for (ParsedColInfo col : orderBys) {
             AbstractExpression rootExpr = col.expression;
             // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-            ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+            Collection<AbstractExpression> tves = rootExpr.findAllTupleValueSubexpressions();
             for (AbstractExpression tve: tves) {
                 if  (((TupleValueExpression) tve).hasAggregate()) {
                     return true;

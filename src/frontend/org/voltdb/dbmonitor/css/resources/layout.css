@@ -738,6 +738,8 @@ ul.tabs {
     width: 100%;
 }
 
+ul.refreshList { margin-top:10px;}
+
     ul.tabs li {
         float: left;
         margin: 0;
@@ -756,7 +758,7 @@ ul.tabs {
             text-decoration: none;
             color: #000;
             display: block;
-            font-size: 1.2em;
+            font-size: 14px;
             padding: 0 3px;
             border: 1px solid #fff;
             outline: none;
@@ -1849,7 +1851,7 @@ ul.topRightList li a {
 .objectExplorer {
     float: left;
     width: 28%;
-    padding: 15px 1%;
+    padding: 13px 1%;
     background: #fff;
     position: relative;
 }

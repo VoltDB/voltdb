@@ -38,6 +38,7 @@ static const double RADIUS_SQ_M = SPHERICAL_EARTH_MEAN_RADIUS_M * SPHERICAL_EART
 
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
+static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg);
 static void throwInvalidWktPoint(const std::string& input)
 {
     std::ostringstream oss;
@@ -56,6 +57,51 @@ static void throwInvalidWktPoly(const std::string& reason)
     throw SQLException(SQLException::data_exception_invalid_parameter,
                        oss.str().c_str());
 }
+
+static void throwInvalidPointLatitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POINTFROMTEXT: '" << input << "'";
+    oss << ".  Latitude must be in the range [-90,90].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPointLongitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POINTFROMTEXT: '" << input << "'";
+    oss << ".  Longitude must be in the range [-180,180].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPolygonLatitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POLYGONFROMTEXT: '" << input << "'";
+    oss << ".  Latitude must be in the range [-90,90].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPolygonLongitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POLYGONFROMTEXT: '" << input << "'";
+    oss << ".  Longitude must be in the range [-180,180].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidDistanceDWithin(const std::string& msg)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to DWITHIN function: '" << msg << "'.";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
 
 static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
                                   const std::string& input,
@@ -77,6 +123,20 @@ static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
     return coord;
 }
 
+
+// function computes distance between two non-null points
+// function computes distance using Haversine formula
+static double getDistance(const GeographyPointValue &point1,
+                          const GeographyPointValue &point2)
+{
+    assert(!point1.isNull());
+    assert(!point2.isNull());
+
+    const S2LatLng latLng1 = S2LatLng(point1.toS2Point()).Normalized();
+    const S2LatLng latLng2 = S2LatLng(point2.toS2Point()).Normalized();
+    S1Angle distance = latLng1.GetDistance(latLng2);
+    return distance.radians() * SPHERICAL_EARTH_MEAN_RADIUS_M;
+}
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
 {
     if (isNull()) {
@@ -109,6 +169,14 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     GeographyPointValue::Coord lat = stringToCoord(POINT, wkt, *it);
     ++it;
 
+    if ( lng < -180.0 || lng > 180.0) {
+        throwInvalidPointLongitude(wkt);
+    }
+
+    if (lat < -90.0 || lat > 90.0 ) {
+        throwInvalidPointLatitude(wkt);
+    }
+
     if (! boost::iequals(*it, ")")) {
         throwInvalidWktPoint(wkt);
     }
@@ -119,7 +187,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     }
 
     NValue returnValue(VALUE_TYPE_POINT);
-    returnValue.getPoint() = GeographyPointValue(lng, lat);
+    returnValue.getGeographyPointValue() = GeographyPointValue(lng, lat);
 
     return returnValue;
 }
@@ -158,16 +226,22 @@ static void readLoop(bool is_shell,
                      S2Loop *loop)
 {
     if (! boost::iequals(*it, "(")) {
-        throwInvalidWktPoly("expected left parenthesis to start a loop");
+        throwInvalidWktPoly("expected left parenthesis to start a ring");
     }
     ++it;
 
     std::vector<S2Point> points;
     while (it != end && *it != ")") {
         GeographyPointValue::Coord lng = stringToCoord(POLY, wkt, *it);
-        ++it;
 
+        if (lng < -180 || lng > 180) {
+            throwInvalidPolygonLongitude(*it);
+        }
+        ++it;
         GeographyPointValue::Coord lat = stringToCoord(POLY, wkt, *it);
+        if (lat < -90 || lat > 90) {
+            throwInvalidPolygonLatitude(*it);
+        }
         ++it;
 
         // Note: This is S2.  It takes latitude, longitude, not
@@ -218,17 +292,8 @@ static void readLoop(bool is_shell,
     loop->Init(points);
 }
 
-template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
+static NValue polygonFromText(const std::string &wkt, bool doValidation)
 {
-    bool is_shell = true;
-    if (isNull()) {
-        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
-    }
-
-    int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
-    const std::string wkt(textData, textLength);
-
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
     Tokenizer::iterator it = tokens.begin();
@@ -244,6 +309,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
     ++it;
 
+    bool is_shell = true;
     std::size_t length = Polygon::serializedLengthNoLoops();
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
@@ -274,9 +340,42 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.
+    if (doValidation) {
+        std::stringstream validReason;
+        if (!poly.IsValid(&validReason)
+                || isMultiPolygon(poly, &validReason)) {
+            throwInvalidWktPoly(validReason.str());
+        }
+    }
     SimpleOutputSerializer output(storage, length);
     poly.saveToBuffer(output);
     return nval;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
+{
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    const std::string wkt(textData, textLength);
+
+    return polygonFromText(wkt, false);
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_VALIDPOLYGONFROMTEXT>() const
+{
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
+    }
+
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    const std::string wkt(textData, textLength);
+
+    return polygonFromText(wkt, true);
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
@@ -284,8 +383,8 @@ template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& ar
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
 
     Polygon poly;
-    poly.initFromGeography(arguments[0].getGeography());
-    S2Point pt = arguments[1].getPoint().toS2Point();
+    poly.initFromGeography(arguments[0].getGeographyValue());
+    S2Point pt = arguments[1].getGeographyPointValue().toS2Point();
     return ValueFactory::getBooleanValue(poly.Contains(pt));
 }
 
@@ -295,7 +394,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() cons
     }
 
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
 
     NValue retVal(VALUE_TYPE_INTEGER);
     // exclude exterior ring
@@ -309,7 +408,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     }
 
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
 
     // the OGC spec suggests that the number of vertices should
     // include the repeated closing vertex which is implicit in S2's
@@ -325,7 +424,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const GeographyPointValue point = getPoint();
+    const GeographyPointValue point = getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLatitude();
     return retVal;
@@ -335,7 +434,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const GeographyPointValue point = getPoint();
+    const GeographyPointValue point = getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLongitude();
     return retVal;
@@ -347,10 +446,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const {
     }
 
     Polygon polygon;
-    polygon.initFromGeography(getGeography());
+    polygon.initFromGeography(getGeographyValue());
     const GeographyPointValue point(polygon.GetCentroid());
     NValue retVal(VALUE_TYPE_POINT);
-    retVal.getPoint() = point;
+    retVal.getGeographyPointValue() = point;
     return retVal;
 }
 
@@ -360,7 +459,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
     }
 
     Polygon polygon;
-    polygon.initFromGeography(getGeography());
+    polygon.initFromGeography(getGeographyValue());
 
     NValue retVal(VALUE_TYPE_DOUBLE);
     // area is in steradians which is a solid angle. Earth in the calculation is treated as sphere
@@ -378,8 +477,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vect
     }
 
     Polygon polygon;
-    polygon.initFromGeography(arguments[0].getGeography());
-    GeographyPointValue point = arguments[1].getPoint();
+    polygon.initFromGeography(arguments[0].getGeographyValue());
+    GeographyPointValue point = arguments[1].getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
     retVal.getDouble() = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
@@ -394,16 +493,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
 
-    // compute distance using Haversine formula
-    // alternate to this is just obtain 2 s2points and compute S1Angle between them
-    // and use that as distance.
-    // S2 test uses S2LatLng for computing distances
-    const S2LatLng latLng1 = S2LatLng(arguments[0].getPoint().toS2Point()).Normalized();
-    const S2LatLng latLng2 = S2LatLng(arguments[1].getPoint().toS2Point()).Normalized();
-    S1Angle distance = latLng1.GetDistance(latLng2);
     NValue retVal(VALUE_TYPE_DOUBLE);
-    // distance is in radians, so convert it to meters
-    retVal.getDouble() = distance.radians() * SPHERICAL_EARTH_MEAN_RADIUS_M;
+    retVal.getDouble() = getDistance(arguments[0].getGeographyPointValue(), arguments[1].getGeographyPointValue());
     return retVal;
 }
 
@@ -413,7 +504,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
 
-    const std::string pointAsText = getPoint().toWKT();
+    const std::string pointAsText = getGeographyPointValue().toWKT();
     return getTempStringValue(pointAsText.c_str(), pointAsText.length());
 }
 
@@ -423,7 +514,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
 
-    const std::string polygonAsText = getGeography().toWKT();
+    const std::string polygonAsText = getGeographyValue().toWKT();
     return getTempStringValue(polygonAsText.c_str(), polygonAsText.length());
 }
 
@@ -431,7 +522,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
 // Return true if poly has more than one shell, or has shells
 // inside holes.
 //
-static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
+static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg) {
     auto nloops = poly.num_loops();
     int nouters = 0;
     for (int idx = 0; idx < nloops; idx += 1) {
@@ -443,7 +534,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
         case 1:
             break;
         default:
-            VMLOG(2, msg) << "Polygons can only be shells or holes." << std::endl;
+            VMLOG(2, msg) << "Polygons can only be shells or holes";
             return true;
         }
         if (!loop->IsNormalized(msg)) {
@@ -451,7 +542,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
         }
     }
     if (nouters != 1) {
-        VMLOG(2, msg) << "Polygons can have only one shell.";
+        VMLOG(2, msg) << "Polygons can have only one shell";
         return true;
     }
     return false;
@@ -466,9 +557,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     bool returnval = true;
     // Extract the polygon and check its validity.
     Polygon poly;
-    poly.initFromGeography(getGeography());
-    if (!poly.IsValid()
-            || isMultiPolygon(poly)) {
+    poly.initFromGeography(getGeographyValue());
+    if (!poly.IsValid(NULL)
+            || isMultiPolygon(poly, NULL)) {
         returnval = false;
     }
     return ValueFactory::getBooleanValue(returnval);
@@ -482,7 +573,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     // Extract the polygon and check its validity.
     std::stringstream msg;
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
     if (poly.IsValid(&msg)) {
         isMultiPolygon(poly, &msg);
     }
@@ -493,4 +584,42 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     return getTempStringValue(res.c_str(),res.length());
 }
 
+template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POLYGON_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    assert(isNumeric(arguments[2].getValueType()));
+
+    if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(arguments[0].getGeographyValue());
+    GeographyPointValue point = arguments[1].getGeographyPointValue();
+    double withinDistanceOf = arguments[2].castAsDoubleAndGetValue();
+    if (withinDistanceOf < 0) {
+        throwInvalidDistanceDWithin("Value of DISTANCE argument must be non-negative");
+    }
+
+    double polygonToPointDistance = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
+    return ValueFactory::getBooleanValue(polygonToPointDistance <= withinDistanceOf);
+}
+
+template<> NValue NValue::call<FUNC_VOLT_DWITHIN_POINT_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+    assert(isNumeric(arguments[2].getValueType()));
+
+    if (arguments[0].isNull() || arguments[1].isNull() || arguments[2].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+
+    double withinDistanceOf = arguments[2].castAsDoubleAndGetValue();
+    if (withinDistanceOf < 0) {
+        throwInvalidDistanceDWithin("Value of DISTANCE argument must be non-negative");
+    }
+
+    double pointToPointDistance = getDistance(arguments[0].getGeographyPointValue(), arguments[1].getGeographyPointValue());
+    return ValueFactory::getBooleanValue(pointToPointDistance <= withinDistanceOf);
+}
 } // end namespace voltdb

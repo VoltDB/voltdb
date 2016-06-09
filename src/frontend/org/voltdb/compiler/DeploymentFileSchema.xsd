@@ -49,6 +49,7 @@
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
+      <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
     </xs:all>
   </xs:complexType>
 
@@ -75,6 +76,18 @@
     <xs:attribute name="id" type="clusterIdType"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
+  </xs:complexType>
+  
+  <xs:simpleType name="readlevelType"> 
+    <xs:restriction base="xs:string"> 
+      <xs:enumeration value="fast"/>
+      <xs:enumeration value="safe"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <!-- <consistency> -->
+  <xs:complexType name="consistencyType">
+    <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -166,7 +179,7 @@
       <xs:all>
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="size" type="xs:string" default="0"/>
+                <xs:attribute name="size" type="xs:string" default="80%"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"
@@ -201,7 +214,7 @@
         </xs:element>
         <xs:element name="query" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="timeout" type="latencyType" default="0"/>
+                <xs:attribute name="timeout" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
@@ -307,9 +320,24 @@
           <xs:attribute name="enabled" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
+      <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
     </xs:sequence>
-    <xs:attribute name="port" type="xs:int" default="8080"/>
+    <xs:attribute name="port" type="xs:int"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- configuration for HTTPS -->
+  <xs:complexType name="httpsType">
+    <xs:sequence>
+      <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <xs:complexType name="keyOrTrustStoreType">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+      <xs:attribute name="password" type="xs:string"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
@@ -334,6 +362,8 @@
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
+    <xs:attribute name="target" type="xs:string" />
+    <!-- stream is deprecated. Use target instead. -->
     <xs:attribute name="stream" type="xs:string" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
@@ -350,11 +380,12 @@
   <xs:complexType name="ImportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="format-property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-    <xs:attribute name="format" type="xs:string"/>
+    <xs:attribute name="format" type="xs:string" default="csv"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -388,6 +419,7 @@
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
       <xs:enumeration value="kafka"/>
+      <xs:enumeration value="kinesis"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -397,14 +429,20 @@
     <xs:sequence>
       <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
         <xs:complexType>
-          <xs:attribute name="name" type="xs:string" use="required"/>
-          <xs:attribute name="roles" type="xs:string"/>
+          <xs:attribute name="name" type="userRoleNameString" use="required"/>
+          <xs:attribute name="roles" type="userRoleNameString"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
           <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+
+  <xs:simpleType name="userRoleNameString">
+	<xs:restriction base="xs:string">
+      <xs:pattern value="[\S]+"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <!--  Security provider enumeration -->
   <xs:simpleType name="SecurityProviderString">

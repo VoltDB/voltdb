@@ -136,8 +136,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                     ErrorInfoItem currItem;
                     currItem = m_errorInfo.take();
 
-                    if (currItem.lineNumber == -1)
+                    if (currItem.lineNumber == -1) {
                         return;
+                    }
 
                     if (currItem.errorInfo.length != 2) {
                         System.out.println("internal error, information is not enough");
@@ -176,14 +177,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             m_errorInfo.put(emptyErrorInfo);
         }
 
-        if (m_errorinfoProcessor != null)
+        if (m_errorinfoProcessor != null) {
             m_errorinfoProcessor.join();
+        }
     }
 
     @Override
     public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
-            //Dont collect more than we want to report.
+            //Don't collect more than we want to report.
             if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {
                 return true;
             }
@@ -271,8 +273,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
-
         @Option(desc = "username when connecting to the servers")
+
         String user = "";
 
         @Option(desc = "password to use when connecting to servers")
@@ -386,7 +388,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         start = System.currentTimeMillis();
         long insertTimeStart = start;
         long insertTimeEnd;
-
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
         config = cfg;
@@ -416,6 +417,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         }
         // Split server list
         final String[] serverlist = config.servers.split(",");
+
+        // If we need to prompt the user for a password, do so.
+        config.password = cfg.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
         final ClientConfig c_config = new ClientConfig(config.user, config.password);

@@ -1,5 +1,4 @@
 /**
- * LinearIterator.java
  * Written by Gil Tene of Azul Systems, and released to the public domain,
  * as explained at http://creativecommons.org/publicdomain/zero/1.0/
  *
@@ -17,51 +16,59 @@ import java.util.Iterator;
  * the next bucket boundary value.
  */
 public class LinearIterator extends AbstractHistogramIterator implements Iterator<HistogramIterationValue> {
-    long valueUnitsPerBucket;
-    long nextValueReportingLevel;
-    long nextValueReportingLevelLowestEquivalent;
+    private long valueUnitsPerBucket;
+    private long currentStepHighestValueReportingLevel;
+    private long currentStepLowestValueReportingLevel;
 
     /**
      * Reset iterator for re-use in a fresh iteration over the same histogram data set.
      * @param valueUnitsPerBucket The size (in value units) of each bucket iteration.
      */
-    public void reset(final int valueUnitsPerBucket) {
+    public void reset(final long valueUnitsPerBucket) {
         reset(histogram, valueUnitsPerBucket);
     }
 
     private void reset(final AbstractHistogram histogram, final long valueUnitsPerBucket) {
         super.resetIterator(histogram);
         this.valueUnitsPerBucket = valueUnitsPerBucket;
-        this.nextValueReportingLevel = valueUnitsPerBucket;
-        this.nextValueReportingLevelLowestEquivalent = histogram.lowestEquivalentValue(nextValueReportingLevel);
+        this.currentStepHighestValueReportingLevel = valueUnitsPerBucket - 1;
+        this.currentStepLowestValueReportingLevel = histogram.lowestEquivalentValue(currentStepHighestValueReportingLevel);
     }
 
     /**
      * @param histogram The histogram this iterator will operate on
      * @param valueUnitsPerBucket The size (in value units) of each bucket iteration.
      */
-    public LinearIterator(final AbstractHistogram histogram, final int valueUnitsPerBucket) {
+    public LinearIterator(final AbstractHistogram histogram, final long valueUnitsPerBucket) {
         reset(histogram, valueUnitsPerBucket);
     }
 
     @Override
     public boolean hasNext() {
-        return (super.hasNext() || (countAtThisValue != 0));
+        if (super.hasNext()) {
+            return true;
+        }
+        // If the next iterate will not move to the next sub bucket index (which is empty if
+        // if we reached this point), then we are not yet done iterating (we want to iterate
+        // until we are no longer on a value that has a count, rather than util we first reach
+        // the last value that has a count. The difference is subtle but important)...
+        return (currentStepHighestValueReportingLevel + 1 < nextValueAtIndex);
     }
 
     @Override
     void incrementIterationLevel() {
-        nextValueReportingLevel += valueUnitsPerBucket;
-        nextValueReportingLevelLowestEquivalent = histogram.lowestEquivalentValue(nextValueReportingLevel);
+        currentStepHighestValueReportingLevel += valueUnitsPerBucket;
+        currentStepLowestValueReportingLevel = histogram.lowestEquivalentValue(currentStepHighestValueReportingLevel);
     }
 
     @Override
     long getValueIteratedTo() {
-        return nextValueReportingLevel;
+        return currentStepHighestValueReportingLevel;
     }
 
     @Override
     boolean reachedIterationLevel() {
-        return (currentValueAtIndex >= nextValueReportingLevelLowestEquivalent);
+        return ((currentValueAtIndex >= currentStepLowestValueReportingLevel) ||
+                (currentIndex >= histogram.countsArrayLength - 1)) ;
     }
 }

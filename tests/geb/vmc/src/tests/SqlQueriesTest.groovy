@@ -27,6 +27,7 @@ import geb.*
 import groovy.json.*
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import spock.lang.*
 import vmcTest.pages.*
 
@@ -42,25 +43,28 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     static final String SQL_QUERY_FILE = 'src/resources/sqlQueries.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the Voter example app
-    static final String VOTER_TABLES_FILE = 'src/resources/expectedVoterTables.txt';
-    static final String VOTER_VIEWS_FILE  = 'src/resources/expectedVoterViews.txt';
+    // Files used to determine the expected Tables, Streams, Views, and (Default
+    // and User-defined) Stored Procedures, when running the Voter example app
+    static final String VOTER_TABLES_FILE  = 'src/resources/expectedVoterTables.txt';
+    static final String VOTER_STREAMS_FILE = 'src/resources/expectedVoterStreams.txt';
+    static final String VOTER_VIEWS_FILE   = 'src/resources/expectedVoterViews.txt';
     static final String VOTER_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedVoterDefaultStoredProcs.txt';
     static final String VOTER_USER_STORED_PROCS_FILE    = 'src/resources/expectedVoterUserStoredProcs.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the Genqa test app
-    static final String GENQA_TABLES_FILE = 'src/resources/expectedGenqaTables.txt';
-    static final String GENQA_VIEWS_FILE  = 'src/resources/expectedGenqaViews.txt';
+    // Files used to determine the expected Tables, Streams, Views, and (Default
+    // and User-defined) Stored Procedures, when running the Genqa test app
+    static final String GENQA_TABLES_FILE  = 'src/resources/expectedGenqaTables.txt';
+    static final String GENQA_STREAMS_FILE = 'src/resources/expectedGenqaStreams.txt';
+    static final String GENQA_VIEWS_FILE   = 'src/resources/expectedGenqaViews.txt';
     static final String GENQA_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedGenqaDefaultStoredProcs.txt';
     static final String GENQA_USER_STORED_PROCS_FILE    = 'src/resources/expectedGenqaUserStoredProcs.txt';
 
-    // Files used to determine the expected Tables, Views, and (Default and
-    // User-defiled) Stored Procedures, when running the GEB VMC test server
+    // Files used to determine the expected Tables, Streams, Views, and (Default,
+    // User-defined and System) Stored Procedures, when running the GEB VMC test server
     // (which is the default; see voltdb/tests/geb/vmc/server/run_voltdb_server.sh)
-    static final String TABLES_FILE = 'src/resources/expectedTables.txt';
-    static final String VIEWS_FILE  = 'src/resources/expectedViews.txt';
+    static final String TABLES_FILE  = 'src/resources/expectedTables.txt';
+    static final String STREAMS_FILE = 'src/resources/expectedStreams.txt';
+    static final String VIEWS_FILE   = 'src/resources/expectedViews.txt';
     static final String DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedDefaultStoredProcs.txt';
     static final String USER_STORED_PROCS_FILE    = 'src/resources/expectedUserStoredProcs.txt';
     static final String SYSTEM_STORED_PROCS_FILE  = 'src/resources/expectedSystemStoredProcs.txt';
@@ -80,28 +84,33 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     // Indicates whether the corresponding table has been created
     static List<Boolean> createdStandardTestTable = [false, false]
 
-    static List<String> savedTables = []
-    static List<String> savedViews = []
+    static List<String> savedTables  = []
+    static List<String> savedStreams = []
+    static List<String> savedViews  = []
     static Boolean initialized  = false;
     static Boolean runningVoter = null;
     static Boolean runningGenqa = null;
     static Boolean runningVmcTestSever = null;
+    static Map<String,Object> sqlQueryVariables = [:]
 
-    @Shared String tablesFileName = TABLES_FILE
-    @Shared String viewsFileName  = VIEWS_FILE
+    @Shared String tablesFileName  = TABLES_FILE
+    @Shared String streamsFileName = STREAMS_FILE
+    @Shared String viewsFileName   = VIEWS_FILE
     @Shared String defaultStoredProcsFileName = DEFAULT_STORED_PROCS_FILE
     @Shared String userStoredProcsFileName    = USER_STORED_PROCS_FILE
 
     @Shared def sqlQueriesFile = new File(SQL_QUERY_FILE)
-    @Shared def tablesFile = new File(TABLES_FILE)
-    @Shared def viewsFile  = new File(VIEWS_FILE)
+    @Shared def tablesFile  = new File(TABLES_FILE)
+    @Shared def streamsFile = new File(STREAMS_FILE)
+    @Shared def viewsFile   = new File(VIEWS_FILE)
     @Shared def systemStoredProcsFile  = new File(SYSTEM_STORED_PROCS_FILE)
     @Shared def defaultStoredProcsFile = new File(DEFAULT_STORED_PROCS_FILE)
     @Shared def userStoredProcsFile    = new File(USER_STORED_PROCS_FILE)
 
     @Shared def sqlQueryLines = []
-    @Shared def tableLines = []
-    @Shared def viewLines  = []
+    @Shared def tableLines  = []
+    @Shared def streamLines = []
+    @Shared def viewLines   = []
     @Shared def systemStoredProcLines = []
     @Shared def defaultStoredProcLines = []
     @Shared def userStoredProcLines = []
@@ -109,6 +118,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def fileLinesPairs = [
             [sqlQueriesFile, sqlQueryLines],
             [tablesFile, tableLines],
+            [streamsFile, streamLines],
             [viewsFile, viewLines],
             [systemStoredProcsFile, systemStoredProcLines],
             [defaultStoredProcsFile, defaultStoredProcLines],
@@ -212,6 +222,19 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Returns the list of stream names, as displayed on the page, but saving
+     * the list for later, so you don't need to get it over and over again.
+     * @param sqp - the SqlQueryPage from which to get the list of stream names.
+     * @return the list of stream names, as displayed on the page.
+     */
+    static List<String> getStreams(SqlQueryPage sqp) {
+        if (savedStreams == null || savedStreams.isEmpty()) {
+            savedStreams = sqp.getStreamNames()
+        }
+        return savedStreams
+    }
+
+    /**
      * Returns the list of view names, as displayed on the page, but saving
      * the list for later, so you don't need to get it over and over again.
      * @param sqp - the SqlQueryPage from which to get the list of view names.
@@ -234,6 +257,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         if (clearValues) {
             sqlQueryLines = []
             tableLines = []
+            streamLines  = []
             viewLines  = []
             systemStoredProcLines = []
             defaultStoredProcLines = []
@@ -241,6 +265,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             fileLinesPairs = [
                 [sqlQueriesFile, sqlQueryLines],
                 [tablesFile, tableLines],
+                [streamsFile, streamLines],
                 [viewsFile, viewLines],
                 [systemStoredProcsFile, systemStoredProcLines],
                 [defaultStoredProcsFile, defaultStoredProcLines],
@@ -254,38 +279,44 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     /**
      * Creates a table with the specified name, if that table does not already
      * exist in the database, and with the column names and types found in the
-     * PARTITIONED_TABLE and REPLICATED_TABLE, in the 'genqa' test app.
-     * @param sqp - the SqlQueryPage from which to get the list of view names.
-     * @param sqp - the name of the table to be created (if necessary).
-     * @return the list of view names, as displayed on the page.
+     * PARTITIONED_TABLE and REPLICATED_TABLE, in the usual test app (which is
+     * based on an old version of 'genqa').
+     * @param sqp - the SqlQueryPage on which to create the table.
+     * @param tableName - the name of the table to be created (if necessary).
+     * @param partitionColumn - the name of the table to be created (if necessary).
+     * @return true if the table needed to be created.
      */
     def boolean createTableIfDoesNotExist(SqlQueryPage sqp, String tableName, String partitionColumn='') {
         if (getTables(sqp).contains(tableName)) {
             return false
         } else {
             String ddl = 'Create table ' + tableName + ' (\n' +
-                    '  rowid                     BIGINT        NOT NULL,\n' +
-                    '  rowid_group               TINYINT       NOT NULL,\n' +
+                    '  rowid                     BIGINT          NOT NULL,\n' +
+                    '  rowid_group               TINYINT         NOT NULL,\n' +
                     '  type_null_tinyint         TINYINT,\n' +
-                    '  type_not_null_tinyint     TINYINT       NOT NULL,\n' +
+                    '  type_not_null_tinyint     TINYINT         NOT NULL,\n' +
                     '  type_null_smallint        SMALLINT,\n' +
-                    '  type_not_null_smallint    SMALLINT      NOT NULL,\n' +
+                    '  type_not_null_smallint    SMALLINT        NOT NULL,\n' +
                     '  type_null_integer         INTEGER,\n' +
-                    '  type_not_null_integer     INTEGER       NOT NULL,\n' +
+                    '  type_not_null_integer     INTEGER         NOT NULL,\n' +
                     '  type_null_bigint          BIGINT,\n' +
-                    '  type_not_null_bigint      BIGINT        NOT NULL,\n' +
+                    '  type_not_null_bigint      BIGINT          NOT NULL,\n' +
                     '  type_null_timestamp       TIMESTAMP,\n' +
-                    '  type_not_null_timestamp   TIMESTAMP     NOT NULL,\n' +
+                    '  type_not_null_timestamp   TIMESTAMP       NOT NULL,\n' +
                     '  type_null_float           FLOAT,\n' +
-                    '  type_not_null_float       FLOAT         NOT NULL,\n' +
+                    '  type_not_null_float       FLOAT           NOT NULL,\n' +
                     '  type_null_decimal         DECIMAL,\n' +
-                    '  type_not_null_decimal     DECIMAL       NOT NULL,\n' +
+                    '  type_not_null_decimal     DECIMAL         NOT NULL,\n' +
                     '  type_null_varchar25       VARCHAR(32),\n' +
-                    '  type_not_null_varchar25   VARCHAR(32)   NOT NULL,\n' +
+                    '  type_not_null_varchar25   VARCHAR(32)     NOT NULL,\n' +
                     '  type_null_varchar128      VARCHAR(128),\n' +
-                    '  type_not_null_varchar128  VARCHAR(128)  NOT NULL,\n' +
+                    '  type_not_null_varchar128  VARCHAR(128)    NOT NULL,\n' +
                     '  type_null_varchar1024     VARCHAR(1024),\n' +
-                    '  type_not_null_varchar1024 VARCHAR(1024) NOT NULL,\n' +
+                    '  type_not_null_varchar1024 VARCHAR(1024)   NOT NULL,\n' +
+                    '  type_null_point           GEOGRAPHY_POINT,\n' +
+                    '  type_not_null_point       GEOGRAPHY_POINT NOT NULL,\n' +
+                    '  type_null_polygon         GEOGRAPHY,\n' +
+                    '  type_not_null_polygon     GEOGRAPHY       NOT NULL,\n' +
                     '  PRIMARY KEY (rowid)\n' +
                     ');'
             if (partitionColumn) {
@@ -332,7 +363,8 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      * view, a 'select * from ...' query, with an 'order by' and a limit 10'
      * clause. (Also, if DEBUG is true, prints: the table or view name, a list
      * of all column names, a list of all column types; and everything that
-     * that runQuery prints, for each query.)
+     * that runQuery prints, for each query.) (Note: streams are deliberately
+     * omitted here, since you cannot query from a stream.)
      * @param sqp - the SqlQueryPage on which to run the query.
      * @param tables - the list of tables or views to be queried.
      * @param tableOrView - this should be "Table" or "View" - whichever is
@@ -415,6 +447,11 @@ class SqlQueriesTest extends SqlQueriesTestBase {
                         } else {
                             query += (j > 0 ? ", " : "") + "'z" + i + "'"
                         }
+                    } else if (columns.get(j).contains('geography_point')) {
+                        query += (j > 0 ? ", " : "") + "PointFromText('POINT(-"+i+" "+i+")')"
+                    } else if (columns.get(j).contains('geography')) {
+                        query += (j > 0 ? ", " : "") + "PolygonFromText('POLYGON(("+(-i)+" "+(-i)+
+                                 ", "+(-i+1)+" "+(-i)+", "+(-i)+" "+(-i+1)+", "+(-i)+" "+(-i)+"))')"
                     } else {
                         query += (j > 0 ? ", " : "") + (minIntValue + i)
                     }
@@ -538,7 +575,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             if (res > 0) {
                 allTablesEmpty = false
                 // TODO: improve this (to get max values, and insert/delete above them)
-                //def 
+                //def
                 //minValuesForEachTable.put(tables[i], getFirstColumnAndMaxValue(tables[i]))
             }
         }
@@ -607,7 +644,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of Tables displayed on the page matches the expected
-     * list (for the 'genqa' test app).
+     * list (for the default test app).
      */
     def checkTables() {
         expect: 'List of displayed Tables should match expected list'
@@ -615,8 +652,17 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Check that the list of Streams displayed on the page matches the expected
+     * list (for the default test app).
+     */
+    def checkStreams() {
+        expect: 'List of displayed Streams should match expected list'
+        printAndCompare('Streams', streamsFileName, true, streamLines, getStreams(page))
+    }
+
+    /**
      * Check that the list of Views displayed on the page matches the expected
-     * list (for the 'genqa' test app).
+     * list (for the default test app).
      */
     def checkViews() {
         expect: 'List of displayed Views should match expected list'
@@ -625,7 +671,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of System Stored Procedures displayed on the page
-     * matches the expected list (for any app, not just 'genqa'!).
+     * matches the expected list (for any app, not just the default one!).
      */
     def checkSystemStoredProcs() {
         expect: 'List of displayed System Stored Procedures should match expected list'
@@ -635,7 +681,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of Default Stored Procedures displayed on the page
-     * matches the expected list (for the 'genqa' test app).
+     * matches the expected list (for the default test app).
      */
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
@@ -645,12 +691,92 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     /**
      * Check that the list of User Stored Procedures displayed on the page
-     * matches the expected list (for the 'genqa' test app).
+     * matches the expected list (for the default test app).
      */
     def checkUserStoredProcs() {
         expect: 'List of displayed User-defined Stored Procedures should match expected list'
         printAndCompare('User-defined Stored Procedures', userStoredProcsFileName, true,
                 userStoredProcLines, page.getUserStoredProcedures())
+    }
+
+    /**
+     * Takes a <i>parsedText</i> Map returned by the JSON slurper, and does two
+     * things with it. First, if any keys of this Map start with "__", these
+     * are interpreted as variable names, whose values are saved for later use
+     * (in <i>sqlQueryVariables</i>). Second, the value of parsedText.sqlCmd
+     * is returned, with any variable names resolved to their values.
+     * @param parsedText - a Map returned by the JSON slurper.
+     * @return the value of parsedText.sqlCmd, with any variable names resolved
+     * to their values.
+     */
+    static String getQueryWithVariables(Map<String,Object> parsedText) {
+        // Check for any variable definitions (starting with "__") and save
+        // their values, to use in the current query or subsequent ones
+        List<String> unresolvedVariableNames = []
+        for (String key : parsedText.keySet()) {
+            if (key.startsWith("__")) {
+                Object value = resolveVariableValues(parsedText.get(key), false, true)
+                sqlQueryVariables.put(key, value)
+                if (value instanceof String && value.contains("__")) {
+                    unresolvedVariableNames.add(key)
+                }
+            }
+        }
+        // For any variables that were defined using other variables that had
+        // not yet been defined, resolve them now
+        for (String key : unresolvedVariableNames) {
+            sqlQueryVariables.put(key, resolveVariableValues(sqlQueryVariables.get(key)))
+        }
+        return (String) resolveVariableValues(parsedText.sqlCmd)
+    }
+
+    /**
+     * Takes a <i>text</i> Object (usually, but not always, a String), and
+     * returns it, with any variable names resolved to their values.
+     * @param text - normally, the text to be searched, which is then returned
+     * after resolving any unresolved variables; however, may also be a
+     * non-String Object, in which case it is simply returned intact.
+     * @param gettingResult - should be true when resolving variable values in
+     * a result (as opposed to in a query), in which case, a single variable
+     * may be used to represent a non-String Object (typically, a Map), which
+     * will then be returned as said Object; when false, a String will always
+     * be returned (assuming that <i>text</i> is a String).
+     * @param ignoreUnknownVariables - when true, no WARNING message will be
+     * printed, when an unkown variable is encountered (optional, default false).
+     * @return the original <i>text</i>, with any variable names resolved to
+     * their values.
+     */
+    static Object resolveVariableValues(Object text, boolean gettingResult=false,
+                                        boolean ignoreUnknownVariables=false) {
+        if (!(text instanceof String)) {
+            // TODO: at some point, we might want to handle Maps differently,
+            // to allow variables to be defined within a "result" Map; but
+            // for now, that is not supported
+            return text
+        }
+        String result = text
+        // Used to prevent infinite loops via recursive variable definitions
+        int maxCount = 100, count = 0
+        for (Matcher variables = result =~ /(__\w+)/; count++ < maxCount && variables.find(); variables = result =~ /(__\w+)/ ) {
+            String variable = variables.group(1)
+            // Special case, for a result whose entire text consists of one variable
+            if (gettingResult && variable.equals(text)) {
+                return sqlQueryVariables.get(variable)
+            }
+            Object value = sqlQueryVariables.get(variable);
+            if (value == null) {
+                if (!ignoreUnknownVariables) {
+                    println "\nWARNING: Unknown variable '"+variable+"'; so this query or result may fail:\n  " + result
+                }
+                break
+            }
+            result = result.replaceAll(variable, value.toString())
+        }
+        if (count >= maxCount) {
+            println "\nWARNING: this query or result contains an excessively nested, probably recursive, variable definition:\n  " +
+                    text + " (-> " + result + " )"
+        }
+        return result
     }
 
     /**
@@ -662,12 +788,13 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         setup: 'execute the next query (or queries)'
         runQuery(page, query)
 
-        when: 'get the Query Result'
+        when: 'get the Query Result, and Expected Result'
         def qResult = page.getQueryResult()
+        def expectedResult = resolveVariableValues(expectedResponse.result, true)
 
         debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status
-        debugPrint "expect result : " + expectedResponse.result
+        debugPrint "expect result : " + expectedResult
         if (expectedResponse.error != null) {
             debugPrint "expect error  : " + expectedResponse.error
         }
@@ -691,13 +818,13 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         }
 
         and: 'for a non-matching result, check if it is just a trim issue, and print details'
-        if (qResult instanceof Map && expectedResponse.result instanceof Map && qResult != expectedResponse.result) {
+        if (qResult instanceof Map && expectedResult instanceof Map && qResult != expectedResult) {
             println "\nWARNING: query result does not match expected, for column(s):"
             boolean allDiffsCausedByTrim = true
-            def expCols = expectedResponse.result.keySet()
+            def expCols = expectedResult.keySet()
             def actCols = qResult.keySet()
             for (String col: expCols) {
-                def expCol = expectedResponse.result.get(col)
+                def expCol = expectedResult.get(col)
                 def actCol = qResult.get(col)
                 if (!expCol.equals(actCol)) {
                     println "  expected " + col + ": '" + expCol + "'"
@@ -713,7 +840,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             }
             // Check for any columns that occur in the actual, but not expected, results
             for (String col: actCols) {
-                def expCol = expectedResponse.result.get(col)
+                def expCol = expectedResult.get(col)
                 if (expCol == null) {
                     println "  expected " + col + ": '" + expCol + "'"
                     println "  actual   " + col + ": '" + qResult.get(col) + "'"
@@ -729,7 +856,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         }
 
         then: 'check the query result, error status, and error message (if any)'
-        expectedResponse.result == qResult
+        expectedResult == qResult
         expectedResponse.status == status
         expectedResponse.error == null || (error != null && error.contains(expectedResponse.error))
 
@@ -740,13 +867,12 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         line << sqlQueryLines
         iter = slurper.parseText(line)
         sqlQueriesTestName = iter.testName
-        query = iter.sqlCmd
+        query = getQueryWithVariables(iter)
         expectedResponse = iter.response
     }
 
-    //sql queries test for admin-client port
 
-
+    // SQL queries test for admin-client port
     def "Check sqlquery client to admin port switching for cancel popup"() {
 
         when: 'click the SQL Query link (if needed)'
@@ -869,7 +995,6 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
 
-
     def "Check sqlquery client to admin port switching for ok poup"() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
@@ -949,6 +1074,6 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         page.setQueryText(deleteQuery)
         then: 'run the query'
         page.runQuery()
-
     }
+
 }

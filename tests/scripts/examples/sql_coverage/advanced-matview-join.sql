@@ -6,12 +6,14 @@
 
 {@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
-{@columnpredicate = "_variable[@comparabletype] _cmp _value[int16]"}
+{@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
+{@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
+{@columnpredicate = "_variable[@comparabletype] @cmp _value[int16]"}
 {@columntype = "int"}
 {@comparableconstant = "42"}
 {@comparabletype = "numeric"}
 {@comparablevalue = "_numericvalue"}
-{@dmlcolumnpredicate = "_variable[int] _cmp _value[int]"}
+{@dmlcolumnpredicate = "_variable[int] @cmp _value[int]"}
 
 {@insertvals = "_id, 9, 9, 9, 9"}
 {@idcol = "V_G1"}

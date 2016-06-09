@@ -74,12 +74,12 @@ public class TestPolygonFactory extends TestCase {
         GeographyPointValue startVertex = x.add(y);
         for (int npts = 3; npts < 10; npts += 1) {
             GeographyValue regularConvex = PolygonFactory.CreateRegularConvex(origin,  startVertex, npts, 0.0);
-            List<List<GeographyPointValue>> loops = regularConvex.getLoops();
+            List<List<GeographyPointValue>> loops = regularConvex.getRings();
             assertEquals(1, loops.size());
             List<GeographyPointValue> loop = loops.get(0);
             assertEquals(npts + 1, loop.size());
             regularConvex = PolygonFactory.CreateRegularConvex(origin,  startVertex, npts, 0.5);
-            loops = regularConvex.getLoops();
+            loops = regularConvex.getRings();
             assertEquals(2, loops.size());
             assertEquals(npts + 1, loops.get(0).size());
             assertEquals(npts + 1, loops.get(1).size());
@@ -89,12 +89,12 @@ public class TestPolygonFactory extends TestCase {
     public void testStarPolygon() throws Exception {
         for (int idx = 3; idx < 10; idx += 1) {
             GeographyValue star = PolygonFactory.CreateStar(origin, y.mul(20.0), idx, 0.5, 0.0);
-            List<List<GeographyPointValue>> loops = star.getLoops();
+            List<List<GeographyPointValue>> loops = star.getRings();
             assertEquals(1, loops.size());
             List<GeographyPointValue> shell = loops.get(0);
             assertEquals(2*idx+1, shell.size());
             star = PolygonFactory.CreateStar(origin, y.mul(20).add(x.mul(20)), idx, 0.5, 0.1);
-            loops = star.getLoops();
+            loops = star.getRings();
             assertEquals(2, loops.size());
             shell = loops.get(0);
             List<GeographyPointValue> hole = loops.get(1);

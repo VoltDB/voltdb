@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -79,82 +78,30 @@ public class ReplaySequencer
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
     private class ReplayEntry {
-        Long m_sentinalTxnId = null;
+        Long m_sentinelUniqueId = null;
         FragmentTaskMessage m_firstFragment = null;
-        CompleteTransactionMessage m_lastFragment = null;
 
         /**
-         * Queue up all sp invocations in this queue before the {@link CompleteTransactionMessage} for
-         * this entry's transaction is received
+         * If this entry is either missing the sentinel or the first fragment, queue up all following Iv2 messages
+         * in this queue until the entry has both sentinel and first fragment.
          */
-        private Deque<VoltMessage> m_blockedMessages = new LinkedList<VoltMessage>();
-
-        /**
-         * If required queue up all this transaction MP fragments in this queue. Move all the
-         * blocked SP invocations here once the {@link CompleteTransactionMessage} for this
-         * entry's transaction is received
-         */
-        private Deque<VoltMessage> m_sequencedMessages = new LinkedList<VoltMessage>();
+        private Deque<VoltMessage> m_queuedMessages = new LinkedList<VoltMessage>();
 
         private boolean m_servedFragment = false;
 
         boolean isReady()
         {
-            return m_sentinalTxnId != null && m_firstFragment != null;
+            return m_sentinelUniqueId != null && m_firstFragment != null;
         }
 
         boolean hasSentinel()
         {
-            return m_sentinalTxnId != null;
+            return m_sentinelUniqueId != null;
         }
 
-        /**
-         * Queue it up in the {@link ReplayEntry#m_blockedMessages} queue
-         * before the {@link CompleteTransactionMessage} for this entry's transaction is received.
-         * Otherwise add it straight to the {@link ReplayEntry#m_sequencedMessages} queue.
-         *
-         * @param m an SP invocation message
-         */
-        void addBlockedMessage(VoltMessage m)
+        void addQueuedMessage(VoltMessage m)
         {
-            if (m_lastFragment == null)
-            {
-                m_blockedMessages.addLast(m);
-            }
-            else
-            {
-                m_sequencedMessages.addLast(m);
-            }
-        }
-
-        /**
-         * If not already done, drain all blocked sps in to the sequenced queue
-         * @param msg a {@link CompleteTransactionMessage}
-         */
-        void markLastFragment(CompleteTransactionMessage msg)
-        {
-            if (m_lastFragment == null)
-            {
-                m_lastFragment = msg;
-
-                Iterator<VoltMessage> blocked = m_blockedMessages.iterator();
-                while (blocked.hasNext())
-                {
-                    m_sequencedMessages.addLast(blocked.next());
-                    blocked.remove();
-                }
-            }
-        }
-
-        void addFragmentMessage(VoltMessage m)
-        {
-            m_sequencedMessages.addLast(m);
-        }
-
-        void addCompletedMessage(CompleteTransactionMessage msg)
-        {
-            m_sequencedMessages.addLast(msg);
-            markLastFragment(msg);
+            m_queuedMessages.addLast(m);
         }
 
         VoltMessage poll()
@@ -168,7 +115,7 @@ public class ReplaySequencer
             }
             else
             {
-                return m_sequencedMessages.poll();
+                return m_queuedMessages.poll();
             }
         }
 
@@ -179,40 +126,34 @@ public class ReplaySequencer
                 m_servedFragment = true;
                 return m_firstFragment;
             }
-            else if (!m_sequencedMessages.isEmpty())
-            {
-                return m_sequencedMessages.poll();
-            }
-            else
-            {
-                return m_blockedMessages.poll();
-            }
+            return m_queuedMessages.poll();
         }
 
         boolean isEmpty() {
-            return isReady() && m_servedFragment && m_sequencedMessages.isEmpty() && m_blockedMessages.isEmpty();
+            return isReady() && m_servedFragment && m_queuedMessages.isEmpty();
         }
 
         @Override
         public String toString()
         {
-            return String.format("(SENTINEL TXNID: %d (%s), %d BLOCKED MESSAGES, %s)\n%s",
-                                 m_sentinalTxnId, m_sentinalTxnId != null ? TxnEgo.txnIdToString(m_sentinalTxnId) : "",
-                                 m_blockedMessages.size(),
+            return String.format("(SENTINEL UNIQUEID: %d (%s), %d QUEUED MESSAGES, %s)\n%s",
+                                 m_sentinelUniqueId, m_sentinelUniqueId != null ?
+                                         UniqueIdGenerator.toString(m_sentinelUniqueId) : "",
+                                 m_queuedMessages.size(),
                                  m_servedFragment ? "SERVED FRAGMENT" : "",
                                  m_firstFragment);
         }
     }
 
-    // queued entries hashed by transaction id.
+    // queued entries hashed by unique id.
     TreeMap<Long, ReplayEntry> m_replayEntries = new TreeMap<Long, ReplayEntry>();
 
-    // lastPolledFragmentTxnId tracks released MP transactions; new fragments
+    // lastPolledFragmentUniqueId tracks released MP transactions; new fragments
     // for released transactions do not need further sequencing.
-    long m_lastPolledFragmentTxnId = Long.MIN_VALUE;
+    long m_lastPolledFragmentUniqueId = Long.MIN_VALUE;
 
-    // lastSeenTxnId tracks the last seen txnId for this partition
-    long m_lastSeenTxnId = Long.MIN_VALUE;
+    // lastSeenUniqueId tracks the last seen uniqueId for this partition
+    long m_lastSeenUniqueId = Long.MIN_VALUE;
 
     // has reached end of log for the MPI, no more fragments or SPs will come,
     // release all txns.
@@ -225,11 +166,11 @@ public class ReplaySequencer
     /**
      * Dedupe initiate task messages. Check if the initiate task message is seen before.
      *
-     * @param inTxnId The txnId of the message
+     * @param inUniqueId The uniqueId of the message
      * @param in The initiate task message
      * @return A client response to return if it's a duplicate, otherwise null.
      */
-    public InitiateResponseMessage dedupe(long inTxnId, TransactionInfoBaseMessage in)
+    public InitiateResponseMessage dedupe(long inUniqueId, TransactionInfoBaseMessage in)
     {
         if (in instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage init = (Iv2InitiateTaskMessage) in;
@@ -242,7 +183,7 @@ public class ReplaySequencer
              */
             if (!(procName.equalsIgnoreCase("@LoadSinglepartitionTable") ||
                     procName.equalsIgnoreCase("@LoadMultipartitionTable")) &&
-                    inTxnId <= m_lastSeenTxnId) {
+                    inUniqueId <= m_lastSeenUniqueId) {
                 // already sequenced
                 final InitiateResponseMessage resp = new InitiateResponseMessage(init);
                 resp.setResults(new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -255,27 +196,27 @@ public class ReplaySequencer
     }
 
     /**
-     * Update the last seen txnId for this partition if it's an initiate task message.
+     * Update the last seen uniqueId for this partition if it's an initiate task message.
      *
-     * @param inTxnId
+     * @param inUniqueId
      * @param in
      */
-    public void updateLastSeenTxnId(long inTxnId, TransactionInfoBaseMessage in)
+    public void updateLastSeenUniqueId(long inUniqueId, TransactionInfoBaseMessage in)
     {
-        if (in instanceof Iv2InitiateTaskMessage && inTxnId > m_lastSeenTxnId) {
-            m_lastSeenTxnId = inTxnId;
+        if (in instanceof Iv2InitiateTaskMessage && inUniqueId > m_lastSeenUniqueId) {
+            m_lastSeenUniqueId = inUniqueId;
         }
     }
 
     /**
-     * Update the last polled txnId for this partition if it's a fragment task message.
-     * @param inTxnId
+     * Update the last polled uniqueId for this partition if it's a fragment task message.
+     * @param inUniqueId
      * @param in
      */
-    public void updateLastPolledTxnId(long inTxnId, TransactionInfoBaseMessage in)
+    public void updateLastPolledUniqueId(long inUniqueId, TransactionInfoBaseMessage in)
     {
         if (in instanceof FragmentTaskMessage) {
-            m_lastPolledFragmentTxnId = inTxnId;
+            m_lastPolledFragmentUniqueId = inUniqueId;
         }
     }
 
@@ -296,7 +237,7 @@ public class ReplaySequencer
         }
 
         VoltMessage m = m_replayEntries.firstEntry().getValue().poll();
-        updateLastPolledTxnId(m_replayEntries.firstEntry().getKey(), (TransactionInfoBaseMessage) m);
+        updateLastPolledUniqueId(m_replayEntries.firstEntry().getKey(), (TransactionInfoBaseMessage) m);
         return m;
     }
 
@@ -344,9 +285,9 @@ public class ReplaySequencer
     }
 
     // Offer a new message. Return false if the offered message can be run immediately.
-    public boolean offer(long inTxnId, TransactionInfoBaseMessage in)
+    public boolean offer(long inUniqueId, TransactionInfoBaseMessage in)
     {
-        ReplayEntry found = m_replayEntries.get(inTxnId);
+        ReplayEntry found = m_replayEntries.get(inUniqueId);
 
         if (in instanceof Iv2EndOfLogMessage) {
             m_mpiEOLReached = true;
@@ -354,6 +295,8 @@ public class ReplaySequencer
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
+            //--------------------------------------------
+            // DRv1 path, mark for future removal
             /*
              * DR sends multiple @LoadMultipartitionTable proc calls with the
              * same txnId, which is the snapshot txnId. For each partition,
@@ -362,75 +305,60 @@ public class ReplaySequencer
              * so that there won't be sentinels end up in the sequencer where
              * matching fragments are deduped.
              */
-            if (inTxnId <= m_lastPolledFragmentTxnId) {
+            if (inUniqueId <= m_lastPolledFragmentUniqueId) {
                 return true;
             }
-
+            //--------------------------------------------
             if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();
-                newEntry.m_sentinalTxnId = inTxnId;
-                m_replayEntries.put(inTxnId, newEntry);
+                newEntry.m_sentinelUniqueId = inUniqueId;
+                m_replayEntries.put(inUniqueId, newEntry);
             }
             else {
-                found.m_sentinalTxnId = inTxnId;
+                found.m_sentinelUniqueId = inUniqueId;
                 assert(found.isReady());
             }
         }
         else if (in instanceof FragmentTaskMessage) {
             // already sequenced
-            if (inTxnId <= m_lastPolledFragmentTxnId) {
+            if (inUniqueId <= m_lastPolledFragmentUniqueId) {
                 return false;
             }
-
             FragmentTaskMessage ftm  = (FragmentTaskMessage)in;
             if (found == null) {
                 ReplayEntry newEntry = new ReplayEntry();
                 newEntry.m_firstFragment = ftm;
-                m_replayEntries.put(inTxnId, newEntry);
+                m_replayEntries.put(inUniqueId, newEntry);
             }
             else if (found.m_firstFragment == null) {
                 found.m_firstFragment = ftm;
                 assert(found.isReady());
             }
             else {
-                found.addFragmentMessage(ftm);
+                found.addQueuedMessage(ftm);
             }
         }
         else if (in instanceof CompleteTransactionMessage) {
-            CompleteTransactionMessage ctm = (CompleteTransactionMessage)in;
-            // already sequenced
-            if (inTxnId <= m_lastPolledFragmentTxnId) {
-                if (found != null && found.m_firstFragment != null) {
-                    found.markLastFragment(ctm);
-                }
-                return false;
-            }
-            if (found != null && found.m_firstFragment != null) {
-                found.addCompletedMessage(ctm);
-            }
-            else {
-                // Always expect to see the fragment first, but there are places in the protocol
-                // where CompleteTransactionMessages may arrive for transactions that this site hasn't
-                // done/won't do, e.g. txn restart, so just tell the caller that we can't do
-                // anything with it and hope the right thing happens.
-                return false;
-            }
-
+            // don't sequence CompleteTranscationMessage, throw them to scheduler directly
+            return false;
         }
         else {
-            if (dedupe(inTxnId, in) != null) {
+            //--------------------------------------------
+            // DRv1 path, mark for future removal
+            if (dedupe(inUniqueId, in) != null) {
                 // Ignore an already seen txn
                 return true;
             }
-            updateLastSeenTxnId(inTxnId, in);
+            //--------------------------------------------
+            updateLastSeenUniqueId(inUniqueId, in);
 
             if (m_replayEntries.isEmpty() || !m_replayEntries.lastEntry().getValue().hasSentinel()) {
                 // not-blocked work; rejected and not queued.
                 return false;
             }
             else {
-                // blocked work queues with the newest replayEntry
-                m_replayEntries.lastEntry().getValue().addBlockedMessage(in);
+                // queued the message with the newest replayEntry
+                m_replayEntries.lastEntry().getValue().addQueuedMessage(in);
             }
         }
         return true;
@@ -441,8 +369,8 @@ public class ReplaySequencer
         final String who = CoreUtils.hsIdToString(hsId);
         tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
                                  who,
-                                 m_lastPolledFragmentTxnId, TxnEgo.txnIdToString(m_lastPolledFragmentTxnId),
-                                 m_lastSeenTxnId, TxnEgo.txnIdToString(m_lastSeenTxnId),
+                                 m_lastPolledFragmentUniqueId, TxnEgo.txnIdToString(m_lastPolledFragmentUniqueId),
+                                 m_lastSeenUniqueId, TxnEgo.txnIdToString(m_lastSeenUniqueId),
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {

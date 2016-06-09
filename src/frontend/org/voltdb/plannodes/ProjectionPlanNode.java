@@ -29,7 +29,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {
@@ -84,11 +83,8 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         resolveColumnIndexesUsingSchema(input_schema);
 
-        // Possible subquery expressions
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
-        }
+        // Resolve subquery expression indexes
+        resolveSubqueryColumnIndexes();
     }
 
     /**
@@ -102,9 +98,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves =
             new ArrayList<TupleValueExpression>();
+        int i = 0;
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
+            col.setDifferentiator(i);
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            ++i;
         }
         // and update their indexes against the table schema
         for (TupleValueExpression tve : output_tves)
@@ -152,12 +151,11 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression expr: exprs) {
-            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
         }
-
-        return;
     }
 
     @Override

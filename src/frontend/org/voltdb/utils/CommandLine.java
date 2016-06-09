@@ -50,6 +50,8 @@ public class CommandLine extends VoltDB.Configuration
      */
     private String m_vemTag = null;
 
+    public String m_modeOverrideForTest = null;
+
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
     public CommandLine(StartAction start_action)
@@ -90,6 +92,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
         cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
+        cl.m_forceVoltdbCreate = m_forceVoltdbCreate;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -109,6 +112,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
         cl.customCmdLn = customCmdLn;
+        cl.m_isPaused = m_isPaused;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -204,6 +208,10 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine replicaMode(ReplicationRole replicaMode) {
         m_replicationRole = replicaMode;
         return this;
+    }
+
+    public void startPaused() {
+        m_isPaused = true;
     }
 
     public CommandLine leader(String leader)
@@ -389,6 +397,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine setForceVoltdbCreate(boolean forceVoltdbCreate)
+    {
+        m_forceVoltdbCreate = forceVoltdbCreate;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -459,6 +473,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
         cmdline.add("-Djava.library.path=" + java_library_path);
+        /*
+         * Facilitate SPNEGO (Kerberos HTTP) authentication
+         */
+        cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
+
         if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);
@@ -558,7 +577,9 @@ public class CommandLine extends VoltDB.Configuration
         if (jarFileName() != null) {
             cmdline.add("catalog"); cmdline.add(jarFileName());
         }
-        cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        if (pathToDeployment() != null) {
+            cmdline.add("deployment"); cmdline.add(pathToDeployment());
+        }
 
         // rejoin has no replication role
         if (!m_startAction.doesRejoin()) {
@@ -601,6 +622,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
+        if (m_forceVoltdbCreate)
+        {
+            cmdline.add("force");
+        }
+
         if (m_isEnterprise) {
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
@@ -627,6 +653,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("ipc");
         }
 
+        if (m_tag != null) {
+            cmdline.add("tag"); cmdline.add(m_tag);
+        }
+
         // handle overrides for testing hotfix version compatibility
         if (m_versionStringOverrideForTest != null) {
             assert(m_versionCompatibilityRegexOverrideForTest != null);
@@ -638,9 +668,8 @@ public class CommandLine extends VoltDB.Configuration
                 cmdline.add(m_buildStringOverrideForTest);
             }
         }
-
-        if (m_tag != null) {
-            cmdline.add("tag"); cmdline.add(m_tag);
+        if (m_isPaused || (m_modeOverrideForTest != null && m_modeOverrideForTest.equalsIgnoreCase("paused")) ) {
+            cmdline.add("paused");
         }
 
         return cmdline;

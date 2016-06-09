@@ -125,7 +125,7 @@ class Table {
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
@@ -154,7 +154,7 @@ class Table {
 
     /**
      * Includes tuples that are pending any kind of delete.
-     * Used by iterators to determine how many tupels to expect while scanning
+     * Used by iterators to determine how many tuples to expect while scanning
      */
     virtual int64_t activeTupleCount() const {
         return m_tupleCount;
@@ -327,6 +327,10 @@ class Table {
     }
 
     virtual bool isExport() {
+        return false;
+    }
+
+    virtual bool isMaterialized() {
         return false;
     }
 

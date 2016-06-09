@@ -57,7 +57,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.hll.MurmurHash;
+import org.voltdb_hll.MurmurHash;
 
 public class UniqueDevicesClient {
 

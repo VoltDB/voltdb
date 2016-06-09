@@ -56,8 +56,9 @@ public:
     const std::string& getSqlState() const { return m_sqlState; }
 
     // internal flags that are not serialized to java
-    static const int TYPE_UNDERFLOW = 1;
-    static const int TYPE_OVERFLOW = 2;
+    static const int TYPE_UNDERFLOW             = 1;
+    static const int TYPE_OVERFLOW              = 2;
+    static const int TYPE_VAR_LENGTH_MISMATCH   = 4;
     int getInternalFlags() const { return m_internalFlags; }
 
 protected:

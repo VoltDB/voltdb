@@ -26,21 +26,30 @@ package org.voltdb.exportclient;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class ExportClientTestBase {
+
+    static final GeographyPointValue GEOG_POINT = GeographyPointValue.fromWKT("point(-122 37)");
+    static final GeographyValue GEOG = GeographyValue.fromWKT("polygon((0 0, 1 1, 0 1, 0 0))");
+
+
     static final String[] COLUMN_NAMES = {"tid", "ts", "sq", "pid", "site", "op",
-            "tinyint", "smallint", "integer", "bigint", "float", "timestamp", "string", "decimal"};
+            "tinyint", "smallint", "integer", "bigint", "float", "timestamp", "string", "decimal",
+            "geog_point", "geog"};
 
     static final VoltType[] COLUMN_TYPES
             = {VoltType.BIGINT, VoltType.BIGINT, VoltType.BIGINT, VoltType.BIGINT, VoltType.BIGINT, VoltType.BIGINT,
             VoltType.TINYINT, VoltType.SMALLINT, VoltType.INTEGER,
-            VoltType.BIGINT, VoltType.FLOAT, VoltType.TIMESTAMP,VoltType.STRING, VoltType.DECIMAL};
+            VoltType.BIGINT, VoltType.FLOAT, VoltType.TIMESTAMP,VoltType.STRING, VoltType.DECIMAL,
+            VoltType.GEOGRAPHY_POINT, VoltType.GEOGRAPHY};
 
     static final Integer COLUMN_LENGTHS[] = {
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 2048
     };
 
     static VoltTable vtable = new VoltTable(
@@ -57,7 +66,9 @@ public class ExportClientTestBase {
             new VoltTable.ColumnInfo("float", VoltType.FLOAT),
             new VoltTable.ColumnInfo("timestamp", VoltType.TIMESTAMP),
             new VoltTable.ColumnInfo("string", VoltType.STRING),
-            new VoltTable.ColumnInfo("decimal", VoltType.DECIMAL)
+            new VoltTable.ColumnInfo("decimal", VoltType.DECIMAL),
+            new VoltTable.ColumnInfo("geog_point", VoltType.GEOGRAPHY_POINT),
+            new VoltTable.ColumnInfo("geog", VoltType.GEOGRAPHY)
     );
 
     static AdvertisedDataSource constructTestSource(boolean replicated, int partition)

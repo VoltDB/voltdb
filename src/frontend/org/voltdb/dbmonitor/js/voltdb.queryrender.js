@@ -104,7 +104,7 @@ function QueryUI(queryString, userName) {
                     if (param.toLowerCase() === 'null') {
                         parameterBank.push(null);
                     } else {
-                        if (param.indexOf(QuotedStringNonceLiteral) == 0) {
+                        if (param.indexOf(QuotedStringNonceLiteral) > -1) {
                             // Clean up by restoring the replaced quoted strings.
                             param = undisguiseQuotedStrings(param, stringBank);
                         }
@@ -317,7 +317,7 @@ function QueryUI(queryString, userName) {
             for (var k = 0; k < table.data[j].length; k++) {
                 var val = table.data[j][k];
                 var typ = table.schema[k].type;
-                if (typ == 11) {
+                if (typ == 11 && val) {
                     var us = val % 1000;
                     var dt = new Date(val / 1000);
                     val = lPadZero(dt.getUTCFullYear(), 4) + "-"

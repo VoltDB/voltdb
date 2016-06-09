@@ -26,6 +26,7 @@ package txnIdSelfCheck.procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 public class doTxn extends VoltProcedure {
 
@@ -46,7 +47,8 @@ public class doTxn extends VoltProcedure {
     }
 
     public VoltTable[] run(byte cid, long rid, long oldestRid, byte[] value) {
-        final long txnId = getVoltPrivateRealTransactionIdDontUseMe();
+        @SuppressWarnings("deprecation")
+        final long txnId = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
         final long uniqueId = getUniqueId();
 
         voltQueueSQL(insertTxnid, txnId, uniqueId, cid, getRid(rid), value);

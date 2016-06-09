@@ -31,11 +31,10 @@ import org.voltdb.utils.Encoder;
 
 /**
  * Specialized CatalogDiffEngine that checks the following conditions:
- * 1. The localCatalog contains all DR tables contained in the remote catalog
- * 2. All shared DR tables contain the same columns in the same order
- * 3. All shared DR tables have the same partition column
- * 4. All shared DR tables have the same row limits/delete policies
- * 5. All shared DR tables have the same unique indexes/primary keys
+ * - The localCatalog contains all DR tables contained in the remote catalog
+ * - All shared DR tables contain the same columns in the same order
+ * - All shared DR tables have the same partition column
+ * - All shared DR tables have the same unique indexes/primary keys
  */
 public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog) {
@@ -74,7 +73,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             assert ((Boolean)suspect.getField("isDRed"));
             return "Missing DR table " + suspect.getTypeName() + " on replica cluster";
         }
-        if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect) || isTableLimitDeleteStmt(suspect)) {
+        if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
             return "Missing " + suspect + " from " + suspect.getParent() + " on " + (ChangeType.ADDITION == changeType ? "replica" : "master");
         }
         return null;
@@ -82,12 +81,19 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     @Override
     protected String checkModifyWhitelist(final CatalogType suspect, final CatalogType prevType, final String field) {
-        if (suspect instanceof Table) {
+        if (suspect instanceof Cluster ||
+            suspect instanceof PlanFragment ||
+            suspect instanceof MaterializedViewInfo) {
+            return null;
+        } else if (suspect instanceof Table) {
             if ("isdred".equalsIgnoreCase(field)) {
                 assert ((Boolean)suspect.getField("isDRed"));
                 return "Table " + suspect.getTypeName() + " has DR enabled on the master but not the replica";
             }
             if ("estimatedtuplecount".equals(field)) {
+                return null;
+            }
+            if ("tuplelimit".equals(field)) {
                 return null;
             }
         } else if (suspect instanceof Database) {
@@ -107,14 +113,9 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 return null;
             }
         } else if (isTableLimitDeleteStmt(suspect)) {
-            if ("cost".equals(field) ||
-                "seqscancount".equals(field) ||
-                "explainplan".equals(field) ||
-                "indexesused".equals(field) ||
-                "cachekeyprefix".equals(field)) {
-                return null;
-            }
-        } else if (isUniqueIndex(suspect) == isUniqueIndex(prevType) && !isUniqueIndexColumn(suspect)) {
+            return null;
+        } else if ((suspect instanceof Index && isUniqueIndex(suspect) == isUniqueIndex(prevType)) ||
+                   (suspect instanceof ColumnRef && !isUniqueIndexColumn(suspect))) {
             return null;
         }
         return "Incompatible schema between master and replica: field " + field + " in schema object " + suspect;

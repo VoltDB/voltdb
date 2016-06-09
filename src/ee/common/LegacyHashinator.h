@@ -82,6 +82,10 @@ protected:
        return abs(hashCode % partitionCount);
    }
 
+   int32_t partitionForToken(int32_t hashCode) const {
+       return abs(hashCode % partitionCount);
+   }
+
 private:
    LegacyHashinator(int32_t count) : partitionCount(count) {}
    const int32_t partitionCount;

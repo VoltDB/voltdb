@@ -16,6 +16,8 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
+import com.google_voltpatches.common.annotations.GwtCompatible;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -30,6 +32,7 @@ import javax.annotation_voltpatches.Nullable;
  * @author Anthony Zana
  * @since 10.0
  */
+@GwtCompatible
 public interface FutureCallback<V> {
   /**
    * Invoked with the result of the {@code Future} computation when it is

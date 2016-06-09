@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -115,6 +117,8 @@ public class VoltZK {
     public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
+    // root for rejoin nodes
+    public static final String rejoinNodeBlocker = "/db/rejoin_nodes_blocker";
 
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
@@ -280,5 +284,65 @@ public class VoltZK {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Creates a rejoin blocker for the given rejoining host.
+     * This prevents other hosts from rejoining at the same time.
+     *
+     * @param zk        ZooKeeper client
+     * @param hostId    The rejoining host ID
+     * @return -1 if the blocker is created successfully, or the host ID
+     * if there is already another host rejoining.
+     */
+    public static int createRejoinNodeIndicator(ZooKeeper zk, int hostId)
+    {
+        try {
+            zk.create(rejoinNodeBlocker,
+                      ByteBuffer.allocate(4).putInt(hostId).array(),
+                      Ids.OPEN_ACL_UNSAFE,
+                      CreateMode.PERSISTENT);
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NODEEXISTS) {
+                try {
+                    return ByteBuffer.wrap(zk.getData(rejoinNodeBlocker, false, null)).getInt();
+                } catch (KeeperException e1) {
+                    if (e1.code() != KeeperException.Code.NONODE) {
+                        VoltDB.crashLocalVoltDB("Unable to get the current rejoining node indicator");
+                    }
+                } catch (InterruptedException e1) {}
+            } else {
+                VoltDB.crashLocalVoltDB("Unable to create rejoin node Indicator", true, e);
+            }
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create rejoin node Indicator", true, e);
+        }
+
+        return -1;
+    }
+
+    /**
+     * Removes the rejoin blocker if the current rejoin blocker contains the given host ID.
+     * @return true if the blocker is removed successfully, false otherwise.
+     */
+    public static boolean removeRejoinNodeIndicatorForHost(ZooKeeper zk, int hostId)
+    {
+        try {
+            Stat stat = new Stat();
+            final int rejoiningHost = ByteBuffer.wrap(zk.getData(rejoinNodeBlocker, false, stat)).getInt();
+            if (hostId == rejoiningHost) {
+                zk.delete(rejoinNodeBlocker, stat.getVersion());
+                return true;
+            }
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NONODE ||
+                e.code() == KeeperException.Code.BADVERSION) {
+                // Okay if the rejoin blocker for the given hostId is already gone.
+                return true;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return false;
     }
 }

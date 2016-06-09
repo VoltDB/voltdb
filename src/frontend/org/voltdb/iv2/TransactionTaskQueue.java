@@ -86,7 +86,7 @@ public class TransactionTaskQueue
              * will act as a barrier for single parts, queuing them for execution after the
              * multipart
              */
-            if (!task.getTransactionState().isSinglePartition()) {
+            if (!txnState.isSinglePartition()) {
                 m_backlog.addLast(task);
                 retval = true;
             }

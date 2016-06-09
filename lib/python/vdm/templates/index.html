@@ -6,11 +6,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Voltdb Deployment Manager</title>
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/jquery-ui.css') }}">
 <link rel="shortcut icon" href="{{ url_for('static',filename='images/favicon.ico') }}" type="image/x-icon" />
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/aero.css') }}">
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/multi-select.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap-tokenfield.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/tokenfield-typeahead.css') }}">
+
 </head>
 <body>
 <div id="wrap">
@@ -20,7 +24,7 @@
       <div class="container-fluid">
         <div class="navbar-header">
           <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span> </button>-->
-         <img src="{{ url_for('static',filename='images/logo.jpg') }}" alt="Voltdb Deployment Manager"> </div>
+          <img src="{{ url_for('static',filename='images/logo.jpg') }}" alt="Voltdb Deployment Manager"> </div>
         <!--<div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-left">
             <li class="active"><a href="#" id="dbManager">Cluster Settings</a></li>
@@ -33,8 +37,8 @@
       <div class="row">
         <div class="col-md-12 clusterWrapTop">
               <div class="clusterHeading">
-                <h4 class="clusterIcon" style="float:left"> <div class="clusterName"> Database </div> </h4>
-               <a class="createDB" data-toggle="modal" data-target="#createDatabase" id="btnDatabaseLink"href="javascript:void(0)">
+                <h4 class="clusterIcon" style="float:left"> <div class="clusterName"> Cluster </div> </h4>
+               <a class="createDB" data-toggle="modal" data-target="#createDatabase" id="btnDatabaseLink">
                    <span class="clusterDBName" id="clusterName">  </span>
                     <span class="glyphicon glyphicon-triangle-bottom"></span>
                   </a>
@@ -44,18 +48,113 @@
       </div>
 
       <div id="dbWarningText" class="overlayText" style="display:none"><span class="glyphicon glyphicon-warning-sign iconModify"></span>
-          <p>No database has been added. Please click the down icon besides the Database to add a new database.</p>
+          <p id="warningMsg">No database has been added. Please click the down icon besides the Database to add a new database.</p>
       <div class="clear"></div>
       </div>
       <div id="divOverlayWrapper" class="overlayWrapper" style="display:none" title="No database has been added. Please click the down icon besides the Database to add a new database.">
       </div>
       <div class="clusterContent">
-      <div class="clusterStartStop">
-    <div class="clusterBtnWrap">
-     <a href="javascript:void(0);" class="clustBtn" data-toggle="modal" data-target="#stopClusterConfirmation"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
-    <div class="clear"></div>
-    </div>
+      <div class="clusterStartStop"  >
+    <div class="clusterBtnWrap" style="display:none;">
+      <a href="javaScript:void(0);" id="btnStartCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
+      <!--<a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>-->
       
+       <div class="form-group startSelect">
+        <select id="startOption" class="form-control">
+        <option value="1">Create new</option>
+        <option value="2">Recover existing</option>
+       
+        </select>
+        </div>
+    <div class="clear"></div>
+      </div>
+      <!--newly added-->
+    <div class="loadingStart" style="display:none;" >
+    	<p><img src="{{ url_for('static',filename='images/startLoader.gif') }}" alt="startloader"/></p>
+    	<p>Starting.......</p>
+    </div>    
+    <div id="startSuccess" class="databaseRg" style="display:none;">
+    <a id="vmcLink" class="btn"><span class="glyphicon glyphicon-new-window" style="padding-right:5px;tr"></span>Go to Management Center</a>
+    <p>Database Running</p>
+    </div>
+    <div id="stallFailed" class="stalledState"  style="display:none;">
+      <div class="modal-dialog modal-dialog-center stalledStateContainer">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign redC" aria-hidden="true"></span>Stalled</h4>
+          </div>
+          <div class="modal-body">
+            <div class="containerStalled">
+            </div>
+            <div class="btnSpelled">
+       <p> Do you want to stop the cluster?</p>
+        <button id="btnStopCluster" type="button" class="btn">Yes</button></div>
+
+ </div>
+    
+    </div>
+  </div>
+</div>	
+	<div id="startFailed" class="startFail" style="display:none;" >
+      <div class="modal-dialog modal-dialog-center startFailContainer">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Start Failed</h4>
+          </div>
+          <div class="modal-body">
+            <div class="containerFailed">
+
+            </div>
+
+            <div class="btnSpelled">
+        <button id="btnFailedOk" type="button" class="btn">OK</button></div>
+     </div>
+ 
+ 
+    
+    </div>
+  </div>
+</div>
+        <!--<div id="" class="recoverFail" style="display:none;" >-->
+          <!--<div class="modal-dialog modal-dialog-center">-->
+            <!--&lt;!&ndash; Modal content&ndash;&gt;-->
+            <!--<div class="modal-content">-->
+              <!--<div class="modal-header">-->
+                <!--<h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Recover Failed</h4>-->
+              <!--</div>-->
+              <!--<div class="modal-body">-->
+                <!--<div class="containerRecover">-->
+
+                <!--</div>-->
+
+                <!--<div class="btnSpelled">-->
+            <!--<button id="" type="button" class="btn">OK</button></div>-->
+         <!--</div>-->
+    <!--</div>-->
+  <!--</div>-->
+<!--</div>-->
+
+        <div id="" class="connectionFail" style="display:none;" >
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Connection Failed</h4>
+      </div>
+      <div class="modal-body">
+        <div class="containerFail">
+        <p>Could not connect to the host</p>
+
+		</div>
+        <!--<div class="btnSpelled">-->
+    <!--<button id="" type="button" class="btn">OK</button></div>-->
+ </div>
+    </div>
+  </div>
+</div>
+   <!--Newly added ends-->
       </div>
         <div class="resetpb">
                     <div class="clusterWrapper">
@@ -66,13 +165,9 @@
                           <div class="addServer ContentServerRight">
                           <!--<a class="addServer" id="btnAddServer" href="javascript:void(0);"data-toggle="modal" data-target="#addServer"> <span class="plus"></span>Add Server</a> </div>-->
                           <div class="dropdown">
-                              <button id="btnAddServerOption" class="btnAddServer dropdown-toggle" type="button"  data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                              <span class="plus"></span> Add Server <span class="caret"></span>
+                              <button id="btnAddServerOption" class="btnAddServer" type="button" data-toggle="modal" data-target="#addServer">
+                              <span class="plus"></span> Add Server
                               </button>
-                              <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-                              <li><a id="btnAddServer"  href="javascript:void(0);"data-toggle="modal" data-target="#addServer">Add New Server</a></li>
-                              <li><a id="btnAddExistingServer" href="javascript:void(0);"data-toggle="modal" data-target="#addExistingServer">Add Existing Server</a></li>
-                              </ul>
                           </div>
                           <div class="clear"></div>
                       </div>
@@ -94,13 +189,31 @@
           <div class="clusterConfigWrapper" style="">
 
             <div class="leftSide"> <span class="clusterConfigIcon" ></span>
-            <span class="clustHeadText">Cluster Configuration</span></div>
+            <span class="clustHeadText">Database Configuration</span></div>
             <div class="rightSide">
-              <div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration
-                <input type="file" multiple>
-                </span> </div>
-              <div class="leftSide upDownBtn"><span class="downloadIcon" ></span> Download Configuration</div>
+              <form id="upload-file" method="post" enctype="multipart/form-data">
+                <div class="leftSide upDownBtn chooseFile" style="display:none">
+                 <input id="file" name="file" type="file">
+                </div>
+                <div id="upload-file-btn-ok" class="leftSide upDownBtn" style="display:none"><span class="uploadOkBtn" ></span> Ok</div>
+                <div id="upload-file-btn-Cancel" class="leftSide upDownBtn uploadCancel"><span class="uploadOkBtn" ></span> Cancel</div>
+                <div id="upload-file-btn" class="leftSide upDownBtn" style="display:none"><span class="uploadIcon" ></span> Upload Configuration</div>
+                <div class="leftSide upDownBtn downloadConfig">
+                  <a id="downloadConfigurations" href="#" download="deployment.xml">
+                    <span class="downloadIcon" ></span>Download Configuration
+                  </a>
+                </div>
+              </form>
             </div>
+            <!--<form id="upload-file" method="post" enctype="multipart/form-data">-->
+                <!--<fieldset>-->
+                    <!--&lt;!&ndash;<label for="file">Select a file</label>&ndash;&gt;-->
+                    <!--<input id="file" name="file" type="file">-->
+                <!--</fieldset>-->
+                <!--<fieldset>-->
+                    <!--<button id="upload-file-btn" type="button">Upload</button>-->
+                <!--</fieldset>-->
+            <!--</form>-->
             <div class="clear"></div>
           </div>
         </div>
@@ -115,15 +228,15 @@
               <div class="mainTbl">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" id="adminTbl" class="adminTbl">
                   <tr>
-                    <td width="42%" class="configLabel">Site per host</td>
-                    <td id="sitePerHost" width="45%" align="right" >
+                    <td width="44%" class="configLabel">Site per host</td>
+                    <td id="sitePerHost" width="40%" align="right" >
                       <form id="frmSitePerHost" action="" method="get" class="form-horizontal">
                         <input id="txtSitePerHost" name="txtSitePerHost" type="text" class="overviewInputText">
                       <label id="errorSitesPerHost" for="txtSitePerHost" class="error ccErrorMsg" style="display: none;">This field is required</label>
                         </form>
                     </td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
+                    <td width="8%">&nbsp;</td>
+                    <td width="8%">&nbsp;</td>
                   </tr>
                   <tr>
                     <td class="configLabel">K-safety </td>
@@ -274,16 +387,6 @@
                     <td>&nbsp;</td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
-                    <td class="configLabel">Max Java Heap </td>
-                    <td align="right">
-                      <form id="frmMaxJavaHeap" action="" method="get" class="form-horizontal">
-                      <input id="txtMaxJavaHeap" name="txtMaxJavaHeap" type="text" value="" class="overviewInputText">
-                      </form>
-                    </td>
-                    <td>MB</td>
-                    <td>&nbsp;</td>
-                  </tr>
-                  <tr class="child-row-5 subLabelRow">
                     <td class="configLabel">Heartbeat time out </td>
                     <td align="right" class="heartBeatTd">
                       <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
@@ -327,7 +430,7 @@
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                   </tr>
-                   <tr class="child-row-5 subLabelRow">
+                  <tr class="child-row-5 subLabelRow">
                     <td class="configLabel">Memory Limit</td>
                     <td id="MemoryLimit" align="right">
                       <form id="frmMemoryLimit" action="" method="get" class="form-horizontal">
@@ -335,8 +438,20 @@
                     <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
                       </form>
                     </td>
-                    <td>GB</td>
+                    <td><select id="selMemoryLimitUnit">
+                    <option val="GB">GB</option>
+                    <option val="%">%</option>
+                    </select></td>
                     <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow diskLimitParentProp" id="row-51">
+                   <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
+
+                    <td id="DiskLimit" align="right"> </td>
+                    <td>&nbsp;</td>
+                    <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnEditDiskLimit" class="">
+                      <span class="editIcon"></span></a></td>
+
                   </tr>
                 </table>
               </div>
@@ -394,6 +509,14 @@
                     </form>
                     </td>
                   </tr>
+                   <tr>
+                    <td>DR Overflow</td>
+                    <td>
+                      <form id="frmDrOverflow" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtDrOverflow" name="txtDrOverflow" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
                 </table>
               </div>
             </div>
@@ -401,75 +524,37 @@
              <div class="drWrapperAdmin" id="divDrWrapperAdmin" >
               <div class="headerAdminContent">
                 <h1>
-                  <div class="drAdminHeaderLeft">Database Replication (DR)</div>
-                  <div class="drAdminHeaderRight">
-                    <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
-                      <span class="editIcon"></span></a>
+                  <div class="headerAdminContainer">
+                    <div class="drAdminHeaderLeft">Database Replication (DR)</div>
+                    <div class="drAdminHeaderRight">
+                      <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
+                        <!--<span class="editIcon"></span></a>-->
+                        <div id="onOffIcon" class="icheckbox_square-blue hover active onIconDR"> <span class="onOffDR" id="chkDrOnOffVal"width="10%"> </span> </div>
+                      </a>
+                    </div>
+                    <div class="clear"></div>
                   </div>
-                  <div class="clear"></div>
                 </h1>
               </div>
               <div class="drContent">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl connectionSourceTbl">
-                  <tr id="row-DrConfig" class="rowDr">
-                    <td class="configLabel" width="62%">DR Enabled</td>
-                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
-                    <td align="right" width="13%"><div id="onOffIcon"></div></td>
-                    <td class="onOff" id="chkDrOnOffVal"width="10%"> On</td>
-                  </tr>
-                  <!--<tr id="row-DrId" class="rowDr clsDrType">-->
-                    <!--<td class="configLabel" width="62%">Id</td>-->
-                    <!--<td  width="45%" align="right" colspan="2">-->
-                      <!--<form id="frmDrId" action="" method="get" class="form-horizontal">-->
-                        <!--<input id="txtDrId" name="txtDrId" type="text" class="overviewInputText valid" aria-required="true" aria-invalid="false">-->
-                        <!--<label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>-->
-                      <!--</form>-->
-                    <!--</td>-->
-                    <!--<td>&nbsp;</td>-->
-                  <!--</tr>-->
                   <tr id="row-DrId" class="rowDr clsDrType">
-                    <td class="configLabel" width="62%">Id</td>
+                    <td class="configLabel" width="62%">ID</td>
                     <td>&nbsp;</td>
                     <td align="right" id="lblDrId"></td>
                     <td>&nbsp;</td>
                   </tr>
-                  <!--<tr class="rowDr clsDrEnabled clsDrType">-->
-                    <!--<td class="configLabel">Type</td>-->
-                    <!--<td align="right">&nbsp;</td>-->
-                    <!--<td align="right">-->
-                      <!--<select id="selectDrType" class="tblSelect">-->
-                        <!--<option value="Master">Master</option>-->
-                        <!--<option value="Replica">Replica</option>-->
-                        <!--<option value="xDCR">XDCR</option>-->
-                      <!--</select>-->
-                    <!--</td>-->
-                    <!--<td>&nbsp;</td>-->
-                  <!--</tr>-->
-                  <tr class="rowDr clsDrEnabled clsDrType">
-                    <td class="configLabel">Type</td>
-                    <td align="right">&nbsp;</td>
-                    <td align="right" id="lblDrType">
-                      Master
-                    </td>
+                  <tr id="rowDrPort" class="rowDr clsDrType">
+                    <td class="configLabel" width="62%">Port</td>
+                    <td>&nbsp;</td>
+                    <td align="right" id="lblDrPort"></td>
                     <td>&nbsp;</td>
                   </tr>
-                  <tr class="rowDr clsDrEnabled" >
-                    <td class="configLabel">Connection Source</td>
-                     <td colspan="2">&nbsp;</td>
-                     <td align="right">&nbsp;</td>
-                  </tr>
-                  <tr class="rowDr subLabelRow clsDrEnabled" style="display:none" id="row-master-cluster">
-                    <td class="configLabel label-master-cluster">Master Cluster</td>
+                  <tr id="trConnectionSource" class="rowDr clsDrEnabled clsDrType" >
+                    <td class="configLabel" width="62%">Connection Source</td>
                     <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
                      <td>&nbsp;</td>
                   </tr>
-                  <tr class="hasSubLabel parent clsDrEnabled" id="row-server" style="display:none" id="trConnectionSource">
-                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily"></span></a>Servers</td>
-                    <td colspan="3">&nbsp;</td>
-                  </tr>
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server1</td><td>&nbsp;</td></tr>-->
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server2</td><td>&nbsp;</td></tr>-->
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server3</td><td>&nbsp;</td></tr>-->
                 </table>
               </div>
             </div>
@@ -479,11 +564,11 @@
       </div>
     </div>
   </div>
-
 <div class="footer" id="mainFooter">
   <p>Copyright © 2015 VoltDB. All rights reserved. </p>
 </div>
 <script src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.cookie.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.validate.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery.multi-select.js') }}"></script>
@@ -494,7 +579,9 @@
 <script src="{{ url_for('static', filename='js/vdm.serversetting.ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vdm.service.js') }}"></script>
 <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap-tokenfield.js') }}"></script>
 <script src="{{ url_for('static', filename='js/icheck.js') }}"></script>
+
 <script>
           $(document).ready(function(){
 			 
@@ -560,7 +647,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal">&times;</button>
         <h4 class="modal-title">Database
-        <a id="btnAddDatabase" href="javascript:void(0);"data-toggle="modal" data-target="#addDatabase" class="addDatabase"> <span class="plus"></span>Add Database</a>
+        <a id="btnAddDatabase" data-toggle="modal" data-target="#addDatabase" class="addDatabase"> <span class="plus"></span>Add Database</a>
         </h4>
         
       </div>
@@ -592,17 +679,17 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       <div class="modal-body" style="overflow:auto; height:300px;">
         <form id="frmCreateServer" action="" method="get" class="form-horizontal">
           <div class="form-group formServer">
-            <label for="serverName" class="col-sm-4 control-label" >Server Name:</label>
-            <div class="col-sm-8" >
-              <input type="text" id="serverName" name="serverName" >
-              <label id="errorServerName" for="serverName" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtHostName" class="col-sm-4 control-label" >Host Name:</label>
+            <label for="txtHostName" class="col-sm-4 control-label" >Host Name<span class="redC">*</span>:</label>
             <div class="col-sm-8">
               <input type="text"  id="txtHostName" name="txtHostName" >
               <label id="errorHostName" for="txtHostName" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="serverName" class="col-sm-4 control-label" >Display Name:</label>
+            <div class="col-sm-8" >
+              <input type="text" id="serverName" name="serverName" >
+              <label id="errorServerName" for="serverName" class="error" style="display:none">This field is required</label>
             </div>
           </div>
           <div class="form-group formServer">
@@ -612,78 +699,96 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
               <label id="errorDescription" for="txtDescription" class="error" style="display:none">This field is required</label>
             </div>
           </div>
-          
-          <div class="form-group formServer">
-            <label for="txtClientPort" class="col-sm-4 control-label" >Client Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtClientPort" name="txtClientPort" >
-              <label id="errorClientPort" for="txtClientPort" class="error" style="display:none">This field is required</label>
+
+          <div class="panel-group" id="accordion">
+            <div class="panel panel-default">
+              <div class="panel-heading">
+                <h4 class="panel-title showMore">
+                  <a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion" href="#collapseOne">
+                    <span id="colExpIcon" class="glyphicon-triangle-right"></span>
+                      Details
+                  </a>
+                </h4>
+              </div>
+              <div id="collapseOne" class="panel-collapse collapse">
+                <div class="panel-body">
+                  <div class="form-group formServer">
+                      <label for="txtClientPort" class="col-sm-4 control-label" >Client Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtClientPort" name="txtClientPort" >
+                        <label id="errorClientPort" for="txtClientPort" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtAdminPort" class="col-sm-4 control-label" >Admin Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtAdminPort" name="txtAdminPort" >
+                        <label id="errorAdminPort" for="txtAdminPort" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtInternalPort" class="col-sm-4 control-label" >Internal Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtInternalPort" name="txtInternalPort" >
+                        <label id="errorInternalPort" for="txtInternalPort" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtHttpPort" class="col-sm-4 control-label" >HTTP Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtHttpPort" name="txtHttpPort" >
+                        <label id="errorHttpPort" for="txtHttpPort" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtZookeeper" class="col-sm-4 control-label" >Zookeeper Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtZookeeper" name="txtZookeeper" >
+                        <label id="errorZookeeper" for="txtZookeeper" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtReplicationPort" class="col-sm-4 control-label" >Replication Listener:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtReplicationPort" name="txtReplicationPort" >
+                        <label id="errorReplicationPort" for="txtReplicationPort" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+
+                    <div class="form-group formServer">
+                      <label for="txtInternalInterface" class="col-sm-4 control-label" >Internal Interface:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtInternalInterface" name="txtInternalInterface" >
+                        <label id="errorInternalInterface" for="txtInternalInterface" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtExternalInterface" class="col-sm-4 control-label" >External Interface:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtExternalInterface" name="txtExternalInterface" >
+                        <label id="errorExternalInterface" for="txtExternalInterface" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtPublicInterface" class="col-sm-4 control-label" >Public Interface:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtPublicInterface" name="txtPublicInterface" >
+                        <label id="errorPublicInterface" for="txtPublicInterface" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                    <div class="form-group formServer">
+                      <label for="txtPlacementGroup" class="col-sm-4 control-label" >Placement Group:</label>
+                      <div class="col-sm-8">
+                        <input type="text"  id="txtPlacementGroup" name="txtPlacementGroup" >
+                        <label id="errorPlacementGroup" for="txtPlacementGroup" class="error" style="display:none">This field is required</label>
+                      </div>
+                    </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtAdminPort" class="col-sm-4 control-label" >Admin Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtAdminPort" name="txtAdminPort" >
-              <label id="errorAdminPort" for="txtAdminPort" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtInternalPort" class="col-sm-4 control-label" >Internal Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtInternalPort" name="txtInternalPort" >
-              <label id="errorInternalPort" for="txtInternalPort" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtHttpPort" class="col-sm-4 control-label" >HTTP Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtHttpPort" name="txtHttpPort" >
-              <label id="errorHttpPort" for="txtHttpPort" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtZookeeper" class="col-sm-4 control-label" >Zookeeper Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtZookeeper" name="txtZookeeper" >
-              <label id="errorZookeeper" for="txtZookeeper" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtReplicationPort" class="col-sm-4 control-label" >Replication Listener:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtReplicationPort" name="txtReplicationPort" >
-              <label id="errorReplicationPort" for="txtReplicationPort" class="error" style="display:none">This field is required</label>
-            </div>
+
           </div>
 
-          <div class="form-group formServer">
-            <label for="txtInternalInterface" class="col-sm-4 control-label" >Internal Interface:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtInternalInterface" name="txtInternalInterface" >
-              <label id="errorInternalInterface" for="txtInternalInterface" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtExternalInterface" class="col-sm-4 control-label" >External Interface:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtExternalInterface" name="txtExternalInterface" >
-              <label id="errorExternalInterface" for="txtExternalInterface" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtPublicInterface" class="col-sm-4 control-label" >Public Interface:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtPublicInterface" name="txtPublicInterface" >
-              <label id="errorPublicInterface" for="txtPublicInterface" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
-          <div class="form-group formServer">
-            <label for="txtPlacementGroup" class="col-sm-4 control-label" >Placement Group:</label>
-            <div class="col-sm-8">
-              <input type="text"  id="txtPlacementGroup" name="txtPlacementGroup" >
-              <label id="errorPlacementGroup" for="txtPlacementGroup" class="error" style="display:none">This field is required</label>
-            </div>
-          </div>
         </form>
        
       </div>
@@ -750,7 +855,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
         <p>Do you want to delete this server?</p>
       </div>
       <div class="modal-footer">
-        <button id="deleteServerOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button id="deleteServerOk" type="button" class="btn"  data-target="#errorDialog">Ok</button>
         <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
       </div>
     </div>
@@ -809,7 +914,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
 <!-- Export table End -->
 
 <!--Error -->
-<div id="errorDialog" class="modal fade" role="dialog">
+<div id="errorDialog" class="modal fade" role="dialog" >
   <div class="modal-dialog modal-dialog-center">
     <!-- Modal content-->
     <div class="modal-content">
@@ -821,7 +926,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
             <p id="errorMsg"></p>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn" data-dismiss="modal">Ok</button>
+            <button type="button" id="btnErrorDialog" class="btn" data-dismiss="modal">Ok</button>
         </div>
     </div>
   </div>
@@ -850,7 +955,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
 
 <!-- Add Database -->
 <div id="addDatabase" class="modal custom fade" role="dialog" data-id="">
-  <div class="modal-dialog modal-dialog-center">
+  <div class="modal-dialog modal-dialog-center addDatabaseModal">
     <!-- Modal content-->
     <div class="modal-content">
       <div class="modal-header">
@@ -866,14 +971,14 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
               <label id="errorDbName" for="txtDbName" class="error" style="display:none">This field is required</label>
             </div>
           </div>
-          <div class="form-group formDB">
-            <label for="txtDeployment" class="col-sm-3 control-label">Deployment:</label>
-            <div class="col-sm-9">
-              <input type="text" id="txtDeployment" name="txtDeployment">
-            </div>
-          </div>
+          <!--<div class="form-group formDB">-->
+            <!--<label for="txtDeployment" class="col-sm-3 control-label">Deployment:</label>-->
+            <!--<div class="col-sm-9">-->
+              <!--<input type="text" id="txtDeployment" name="txtDeployment">-->
+            <!--</div>-->
+          <!--</div>-->
         </form>
-        <div class="noteDb" ><p>Note: <span class="txt-bold">Server can only be added after creating Database</span></p></div>
+        <!--<div class="noteDb" ><p>Note: <span class="txt-bold">Server can only be added after creating Database</span></p></div>-->
       </div>
       <div class="modal-footer">
         <button id="btnAddDatabaseOk" type="button" class="btn" data-dismiss="modal">Ok</button>
@@ -1021,7 +1126,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal">&times;</button>
         <h4 class="modal-title" id="btnAddSecurityTitle">Add User</h4>
-        <div id="deleteUser" class="delete-export"><span class="icon-delete"></span>Delete this configuration</div>
+        <div id="deleteUser" class="delete-export"><span class="icon-delete"></span>Delete this user</div>
       </div>
         <div class="modal-body">
           <form id="frmAddUser" method="get" action="" style="overflow:auto;">
@@ -1053,73 +1158,42 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       </div>
       <div class="modal-body">
         <form id="frmDatabaseReplication" method="get" action="" novalidate style="overflow:auto;">
-          <div id="" class="configWrapper-modal">
+          <div class="configWrapper-modal">
               <table width="100%" cellpadding="0" cellspacing="0" class="connectionSourceTblPopup">
-                <tr>
-                  <td width="5%">DR Enabled</td>
-                   <td width="10%">
-                     <span><input id="chkDrOnOffStatus" tabindex="6" type="checkbox" checked></span>
-                     <span id="chkDrOnOffValue" class="onOffDr" id="chkDrOnOffValue1">On</span>
-                   </td>
-
-                </tr>
                 <tr class="showHideDrConfig">
-                  <td>Id</td>
+                  <td width="5%">ID<span class="redC">*</span></td>
                   <td id="trDrId" width="10%" align="">
-                    <input id="txtDrId" name="txtDrId" type="text" class="overviewInputText valid" aria-required="true" aria-invalid="false">
+                    <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
                   </td>
-
+                </tr>
+                <tr class="showHideDrConfig" id="trDrPort">
+                    <td>Port</td>
+                    <td id="tdDrPort" width="10%" align="">
+                      <input id="txtDrPort" name="txtDrPort" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                      <label id="errorDrPort" for="txtDrPort" class="error ccErrorMsg" style="display: none;"></label>
+                    </td>
                 </tr>
                 <tr class="showHideDrConfig">
-                  <td>Type</td>
-                  <td><select id="selectDrType" class="tblSelect">
-                        <option value="Master">Master</option>
-                        <option value="Replica">Replica</option>
-                        <option value="XDCR">XDCR</option>
-                      </select></td>
-                </tr>
-
-                <tr class="trConnectionSource showHideDrConfig">
-                  <td colspan="2"><h4>Connection Source</h4></td>
-                </tr>
-                <tr class="trConnectionSource showHideDrConfig">
-                  <td>Master Cluster:</td>
-                  <td>
-                    <div id="selectDrDatabase">
-                      <select >
-                        <option>Local</option>
-                        <option>ABC</option>
-                        <option>XYZ</option>
-                      </select>
-                    </div>
+                  <td><h4>Connection Source</h4></td>
+                  <td width="10%" class="connSource">
+                     <span id="addConnectionSource" class="plusIconDR"></span>
                   </td>
                 </tr>
-                <tr id="trServerList" class="trConnectionSource showHideDrConfig">
-                  <td>Servers</td>
+                <tr class="trConnectionSource showHideDrConfig">
+                  <td>Source</td>
                   <td>
-                    <div id="divDrServerList" >
-                      <ul class="server-lists">
-                          <li class="checked-server"><span><input type="checkbox" id="1" checked />Server1</span></li>
-                          <li><span><input type="checkbox"  />Server2</span></li>
-                          <li class="checked-server"><span><input type="checkbox"  checked />Server3</span></li>
-                          <li class="checked-server"><span><input type="checkbox" checked  />Server4</span></li>
-                          <li><span><input type="checkbox"  />Server5</span></li>
-                          <li><span><input type="checkbox"  />Server6</span></li>
-                      </ul>
-                    </div>
+                    <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                    <span id="deleteConnectionSource" class="deleteDR"></span>
+                    <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
+
+
                   </td>
                 </tr>
-
                 <tr class="showHideDrConfig" style="border-bottom:none;" >
                   <td></td>
                   <td colspan="3">
                     <label id="drServers-error" class="error" for="drServers" style="display:none">No servers selected.</label>
-                  </td>
-                </tr>
-                <tr id="drMessage" style="border-bottom:none;" class="showHideXDCRMessagge">
-                  <td colspan="2" class="drnote">
-                    Note:You cannot change the selected DR Type and Master Cluster because the database "<span id="spanCurrentDb"></span>" is configured to use Type "XDCR" for this database. To change the DR Type, please disable DR for this database and choose another DR Type in "<span id="spanSelectedDb"></span>".
                   </td>
                 </tr>
               </table>
@@ -1134,6 +1208,30 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Connection Source End -->
+<!-- Disk Limit -->
+<div id="diskLimit" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Edit Disk Limit</h4>
+      </div>
+      <div class="modal-body">
+         <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+          <div id="addDiskLimitWrapper" class="configWrapper-modal">
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveDiskLimitOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button id="btnSaveDiskLimitCancel" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Disk Limit End-->
 
 <div class="loader" ></div>
 </div>

@@ -16,13 +16,13 @@
 
 package com.google_voltpatches.common.io;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import com.google_voltpatches.common.annotations.Beta;
 
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-
-import javax.annotation_voltpatches.Nullable;
 
 /**
  * An {@link InputStream} that counts the number of bytes read.
@@ -41,8 +41,8 @@ public final class CountingInputStream extends FilterInputStream {
    *
    * @param in the input stream to be wrapped
    */
-  public CountingInputStream(@Nullable InputStream in) {
-    super(in);
+  public CountingInputStream(InputStream in) {
+    super(checkNotNull(in));
   }
 
   /** Returns the number of bytes read. */

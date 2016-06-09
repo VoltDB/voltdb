@@ -132,7 +132,7 @@ typedef std::vector<T_HashRange> T_HashRangeVector;
  */
 class CopyOnWriteTest : public Test {
 public:
-    CopyOnWriteTest() : m_table(NULL) {
+    CopyOnWriteTest() : m_table(NULL), drStream(0) {
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -140,7 +140,7 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", 0, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -205,7 +205,7 @@ public:
 
         strcpy(m_stage, "Initialize");
 
-        ExecutorContext::getExecutorContext()->setDrStreamForTest(&drStream);
+        ExecutorContext::getExecutorContext()->setDrStream(&drStream);
     }
 
     ~CopyOnWriteTest() {
@@ -1190,6 +1190,32 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     tuple.setDirtyFalse();
     ASSERT_TRUE(tuple.isActive());
     ASSERT_FALSE(tuple.isDirty());
+}
+
+// Simple test that performs snapshot activation on empty table, inserts tuples and calls stream more tuples
+TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
+    initTable(1, 0);
+    int tupleCount = 4;
+
+    // Empty table has an assigned allocated tuple storage
+    ASSERT_EQ(1, m_table->allocatedBlockCount());
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+    // activate snapshot
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    // insert tuples
+    addRandomUniqueTuples(m_table, tupleCount);
+    // do work - start taking snapshot of the table
+    char serializationBuffer[BUFFER_SIZE];
+    TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+    std::vector<int> retPositions;
+    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+    // no work done by snapshot as the table was empty
+    ASSERT_EQ(0, remaining);
+    ASSERT_EQ(outputStreams.size(), retPositions.size());
+    // check the # tuple insertion count is reflected correctly
+    ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
 }
 
 TEST_F(CopyOnWriteTest, BigTest) {

@@ -126,7 +126,7 @@ public class SaveRestoreBase extends RegressionSuite {
         }
     }
 
-    static protected GeographyPointValue getPoint(int index) {
+    static protected GeographyPointValue getGeographyPointValue(int index) {
         double lat = index % 90;
         double lng = (index * 2) % 180;
         if ((index & 0x1) != 0) {
@@ -140,10 +140,10 @@ public class SaveRestoreBase extends RegressionSuite {
         return new GeographyPointValue(lng, lat);
     }
 
-    static protected GeographyValue getGeography(int index) {
+    static protected GeographyValue getGeographyValue(int index) {
         List<GeographyPointValue> loop = new ArrayList<GeographyPointValue>();
         for (int i = 0; i < 3; ++i) {
-            loop.add(getPoint(index + i));
+            loop.add(getGeographyPointValue(index + i));
         }
         loop.add(loop.get(0));
 

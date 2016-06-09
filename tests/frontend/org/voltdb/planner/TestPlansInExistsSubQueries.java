@@ -52,18 +52,22 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     public void testInExistsGuard() {
         String errorMsg = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
         String sql;
+        List<AbstractPlanNode> pns;
 
         sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select p2.c from p2 where p2.a in (select c from r1)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
         failToCompile(sql, errorMsg);
 
         sql = "select * from P1 as parent where (A,C) in (select 2, C from r2 where r2.c > parent.c group by c)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c and "
                 + "exists (select c from p1 where p1.c = r1.c ))";
@@ -301,7 +305,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testExistsJoin() {
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where exists (" +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where exists (" +
                     "select 1 from r3 where r1.d = r3.c and r2.a = r3.c)");
             pn = pn.getChild(0).getChild(0);
             assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
@@ -335,7 +339,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.VALUE_PARAMETER, re.getRight().getExpressionType());
         }
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where r1.a = r2.a and " +
                     "exists ( select 1 from r3 where r1.a = r3.a)");
 
             pn = pn.getChild(0).getChild(0);
@@ -347,7 +351,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.OPERATOR_EXISTS, pred.getExpressionType());
         }
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where " +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where " +
                     "exists ( select 1 from r3 where r1.a = r3.a and r2.c = r3.c)");
 
             pn = pn.getChild(0).getChild(0);
@@ -682,7 +686,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             //EXISTS => TRUE, join predicate is TRUE or EXPR = > TRUE and dropped
-            AbstractPlanNode pn = compile("select a from r1 join r2 on (exists " +
+            AbstractPlanNode pn = compile("select r1.a from r1 join r2 on (exists " +
                 " (select max(a)  from r2) or r2.a > 0)");
             assertEquals(true, pn.getChild(0).getChild(0) instanceof AbstractJoinPlanNode);
             AbstractJoinPlanNode jpn = (AbstractJoinPlanNode) pn.getChild(0).getChild(0);
@@ -690,7 +694,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             //EXISTS => FALSE, join predicate is retained
-            AbstractPlanNode pn = compile("select a from r1 join r2 on exists " +
+            AbstractPlanNode pn = compile("select r1.a from r1 join r2 on exists " +
                 " (select max(a)  from r2 offset 1) ");
             assertEquals(true, pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
             NestLoopPlanNode jpn = (NestLoopPlanNode) pn.getChild(0).getChild(0);
@@ -758,13 +762,13 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     public void testConstantExpressionInWhereClause() {
-        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support constant Boolean values, like TRUE or FALSE");
 
         failToCompile("select a from r1 where exists " +
-                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
+                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support constant Boolean values, like TRUE or FALSE");
     }
 
-    // HSQL failed to parse  these statement
+    // HSQL failed to parse these statement
     public void testHSQLFailed() {
         {
             failToCompile("select a from r1 where exists (" +
@@ -778,6 +782,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
         {
+            // This may not actually an HSQL failure
+            // -- at any rate, it gets detected later in the planner.
             failToCompile("select * from r1 join r2 on exists " +
                     " (select a from r2 where a > 1) ",
                     "Join with filters that do not depend on joined tables is not supported in VoltDB");

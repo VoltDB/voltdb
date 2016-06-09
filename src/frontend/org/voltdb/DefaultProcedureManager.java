@@ -70,8 +70,14 @@ public class DefaultProcedureManager {
         for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
-            // skip export tables XXX why no insert?
             if (CatalogUtil.isTableExportOnly(m_db, table)) {
+                Column partitioncolumn = table.getPartitioncolumn();
+                if (partitioncolumn != null) {
+                    int partitionIndex = partitioncolumn.getIndex();
+                    addShimProcedure(prefix + "insert", table, null, true, partitionIndex, partitioncolumn, false);
+                } else {
+                    addShimProcedure(prefix + "insert", table, null, true, -1, null, false);
+                }
                 continue;
             }
 

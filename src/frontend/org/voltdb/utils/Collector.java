@@ -25,25 +25,31 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.zip.ZipOutputStream;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.varia.NullAppender;
-import org.hsqldb_voltpatches.lib.tar.TarGenerator;
-import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
@@ -63,7 +69,8 @@ public class Collector {
     public static long m_currentTimeMillis = System.currentTimeMillis();
 
     private static String m_workingDir = null;
-    private static List<String> m_logPaths = new ArrayList<String>();
+    private static Set<String> m_logPaths = new HashSet<String>();
+    private static Properties m_systemStats = new Properties();
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
 
@@ -87,10 +94,10 @@ public class Collector {
         boolean dryrun = false;
 
         @Option(desc = "exclude heap dump file from collection")
-        boolean skipheapdump = false;
+        boolean skipheapdump = true;
 
         @Option(desc = "number of days of files to collect (files included are log, crash files), Current day value is 1")
-        int days = 14;
+        int days = 7;
 
         @Option(desc = "the voltdbroot path")
         String voltdbroot = "";
@@ -107,6 +114,9 @@ public class Collector {
         // used by files display panel in VEM UI
         @Option(desc = "generate a list of information (server name, size, and path) of files rather than actually collect files")
         boolean fileInfoOnly=false;
+
+        @Option
+        String libPathForTest = "";
 
         @Override
         public void validate() {
@@ -133,7 +143,25 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        List<String> collectionFilesList = listCollection(m_config.skipheapdump);
+        String systemStatsPathBase;
+        if (m_config.libPathForTest.isEmpty())
+            systemStatsPathBase = System.getenv("VOLTDB_LIB");
+        else
+            systemStatsPathBase = m_config.libPathForTest;
+        String systemStatsPath;
+        if (System.getProperty("os.name").contains("Mac"))
+            systemStatsPath = systemStatsPathBase + File.separator + "macstats.properties";
+        else
+            systemStatsPath = systemStatsPathBase + File.separator + "linuxstats.properties";
+        try {
+            InputStream systemStatsIS = new FileInputStream(systemStatsPath);
+            m_systemStats.load(systemStatsIS);
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+
+
+        Set<String> collectionFilesList = setCollection(m_config.skipheapdump);
 
         if (m_config.dryrun) {
             System.out.println("List of the files to be collected:");
@@ -246,8 +274,8 @@ public class Collector {
         }
     }
 
-    private static List<String> listCollection(boolean skipHeapDump) {
-        List<String> collectionFilesList = new ArrayList<String>();
+    private static Set<String> setCollection(boolean skipHeapDump) {
+        Set<String> collectionFilesList = new HashSet<String>();
 
         try {
             if (new File(m_deploymentPath).exists()) {
@@ -258,6 +286,9 @@ public class Collector {
             }
             if (new File(m_systemCheckPath).exists()) {
                 collectionFilesList.add(m_systemCheckPath);
+            }
+            if (new File(m_configInfoPath).exists()) {
+                collectionFilesList.add(m_configInfoPath);
             }
 
             for (String path: m_logPaths) {
@@ -291,6 +322,25 @@ public class Collector {
                 }
             }
 
+            String systemLogBase;
+            if (System.getProperty("os.name").startsWith("Mac")) {
+                systemLogBase = "system.log";
+            } else {
+                String[] unameCmd = {"bash", "-c", "lsb_release -id"};
+                Process p = Runtime.getRuntime().exec(unameCmd);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String line = reader.readLine();
+                if (line.contains("Ubuntu"))
+                    systemLogBase = "syslog";
+                else
+                    systemLogBase = "messages";
+            }
+            for (File file: new File("/var/log/").listFiles()) {
+                if (file.getName().startsWith(systemLogBase)) {
+                    collectionFilesList.add(file.getCanonicalPath());
+                }
+            }
+
             if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")
@@ -300,8 +350,13 @@ public class Collector {
                 }
             }
 
-            collectionFilesList.add("sardata (result of executing \"sar -A\" if sar enabled)");
-            collectionFilesList.add("dmesgdata (result of executing \"/bin/dmesg\")");
+            collectionFilesList.add("duvoltdbrootdata (result of executing \"du -h <voltdbroot>\")");
+            collectionFilesList.add("dudroverflowdata (result of executing \"du -h <droverflow>\")");
+            collectionFilesList.add("duexportoverflowdata (result of executing \"du -h <exportoverflow>\")");
+
+            for (String fileName : m_systemStats.stringPropertyNames()) {
+                collectionFilesList.add(fileName + " (result of executing \"" + m_systemStats.getProperty(fileName) + "\")");
+            }
 
             File varlogDir = new File("/var/log");
             if (varlogDir.canRead()) {
@@ -335,7 +390,7 @@ public class Collector {
         m_currentTimeMillis = System.currentTimeMillis();
     }
 
-    private static void generateCollection(List<String> paths, boolean copyToVEM) {
+    private static void generateCollection(Set<String> paths, boolean copyToVEM) {
         try {
             String timestamp = "";
             String rootpath = "";
@@ -353,11 +408,15 @@ public class Collector {
                 rootpath = System.getProperty("user.dir");
             }
 
-            String collectionFilePath = rootpath + File.separator + m_config.prefix + timestamp + ".tgz";
-            File collectionFile = new File(collectionFilePath);
-            TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
-            String folderPath= m_config.prefix + timestamp + File.separator;
+            String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
+                                CoreUtils.getHostnameOrAddress() + "_voltlogs_" + timestamp;
+            String folderPath = folderBase + File.separator;
+            String collectionFilePath = rootpath + File.separator + folderBase + ".zipfile";
 
+            FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
+            ZipOutputStream zipStream = new ZipOutputStream(collectionStream);
+
+            Map<String, Integer> pathCounter = new HashMap<String, Integer>();
             // Collect files with paths indicated in the list
             for (String path: paths) {
                 // Skip particular items corresponding to temporary files that are only generated during collecting
@@ -371,31 +430,82 @@ public class Collector {
                 String entryPath = file.getName();
                 for (String logPath: m_logPaths) {
                     if (filename.startsWith(new File(logPath).getName())) {
-                        entryPath = "log" + File.separator + file.getName();
+                        entryPath = "voltdb_logs" + File.separator + file.getName();
                         break;
                     }
                 }
                 if (filename.startsWith("voltdb_crash")) {
-                    entryPath = "voltdb_crash" + File.separator + file.getName();
+                    entryPath = "voltdb_crashfiles" + File.separator + file.getName();
                 }
-                if (filename.startsWith("syslog") || filename.equals("dmesg")) {
-                    entryPath = "syslog" + File.separator + file.getName();
+                if (filename.startsWith("syslog") || filename.equals("dmesg") || filename.equals("systemcheck") ||
+                        filename.startsWith("hs_err_pid") || path.startsWith("/var/log/")) {
+                    entryPath = "system_logs" + File.separator + file.getName();
+                }
+                if (filename.equals("deployment.xml") || filename.equals("catalog.jar") || filename.equals("config.json")) {
+                    entryPath = "voltdb_files" + File.separator + file.getName();
+                }
+                if (filename.endsWith(".hprof")) {
+                    entryPath = "heap_dumps" + File.separator + file.getName();
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    tarGenerator.queueEntry(folderPath + entryPath, file);
+                    String zipPath = folderPath + entryPath;
+                    System.out.println(zipPath + "...");
+                    if (pathCounter.containsKey(zipPath)) {
+                        Integer pathCount = pathCounter.get(zipPath);
+                        pathCounter.put(zipPath, pathCount + 1);
+                        zipPath = zipPath.concat("(" + pathCount.toString() + ")");
+                    } else {
+                        pathCounter.put(zipPath, 1);
+                    }
+
+                    ZipEntry zEntry= new ZipEntry(zipPath);
+                    zipStream.putNextEntry(zEntry);
+                    FileInputStream in = new FileInputStream(path);
+
+                    int len;
+                    byte[] buffer = new byte[1024];
+                    while ((len = in.read(buffer)) > 0) {
+                        zipStream.write(buffer, 0, len);
+                    }
+
+                    in.close();
+                    zipStream.closeEntry();
                 }
             }
 
-            String[] sarCmd = {"bash", "-c", "sar -A"};
-            cmd(tarGenerator, sarCmd, folderPath , "sardata");
+            String duCommand = m_systemStats.getProperty("dudata");
+            if (duCommand != null) {
+                String[] duVoltdbrootCmd = {"bash", "-c", duCommand + " " + m_config.voltdbroot};
+                cmd(zipStream, duVoltdbrootCmd, folderPath + "system_logs" + File.separator, "duvoltdbrootdata");
 
-            String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
-            cmd(tarGenerator, dmesgCmd, folderPath, "dmesgdata");
+                String drOverflowPath = m_config.voltdbroot + File.separator + "dr_overflow";
+                String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
+                DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
+                PathsType deploymentPaths = deployment.getPaths();
+                if (deploymentPaths != null) {
+                    PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
+                    if (drPath != null)
+                        drOverflowPath = drPath.getPath();
+                    PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
+                    if (exportPath != null)
+                        exportOverflowPath = exportPath.getPath();
+                }
+                String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
+                cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
 
-            tarGenerator.write(m_config.calledFromVEM ? null : System.out);
+                String[] duExportOverflowCmd = {"bash", "-c", duCommand + " " + exportOverflowPath};
+                cmd(zipStream, duExportOverflowCmd, folderPath + "system_logs" + File.separator, "duexportoverflowdata");
+            }
 
-            long sizeInByte = collectionFile.length();
+            for (String fileName : m_systemStats.stringPropertyNames()) {
+                String[] statsCmd = {"bash", "-c", m_systemStats.getProperty(fileName)};
+                cmd(zipStream, statsCmd, folderPath + "system_logs" + File.separator, fileName);
+            }
+
+            zipStream.close();
+
+            long sizeInByte = new File(collectionFilePath).length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
             if (!m_config.calledFromVEM) {
                 System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
@@ -437,7 +547,7 @@ public class Collector {
 
                         if (delLocalCopy) {
                             try {
-                                collectionFile.delete();
+                                new File(collectionFilePath).delete();
                                 if (!m_config.calledFromVEM) {
                                     System.out.println("Local copy "  + collectionFilePath + " deleted");
                                 }
@@ -480,8 +590,9 @@ public class Collector {
         }
     }
 
-    private static void cmd(TarGenerator tarGenerator, String[] command, String folderPathInTar, String resFilename)
-            throws IOException, TarMalformatException {
+    private static void cmd(ZipOutputStream zipStream, String[] command, String folderPath, String resFilename)
+            throws IOException, ZipException {
+        System.out.println(folderPath + resFilename + "...");
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
 
@@ -507,7 +618,18 @@ public class Collector {
         writer.close();
 
         if (tempFile.length() > 0) {
-            tarGenerator.queueEntry(folderPathInTar + resFilename, tempFile);
+            ZipEntry zEntry= new ZipEntry(folderPath + resFilename);
+            zipStream.putNextEntry(zEntry);
+            FileInputStream in = new FileInputStream(tempFile);
+
+            int len;
+            byte[] buffer = new byte[1024];
+            while ((len = in.read(buffer)) > 0) {
+                zipStream.write(buffer, 0, len);
+            }
+
+            in.close();
+            zipStream.closeEntry();
         }
     }
 

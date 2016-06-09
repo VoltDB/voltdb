@@ -64,6 +64,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -454,15 +455,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             TruncationSnapshotAttempt snapshotAttempt = entry.getValue();
             if (!foundMostRecentSuccess) {
                 if (snapshotAttempt.finished) {
-                    loggingLog.info("Found most recent successful snapshot txnid " + entry.getKey()
+                    loggingLog.info("Found most recent successful snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                             + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                     foundMostRecentSuccess = true;
                 } else {
-                    loggingLog.info("Retaining possible partial snapshot txnid " + entry.getKey()
+                    loggingLog.info("Retaining possible partial snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                             + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 }
             } else {
-                loggingLog.info("Deleting old unecessary snapshot txnid " + entry.getKey()
+                loggingLog.info("Deleting old unecessary snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                         + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 toDelete.add(entry.getValue());
                 iter.remove();

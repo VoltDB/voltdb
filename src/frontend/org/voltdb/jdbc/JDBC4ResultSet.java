@@ -651,7 +651,7 @@ public class JDBC4ResultSet implements java.sql.ResultSet {
 
             if (table.wasNull()) {
                 doubleValue = new Double(0);
-            } else if (doubleValue > new Double(Float.MAX_VALUE) || doubleValue < new Double(Float.MIN_VALUE)) {
+            } else if (Math.abs(doubleValue) > new Double(Float.MAX_VALUE)) {
                 throw new SQLException("Value out of float range");
             }
             return doubleValue.floatValue();

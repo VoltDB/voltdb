@@ -217,7 +217,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_PROJECTION       = 54,
     PLAN_NODE_TYPE_MATERIALIZE      = 55,
     PLAN_NODE_TYPE_LIMIT            = 56,
-    PLAN_NODE_TYPE_PARTIALAGGREGATE = 57
+    PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
+    PLAN_NODE_TYPE_PARTITIONBY      = 58
 };
 
 // ------------------------------------------------------------------
@@ -351,6 +352,8 @@ enum QuantifierType {
 enum TableIndexType {
     BALANCED_TREE_INDEX     = 1,
     HASH_TABLE_INDEX        = 2,
+    BTREE_INDEX             = 3, // unused
+    COVERING_CELL_INDEX     = 4
 };
 
 // ------------------------------------------------------------------
@@ -363,10 +366,7 @@ enum IndexLookupType {
    INDEX_LOOKUP_TYPE_GTE     = 3,
    INDEX_LOOKUP_TYPE_LT      = 4,
    INDEX_LOOKUP_TYPE_LTE     = 5,
-   INDEX_LOOKUP_TYPE_GT_LT   = 6,
-   INDEX_LOOKUP_TYPE_GTE_LT  = 7,
-   INDEX_LOOKUP_TYPE_GTL_TE  = 8,
-   INDEX_LOOKUP_TYPE_GTE_LTE = 9
+   INDEX_LOOKUP_TYPE_GEO_CONTAINS = 6,
 };
 
 // ------------------------------------------------------------------
@@ -481,7 +481,20 @@ enum RecoveryMsgType {
 enum TaskType {
     TASK_TYPE_VALIDATE_PARTITIONING = 0,
     TASK_TYPE_GET_DR_TUPLESTREAM_STATE = 1,
-    TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 2
+    TASK_TYPE_SET_DR_SEQUENCE_NUMBERS = 2,
+    TASK_TYPE_SET_DR_PROTOCOL_VERSION = 3,
+    TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
+    TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
+    TASK_TYPE_GENERATE_DR_EVENT = 6
+};
+
+// ------------------------------------------------------------------
+// Types of DR in-band events
+// ------------------------------------------------------------------
+enum DREventType {
+    NOT_A_EVENT = 0,
+    POISON_PILL = 1,      // not supported in EE
+    CATALOG_UPDATE = 2,
 };
 
 
@@ -496,7 +509,19 @@ enum DRRecordType {
     DR_RECORD_END_TXN = 4,
     DR_RECORD_TRUNCATE_TABLE = 5,
     DR_RECORD_DELETE_BY_INDEX = 6,
-    DR_RECORD_UPDATE_BY_INDEX = 7
+    DR_RECORD_UPDATE_BY_INDEX = 7,
+    DR_RECORD_HASH_DELIMITER = 8
+};
+
+// ------------------------------------------------------------------
+// Flags of DR Transaction Partition Hash
+// ------------------------------------------------------------------
+enum DRTxnPartitionHashFlag {
+    TXN_PAR_HASH_PLACEHOLDER = 0, // a sentinel for unassigned hash flag
+    TXN_PAR_HASH_REPLICATED = 1,  // txn is from DR stream for replicated table
+    TXN_PAR_HASH_SINGLE = 2,      // txn contains a single partition key hash
+    TXN_PAR_HASH_MULTI = 3,       // txn contains multiple partition key hashes
+    TXN_PAR_HASH_SPECIAL = 4      // txn contains TRUNCATE_TABLE record(s)
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
@@ -541,6 +566,7 @@ enum DRConflictRowType {
     EXISTING_ROW,
     EXPECTED_ROW,
     NEW_ROW,
+    DELETED_ROW,
 };
 
 enum DRRowDecision {

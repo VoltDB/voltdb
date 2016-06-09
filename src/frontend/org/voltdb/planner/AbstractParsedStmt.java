@@ -404,16 +404,14 @@ public abstract class AbstractParsedStmt {
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
             VoltType vt = VoltType.typeFromString(type);
-            int size = VoltType.MAX_VALUE_LENGTH;
             assert(vt != VoltType.VOLTTABLE);
 
-            if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
-                if (vt == VoltType.NULL) size = 0;
-                else size = vt.getLengthInBytesForFixedTypes();
-            }
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
-            cve.setValueSize(size);
+            if ((vt != VoltType.NULL) && (vt != VoltType.NUMERIC)) {
+                int size = vt.getMaxLengthInBytes();
+                cve.setValueSize(size);
+            }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
                 cve.setValue(valueStr);
@@ -453,8 +451,28 @@ public abstract class AbstractParsedStmt {
         }
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
+
+        // Whether or not this column is the coalesced column produced by a join with a
+        // USING predicate.
+        String usingAttr = exprNode.attributes.get("using");
+        boolean isUsingColumn = usingAttr != null ? Boolean.parseBoolean(usingAttr) : false;
+
+        // Use the index produced by HSQL as a way to differentiate columns that have
+        // the same name with a single table (which can happen for subqueries containing joins).
+        int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
+        if (differentiator == -1 && isUsingColumn) {
+            for (VoltXMLElement usingElem : exprNode.children) {
+                String usingTableAlias = usingElem.attributes.get("tablealias");
+                if (usingTableAlias != null && usingTableAlias.equals(tableAlias)) {
+                    differentiator = Integer.parseInt(usingElem.attributes.get("index"));
+                }
+            }
+        }
+
+        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias,
+                columnName, columnAlias, -1, differentiator);
         // Collect the unique columns used in the plan for a given scan.
+
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
         // correlated queries it may not be THIS statement but its parent
@@ -593,7 +611,6 @@ public abstract class AbstractParsedStmt {
      * @return
      */
     private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
-
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -604,7 +621,8 @@ public abstract class AbstractParsedStmt {
 
         try {
             expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -648,7 +666,8 @@ public abstract class AbstractParsedStmt {
             AbstractExpression rightExpr = parseExpressionNode(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
-        } else {
+        }
+        else {
             assert(rightExprNode == null);
             if (exprType == ExpressionType.OPERATOR_CAST) {
                 String valuetype = exprNode.attributes.get("valuetype");
@@ -657,7 +676,8 @@ public abstract class AbstractParsedStmt {
                 expr.setValueType(voltType);
                 // We don't support parameterized casting, such as specifically to "VARCHAR(3)" vs. VARCHAR,
                 // so assume max length for variable-length types (VARCHAR and VARBINARY).
-                expr.setValueSize(voltType.getMaxLengthInBytes());
+                int size = voltType.getMaxLengthInBytes();
+                expr.setValueSize(size);
             }
         }
 
@@ -667,7 +687,8 @@ public abstract class AbstractParsedStmt {
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
             expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
-        } else if (exprType == ExpressionType.OPERATOR_EXISTS) {
+        }
+        else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
         }
         return expr;
@@ -718,7 +739,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            List<AbstractExpression> tves = arg.findBaseTVEs();
+            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -954,7 +975,10 @@ public abstract class AbstractParsedStmt {
         expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
-            expr.setValueSize(value_type.getMaxLengthInBytes());
+            if (value_type != VoltType.INVALID && value_type != VoltType.NUMERIC) {
+                int size = value_type.getMaxLengthInBytes();
+                expr.setValueSize(size);
+            }
         }
 
         if (result_type_parameter_index != null) {
@@ -1351,20 +1375,6 @@ public abstract class AbstractParsedStmt {
         return subqueries;
     }
 
-    /*
-     *  Extract all subexpressions of a given type from this statement
-     */
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        if (m_joinTree != null) {
-            AbstractExpression treeExpr = m_joinTree.getAllFilters();
-            if (treeExpr != null) {
-                exprs.addAll(treeExpr.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        return exprs;
-    }
-
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
     /// the parameter is being used in a BIGINT context.
@@ -1479,7 +1489,7 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findBaseTVEs();
+            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
             Set<String> baseTableNames = new HashSet<String>();
             for (AbstractExpression ae : baseTVEExpressions) {
                 assert(ae instanceof TupleValueExpression);
@@ -1711,7 +1721,7 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+    protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
@@ -1735,10 +1745,13 @@ public abstract class AbstractParsedStmt {
             return true;
         }
         // Verify expression subqueries
-        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
-                SelectSubqueryExpression.class);
-        return !subqueryExprs.isEmpty();
+        return !findSubquerySubexpressions().isEmpty();
     }
+
+    protected Set<AbstractExpression> findSubquerySubexpressions() {
+        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
+    }
+
     public abstract boolean isDML();
 
     /**
@@ -1801,5 +1814,84 @@ public abstract class AbstractParsedStmt {
 
     public boolean isContentDetermistic() {
         return m_contentDeterminismMessage != null;
+    }
+
+    // Function evaluates whether the statement results in at most
+    // one output row. This is implemented for single table by checking
+    // value equivalence of predicates in where clause and checking
+    // if all defined unique indexes are in value equivalence set.
+    // Returns true if the statement results is at most one output
+    // row else false
+    protected boolean producesOneRowOutput () {
+        if (m_tableAliasMap.size() != 1) {
+            return false;
+        }
+
+        // Get the table.  There's only one.
+        StmtTableScan scan = m_tableAliasMap.values().iterator().next();
+        Table table = getTableFromDB(scan.getTableName());
+        // May be sub-query? If can't find the table there's no use to continue.
+        if (table == null) {
+            return false;
+        }
+
+        // Get all the indexes defined on the table
+        CatalogMap<Index> indexes = table.getIndexes();
+        if (indexes == null || indexes.size() == 0) {
+            // no indexes defined on the table
+            return false;
+        }
+
+        // Collect value equivalence expression for the SQL statement
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+
+        // If no value equivalence filter defined in SQL statement, there's no use to continue
+        if (valueEquivalence.isEmpty()) {
+            return false;
+        }
+
+        // Collect all tve expressions from value equivalence set which have equivalence
+        // defined to parameterized or constant value expression.
+        // Eg: T.A = ? or T.A = 1
+        Set <AbstractExpression> parameterizedConstantKeys = new HashSet<AbstractExpression>();
+        Set<AbstractExpression> valueEquivalenceKeys = valueEquivalence.keySet();   // get all the keys
+        for (AbstractExpression key : valueEquivalenceKeys) {
+            if (key instanceof TupleValueExpression) {
+                Set<AbstractExpression> values = valueEquivalence.get(key);
+                for (AbstractExpression value : values) {
+                    if ((value instanceof ParameterValueExpression) ||
+                        (value instanceof ConstantValueExpression)) {
+                        TupleValueExpression tve = (TupleValueExpression) key;
+                        parameterizedConstantKeys.add(tve);
+                    }
+                }
+            }
+        }
+
+        // Iterate over the unique indexes defined on the table to check if the unique
+        // index defined on table appears in tve equivalence expression gathered above.
+        for (Index index : indexes) {
+            // Perform lookup only on pure column indices which are unique
+            if (!index.getUnique() || !index.getExpressionsjson().isEmpty()) {
+                continue;
+            }
+
+            Set<AbstractExpression> indexExpressions = new HashSet<AbstractExpression>();
+            CatalogMap<ColumnRef> indexColRefs = index.getColumns();
+            for (ColumnRef indexColRef:indexColRefs) {
+                Column col = indexColRef.getColumn();
+                TupleValueExpression tve = new TupleValueExpression(scan.getTableName(),
+                                                                    scan.getTableAlias(),
+                                                                    col.getName(),
+                                                                    col.getName(),
+                                                                    col.getIndex());
+                indexExpressions.add(tve);
+            }
+
+            if (parameterizedConstantKeys.containsAll(indexExpressions)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

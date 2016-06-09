@@ -1,36 +1,26 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import java.io.BufferedReader
 import java.io.FileNotFoundException
 import java.io.FileReader
 import java.io.IOException
+import org.openqa.selenium.WebElement
+import org.openqa.selenium.Keys
 
 class ClusterConfigurationTest extends TestBase {
     static String sitePerHost = "Site per host"
@@ -115,7 +105,7 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifySitePerHost() {
         println("Test: verifySitePerHost")
-        String oldVariable = overview.sitePerHostField.value()
+       // String oldVariable = overview.sitePerHostField.value()
 
         when: 'Verify if text and field are displayed'
         for(count=0; count<numberOfTrials; count++) {
@@ -137,10 +127,18 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        and: 'Create new database that returns'
-        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        and: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Site Per Host'
@@ -160,10 +158,7 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Choose the database with index 1'
         openDatabase()
         chooseDatabase(indexOfLocal, "local")
-        then: ''
-        println()
-
-        when: 'Click delete for the required database'
+        and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
@@ -197,19 +192,26 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        and: 'Create new database that returns'
-        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        and: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
-        when: 'Provide Value for Site Per Host'
+        when: 'Provide Value for K-Safety'
         overview.ksafetyField.value("1")
         overview.ksafetyText.click()
-        report "new"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in K-Safety has changed'
         if(overview.ksafetyField.value() == "1") {
             println("Test Pass: The change is displayed")
         }
@@ -221,10 +223,7 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Choose the database with index 1'
         openDatabase()
         chooseDatabase(indexOfLocal, "local")
-        then: ''
-        println()
-
-        when: 'Click delete for the required database'
+        and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
@@ -259,92 +258,57 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        // Change the checkbox status
-        when: 'Click the Checkbox'
+        when: 'Create a new database'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                overview.partitionDetectionCheckbox.click()
-                overview.partitionDetectionText.click()
-
-                if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-                }
-                else {
-                    println("Test Fail: The required text is not displayed")
-                    assert false
-                }
-
-                if(overview.partitionDetectionStatus.text().equals(initialStatus)) {
-                    println("The status hasn't changed")
-                }
-                else if(!overview.partitionDetectionStatus.text().equals(initialStatus)) {
-                    statusOfTest = true
-                    break
-                }
-                else {
-                    println("Unknown error")
-                }
-            } catch(geb.waiting.WaitTimeoutException exception) {
-                println("Waiting error - Retrying")
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
             }
         }
-        then: 'Check the status of test'
-        if(statusOfTest == true) {
-            println("Test Pass: The change was displayed")
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Get the status of Partition Detection'
+        String statusOfPartitionDetection = overview.partitionDetectionStatus.text()
+        and: 'Provide Value for Partition Detection'
+        overview.partitionDetectionCheckbox.click()
+        overview.partitionDetectionText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Partition Detection has changed'
+        if(statusOfPartitionDetection == "Off" && overview.partitionDetectionStatus.text() == "On") {
+            println("Test Pass: The change is displayed")
+        }
+        else if(statusOfPartitionDetection == "On" && overview.partitionDetectionStatus.text() == "Off") {
+            println("Test Pass: The change is displayed")
         }
         else {
             println("Test Fail: The change isn't displayed")
             assert false
         }
 
-        // Restore the checkbox status
-        when: 'Click the Checkbox'
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                overview.partitionDetectionCheckbox.click()
-                overview.partitionDetectionText.click()
-
-                if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-                }
-                else {
-                    println("Test Fail: The required text is not displayed")
-                    assert false
-                }
-
-                if(!overview.partitionDetectionStatus.text().equals(initialStatus)) {
-                    println("The status hasn't changed")
-                }
-                else if(overview.partitionDetectionStatus.text().equals(initialStatus)) {
-                    statusOfTest = true
-                    break
-                }
-                else {
-                    println("Unknown error")
-                }
-            } catch(geb.waiting.WaitTimeoutException exception) {
-                println("Waiting error - Retrying")
-            }
-        }
-        then: 'Check the status of test'
-        if(statusOfTest == true) {
-            println("Test Pass: The restore was displayed")
-        }
-        else {
-            println("Test Fail: The restore wasn't displayed")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
     def verifySecurity() {
         boolean result = overview.CheckIfSecurityChkExist()
+        println("Test: verifySecurity")
+        when:
         if(result) {
-            println("Test: verifySecurity")
             String initialStatus = overview.securityStatus.text()
             println("Initially " + initialStatus)
 
-            when: 'Verify if text and field are displayed'
             for (count = 0; count < numberOfTrials; count++) {
                 try {
                     if (overview.securityText.text() == security) {
@@ -362,8 +326,6 @@ class ClusterConfigurationTest extends TestBase {
                 }
             }
             overview.securityCheckbox.isDisplayed()
-            then: 'Verify Elements of Security are displayed'
-
             overview.securityText.click()
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -385,8 +347,6 @@ class ClusterConfigurationTest extends TestBase {
                 }
             }
 
-            // Change the checkbox status
-            when: 'Click the Checkbox'
             statusOfTest = false
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -412,7 +372,6 @@ class ClusterConfigurationTest extends TestBase {
                     println("Waiting error - Retrying")
                 }
             }
-            then: 'Check the status of test'
             if (statusOfTest == true) {
                 println("Test Pass: The change is displayed")
             } else {
@@ -420,8 +379,6 @@ class ClusterConfigurationTest extends TestBase {
                 assert false
             }
 
-            // Restore the checkbox status
-            when: 'Click the Checkbox'
             statusOfTest = false
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -446,19 +403,18 @@ class ClusterConfigurationTest extends TestBase {
                     println("Waiting error - Retrying")
                 }
             }
-            then: 'Check the status of test'
             if (statusOfTest == true) {
                 println("Test Pass: The restore is displayed")
             } else {
                 println("Test Fail: The restore isn't displayed")
                 assert false
             }
-            println()
         }
         else {
             println("Security is not enabled.")
-
         }
+        then:
+        println()
     }
 
     def verifyHttpAccess() {
@@ -502,38 +458,32 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        // Change the checkbox status
-        when: 'Click the Checkbox'
-        statusOfTest = false
+        when: 'Create a new database'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                overview.httpAccessCheckbox.click()
-                overview.httpAccessText.click()
-
-                if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-                }
-                else {
-                    println("Test Fail: The required text is not displayed")
-                    assert false
-                }
-
-                if(overview.httpAccessStatus.text().equals(initialStatus)) {
-                    println("The status hasn't changed")
-                }
-                else if(!overview.httpAccessStatus.text().equals(initialStatus)) {
-                    statusOfTest = true
-                    break
-                }
-                else {
-                    println("Unknown error")
-                }
-            } catch(geb.waiting.WaitTimeoutException exception) {
-                println("Waiting error - Retrying")
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
             }
         }
-        then: 'Check the status of test'
-        if(statusOfTest == true) {
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Get the status of Http Access'
+        String statusOfHttpAccess = overview.httpAccessStatus.text()
+        and: 'Provide Value for Http Access'
+        overview.httpAccessCheckbox.click()
+        overview.httpAccessText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Http Access has changed'
+        if(statusOfHttpAccess == "Off" && overview.httpAccessStatus.text() == "On") {
+            println("Test Pass: The change is displayed")
+        }
+        else if(statusOfHttpAccess == "On" && overview.httpAccessStatus.text() == "Off") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -541,43 +491,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        // Restore the checkbox status
-        when: 'Click the Checkbox'
-        statusOfTest = false
-        for(count=0; count<numberOfTrials; count++) {
-            try {
-                overview.httpAccessCheckbox.click()
-                overview.httpAccessText.click()
-                if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-                }
-                else {
-                    println("Test Fail: The required text is not displayed")
-                    assert false
-                }
-
-                if(overview.httpAccessStatus.text().equals(initialStatus)) {
-                    statusOfTest = true
-                    break
-                }
-                else if(!overview.httpAccessStatus.text().equals(initialStatus)) {
-                    println("The status hasn't restored")
-                }
-                else {
-                    println("Unknown error")
-                }
-            } catch(geb.waiting.WaitTimeoutException exception) {
-                println("Waiting error - Retrying")
-            }
-        }
-        then: 'Check the status of test'
-        if(statusOfTest == true) {
-            println("Test Pass: The restore is displayed")
-        }
-        else {
-            println("Test Fail: The restore isn't displayed")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -655,19 +575,55 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Create new database that returns'
-        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
-        when: 'Provide Value for Site Per Host'
-        overview.filePrefixField.value("At_Least")
-        overview.filePrefixText.click()
-        report "hello"
+        when: 'Get the status of Http Access'
+        String statusOfAutoSnapshots = overview.autoSnapshotsStatus.text()
+        and: 'Provide Value for Http Access'
+        overview.autoSnapshotsCheckbox.click()
+        overview.autoSnapshotsText.click()
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in Auto Snapshots has changed'
+        if(statusOfAutoSnapshots == "Off" && overview.autoSnapshotsStatus.text() == "On") {
+            println("Test Pass: The change is displayed")
+        }
+        else if(statusOfAutoSnapshots == "On" && overview.autoSnapshotsStatus.text() == "Off") {
+            println("Test Pass: The change is displayed")
+        }
+        else {
+            println("Test Fail: The change isn't displayed")
+            assert false
+        }
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.autoSnapshotsText.click()
+                waitFor {  overview.filePrefixField.isDisplayed }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+
+            }
+        }
+
+        when: 'Provide Value for File Prefix Field in Auto Snapshot'
+        overview.filePrefixField.value("At_Least")
+        overview.filePrefixText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in File Prefix Field in Auto Snapshot has changed'
         if(overview.filePrefixField.value() == "At_Least") {
             println("Test Pass: The change is displayed")
         }
@@ -679,10 +635,9 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Frequency in Auto Snapshot'
         overview.frequencyField.value("10")
         overview.frequencyText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in Frequency in Auto Snapshot has changed'
         if(overview.frequencyField.value() == "10") {
             println("Test Pass: The change is displayed")
         }
@@ -694,10 +649,9 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Retained in Auto Snapshot'
         overview.retainedField.value("10")
         overview.retainedText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in Retained in Auto Snapshot has changed'
         if(overview.retainedField.value() == "10") {
             println("Test Pass: The change is displayed")
         }
@@ -791,15 +745,42 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Create new database that returns'
-        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
+        when: 'Get the status of Command Logging'
+        String statusOfCommandLogging = overview.commandLoggingStatus.text()
+        and: 'Provide Value for Command Logging'
+        overview.commandLoggingCheckbox.click()
+        overview.commandLoggingText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Command Logging has changed'
+        if(statusOfCommandLogging == "Off" && overview.commandLoggingStatus.text() == "On") {
+            println("Test Pass: The change is displayed")
+        }
+        else if(statusOfCommandLogging == "On" && overview.commandLoggingStatus.text() == "Off") {
+            println("Test Pass: The change is displayed")
+        }
+        else {
+            println("Test Fail: The change isn't displayed")
+            assert false
+        }
+
         when: 'Provide Value for Log Frequency Time in Command Logging'
+        overview.commandLoggingText.click()
         overview.logFrequencyTimeField.value("10")
         overview.logFrequencyTimeText.click()
-        report "hello"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Log Frequency Time in Command Logging has changed'
@@ -811,13 +792,12 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Provide Value for Frequency in Auto Snapshot'
+        when: 'Provide Value for Log Frequency Transactions in Command Logging'
         overview.logFrequencyTransactionsField.value("10")
         overview.logFrequencyTransactionsText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in Log Frequency Transactions in Command Logging has changed'
         if(overview.logFrequencyTransactionsField.value() == "10") {
             println("Test Pass: The change is displayed")
         }
@@ -826,13 +806,12 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Provide Value for Log Segment Size in Auto Snapshot'
+        when: 'Provide Value for Log Segment Size in Command Logging'
         overview.logSegmentSizeField.value("10")
         overview.logSegmentSizeText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Log Segment Size has changed'
+        then: 'Check if Value in Log Segment Size in Command Logging has changed'
         if(overview.logSegmentSizeField.value() == "10") {
             println("Test Pass: The change is displayed")
         }
@@ -907,7 +886,6 @@ class ClusterConfigurationTest extends TestBase {
 
     def verifyAdvanced() {
         println("Test: verifyAdvanced")
-        String oldVariableMaxJavaHeap           = overview.maxJavaHeapField.value()
         String oldVariableHeartbeatTimeout      = overview.heartbeatTimeoutField.value()
         String oldVariableQueryTimeout          = overview.queryTimeoutField.value()
         String oldVariableMaxTempTableMemory    = overview.maxTempTableMemoryField.value()
@@ -938,8 +916,7 @@ class ClusterConfigurationTest extends TestBase {
         overview.advancedText.click()
         for(count=0; count<numberOfTrials; count++) {
             try {
-                if(overview.maxJavaHeapText.text() == maxJavaHeap &&
-                        overview.heartbeatTimeoutText.text() == heartbeatTimeout &&
+                if(overview.heartbeatTimeoutText.text() == heartbeatTimeout &&
                         overview.queryTimeoutText.text() == queryTimeout &&
                         overview.maxTempTableMemoryText.text() == maxTempTableMemory &&
                         overview.snapshotPriorityText.text() == snapshotPriority &&
@@ -947,27 +924,23 @@ class ClusterConfigurationTest extends TestBase {
                     println("Test Pass: The text contents are present")
                     break
                 }
-                else if(overview.maxJavaHeapText.text() != maxJavaHeap) {
-                    println("Test Fail: The text of Max Java Heap has error")
-                    assert false
-                }
-                else if(overview.maxJavaHeapText.text() != heartbeatTimeout) {
+                else if(overview.heartbeatTimeoutText.text() != heartbeatTimeout) {
                     println("Test Fail: The text of Heartbeat Timeout has error")
                     assert false
                 }
-                else if(overview.maxJavaHeapText.text() != queryTimeout) {
+                else if(overview.queryTimeoutText.text() != queryTimeout) {
                     println("Test Fail: The text of Max Query Timeout has error")
                     assert false
                 }
-                else if(overview.maxJavaHeapText.text() != maxTempTableMemory) {
+                else if(overview.maxTempTableMemoryText.text() != maxTempTableMemory) {
                     println("Test Fail: The text of Max Temp Table has error")
                     assert false
                 }
-                else if(overview.maxJavaHeapText.text() != snapshotPriority) {
+                else if(overview.snapshotPriorityText.text() != snapshotPriority) {
                     println("Test Fail: The text of Snapshot Priority has error")
                     assert false
                 }
-                else if(overview.maxJavaHeapText.text() != memoryLimit) {
+                else if(overview.memoryLimitText.text() != memoryLimit) {
                     println("Test Fail: The text of memory Limit has error")
                     assert false
                 }
@@ -982,8 +955,7 @@ class ClusterConfigurationTest extends TestBase {
         then: 'Check the contents'
         for(count=0; count<numberOfTrials; count++) {
             try {
-                if( overview.maxJavaHeapField.isDisplayed() &&
-                        overview.heartbeatTimeoutField.isDisplayed() &&
+                if( overview.heartbeatTimeoutField.isDisplayed() &&
                         overview.queryTimeoutField.isDisplayed() &&
                         overview.maxTempTableMemoryField.isDisplayed() &&
                         overview.snapshotPriorityField.isDisplayed() &&
@@ -991,10 +963,6 @@ class ClusterConfigurationTest extends TestBase {
                 ) {
                     println("Test Pass: The text contents are present")
                     break
-                }
-                else if(overview.maxJavaHeapField.isDisplayed()) {
-                    println("Test Fail: The box of Max Java Heap has error")
-                    assert false
                 }
                 else if(overview.heartbeatTimeoutField.isDisplayed()) {
                     println("Test Fail: The box of Heartbeat Timeout has error")
@@ -1026,30 +994,23 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Create new database that returns'
-        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
-        when: 'Provide Value for Max Java Heap in Advanced'
-        overview.maxJavaHeapField.value("10")
-        overview.maxJavaHeapText.click()
-        report "hello"
-        and: 'Check Save Message'
-        checkSaveMessage()
-        then: 'Check if Value in Max Java Heap in Advanced has changed'
-        if(overview.maxJavaHeapField.value() == "10") {
-            println("Test Pass: The change is displayed")
-        }
-        else {
-            println("Test Fail: The change isn't displayed")
-            assert false
-        }
-
         when: 'Provide Value for Heartbeat Timeout in Advanced'
+        overview.heartbeatTimeoutField.value("0")
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Heartbeat Timeout in Advanced has changed'
@@ -1062,9 +1023,9 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Query Timeout in Advanced'
+        overview.queryTimeoutField.value("0")
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Query Timeout in Advanced has changed'
@@ -1077,9 +1038,9 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Max Temp Table Memory in Advanced'
+        overview.maxTempTableMemoryField.value("0")
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
-        report "hello3"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Temp Table Memory in Advanced has changed'
@@ -1092,9 +1053,9 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Snapshot Priority in Advanced'
+        overview.snapshotPriorityField.value("0")
         overview.snapshotPriorityField.value("10")
         overview.snapshotPriorityText.click()
-        report "hello4"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Snapshot Priority in Advanced has changed'
@@ -1107,9 +1068,10 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Memory Limit in Advanced'
+        overview.memoryLimitField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
-        report "hello5"
+
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Memory Limit in Advanced has changed'
@@ -1173,20 +1135,28 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        when: 'Provide the value in field'
-        directories.rootDestinationField.value("something")
-        overview.sitePerHostText.click()
-        directories.rootDestinationField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
 
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
         }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.rootDestinationField.value() == "checkout") {
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Provide Value for Root in Directories'
+        directories.rootDestinationField.value("new_value")
+        directories.rootDestinationText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Root in Directories has changed'
+        if(directories.rootDestinationField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1194,25 +1164,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.rootDestinationField.value(oldVariablesRootDestination)
-        directories.rootDestinationText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.rootDestinationField.value() == oldVariablesRootDestination) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1258,20 +1216,28 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        when: 'Provide the value in field'
-        directories.snapshotField.value("something")
-        overview.sitePerHostText.click()
-        directories.snapshotField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
 
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
         }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.snapshotField.value() == "checkout") {
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Provide Value for Snapshots in Directories'
+        directories.snapshotField.value("new_value")
+        directories.snapshotText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Snapshots has changed'
+        if(directories.snapshotField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1279,25 +1245,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.snapshotField.value(oldVariablesSnapshot)
-        directories.snapshotText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.snapshotField.value() == oldVariablesSnapshot) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1344,47 +1298,41 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.exportOverflowField.value("something")
-        overview.sitePerHostText.click()
-        directories.exportOverflowField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.exportOverflowField.value() == "checkout") {
+        when: 'Provide Value for Export Overflow in Directories'
+        directories.exportOverflowField.value("new_value")
+        directories.exportOverflowText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Export Overflow has changed'
+        if(directories.exportOverflowField.value() == "new_value") {
             println("Test Pass: The change is displayed")
-            report "hello"
         }
         else {
             println("Test Fail: The change isn't displayed")
             assert false
         }
 
-        when: 'Restore old value'
-        directories.exportOverflowField.value(oldVariablesExportOverflow)
-        directories.exportOverflowText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.exportOverflowField.value() == oldVariablesExportOverflow) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1431,20 +1379,27 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.commandLogField.value("something")
-        overview.sitePerHostText.click()
-        directories.commandLogField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.commandLogField.value() == "checkout") {
+        when: 'Provide Value for Command Log Field in Directories'
+        directories.commandLogField.value("new_value")
+        directories.commandLogText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Command Log Field has changed'
+        if(directories.commandLogField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1452,25 +1407,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.commandLogField.value(oldVariablesCommandLog)
-        directories.commandLogText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.commandLogField.value() == oldVariablesCommandLog) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1517,20 +1460,27 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.commandLogSnapshotsField.value("command_log_snapshot")
-        overview.sitePerHostText.click()
-        directories.commandLogSnapshotsField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                deleteDatabase(create_DatabaseTest_File)
+            }
+        }
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.commandLogSnapshotsField.value() == "checkout") {
+        when: 'Provide Value for Command Log Snapshots in Directories'
+        directories.commandLogSnapshotsField.value("new_value")
+        directories.commandLogSnapshotsText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Command Log Snapshots has changed'
+        if(directories.commandLogSnapshotsField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1538,25 +1488,217 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.commandLogSnapshotsField.value(oldVariablesCommandLogSnapshots)
-        directories.commandLogSnapshotsText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
+        println()
+    }
+
+    def verifyCreateEditAndDeleteSecurityUsers() {
+        String username     = "usename"
+        String password     = "password"
+        String role         = "role"
+
+        when: 'Expand Security if not already expanded'
+        overview.expandSecurity()
+        then: 'Open the Add User Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.addSecurityButton.click()
+                waitFor { overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide Value For User'
+        overview.provideValueForUser(username, password, role)
+        and: 'Save the User'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        username    = "username_edited"
+        password    = "password_edited"
+        role        = "user_edited"
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'Provide value for Edit Popup'
+        overview.provideValueForUser(username, password, role)
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username and Role text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: "Delete the User"
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.deleteUserButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+
+        when: "Check Save Message"
+        checkSaveMessage()
+        try {
+            waitFor { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
 
         }
+        then: "Check No Security Available Text"
+        waitFor { overview.noSecurityAvailable.isDisplayed() }
+        waitFor { overview.noSecurityAvailable.text().equals("No security available.") }
+    }
+
+    def cleanup() { // called after each test
+        count = 0
+
+        while (count < numberOfTrials) {
+            count++
+            try {
+                setup: 'Open Cluster Settings page'
+                to ClusterSettingsPage
+                expect: 'to be on Cluster Settings page'
+                at ClusterSettingsPage
+
+                break
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
+
+        String databaseName = nameOfDatabaseInCSV(create_DatabaseTest_File)
+        int numberOfDatabases =  $('.btnDbList').size()
+        buttonDatabase.click()
+        int indexOfDatabaseToDelete = returnTheDatabaseIndexToDelete(numberOfDatabases, databaseName)
+        if(indexOfDatabaseToDelete==0) {
+            println("Cleanup: Database wasn't found")
+        }
         else {
-            println("Test Fail: The required text is not displayed")
-            assert false
+            try {
+                waitFor { buttonDatabase.isDisplayed() }
+            }
+            catch(geb.waiting.WaitTimeoutException exception) {
+                openDatabase()
+            }
+
+            chooseDatabase(indexOfLocal, "local")
+            openDatabase()
+
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    $(returnCssPathOfDatabaseDelete(indexOfDatabaseToDelete)).click()
+                    waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+
+                }
+            }
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    popupDeleteDatabaseButtonOk.click()
+                    if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+                        println("Cleanup: Database was deleted")
+                    }
+                } catch(Exception e) {
+
+                }
+            }
+            println()
         }
-        then: 'Check if the old value is restored'
-        if(directories.commandLogSnapshotsField.value() == oldVariablesCommandLogSnapshots) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
-        println()
     }
 }

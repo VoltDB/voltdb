@@ -68,7 +68,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     private final String m_username;
     private final byte m_passwordHash[];
-    private final ClientAuthHashScheme m_hashScheme;
+    private final ClientAuthScheme m_hashScheme;
 
     /**
      * These threads belong to the network thread pool
@@ -106,7 +106,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
-            username = config.m_subject.getPrincipals().iterator().next().getName();
+            username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
 
@@ -568,6 +568,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         if (m_reconnectStatusListener != null) {
             m_distributer.removeClientStatusListener(m_reconnectStatusListener);
+            m_reconnectStatusListener.close();
         }
 
         m_distributer.shutdown();
@@ -596,6 +597,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 if (m_backpressure) {
                     while (m_backpressure && !m_isShutdown) {
                        if (start != 0) {
+                           if (timeoutNanos <= 0) {
+                               // timeout nano value is negative or zero, indicating it timed out.
+                               return true;
+                           }
+
                             //Wait on the condition for the specified timeout remaining
                             m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
 

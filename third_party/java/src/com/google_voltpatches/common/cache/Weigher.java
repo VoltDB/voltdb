@@ -14,7 +14,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 
 /**
@@ -23,7 +22,6 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
  * @author Charles Fry
  * @since 11.0
  */
-@Beta
 @GwtCompatible
 public interface Weigher<K, V> {
 

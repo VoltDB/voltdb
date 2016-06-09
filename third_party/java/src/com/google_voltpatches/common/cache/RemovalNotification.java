@@ -18,7 +18,6 @@ package com.google_voltpatches.common.cache;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
 
@@ -37,14 +36,25 @@ import javax.annotation_voltpatches.Nullable;
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 @GwtCompatible
 public final class RemovalNotification<K, V> implements Entry<K, V> {
   @Nullable private final K key;
   @Nullable private final V value;
   private final RemovalCause cause;
 
-  RemovalNotification(@Nullable K key, @Nullable V value, RemovalCause cause) {
+  /**
+   * Creates a new {@code RemovalNotification} for the given {@code key}/{@code value} pair, with
+   * the given {@code cause} for the removal. The {@code key} and/or {@code value} may be
+   * {@code null} if they were already garbage collected.
+   *
+   * @since 19.0
+   */
+  public static <K, V> RemovalNotification<K, V> create(
+      @Nullable K key, @Nullable V value, RemovalCause cause) {
+    return new RemovalNotification(key, value, cause);
+  }
+
+  private RemovalNotification(@Nullable K key, @Nullable V value, RemovalCause cause) {
     this.key = key;
     this.value = value;
     this.cause = checkNotNull(cause);

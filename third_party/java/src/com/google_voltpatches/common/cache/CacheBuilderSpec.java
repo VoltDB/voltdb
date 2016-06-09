@@ -18,7 +18,6 @@ package com.google_voltpatches.common.cache;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Objects;
@@ -28,6 +27,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation_voltpatches.Nullable;
@@ -79,7 +79,6 @@ import javax.annotation_voltpatches.Nullable;
  * @author Adam Winer
  * @since 12.0
  */
-@Beta
 public final class CacheBuilderSpec {
   /** Parses a single value. */
   private interface ValueParser {
@@ -295,7 +294,7 @@ public final class CacheBuilderSpec {
         parseInteger(spec, Integer.parseInt(value));
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(
-            String.format("key %s value set to %s, must be integer", key, value), e);
+            format("key %s value set to %s, must be integer", key, value), e);
       }
     }
   }
@@ -311,7 +310,7 @@ public final class CacheBuilderSpec {
         parseLong(spec, Long.parseLong(value));
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(
-            String.format("key %s value set to %s, must be integer", key, value), e);
+            format("key %s value set to %s, must be integer", key, value), e);
       }
     }
   }
@@ -433,7 +432,7 @@ public final class CacheBuilderSpec {
             break;
           default:
             throw new IllegalArgumentException(
-                String.format("key %s invalid format.  was %s, must end with one of [dDhHmMsS]",
+                format("key %s invalid format.  was %s, must end with one of [dDhHmMsS]",
                     key, value));
         }
 
@@ -441,7 +440,7 @@ public final class CacheBuilderSpec {
         parseDuration(spec, duration, timeUnit);
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(
-            String.format("key %s value set to %s, must be integer", key, value));
+            format("key %s value set to %s, must be integer", key, value));
       }
     }
   }
@@ -471,5 +470,9 @@ public final class CacheBuilderSpec {
       spec.refreshDuration = duration;
       spec.refreshTimeUnit = unit;
     }
+  }
+
+  private static String format(String format, Object... args) {
+    return String.format(Locale.ROOT, format, args);
   }
 }

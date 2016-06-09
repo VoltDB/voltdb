@@ -39,8 +39,8 @@ import javax.servlet.http.HttpServletResponse;
 import junit.framework.TestCase;
 
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
@@ -145,7 +145,7 @@ public class HTTPDBenchmark extends TestCase {
     void runJettyBenchmark(int port, int iterations, int clientCount, int delay, int responseSize) throws Exception {
         System.gc();
         Server s = new Server();
-        SelectChannelConnector connector = new SelectChannelConnector();
+        ServerConnector connector = new ServerConnector(s);
         connector.setPort(port);
         s.addConnector(connector);
 

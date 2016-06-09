@@ -48,7 +48,7 @@ function clean() {
 
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH *.java
+    javac -classpath $APPCLASSPATH *.java
     # build procedure and client jars
     jar cf $APPNAME.jar *.class
     # remove compiled .class files

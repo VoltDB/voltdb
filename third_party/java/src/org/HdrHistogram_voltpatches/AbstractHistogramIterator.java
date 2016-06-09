@@ -1,5 +1,4 @@
 /**
- * AbstractHistogramIterator.java
  * Written by Gil Tene of Azul Systems, and released to the public domain,
  * as explained at http://creativecommons.org/publicdomain/zero/1.0/
  *
@@ -7,8 +6,6 @@
  */
 
 package org.HdrHistogram_voltpatches;
-
-import static org.HdrHistogram_voltpatches.AbstractHistogram.valueFromIndex;
 
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
@@ -20,12 +17,9 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
     AbstractHistogram histogram;
     long savedHistogramTotalRawCount;
 
-    int currentBucketIndex;
-    int currentSubBucketIndex;
+    int currentIndex;
     long currentValueAtIndex;
 
-    int nextBucketIndex;
-    int nextSubBucketIndex;
     long nextValueAtIndex;
 
     long prevValueIteratedTo;
@@ -38,26 +32,24 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
     long countAtThisValue;
 
     private boolean freshSubBucket;
-    HistogramIterationValue currentIterationValue;
+    final HistogramIterationValue currentIterationValue = new HistogramIterationValue();
+
+    private double integerToDoubleValueConversionRatio;
 
     void resetIterator(final AbstractHistogram histogram) {
         this.histogram = histogram;
         this.savedHistogramTotalRawCount = histogram.getTotalCount();
         this.arrayTotalCount = histogram.getTotalCount();
-        this.currentBucketIndex = 0;
-        this.currentSubBucketIndex = 0;
+        this.integerToDoubleValueConversionRatio = histogram.getIntegerToDoubleValueConversionRatio();
+        this.currentIndex = 0;
         this.currentValueAtIndex = 0;
-        this.nextBucketIndex = 0;
-        this.nextSubBucketIndex = 1;
-        this.nextValueAtIndex = 1;
+        this.nextValueAtIndex = 1 << histogram.unitMagnitude;
         this.prevValueIteratedTo = 0;
         this.totalCountToPrevIndex = 0;
         this.totalCountToCurrentIndex = 0;
         this.totalValueToCurrentIndex = 0;
         this.countAtThisValue = 0;
         this.freshSubBucket = true;
-        if (this.currentIterationValue == null)
-            this.currentIterationValue = new HistogramIterationValue();
         currentIterationValue.reset();
     }
 
@@ -67,6 +59,7 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
      *
      * @return true if the iterator has more elements.
      */
+    @Override
     public boolean hasNext() {
         if (histogram.getTotalCount() != savedHistogramTotalRawCount) {
             throw new ConcurrentModificationException();
@@ -79,13 +72,14 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
      *
      * @return the {@link HistogramIterationValue} associated with the next element in the iteration.
      */
+    @Override
     public HistogramIterationValue next() {
-        // Move through the sub buckets and buckets until we hit the next  reporting level:
+        // Move through the sub buckets and buckets until we hit the next reporting level:
         while (!exhaustedSubBuckets()) {
-            countAtThisValue = histogram.getCountAt(currentBucketIndex, currentSubBucketIndex);
+            countAtThisValue = histogram.getCountAtIndex(currentIndex);
             if (freshSubBucket) { // Don't add unless we've incremented since last bucket...
                 totalCountToCurrentIndex += countAtThisValue;
-                totalValueToCurrentIndex += countAtThisValue * histogram.medianEquivalentValue(currentValueAtIndex);
+                totalValueToCurrentIndex += countAtThisValue * histogram.highestEquivalentValue(currentValueAtIndex);
                 freshSubBucket = false;
             }
             if (reachedIterationLevel()) {
@@ -93,10 +87,10 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
                 currentIterationValue.set(valueIteratedTo, prevValueIteratedTo, countAtThisValue,
                         (totalCountToCurrentIndex - totalCountToPrevIndex), totalCountToCurrentIndex,
                         totalValueToCurrentIndex, ((100.0 * totalCountToCurrentIndex) / arrayTotalCount),
-                        getPercentileIteratedTo());
+                        getPercentileIteratedTo(), integerToDoubleValueConversionRatio);
                 prevValueIteratedTo = valueIteratedTo;
                 totalCountToPrevIndex = totalCountToCurrentIndex;
-                // move the next percentile reporting level forward:
+                // move the next iteration level forward:
                 incrementIterationLevel();
                 if (histogram.getTotalCount() != savedHistogramTotalRawCount) {
                     throw new ConcurrentModificationException();
@@ -112,6 +106,7 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
     /**
      * Not supported. Will throw an {@link UnsupportedOperationException}.
      */
+    @Override
     public void remove() {
         throw new UnsupportedOperationException();
     }
@@ -133,21 +128,15 @@ abstract class AbstractHistogramIterator implements Iterator<HistogramIterationV
     }
 
     private boolean exhaustedSubBuckets() {
-        return (currentBucketIndex >= histogram.bucketCount);
+        return (currentIndex >= histogram.countsArrayLength);
     }
 
     void incrementSubBucket() {
         freshSubBucket = true;
         // Take on the next index:
-        currentBucketIndex = nextBucketIndex;
-        currentSubBucketIndex = nextSubBucketIndex;
-        currentValueAtIndex = nextValueAtIndex;
-        // Figure out the next next index:
-        nextSubBucketIndex++;
-        if (nextSubBucketIndex >= histogram.subBucketCount) {
-            nextSubBucketIndex = histogram.subBucketHalfCount;
-            nextBucketIndex++;
-        }
-        nextValueAtIndex = valueFromIndex(nextBucketIndex, nextSubBucketIndex, histogram.unitMagnitude);
+        currentIndex++;
+        currentValueAtIndex = histogram.valueFromIndex(currentIndex);
+        // Figure out the value at the next index (used by some iterators):
+        nextValueAtIndex = histogram.valueFromIndex(currentIndex + 1);
     }
 }

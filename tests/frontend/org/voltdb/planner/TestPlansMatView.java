@@ -240,17 +240,10 @@ public class TestPlansMatView extends PlannerTestCase {
                     ));
         }
 
-        try {
-            pns = compileToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
-            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
-            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
-            fail("unexpected success for partitioned view query with subquery.");
-        }
-        catch (PlanningErrorException pex) {
-            assertTrue(pex.getMessage().contains(
-                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
-                    ));
-        }
+        pns = compileToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
+        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+        assertEquals(2, pns.size());
+        //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
 
         try {
             pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");

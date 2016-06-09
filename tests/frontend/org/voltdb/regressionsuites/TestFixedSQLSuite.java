@@ -693,6 +693,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9032();
         subTestENG9389();
         subTestENG9533();
+        subTestENG9796();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -2376,17 +2377,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    private void nullIndexSearchKeyChecker(Client client, String sql) throws IOException, ProcCallException {
+    private void nullIndexSearchKeyChecker(Client client, String sql, String tbleName, String columnName) throws IOException, ProcCallException {
         VoltTable vt;
         vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
 
-        String sql1 = sql.replace("SELECT ID", "SELECT COUNT(ID)");
-        assertTrue(sql1.contains("SELECT COUNT(ID) FROM"));
+
+        String sql1;
+        // We replace a select list element with its count.
+        // if tbleName == null,
+        //   Replace "SELECT $columnName" with "SELECT COUNT($columnName)"
+        // else
+        //   Replace "SELECT $tbleName.$columnName" with "SELECT COUNT($tableName.$columnName)"
+        //
+        // Of course, we can't use $tbleName and $columnName, so we need to
+        // do some hacking with strings.
+        //
+        String pattern = ((tbleName == null) ? "" : (tbleName + ".")) + columnName;
+        String selectListElement = "SELECT " + pattern;
+        String repl = "SELECT COUNT(" + pattern + ")";
+        sql1 = sql.replace(selectListElement, repl);
+        assertTrue(sql1.contains(repl + " FROM"));
         vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{0});
-
-        String sql2 = sql.replace("SELECT ID", "SELECT COUNT(*)");
+        String sql2 = sql.replace(selectListElement, "SELECT COUNT(*)");
         assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
         vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{0});
@@ -2417,67 +2431,67 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
             // activate # of searchkey is 1
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // activate # of searchkey is 2
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // post predicate
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
 
             // nest loop index join
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
 
             if (tb != "R4") {
                 vt = client.callProcedure("@Explain", sql, null).getResults()[0];
                 assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
                 assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
             }
-            nullIndexSearchKeyChecker(client, sql);
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
 
-            sql = "SELECT ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
-            nullIndexSearchKeyChecker(client, sql);
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
         }
 
         truncateTables(client, tables);
@@ -2599,6 +2613,50 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 {1, 5},
                 {2, 10}
         });
+    }
+
+    private void subTestENG9796() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        // In this bug, result tables that had duplicate column names
+        // (not possible for a persistent DB table, but is possible
+        // for the output of a join or a subquery), produced wrong
+        // answers.
+
+        //                                id, desc,  num, ratio
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("r1.Insert", 11, "bar", 20,  99.0);
+        client.callProcedure("r2.Insert", 12, "baz", 20,  111.0);
+
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id as zzz, num as zzz from p1) as derived")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{10, 20}}, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "select * from (select id  * 5 as zzz, num * 10 as zzz from p1) as derived")
+                .getResults()[0];
+        assertContentOfTable(new Object[][] {{50, 200}}, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "select S1.* "
+                + "from (R1 join R2 using(num)) as S1,"
+                + "     (R1 join R2 using(num)) as S2")
+                .getResults()[0];
+        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{20, 11, "bar", 99.0, 12, "baz", 111.0}}, vt);
+
+        vt = client.callProcedure("@AdHoc",
+                "select * "
+                + "from (R1 join R2 using(num)) as S1,"
+                + "     (R1 join R2 using(num)) as S2")
+                .getResults()[0];
+        System.out.println(vt);
+        assertContentOfTable(new Object[][] {{
+            20, 11, "bar", 99.0, 12, "baz", 111.0,
+            20, 11, "bar", 99.0, 12, "baz", 111.0
+            }}, vt);
     }
 
     //

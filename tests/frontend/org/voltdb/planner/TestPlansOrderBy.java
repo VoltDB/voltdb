@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -295,7 +294,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         // DISTINCT
         failToCompile("select DISTINCT T.T_D0 from T order by T.T_D1;", "invalid ORDER BY expression");
         // GROUP BY
-        failToCompile("select T.T_D0, count(*) from T group by T.T_D0 order by T.T_D1;", "invalid ORDER BY expression");
+        failToCompile("select T.T_D0, count(*) from T group by T.T_D0 order by T.T_D1;",
+                "expression not in aggregate or GROUP BY columns: ORDER BY ");
 
         // Very edge case:
         // Order by GROUP BY columns or expressions which are not in display list
@@ -514,7 +514,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // the subquery post-processing still keeps it.
             failToCompile(
                     "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;",
-                    "Join of multiple partitioned tables has insufficient join criteria.");
+                    "This query is not plannable.  It has a subquery which needs cross-partition access.");
+
         }
         {
             // The subquery with partition column (P_D0) in the GROUP BY columns.
@@ -781,7 +782,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         int idx = 0;
         List<AbstractExpression> sesTves = new ArrayList<>();
         for (AbstractExpression se : ses) {
-            sesTves.addAll(ExpressionUtil.findAllExpressionsOfClass(se, TupleValueExpression.class));
+            sesTves.addAll(se.findAllTupleValueSubexpressions());
         }
         assertEquals(sortColumnIdx.length, sesTves.size());
         for (AbstractExpression seTve : sesTves) {

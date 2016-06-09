@@ -81,11 +81,11 @@ public class TestGeographyPointValue extends RegressionSuite {
         assertTrue(vt.advanceRow());
         long id = vt.getLong(0);
         assertEquals(1, id);
-        GeographyPointValue ptByIndex = vt.getPoint(1);
+        GeographyPointValue ptByIndex = vt.getGeographyPointValue(1);
         assertTrue(vt.wasNull());
         assertNull(ptByIndex);
 
-        GeographyPointValue ptByColumnName = vt.getPoint("pt");
+        GeographyPointValue ptByColumnName = vt.getGeographyPointValue("pt");
         assertTrue(vt.wasNull());
         assertNull(ptByColumnName);
 
@@ -93,7 +93,7 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "select pt from t where pt is null;").getResults()[0];
         assertTrue(vt.advanceRow());
-        ptByIndex = vt.getPoint(0);
+        ptByIndex = vt.getGeographyPointValue(0);
         assert(vt.wasNull());
     }
 
@@ -107,7 +107,7 @@ public class TestGeographyPointValue extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select pointfromtext('point (-71.2767 42.4906)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
-        GeographyPointValue pt = vt.getPoint(0);
+        GeographyPointValue pt = vt.getGeographyPointValue(0);
         assertFalse(vt.wasNull());
         assertEquals(42.4906, pt.getLatitude(), EPSILON);
         assertEquals(-71.2767, pt.getLongitude(), EPSILON);
@@ -215,6 +215,89 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt, EPSILON);
     }
 
+    private void fillTableWithFunnyPoints(Client client) throws Exception {
+        final double lessThanEps = 1e-13; // 1/2 of epsilon
+        final double moreThanEps = 2e-12; // two times epsilon
+
+        int i = 0;
+        client.callProcedure("t.Insert", i++, "point", new GeographyPointValue(10.333, 20.666));
+        client.callProcedure("t.Insert", i++, "closePoint", new GeographyPointValue(10.333 + lessThanEps, 20.666 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "farPoint", new GeographyPointValue(0.0, 10.0));
+        client.callProcedure("t.Insert", i++, "northPole1", new GeographyPointValue( 50.0, 90.0));
+        client.callProcedure("t.Insert", i++, "northPole2", new GeographyPointValue(-70.0, 90.0));
+        client.callProcedure("t.Insert", i++, "northPole3", new GeographyPointValue( 10.0, 90.0 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "northPole4", new GeographyPointValue( 180.0, 90.0 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "northPole5", new GeographyPointValue( -180.0, 90.0 - lessThanEps));
+        client.callProcedure("t.Insert", i++, "notNorthPole", new GeographyPointValue( 10.0, 90.0 - moreThanEps));
+        client.callProcedure("t.Insert", i++, "southPole1", new GeographyPointValue( 50.0, -90.0));
+        client.callProcedure("t.Insert", i++, "southPole2", new GeographyPointValue(-70.0, -90.0));
+        client.callProcedure("t.Insert", i++, "southPole3", new GeographyPointValue( 10.0, -90.0 + lessThanEps));
+        client.callProcedure("t.Insert", i++, "southPole4", new GeographyPointValue( 180.0, -90.0 + lessThanEps));
+        client.callProcedure("t.Insert", i++, "southPole5", new GeographyPointValue( -180.0, -90.0 + lessThanEps));
+        client.callProcedure("t.Insert", i++, "notSouthPole", new GeographyPointValue( 10.0, -90.0 + moreThanEps));
+        client.callProcedure("t.Insert", i++, "onAntimeridianNeg1", new GeographyPointValue(-180.0              , 37.0));
+        client.callProcedure("t.Insert", i++, "onAntimeridianNeg2", new GeographyPointValue(-180.0 + lessThanEps, 37.0));
+        client.callProcedure("t.Insert", i++, "onAntimeridianPos1", new GeographyPointValue( 180.0              , 37.0));
+        client.callProcedure("t.Insert", i++, "onAntimeridianPos2", new GeographyPointValue( 180.0 - lessThanEps, 37.0));
+        client.callProcedure("t.Insert", i++, "notOnIDLNeg", new GeographyPointValue(-180.0 + moreThanEps, 37.0));
+        client.callProcedure("t.Insert", i++, "notOnIDLPos", new GeographyPointValue( 180.0 - moreThanEps, 37.0));
+    }
+
+    // Make sure that points at the poles compare as equal.
+    // Also make sure that longitude 180 and -180 are seen as equal.
+    // Finally, make sure that points within our epsilon are considered equal.
+    public void testFunnyPointComparison() throws Exception {
+        Client client = getClient();
+        fillTableWithFunnyPoints(client);
+
+        VoltTable vt;
+        String query = "select t2.name "
+                + "from t as t1 inner join t as t2 "
+                + "  on t1.pt = t2.pt "
+                + "where t1.name = ? "
+                + "order by t2.pk";
+
+        vt = client.callProcedure("@AdHoc", query, "point").getResults()[0];
+        assertContentOfTable(new Object[][] {
+                {"point"},
+                {"closePoint"}},
+                vt);
+
+        vt = client.callProcedure("@AdHoc", query, "northPole1").getResults()[0];
+        assertContentOfTable(new Object[][] {
+                {"northPole1"},
+                {"northPole2"},
+                {"northPole3"},
+                {"northPole4"},
+                {"northPole5"}},
+                vt);
+
+        vt = client.callProcedure("@AdHoc", query, "southPole1").getResults()[0];
+        assertContentOfTable(new Object[][] {
+                {"southPole1"},
+                {"southPole2"},
+                {"southPole3"},
+                {"southPole4"},
+                {"southPole5"}},
+                vt);
+
+        vt = client.callProcedure("@AdHoc", query, "onAntimeridianNeg1").getResults()[0];
+        assertContentOfTable(new Object[][] {
+                {"onAntimeridianNeg1"},
+                {"onAntimeridianNeg2"},
+                {"onAntimeridianPos1"},
+                {"onAntimeridianPos2"}},
+                vt);
+
+        vt = client.callProcedure("@AdHoc", query, "onAntimeridianPos2").getResults()[0];
+        assertContentOfTable(new Object[][] {
+                {"onAntimeridianNeg1"},
+                {"onAntimeridianNeg2"},
+                {"onAntimeridianPos1"},
+                {"onAntimeridianPos2"}},
+                vt);
+    }
+
     public void testPointGroupBy() throws Exception {
         Client client = getClient();
 
@@ -277,11 +360,11 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         verifyStmtFails(client,
                 "select pk, pt + pt from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data types in combination");
 
         verifyStmtFails(client,
                 "select pk, pt + 1 from t order by pk",
-                "incompatible data type in conversion");
+                "incompatible data types in combination");
     }
 
     public void testPointNotNull() throws Exception {

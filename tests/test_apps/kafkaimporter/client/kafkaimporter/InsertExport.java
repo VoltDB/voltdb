@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package kafkaimporter.client.kafkaimporter;
+package client.kafkaimporter;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;

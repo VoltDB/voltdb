@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,6 +36,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
@@ -87,7 +89,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
     private Runnable m_onMastership;
-    private final ListeningExecutorService m_es;
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
@@ -104,6 +105,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile boolean m_mastershipAccepted = false;
+    private volatile ListeningExecutorService m_executor;
+    private final Integer m_executorLock = new Integer(0);
+    private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
+    private RunnableWithES m_firstAction = null;
 
     /**
      * Create a new data source.
@@ -140,10 +145,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         };
         m_database = db;
         m_tableName = tableName;
-        m_es =
-                CoreUtils.getListeningExecutorService(
-                        "ExportDataSource gen " + m_generation
-                        + " table " + m_tableName + " partition " + partitionId, 1);
 
         String nonce = signature + "_" + partitionId;
 
@@ -195,7 +196,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
-        assert(!adFile.exists());
         byte jsonBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
@@ -206,6 +206,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             JSONObject jsObj = new JSONObject(stringer.toString());
             jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
         } catch (JSONException e) {
+            exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
         }
 
@@ -217,6 +218,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
+
+        // This is not being loaded from file, so activate immediately
+        activate();
     }
 
     public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
@@ -295,7 +299,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
+    }
+
+    public void activate() {
+        setupExecutor();
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
@@ -425,14 +432,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public long sizeInBytes() {
         try {
-            return m_es.submit(new Callable<Long>() {
-                @Override
-                public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
-                }
-            }).get();
+            ListeningExecutorService es = getExecutorService();
+            if (es==null) {
+                return m_committedBuffers.sizeInBytes();
+            }
+            else {
+                return es.submit(new Callable<Long>() {
+                    @Override
+                    public Long call() throws Exception {
+                        return m_committedBuffers.sizeInBytes();
+                    }
+                }).get();
+            }
         } catch (RejectedExecutionException e) {
-                return 0;
+            return 0;
         } catch (Throwable t) {
             Throwables.propagate(t);
             return 0;
@@ -488,16 +501,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             new BBContainer(buffer) {
                                 @Override
                                 public void discard() {
-                                    final ByteBuffer buf = checkDoubleFree();
+                                    checkDoubleFree();
                                     cont.discard();
                                     deleted.set(true);
                                 }
                             }, uso, false));
                 } catch (IOException e) {
-                    exportLog.error(e);
-                    if (!deleted.get()) {
-                        cont.discard();
-                    }
+                    VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
             } else {
                 /*
@@ -516,7 +526,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //to a file. @Quiesce or blocking snapshot will do the sync
                 m_committedBuffers.sync(true);
             } catch (IOException e) {
-                exportLog.error(e);
+                VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
         }
         pollImpl(m_pollFuture);
@@ -532,16 +542,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (InterruptedException e) {
             Throwables.propagate(e);
         }
-        if (m_es.isShutdown()) {
+        ListeningExecutorService es = getExecutorService();
+        assert(es!=null); // tests will fail because we run with assertion enabled
+        if (es==null) {
+            exportLog.error(
+                "Push export buffer called before the generation is active. This push will be ignored");
+            return;
+        }
+
+        if (es.isShutdown()) {
            m_bufferPushPermits.release();
            return;
         }
         try {
-            m_es.execute((new Runnable() {
+            es.execute((new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        if (!m_es.isShutdown()) {
+                        if (!es.isShutdown()) {
                             pushExportBufferImpl(uso, buffer, sync, endOfStream);
                         }
                     } catch (Throwable t) {
@@ -559,17 +577,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> closeAndDelete() {
-        return m_es.submit(new Callable<Object>() {
+        RunnableWithES runnable = new RunnableWithES() {
             @Override
-            public Object call() throws Exception {
+            public void run() {
                 try {
                     m_committedBuffers.closeAndDelete();
-                    return null;
+                } catch(IOException e) {
+                    exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
-                    m_es.shutdown();
+                    getLocalExecutorService().shutdown();
                 }
             }
-        });
+        };
+
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public long getGeneration() {
@@ -577,10 +598,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        if (m_es.isShutdown()) {
-            return Futures.immediateFuture(null);
-        }
-        return m_es.submit((new Runnable() {
+        RunnableWithES runnable = new RunnableWithES() {
             @Override
             public void run() {
                 try {
@@ -598,7 +616,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
                 }
             }
-        }));
+        };
+        //This is a setup task when stashed tasks are run this is run first.
+        return stashOrSubmitTask(runnable, false, true);
     }
 
     private class SyncRunnable implements Runnable {
@@ -618,19 +638,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> sync(final boolean nofsync) {
-        try {
-            return m_es.submit(new SyncRunnable(nofsync));
-        } catch (RejectedExecutionException e) {
-            exportLog.error("Error scheduling export buffer sync", e);
-        }
-        return null;
+        RunnableWithES runnable = new RunnableWithES() {
+            @Override
+            public void run() {
+                new SyncRunnable(nofsync).run();
+            }
+        };
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<?> close() {
         m_closed = true;
         //If we are waiting at this allow to break out when close comes in.
         m_allowAcceptingMastership.release();
-        return m_es.submit((new Runnable() {
+        RunnableWithES runnable = new RunnableWithES() {
             @Override
             public void run() {
                 try {
@@ -638,42 +659,40 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
-                    m_es.shutdown();
+                    getLocalExecutorService().shutdown();
                 }
             }
-        }));
+        };
+
+        return stashOrSubmitTask(runnable, false, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
         final SettableFuture<BBContainer> fut = SettableFuture.create();
-        try {
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        /*
-                         * The poll is blocking through the future, shouldn't
-                         * call poll a second time until a response has been given
-                         * which nulls out the field
-                         */
-                        if (m_pollFuture != null) {
-                            fut.setException(new RuntimeException("Should not poll more than once"));
-                            return;
-                        }
-                        if (!m_es.isShutdown()) {
-                            pollImpl(fut);
-                        }
-                    } catch (Exception e) {
-                        exportLog.error("Exception polling export buffer", e);
-                    } catch (Error e) {
-                        VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
+        RunnableWithES runnable = new RunnableWithES() {
+            @Override
+            public void run() {
+                try {
+                    /*
+                     * The poll is blocking through the future, shouldn't
+                     * call poll a second time until a response has been given
+                     * which nulls out the field
+                     */
+                    if (m_pollFuture != null) {
+                        fut.setException(new RuntimeException("Should not poll more than once"));
+                        return;
                     }
+                    if (!getLocalExecutorService().isShutdown()) {
+                        pollImpl(fut);
+                    }
+                } catch (Exception e) {
+                    exportLog.error("Exception polling export buffer", e);
+                } catch (Error e) {
+                    VoltDB.crashLocalVoltDB("Error polling export buffer", true, e);
                 }
-            });
-        } catch (RejectedExecutionException e) {
-            //Don't expect this to happen outside of test, but in test it's harmless
-            exportLog.info("Polling from export data source rejected, this should be harmless");
-        }
+            }
+        };
+        stashOrSubmitTask(runnable, true, false);
         return fut;
     }
 
@@ -761,32 +780,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void discard() {
             checkDoubleFree();
-            try {
-                m_es.execute(new Runnable() {
-                    @Override
-                    public void run() {
+            RunnableWithES runnable = new RunnableWithES() {
+                @Override
+                public void run() {
+                    try {
+                        m_backingCont.discard();
                         try {
-                            m_backingCont.discard();
-                            try {
-                                if (!m_es.isShutdown()) {
-                                    ackImpl(m_uso);
-                                }
-                            } finally {
-                                forwardAckToOtherReplicas(m_uso);
+                            if (!getLocalExecutorService().isShutdown()) {
+                                ackImpl(m_uso);
                             }
-                        } catch (Exception e) {
-                            exportLog.error("Error acking export buffer", e);
-                        } catch (Error e) {
-                            VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
+                        } finally {
+                            forwardAckToOtherReplicas(m_uso);
                         }
+                    } catch (Exception e) {
+                        exportLog.error("Error acking export buffer", e);
+                    } catch (Error e) {
+                        VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
                     }
-                });
-            } catch (RejectedExecutionException e) {
-                //Don't expect this to happen outside of test, but in test it's harmless
-                exportLog.info("Acking export data task rejected, this should be harmless");
-                //With the executor service stopped, it is safe to discard the backing container
-                m_backingCont.discard();
-            }
+                }
+            };
+            stashOrSubmitTask(runnable, true, false);
         }
     }
 
@@ -833,11 +846,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         //In replicated only master will be doing this.
-        m_es.execute(new Runnable() {
+        RunnableWithES runnable = new RunnableWithES() {
             @Override
             public void run() {
                 try {
-                    if (!m_es.isShutdown()) {
+                    if (!getLocalExecutorService().isShutdown()) {
                        ackImpl(uso);
                     }
                 } catch (Exception e) {
@@ -846,7 +859,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     VoltDB.crashLocalVoltDB("Error acking export buffer", true, e);
                 }
             }
-        });
+        };
+
+        stashOrSubmitTask(runnable, true, false);
     }
 
      private void ackImpl(long uso) {
@@ -864,6 +879,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+        } else {
+            exportLog.info("Ack with 0 for source ");
         }
     }
 
@@ -894,12 +911,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
             return;
         }
+        exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
         m_mastershipAccepted = true;
-        m_es.execute(new Runnable() {
+        RunnableWithES runnable = new RunnableWithES() {
             @Override
             public void run() {
                 try {
-                    if (!m_es.isShutdown() || !m_closed) {
+                    if (!getLocalExecutorService().isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();
                     }
@@ -907,7 +925,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     exportLog.error("Error in accepting mastership", e);
                 }
             }
-        });
+        };
+        stashOrSubmitTask(runnable, true, false);
     }
 
     /**
@@ -928,7 +947,82 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_runEveryWhere = runEveryWhere;
     }
 
+    private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, final boolean callExecute, final boolean setupTask) {
+        if (m_executor==null) {
+            synchronized (m_executorLock) {
+                if (m_executor==null) {
+                    // Bound the queue. It shouldn't get to this high value.
+                    // Log an error so that we know if it does get to the high value.
+                    if (m_queuedActions.size() > 50) {
+                        exportLog.error("Queue for export source for generation " + m_generation +
+                                " is going beyond 50. Not queueing anymore events");
+                        return Futures.immediateFuture(null);
+                    }
+                    if (setupTask) {
+                        m_firstAction = runnable;
+                    } else {
+                        m_queuedActions.add(runnable);
+                    }
+                    return Futures.immediateFuture(null);
+                }
+            }
+        }
+
+        // If we got here executor is not null and this generation is active
+        runnable.setExecutorService(m_executor);
+
+        if (m_executor.isShutdown()) {
+            return Futures.immediateFuture(null);
+        }
+        if (callExecute) {
+            m_executor.execute(runnable);
+            return Futures.immediateFuture(null);
+        } else {
+            return m_executor.submit(runnable);
+        }
+    }
+
+    public void setupExecutor() {
+        if (m_executor!=null) {
+            return;
+        }
+
+        synchronized(m_executorLock) {
+            if (m_executor==null) {
+                ListeningExecutorService es = CoreUtils.getListeningExecutorService(
+                            "ExportDataSource gen " + m_generation
+                            + " table " + m_tableName + " partition " + m_partitionId, 1);
+                //If we have a truncate task do that first.
+                if (m_firstAction != null) {
+                    exportLog.info("Submitting truncate task for ExportDataSource gen " + m_generation
+                            + " table " + m_tableName + " partition " + m_partitionId);
+                    es.submit(m_firstAction);
+                }
+                if (m_queuedActions.size()>0) {
+                    for (RunnableWithES queuedR : m_queuedActions) {
+                        queuedR.setExecutorService(es);
+                        es.submit(queuedR);
+                    }
+                    m_queuedActions.clear();
+                }
+                m_executor = es;
+            }
+        }
+    }
+
     public ListeningExecutorService getExecutorService() {
-        return m_es;
+        return m_executor;
+    }
+
+    private abstract class RunnableWithES implements Runnable {
+        private ListeningExecutorService m_executorService;
+
+        public void setExecutorService(ListeningExecutorService executorService) {
+            m_executorService = executorService;
+        }
+
+        public ListeningExecutorService getLocalExecutorService() {
+            return m_executorService;
+        }
     }
 }

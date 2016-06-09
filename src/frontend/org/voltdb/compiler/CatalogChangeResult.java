@@ -26,6 +26,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public byte[] catalogBytes;
     public String deploymentString;
     public String encodedDiffCommands;
+    public int diffCommandsLength;
     public String[] tablesThatMustBeEmpty;
     public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
@@ -36,4 +37,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
     public byte[] deploymentHash;
+    public boolean isForReplay;
+    public long replayTxnId;
+    public long replayUniqueId;
 }

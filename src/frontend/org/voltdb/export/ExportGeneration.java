@@ -69,8 +69,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
  * Export data from a single catalog version and database instance.
  *
  */
-public class ExportGeneration {
-
+public class ExportGeneration implements Generation {
     /**
      * Processors also log using this facility.
      */
@@ -88,8 +87,12 @@ public class ExportGeneration {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final HashMap<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
-            = new HashMap<Integer, Map<String, ExportDataSource>>();
+    private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
+            =        new HashMap<Integer, Map<String, ExportDataSource>>();
+    @Override
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        return m_dataSourcesByPartition;
+    }
 
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);

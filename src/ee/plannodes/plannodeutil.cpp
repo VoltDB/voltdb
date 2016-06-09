@@ -67,6 +67,7 @@
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
+#include "plannodes/partitionbynode.h"
 
 #include <sstream>
 
@@ -201,6 +202,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
             ret = new voltdb::MergeReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // PartitionBy
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_PARTITIONBY):
+            ret = new voltdb::PartitionByPlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

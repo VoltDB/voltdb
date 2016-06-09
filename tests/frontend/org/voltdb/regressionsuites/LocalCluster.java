@@ -123,10 +123,13 @@ public class LocalCluster implements VoltServerConfig {
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private String m_voltdbroot = "";
+    private VoltFile m_filePrefix;
 
     private String[] m_versionOverrides = null;
     private String[] m_versionCheckRegexOverrides = null;
     private String[] m_buildStringOverrides = null;
+
+    private String[] m_modeOverrides = null;
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -135,6 +138,7 @@ public class LocalCluster implements VoltServerConfig {
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
     private String m_prefix = null;
+    private boolean m_isPaused = false;
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -314,7 +318,8 @@ public class LocalCluster implements VoltServerConfig {
             buildDir(buildDir).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j);
+            log4j(log4j).
+            setForceVoltdbCreate(true);
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
@@ -323,6 +328,9 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
+    public void setToStartPaused() {
+       m_isPaused = true;
+    }
     /**
      * Override the Valgrind backend with a JNI backend.
      * Called after a constructor but before startup.
@@ -411,10 +419,18 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
+    public void setForceVoltdbCreate(boolean newVoltdb) {
+        templateCmdLine.setForceVoltdbCreate(newVoltdb);
+    }
+
     public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {
         templateCmdLine.pathToDeployment(pathToDeployment);
         m_voltdbroot = pathToVoltDBRoot;
         m_compiled = true;
+    }
+
+    public void setFilePrefix(VoltFile filePrefix) {
+        m_filePrefix = filePrefix;
     }
 
     public void setHostCount(int hostCount)
@@ -436,15 +452,18 @@ public class LocalCluster implements VoltServerConfig {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
         try {
-        if (clearLocalDataDirectories) {
+            if (m_filePrefix != null) {
+                subroot = m_filePrefix;
+                m_subRoots.add(subroot);
+            } else if (clearLocalDataDirectories) {
                 subroot = VoltFile.initNewSubrootForThisProcess();
                 m_subRoots.add(subroot);
-        } else {
-            if (m_subRoots.size() <= hostId) {
-                m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+            } else {
+                if (m_subRoots.size() <= hostId) {
+                    m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+                }
+                subroot = m_subRoots.get(hostId);
             }
-            subroot = m_subRoots.get(hostId);
-        }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -487,6 +506,10 @@ public class LocalCluster implements VoltServerConfig {
                 assert(m_buildStringOverrides[hostId] != null);
                 cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
             }
+        }
+        if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+            assert(m_modeOverrides[hostId] != null);
+            cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
         }
 
         // for debug, dump the command line to a unique file.
@@ -563,6 +586,10 @@ public class LocalCluster implements VoltServerConfig {
 
         // set 'replica' option -- known here for the first time.
         templateCmdLine.replicaMode(role);
+        if (m_isPaused) {
+            // Set paused mode
+            templateCmdLine.startPaused();
+        }
 
         // set to true to spew startup timing data
         boolean logtime = false;
@@ -743,7 +770,10 @@ public class LocalCluster implements VoltServerConfig {
             // If local directories are being cleared
             // generate a new subroot, otherwise reuse the existing directory
             File subroot = null;
-            if (clearLocalDataDirectories) {
+            if (m_filePrefix != null) {
+                subroot = m_filePrefix;
+                m_subRoots.add(subroot);
+            } else if (clearLocalDataDirectories) {
                 subroot = VoltFile.getNewSubroot();
                 m_subRoots.add(subroot);
             } else {
@@ -764,6 +794,11 @@ public class LocalCluster implements VoltServerConfig {
                     assert(m_buildStringOverrides[hostId] != null);
                     cmdln.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
                 }
+            }
+
+            if ((m_modeOverrides != null) && (m_modeOverrides.length > hostId)) {
+                assert(m_modeOverrides[hostId] != null);
+                cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
             }
 
             m_cmdLines.add(cmdln);
@@ -911,6 +946,8 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
+            rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
+
             rejoinCmdLn.startCommand(startAction);
             rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
 
@@ -933,6 +970,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            //rejoin can hotfix
             if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
                 assert(m_versionOverrides[hostId] != null);
                 assert(m_versionCheckRegexOverrides[hostId] != null);
@@ -943,6 +981,7 @@ public class LocalCluster implements VoltServerConfig {
                     rejoinCmdLn.m_buildStringOverrideForTest = m_buildStringOverrides[hostId];
                 }
             }
+            //Rejoin does not do paused mode.
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
@@ -1357,6 +1396,12 @@ public class LocalCluster implements VoltServerConfig {
         m_versionCheckRegexOverrides = regexOverrides;
     }
 
+    public void setOverridesForModes(String[] modes) {
+        assert(modes != null);
+
+        m_modeOverrides = modes;
+    }
+
     @Override
     public void setMaxHeap(int heap) {
         templateCmdLine.setMaxHeap(heap);
@@ -1406,6 +1451,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public boolean isValgrind() {
+        System.out.println("----templateCmdLine.m_backend=" + templateCmdLine.m_backend);
         return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
 

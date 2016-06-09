@@ -17,7 +17,7 @@
 
 package org.voltdb.security;
 
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 
 public abstract class AuthenticationRequest {
 
@@ -30,7 +30,7 @@ public abstract class AuthenticationRequest {
      * @return true if authenticated, false if not
      * @throws {@link IllegalStateException} if this request was already made
      */
-    public boolean authenticate(ClientAuthHashScheme scheme) {
+    public boolean authenticate(ClientAuthScheme scheme) {
         if (m_done) throw new IllegalStateException("this authentication request has a result");
         boolean authenticated = false;
         try {
@@ -49,7 +49,7 @@ public abstract class AuthenticationRequest {
      * @return true if authenticated, false if not
      * @throws Exception raised by the provider (if any)
      */
-    protected abstract boolean authenticateImpl(ClientAuthHashScheme scheme) throws Exception;
+    protected abstract boolean authenticateImpl(ClientAuthScheme scheme) throws Exception;
 
     /**
      * if the request is successful it returns the authenticated user name

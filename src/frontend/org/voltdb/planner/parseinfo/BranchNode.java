@@ -25,8 +25,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.types.JoinType;
 
@@ -100,8 +100,10 @@ public class BranchNode extends JoinNode {
 
     @Override
     public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
-        getLeftNode().analyzeJoinExpressions(noneList);
-        getRightNode().analyzeJoinExpressions(noneList);
+        JoinNode leftChild = getLeftNode();
+        JoinNode rightChild = getRightNode();
+        leftChild.analyzeJoinExpressions(noneList);
+        rightChild.analyzeJoinExpressions(noneList);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() == JoinType.LEFT || getJoinType() == JoinType.INNER);
@@ -114,14 +116,12 @@ public class BranchNode extends JoinNode {
         whereList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
 
         // Collect children expressions only if a child is a leaf. They are not classified yet
-        JoinNode leftChild = getLeftNode();
         if ( ! (leftChild instanceof BranchNode)) {
             joinList.addAll(leftChild.m_joinInnerList);
             leftChild.m_joinInnerList.clear();
             whereList.addAll(leftChild.m_whereInnerList);
             leftChild.m_whereInnerList.clear();
         }
-        JoinNode rightChild = getRightNode();
         if ( ! (rightChild instanceof BranchNode)) {
             joinList.addAll(rightChild.m_joinInnerList);
             rightChild.m_joinInnerList.clear();
@@ -176,8 +176,17 @@ public class BranchNode extends JoinNode {
         Iterator<AbstractExpression> iter = noneList.iterator();
         while (iter.hasNext()) {
             AbstractExpression noneExpr = iter.next();
-            // Allow CVE(TRUE/FALSE)
-            if (VoltType.BOOLEAN == noneExpr.getValueType()) {
+            // Allow only CVE(TRUE/FALSE) for now.
+            // Though it does seem strange to be adding a constant TRUE or FALSE
+            // to a list of conjunctions rather than replacing it with an empty
+            // list or a single FALSE element.
+            // TODO: there may be other use cases that can be handled the same way
+            // as CVEs like predicates based on non-correlated subqueries or predicates
+            // based on correlation parameters from parent queries. These would require
+            // additional testing to be enabled here.
+            // TODO: it seems like there are at least some cases that would perform
+            // better with these predicates pushed down to the inner child node.
+            if (noneExpr instanceof ConstantValueExpression) {
                 m_whereInnerOuterList.add(noneExpr);
                 iter.remove();
             }

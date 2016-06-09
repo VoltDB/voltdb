@@ -18,6 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 
 /**
@@ -35,4 +36,6 @@ public interface ImporterConfig
      * @return the unique resource id
      */
     public URI getResourceID();
+
+    public FormatterBuilder getFormatterBuilder();
 }

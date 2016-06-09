@@ -40,6 +40,10 @@ CREATE TABLE bids
 
 CREATE INDEX bids_end ON bids(ts_end);
 
+-- Create a geospatial index on the polygons that model bid regions.
+-- This will acccelerate the key query in GetHighestBidForLocation.
+CREATE INDEX bid_area on bids(region);
+
 -- This table contains one row for each occurence of a
 -- device requesting an ad.  If an ad was served, it
 -- includes the winning bid info, and nulls otherwise.

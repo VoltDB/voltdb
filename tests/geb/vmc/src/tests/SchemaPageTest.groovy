@@ -56,21 +56,21 @@ class SchemaPageTest extends TestBase {
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
         count = 0
-		
-		while(count<numberOfTrials) {
-			count ++
-			try {
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
                 when: 'click the Schema (page) link'
                 page.openSchemaPage()
                 then: 'should be on Schema page'
                 at SchemaPage
-            
-				break
-			} catch (org.openqa.selenium.ElementNotVisibleException e) {
-				println("ElementNotVisibleException: Unable to Start the test")
-				println("Retrying")
-			}
-		}
+
+                break
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
     }
 
     /**
@@ -452,7 +452,7 @@ class SchemaPageTest extends TestBase {
     /**
      * Check that the DDL Source displayed on the DDL Source tab matches the
      * expected list (for the 'genqa' test app).
-     */ 
+     */
     def checkSchemaTab() {
         when: 'click the Schema tab link'
         page.openSchemaPageSchemaTab()
@@ -471,7 +471,7 @@ class SchemaPageTest extends TestBase {
     /**
      * Check that the DDL Source displayed on the DDL Source tab matches the
      * expected list (for the 'genqa' test app).
-     */ 
+     */
     def checkDdlSourceTab() {
         when: 'click the DDL Source tab link'
         page.openSchemaPageDdlSourceTab()
@@ -1009,340 +1009,340 @@ class SchemaPageTest extends TestBase {
 
     // Schema Tab
 
-	def "Schema Tab:Check Ascending Descending in Name"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+    def "Schema Tab:Check Ascending Descending in Name"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.name.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
-		
-		when: 'click name'
-		page.name.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.name.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in Type"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.name.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.type.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in Type"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.type.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		println()
-	}
+        when: 'click name'
+        page.type.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in Partitioning"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.type.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.partitioning.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in Partitioning"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.partitioning.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.partitioning.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in Columns"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.partitioning.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.columns.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in Columns"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.columns.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.columns.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in Indexes"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.columns.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.indexes.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in Indexes"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.indexes.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.indexes.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in PKey"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.indexes.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.pkey.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in PKey"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.pkey.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.pkey.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	def "Schema Tab:Check Ascending Descending in Tuple Limit"() {
-		when: 'go to schema tab'
-		page.openSchemaPageSchemaTab()
-		then: 'at schema tab'
-		at SchemaPageSchemaTab
+        when: 'click name'
+        page.pkey.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-		when: 'click name'
-		page.tuplelimit.click()
-		then: 'check ascending'
-		if (page.ascending.isDisplayed()) {
-			println("Schema Tab:Ascending Success")
-		}
-		else {
-		    println("Schema Tab:Ascending Success")
-		    assert false
-		}
+    def "Schema Tab:Check Ascending Descending in Tuple Limit"() {
+        when: 'go to schema tab'
+        page.openSchemaPageSchemaTab()
+        then: 'at schema tab'
+        at SchemaPageSchemaTab
 
-		when: 'click name'
-		page.tuplelimit.click()
-		then: 'check descending'
-		if(page.descending.isDisplayed()) {
-			println("Schema Tab:Descending Success")
-		}
-		else {
-		    println("Schema Tab:Descending Success")
-		    assert false
-		}
-		println()
-	}
+        when: 'click name'
+        page.tuplelimit.click()
+        then: 'check ascending'
+        if (page.ascending.isDisplayed()) {
+            println("Schema Tab:Ascending Success")
+        }
+        else {
+            println("Schema Tab:Ascending Success")
+            assert false
+        }
 
-	// Procedures and SQLData
+        when: 'click name'
+        page.tuplelimit.click()
+        then: 'check descending'
+        if(page.descending.isDisplayed()) {
+            println("Schema Tab:Descending Success")
+        }
+        else {
+            println("Schema Tab:Descending Success")
+            assert false
+        }
+        println()
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in Procedure Name"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    // Procedures and SQLData
 
-		when: 'click procedure name'
-		page.procedureName.click()
-		then: 'check ascending'
+    def "Procedures And SQL Tab:Check Ascending Descending in Procedure Name"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
+
+        when: 'click procedure name'
+        page.procedureName.click()
+        then: 'check ascending'
         waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.procedureName.click()
-		then: 'check descending'
+        when: 'click procedure name'
+        page.procedureName.click()
+        then: 'check descending'
         waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
 
-		when: 'click procedure name'
-		page.parameters.click()
-		then: 'check ascending'
-		waitFor(waitTime) { page.ascending.isDisplayed() }
+        when: 'click procedure name'
+        page.parameters.click()
+        then: 'check ascending'
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.parameters.click()
-		then: 'check descending'
-		waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+        when: 'click procedure name'
+        page.parameters.click()
+        then: 'check descending'
+        waitFor(waitTime) { page.descending.isDisplayed() }
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
 
-		when: 'click procedure name'
-		page.partitioning.click()
-		then: 'check ascending'
-		waitFor(waitTime) { page.ascending.isDisplayed() }
+        when: 'click procedure name'
+        page.partitioning.click()
+        then: 'check ascending'
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.partitioning.click()
-		then: 'check descending'
-		waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+        when: 'click procedure name'
+        page.partitioning.click()
+        then: 'check descending'
+        waitFor(waitTime) { page.descending.isDisplayed() }
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
 
-		when: 'click procedure name'
-		page.rw.click()
-		then: 'check ascending'
-		waitFor(waitTime) { page.ascending.isDisplayed() }
+        when: 'click procedure name'
+        page.rw.click()
+        then: 'check ascending'
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.rw.click()
-		then: 'check descending'
-		waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+        when: 'click procedure name'
+        page.rw.click()
+        then: 'check descending'
+        waitFor(waitTime) { page.descending.isDisplayed() }
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
 
-		when: 'click procedure name'
-		page.access.click()
-		then: 'check ascending'
-		waitFor(waitTime) { page.ascending.isDisplayed() }
+        when: 'click procedure name'
+        page.access.click()
+        then: 'check ascending'
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.access.click()
-		then: 'check descending'
-		waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+        when: 'click procedure name'
+        page.access.click()
+        then: 'check descending'
+        waitFor(waitTime) { page.descending.isDisplayed() }
+    }
 
-	def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
-		when: 'go to procedures and sql tab'
-		page.openSchemaPageProceduresAndSqlTab()
-		then: 'at procedures and sql tab'
-		at SchemaPageProceduresAndSqlTab
+    def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
+        when: 'go to procedures and sql tab'
+        page.openSchemaPageProceduresAndSqlTab()
+        then: 'at procedures and sql tab'
+        at SchemaPageProceduresAndSqlTab
 
-		when: 'click procedure name'
-		page.attributes.click()
-		then: 'check ascending'
-		waitFor(waitTime) { page.ascending.isDisplayed() }
+        when: 'click procedure name'
+        page.attributes.click()
+        then: 'check ascending'
+        waitFor(waitTime) { page.ascending.isDisplayed() }
 
-		when: 'click procedure name'
-		page.attributes.click()
-		then: 'check descending'
-		waitFor(waitTime) { page.descending.isDisplayed() }
-	}
+        when: 'click procedure name'
+        page.attributes.click()
+        then: 'check descending'
+        waitFor(waitTime) { page.descending.isDisplayed() }
+    }
 
-	// DLL Source
+    // DLL Source
 
-	def "DDL Source Tab:Check Download Button"() {
-		when: 'go to ddl source tab'
-		page.openSchemaPageDdlSourceTab()
-		then: 'at ddl source tab'
-		at SchemaPageDdlSourceTab
+    def "DDL Source Tab:Check Download Button"() {
+        when: 'go to ddl source tab'
+        page.openSchemaPageDdlSourceTab()
+        then: 'at ddl source tab'
+        at SchemaPageDdlSourceTab
 
-		when: 'check if download button is present'
-		waitFor(waitTime) { page.downloadButton.isDisplayed() }
-		then: 'check if download button is correct'
-		page.downloadButton.text().equals("Download")
-	}
+        when: 'check if download button is present'
+        waitFor(waitTime) { page.downloadButton.isDisplayed() }
+        then: 'check if download button is correct'
+        page.downloadButton.text().equals("Download")
+    }
 
-	def "DDL Source Tab:Check Content"() {
-		when: 'go to ddl source tab'
-		page.openSchemaPageDdlSourceTab()
-		then: 'at ddl source tab'
-		at SchemaPageDdlSourceTab
+    def "DDL Source Tab:Check Content"() {
+        when: 'go to ddl source tab'
+        page.openSchemaPageDdlSourceTab()
+        then: 'at ddl source tab'
+        at SchemaPageDdlSourceTab
 
-		waitFor(waitTime) { page.sourceText.isDisplayed() }
-	}
+        waitFor(waitTime) { page.sourceText.isDisplayed() }
+    }
 
-	// Cleanup
+    // Cleanup
 
 
     //expand all checkbox in schema tab and procedure and sql tab
@@ -1560,7 +1560,7 @@ class SchemaPageTest extends TestBase {
 
 
     def cleanupSpec() {
-		if (!(page instanceof VoltDBManagementCenterPage)) {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
             then: 'to be on VMC page'
@@ -1574,8 +1574,8 @@ class SchemaPageTest extends TestBase {
         then: 'should be on DB Monitor page'
         at SqlQueryPage
         String deleteQuery = page.getQueryToDeleteTable()
-		page.setQueryText(deleteQuery)
+        page.setQueryText(deleteQuery)
 
-		page.runQuery()
-	}
+        page.runQuery()
+    }
 }

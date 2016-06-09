@@ -49,9 +49,9 @@ function clean() {
 
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
+    javac -g -classpath $APPCLASSPATH \
         src/com/auctionexample/*.java
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
+    javac -g -classpath $APPCLASSPATH \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
     # build procedure and client jars

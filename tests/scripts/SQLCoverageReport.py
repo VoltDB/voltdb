@@ -24,10 +24,12 @@
 
 import sys
 import cgi
-import os
+import codecs
 import cPickle
 import decimal
 import datetime
+import os
+import traceback
 from distutils.util import strtobool
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
@@ -49,25 +51,36 @@ def as_html_unicode_string(s):
 
 def generate_table_str(res, key):
 
-    highlights = res.get("highlight")
     source = res[key].get("Result")
     if not source:
         return ""
+    highlights = res.get("highlight")
+    if isinstance(highlights, list):
+        key_highlights = highlights
+    else:
+        key_highlights = res.get("highlight_" + key)
 
     result = []
-    result.append(highlight("column count: %d" % (len(source.columns)), "columns" == highlights))
-    result.append(highlight("row count: %d" % (len(source.tuples)), "tuples" == highlights))
+    result.append(highlight("column count: %d" % (len(source.columns)), "Columns" == highlights))
+    result.append(highlight("row count: %d" % (len(source.tuples)), "Tuples" == highlights))
     result.append("cols: " + ", ".join(map(lambda x: str(x), source.columns)))
     result.append("rows -")
-    if isinstance(highlights, list):
+    if isinstance(key_highlights, list):
         for j in xrange(len(source.tuples)):
-            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in highlights))
+            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in key_highlights))
     else:
         result.extend(map(lambda x: as_html_unicode_string(x), source.tuples))
     tablestr = "<br />".join(result)
     return tablestr
 
-def generate_detail(name, item, output_dir, cmpdb):
+def generate_modified_query(cmpdb, sql, modified_sql):
+    result = ''
+    mod_sql = modified_sql.get(sql, None)
+    if mod_sql:
+        result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
+    return result
+
+def generate_detail(name, item, output_dir, cmpdb, modified_sql):
     if output_dir == None:
         return
 
@@ -82,6 +95,7 @@ td {width: 50%%}
 
 <body>
 <h2>%s</h2>
+%s
 <table cellpadding=3 cellspacing=1 border=1>
 <tr>
 <th>VoltDB Response</th>
@@ -105,13 +119,14 @@ td {width: 50%%}
 </html>
 """ % (cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
        cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
+       generate_modified_query(cmpdb, cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'), modified_sql),
        cmpdb,
        highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
        highlight(item["cmp"]["Status"], "Status" == item.get("highlight")),
        item["jni"].get("Info") or "",
        item["cmp"].get("Info") or "",
        generate_table_str(item, "jni"),
-       generate_table_str(item, "cmp"))
+       generate_table_str(item, "cmp") )
 
     filename = "%s.html" % (item["id"])
     fd = open(os.path.join(output_dir, filename), "w")
@@ -124,7 +139,7 @@ def safe_print(s):
     if not __quiet:
         print s
 
-def print_section(name, mismatches, output_dir, cmpdb):
+def print_section(name, mismatches, output_dir, cmpdb, modified_sql):
     result = """
 <h2>%s: %d</h2>
 <table cellpadding=3 cellspacing=1 border=1>
@@ -139,7 +154,7 @@ def print_section(name, mismatches, output_dir, cmpdb):
     temp = []
     for i in mismatches:
         safe_print(i["SQL"])
-        detail_page = generate_detail(name, i, output_dir, cmpdb)
+        detail_page = generate_detail(name, i, output_dir, cmpdb, modified_sql)
         jniStatus = i["jni"]["Status"]
         if jniStatus < 0:
             jniStatus = "Error: " + `jniStatus`
@@ -219,7 +234,15 @@ def is_different(x, cntonly):
 
     if len(jniTuples) != len(cmpTuples):
         x["highlight"] = "Tuples"
+        x["highlight_jni"] = []
+        x["highlight_cmp"] = []
         # print "DEBUG is_different -- got different numbers of tuples?"
+        for ii in xrange(len(jniTuples)):
+            if jniTuples[ii] not in cmpTuples:
+                x["highlight_jni"].append(ii)
+        for ii in xrange(len(cmpTuples)):
+            if cmpTuples[ii] not in jniTuples:
+                x["highlight_cmp"].append(ii)
         return True
     # print "DEBUG is_different -- got same numbers of tuples?", len(jniTuples), "namely ", jniTuples
 
@@ -270,20 +293,26 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
-                          output_dir, report_all, extra_stats='', cmpdb='HSqlDB',
-                          cntonly=False):
+                          output_dir, report_invalid, report_all, extra_stats='',
+                          cmpdb='HSqlDB', modified_sql_path=None, cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     statements_file = open(statements_path, "rb")
     cmpdb_file = open(cmpdb_path, "rb")
     jni_file = open(jni_path, "rb")
+    if modified_sql_path:
+        modified_sql_file = codecs.open(modified_sql_path, encoding='utf-8')
+    else:
+        modified_sql_file = None
+    modified_sql = {}
     failures = 0
     count = 0
     mismatches = []
     crashed = []
     voltdb_npes = []
     cmpdb_npes  = []
+    invalid     = []
     all_results = []
 
     try:
@@ -311,9 +340,12 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             count += 1
             if int(jni["Status"]) != 1:
                 failures += 1
+                if report_invalid:
+                    invalid.append(statement)
 
             statement["jni"] = jni
             statement["cmp"] = cdb
+
             if notFound:
                 crashed.append(statement)
             elif is_different(statement, cntonly):
@@ -331,6 +363,24 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     statements_file.close()
     cmpdb_file.close()
     jni_file.close()
+
+    if modified_sql_file:
+        try:
+            while True:
+                try:
+                    orig_sql = modified_sql_file.readline().rstrip('\n').replace('original SQL: ', '')
+                    mod_sql  = modified_sql_file.readline().rstrip('\n').replace('modified SQL: ', '')
+                    if orig_sql and mod_sql:
+                        modified_sql[cgi.escape(orig_sql).encode('ascii', 'xmlcharrefreplace')] \
+                                    = cgi.escape(mod_sql).encode('ascii', 'xmlcharrefreplace')
+                    else:
+                        break
+                except EOFError as e:
+                    break
+            modified_sql_file.close()
+        except Exception as e:
+            traceback.print_exc()
+            raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
 
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
@@ -362,22 +412,25 @@ h2 {text-transform: uppercase}
         return int(x["id"])
     if(len(mismatches) > 0):
         sorted(mismatches, cmp=cmp, key=key)
-        report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb)
+        report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb, modified_sql)
 
     if(len(crashed) > 0):
         sorted(crashed, cmp=cmp, key=key)
-        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)", crashed, output_dir, cmpdb)
+        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)", crashed, output_dir, cmpdb, modified_sql)
 
     if(len(voltdb_npes) > 0):
         sorted(voltdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB", voltdb_npes, output_dir, cmpdb)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB", voltdb_npes, output_dir, cmpdb, modified_sql)
 
     if(len(cmpdb_npes) > 0):
         sorted(cmpdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb, modified_sql)
+
+    if report_invalid and (len(invalid) > 0):
+        report += print_section("Invalid Statements", invalid, output_dir, cmpdb, modified_sql)
 
     if report_all:
-        report += print_section("Total Statements", all_results, output_dir, cmpdb)
+        report += print_section("Total Statements", all_results, output_dir, cmpdb, modified_sql)
 
     report += """
 </body>

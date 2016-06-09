@@ -1,0 +1,99 @@
+
+drop table FOO if exists;
+Command succeeded.
+
+create table FOO ( a timestamp, source varchar);
+Command succeeded.
+
+insert into FOO values ('2015-11-11 10:11:12.123456', 'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.12345',  'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.1234',   'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.123',    'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.12',     'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12.1',      'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11 10:11:12',        'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('2015-11-11',                 'sql');
+(Returned 1 rows in #.##s)
+
+insert into FOO values ('20150-11-11 10:10:10', 'sqlfail');
+
+insert into FOO values ('201-11-11 10:10:10',   'sqlfail');
+
+insert into FOO values ('2015-111-11 10:10:10', 'sqlfail');
+
+insert into FOO values ('2015-11-111 10:10:10', 'sqlfail');
+
+insert into FOO values ('2015-11-11 10:10:10.', 'sqlfail');
+
+exec FOO.insert '2015-11-11 10:11:12.123456' 'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.12345'  'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.1234'   'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.123'    'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.12'     'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12.1'      'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11 10:11:12'        'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '2015-11-11'                 'crud';
+(Returned 1 rows in #.##s)
+
+exec FOO.insert '20150-11-11 10:10:10' 'crudfail';
+
+exec FOO.insert '201-11-11 10:10:10'   'crudfail';
+
+exec FOO.insert '2015-111-11 10:10:10' 'crudfail';
+
+exec FOO.insert '2015-11-111 10:10:10' 'crudfail';
+
+exec FOO.insert '2015-11-11 10:11:12.' 'crudfail';
+
+select * from FOO;
+A                           SOURCE 
+--------------------------- -------
+2015-11-11 10:11:12.123456  sql    
+2015-11-11 10:11:12.123450  sql    
+2015-11-11 10:11:12.123400  sql    
+2015-11-11 10:11:12.123000  sql    
+2015-11-11 10:11:12.120000  sql    
+2015-11-11 10:11:12.100000  sql    
+2015-11-11 10:11:12.000000  sql    
+2015-11-11 00:00:00.000000  sql    
+2015-11-11 10:11:12.123456  crud   
+2015-11-11 10:11:12.123450  crud   
+2015-11-11 10:11:12.123400  crud   
+2015-11-11 10:11:12.123000  crud   
+2015-11-11 10:11:12.120000  crud   
+2015-11-11 10:11:12.100000  crud   
+2015-11-11 10:11:12.000000  crud   
+2015-11-11 00:00:00.000000  crud   
+
+(Returned 16 rows in #.##s)
+
+drop table FOO if exists;
+Command succeeded.

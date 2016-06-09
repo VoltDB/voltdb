@@ -147,7 +147,6 @@ std::string NValue::debug() const {
         buffer << getInteger();
         break;
     case VALUE_TYPE_BIGINT:
-    case VALUE_TYPE_TIMESTAMP:
         buffer << getBigInt();
         break;
     case VALUE_TYPE_DOUBLE:
@@ -176,11 +175,25 @@ std::string NValue::debug() const {
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
+    case VALUE_TYPE_TIMESTAMP: {
+        try {
+            std::stringstream ss;
+            streamTimestamp(ss);
+            buffer << ss.str();
+        }
+        catch (const SQLException &) {
+            buffer << "<out of range timestamp:" << getBigInt() << ">";
+        }
+        catch (...) {
+            buffer << "<exception when converting timestamp:" << getBigInt() << ">";
+        }
+        break;
+    }
     case VALUE_TYPE_POINT:
-        buffer << getPoint().toString();
+        buffer << getGeographyPointValue().toString();
         break;
     case VALUE_TYPE_GEOGRAPHY:
-        buffer << getGeography().toString();
+        buffer << getGeographyValue().toString();
         break;
     default:
         buffer << "(no details)";

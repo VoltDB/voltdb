@@ -528,6 +528,14 @@ public class StatsAgent extends OpsAgent
         statsSources.add(source);
     }
 
+    public void deregisterStatsSourcesFor(StatsSelector selector, long siteId) {
+        assert selector != null;
+        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        if (siteIdToStatsSources != null) {
+            siteIdToStatsSources.remove(siteId);
+        }
+    }
+
     /**
      * Get aggregate statistics on this node for the given selector.
      * If you need both site-wise and node-wise stats, register the appropriate StatsSources for that

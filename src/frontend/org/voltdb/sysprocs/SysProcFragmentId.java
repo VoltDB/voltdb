@@ -174,18 +174,29 @@ public class SysProcFragmentId
     public static final long PF_balancePartitionsClearIndex = 233;
     public static final long PF_balancePartitionsClearIndexAggregate = 234;
 
+    // @ValidatePartitioning
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;
 
+    // @MatchesHashinator
     public static final long PF_matchesHashinator = 250;
     public static final long PF_matchesHashinatorResults = 251;
 
+    // @ApplyBinaryLog
     public static final long PF_applyBinaryLog = 260;
     public static final long PF_applyBinaryLogAggregate = 261;
 
+    // @LoadVoltTable
     public static final long PF_loadVoltTable = 270;
     public static final long PF_loadVoltTableAggregate = 271;
 
-    public static final long PF_resetDR = 280;
-    public static final long PF_resetDRAggregate = 281;
+    // @ResetDR
+    public static final long PF_preResetDR = 280;
+    public static final long PF_preResetDRAggregate = 281;
+    public static final long PF_postResetDR = 282;
+    public static final long PF_postResetDRAggregate = 283;
+
+    // @ExecuteTask
+    public static final long PF_executeTask = 290;
+    public static final long PF_executeTaskAggregate = 291;
 }

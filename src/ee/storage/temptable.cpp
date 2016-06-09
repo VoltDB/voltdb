@@ -64,24 +64,13 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
+void TempTable::deleteAllTuples(bool freeAllocatedStrings, bool) {
     deleteAllTuplesNonVirtual(freeAllocatedStrings);
 }
 
 bool TempTable::insertTuple(TableTuple &source) {
     insertTempTuple(source);
     return true;
-}
-
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool)
-{
-    throwFatalException("TempTable does not support update");
-    // Some day maybe, if we find a use case:
-    // Copy the source tuple into the target
-    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
 }
 
 bool TempTable::deleteTuple(TableTuple &, bool)

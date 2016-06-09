@@ -256,6 +256,9 @@ static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
 static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
 static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
 
+static const int FUNC_VOLT_ROUND                       = 20042;
+static const int FUNC_VOLT_STR                         = 20043;
+
 // Geospatial functions
 static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
 static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
@@ -274,6 +277,10 @@ static const int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT      = 21013;     // asText(<p
 static const int FUNC_VOLT_ASTEXT_GEOGRAPHY            = 21014;     // asText(<geography value>)
 static const int FUNC_VOLT_VALIDATE_POLYGON            = 21015;     // Validate a polygon.
 static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 21016;     // Reason a polygon is invalid.
+static const int FUNC_VOLT_DWITHIN                     = 21017;     // wrapper id for DWithin function
+static const int FUNC_VOLT_DWITHIN_POINT_POINT         = 21018;     // if two points are within certain distance of each other
+static const int FUNC_VOLT_DWITHIN_POLYGON_POINT       = 21019;     // if a polygon and a point are within certain distance of each other
+static const int FUNC_VOLT_VALIDPOLYGONFROMTEXT        = 21020;     // like polygonfromtext, but also validates the result
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

@@ -1,39 +1,28 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import geb.Page
 import geb.Module
+import org.openqa.selenium.Keys
 
 class OverviewModule extends Module {
     static content = {
         // Site Per Host
-        sitePerHostText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(1) > td.configLabel") }
+        sitePerHostText                 { $("#adminTbl > tbody > tr:nth-child(1) > td.configLabel") }
         sitePerHostField                { $(id:"txtSitePerHost") }
 
         // K-Safety
@@ -53,6 +42,24 @@ class OverviewModule extends Module {
         usernameTitleText               { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.child-row-6.subLabelRow.thead.secTbl1 > td.configLabel") }
         roleTitleText                   { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr.child-row-6.subLabelRow.thead.secTbl1 > td:nth-child(2)") }
         addUserButton                   { $("#btnAddSecurity > span") }
+
+        addSecurityButton               { $("#btnAddSecurity") }
+        userField                       { $("#txtUser") }
+        passwordField                   { $("#txtPassword") }
+        roleField                       { $("#txtUserRole-tokenfield") }
+        selectAdminRole                 { $("#selectRole > option:nth-child(1)") }
+        saveUserOkButton                { $("#btnSaveUserOk") }
+        securityLabel                   { $("tr.securityList").find("td.configLabel") }
+        updateSecurityButton            { $("a.btnUpdateSecurity") }
+        deleteUserButton                { $("#deleteUser") }
+        errorUser                       { $("#errorUser") }
+        errorPassword                   { $("#errorPassword") }
+        cancelUserButton                { $("#btnCancelUser") }
+        noSecurityAvailable             { $("#trSecurity > td.configLabel") }
+
+        editSecurityOne (required: false)   { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td:nth-child(4) > a") }
+        usernameOne (required: false)       { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td.configLabel") }
+        roleOne (required: false)           { $("#adminTbl > tbody > tr.child-row-6.subLabelRow.securityList > td:nth-child(2)") }
 
         // HTTP Access
         httpAccessText                  { $("#row-1 > td.configLabel > a > span") }
@@ -163,51 +170,30 @@ class OverviewModule extends Module {
         // Advanced
         advancedText                    { $(class:"fontFamily", text: "Advanced") }
 
-        maxJavaHeapText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(24) > td.configLabel") }
+        maxJavaHeapText                 { $("#adminTbl > tbody > tr:nth-child(21) > td.configLabel") }
         maxJavaHeapField                { $(id:"txtMaxJavaHeap") }
 
-        heartbeatTimeoutText            { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(25) > td.configLabel") }
+        heartbeatTimeoutText            { $("#adminTbl > tbody > tr:nth-child(22) > td.configLabel") }
         heartbeatTimeoutField           { $(id:"txtHeartbeatTimeout") }
 
-        queryTimeoutText                { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(26) > td.configLabel") }
+        queryTimeoutText                { $("#adminTbl > tbody > tr:nth-child(23) > td.configLabel") }
         queryTimeoutField               { $(id:"txtQueryTimeout") }
 
-        maxTempTableMemoryText          { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(27) > td.configLabel") }
+        maxTempTableMemoryText          { $("#adminTbl > tbody > tr:nth-child(24) > td.configLabel") }
         maxTempTableMemoryField         { $(id:"txtMaxTempTableMemory") }
 
-        snapshotPriorityText            { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(28) > td.configLabel") }
+        snapshotPriorityText            { $("#adminTbl > tbody > tr:nth-child(25) > td.configLabel") }
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
-        memoryLimitText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(29) > td.configLabel") }
-        memoryLimitField                { $(id:"txtMemoryLimit") }
-
-        // security
-        securityText               { $("#row-6 > td.configLabel") }
-
-        addSecurityButton              {$("#btnAddSecurity")}
-
-        userField                     {$("#txtUser")}
-
-        passwordField                 {$("#txtPassword")}
-
-        selectAdminRole             { $("#selectRole > option:nth-child(1)") }
-
-        SaveUserOkButton               {$("#btnSaveUserOk")}
-
-        securityLabel               {$("tr.securityList").find("td.configLabel")}
-
-
-        updateSecurityButton           {$("a.btnUpdateSecurity")}
-
-        deleteUserButton               {$("#deleteUser")}
-
-        errorUser                   {$("#errorUser")}
-
-        errorPassword               {$("#errorPassword")}
-
-        cancelUserButton               {$("#btnCancelUser")}
-
+        memoryLimitText                 { $("#adminTbl > tbody > tr:nth-child(26) > td.configLabel") }
+        memoryLimitField                { $("#txtMemoryLimit") }
+        memoryLimitType                 { $(id:"selMemoryLimitUnit") }
+        memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }
     }
+
+    int count
+    static int numberOfTrials = 10
+
     def String getIdOfExportText(int index) {
         return ("exportList_" + String.valueOf(index))
     }
@@ -226,6 +212,78 @@ class OverviewModule extends Module {
             println("Checkbox is not displayed")
         }
         return result;
+    }
+
+    // Edit for VDM-37 starts from here
+
+    def void expandSecurity() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                securityText.click()
+                waitFor { addSecurityButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { addSecurityButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
+            }
+        }
+    }
+
+    def addUser() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                addSecurityButton.click()
+                waitFor { saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+    }
+
+    def provideValueForUser(String username, String password, String role) {
+        userField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        userField.value(username)
+
+        passwordField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        passwordField.value(password)
+
+        roleField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        roleField.value(role + ",")
+    }
+
+    def saveUser() {
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                saveUserOkButton.click()
+                waitFor { !saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
     }
 
 }

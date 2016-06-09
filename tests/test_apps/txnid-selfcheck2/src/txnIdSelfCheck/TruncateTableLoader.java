@@ -95,9 +95,9 @@ public class TruncateTableLoader extends BenchmarkThread {
                 hardStop("TruncateTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.", clientResponse);
             }
             if (status != ClientResponse.SUCCESS) {
-                // log what happened
-                log.error("TruncateTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                // log what happened, we'll retry the op so loglevel warn is ok
+                log.warn("TruncateTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 Benchmark.txnCount.incrementAndGet();
@@ -176,8 +176,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                 }
                 if (status != ClientResponse.SUCCESS) {
                     // log what happened
-                    log.error("TruncateTableLoader ungracefully failed to truncate table " + tableName);
-                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    log.warn("TruncateTableLoader ungracefully failed to truncate table " + tableName);
+                    log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 }
                 else {
                     Benchmark.txnCount.incrementAndGet();
@@ -198,7 +198,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
             catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
+                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
             catch (IOException e) {
@@ -228,8 +228,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                 }
                 if (status != ClientResponse.SUCCESS) {
                     // log what happened
-                    log.error("TruncateTableLoader ungracefully failed to scan-agg table " + tableName);
-                    log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                    log.warn("TruncateTableLoader ungracefully failed to scan-agg table " + tableName);
+                    log.warn(((ClientResponseImpl) clientResponse).toJSONString());
                 }
                 else
                     Benchmark.txnCount.incrementAndGet();
@@ -248,7 +248,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
             catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
+                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
             catch (IOException e) {

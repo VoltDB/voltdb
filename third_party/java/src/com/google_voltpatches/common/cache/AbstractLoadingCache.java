@@ -16,7 +16,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.UncheckedExecutionException;
@@ -40,7 +39,6 @@ import java.util.concurrent.ExecutionException;
  * @author Charles Fry
  * @since 11.0
  */
-@Beta
 public abstract class AbstractLoadingCache<K, V>
     extends AbstractCache<K, V> implements LoadingCache<K, V> {
 

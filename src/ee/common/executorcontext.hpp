@@ -23,6 +23,7 @@
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
+#include "common/UniqueId.hpp"
 
 #include <vector>
 #include <map>
@@ -32,7 +33,7 @@ namespace voltdb {
 extern const int64_t VOLT_EPOCH;
 
 class AbstractExecutor;
-class DRTupleStream;
+class AbstractDRTupleStream;
 class VoltDBEngine;
 
 /*
@@ -57,8 +58,8 @@ class ExecutorContext {
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream,
-                    DRTupleStream *drReplicatedStream,
+                    AbstractDRTupleStream *drTupleStream,
+                    AbstractDRTupleStream *drReplicatedStream,
                     CatalogId drClusterId);
 
     ~ExecutorContext();
@@ -119,16 +120,12 @@ class ExecutorContext {
         return (clusterId << 49) | (uniqueId >> 14);
     }
 
-    static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
+    static int64_t getDRTimestampFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        // Convert this into a microsecond-resolution timestamp; treat the time
-        // portion as the time in milliseconds, and the sequence number as if
-        // it is a time in microseconds
-        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
-        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
+        return UniqueId::tsCounterSinceUnixEpoch(hiddenValue & UniqueId::TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
     }
 
-    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
+    static int8_t getClusterIdFromHiddenNValue(const NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
         return static_cast<int8_t>(hiddenValue >> 49);
     }
@@ -171,6 +168,11 @@ class ExecutorContext {
     /** Timestamp from unique id for this transaction */
     int64_t currentTxnTimestamp() {
         return m_currentTxnTimestamp;
+    }
+
+    /** DR cluster id for the local cluster */
+    int32_t drClusterId() {
+        return m_drClusterId;
     }
 
     /** Last committed transaction known to this EE */
@@ -224,11 +226,14 @@ class ExecutorContext {
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
-    DRTupleStream* drStream() {
+    void setDrStream(AbstractDRTupleStream *drStream);
+    void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
+
+    AbstractDRTupleStream* drStream() {
         return m_drStream;
     }
 
-    DRTupleStream* drReplicatedStream() {
+    AbstractDRTupleStream* drReplicatedStream() {
         return m_drReplicatedStream;
     }
 
@@ -239,10 +244,6 @@ class ExecutorContext {
         assert(singleton != NULL);
         assert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
-    }
-
-    void setDrStreamForTest(DRTupleStream *drStream) {
-        m_drStream = drStream;
     }
 
     bool allOutputTempTablesAreEmpty() const;
@@ -259,8 +260,8 @@ class ExecutorContext {
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
-    DRTupleStream *m_drStream;
-    DRTupleStream *m_drReplicatedStream;
+    AbstractDRTupleStream *m_drStream;
+    AbstractDRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;

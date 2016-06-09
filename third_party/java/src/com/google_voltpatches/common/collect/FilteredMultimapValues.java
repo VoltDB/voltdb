@@ -20,6 +20,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Predicates;
+import com.google_voltpatches.j2objc.annotations.Weak;
 
 import java.util.AbstractCollection;
 import java.util.Collection;
@@ -36,7 +37,7 @@ import javax.annotation_voltpatches.Nullable;
  */
 @GwtCompatible
 final class FilteredMultimapValues<K, V> extends AbstractCollection<V> {
-  private final FilteredMultimap<K, V> multimap;
+  @Weak private final FilteredMultimap<K, V> multimap;
 
   FilteredMultimapValues(FilteredMultimap<K, V> multimap) {
     this.multimap = checkNotNull(multimap);
@@ -73,17 +74,20 @@ final class FilteredMultimapValues<K, V> extends AbstractCollection<V> {
 
   @Override
   public boolean removeAll(Collection<?> c) {
-    return Iterables.removeIf(multimap.unfiltered().entries(),
+    return Iterables.removeIf(
+        multimap.unfiltered().entries(),
         // explicit <Entry<K, V>> is required to build with JDK6
-        Predicates.<Entry<K, V>>and(multimap.entryPredicate(),
-            Maps.<V>valuePredicateOnEntries(Predicates.in(c))));
+        Predicates.<Entry<K, V>>and(
+            multimap.entryPredicate(), Maps.<V>valuePredicateOnEntries(Predicates.in(c))));
   }
 
   @Override
   public boolean retainAll(Collection<?> c) {
-    return Iterables.removeIf(multimap.unfiltered().entries(),
+    return Iterables.removeIf(
+        multimap.unfiltered().entries(),
         // explicit <Entry<K, V>> is required to build with JDK6
-        Predicates.<Entry<K, V>>and(multimap.entryPredicate(),
+        Predicates.<Entry<K, V>>and(
+            multimap.entryPredicate(),
             Maps.<V>valuePredicateOnEntries(Predicates.not(Predicates.in(c)))));
   }
 

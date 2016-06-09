@@ -1,35 +1,23 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 from wtforms.validators import DataRequired, IPAddress, ValidationError, Optional, Regexp
 from flask_inputs import Inputs
 import socket
+import traceback
 from flask_inputs.validators import JsonSchema
 
 
@@ -51,19 +39,23 @@ class Validation(object):
                 try:
                     socket.inet_pton(socket.AF_INET, array[0])
                 except AttributeError:
+                    #print traceback.format_exc()
                     try:
                         socket.inet_aton(array[0])
                     except socket.error:
+                        print traceback.format_exc()
                         raise ValidationError('Invalid IP address')
                     return array[0].count('.') == 3
                 except socket.error:
+                    #print traceback.format_exc()
                     raise ValidationError('Invalid IP address')
                 try:
                     val = int(array[1])
                     if val < 1 or val >= 65535:
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                 except ValueError as err:
-                    msg = err.message
+                    msg = err.args[0]
+                    #print traceback.format_exc()
                     if msg is 'Port must be greater than 1 and less than 65535':
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                     else:
@@ -76,7 +68,8 @@ class Validation(object):
                 if val < 1 or val > 65536:
                     raise ValidationError('Port must be greater than 1 and less than 65535')
             except ValueError as err:
-                msg = err.message
+                msg = err.args[0]
+                #print traceback.format_exc()
                 if msg is 'Port must be greater than 1 and less than 65535':
                     raise ValidationError('Port must be greater than 1 and less than 65535')
                 else:
@@ -89,12 +82,12 @@ class ServerInputs(Inputs):
     """
     json = {
         'name': [
-            DataRequired('Server name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            Optional(),
+            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            IPAddress('Invalid IP address.')
         ],
         'enabled': [
             Optional(),
@@ -146,10 +139,11 @@ user_schema = {
                 "type": "integer",
             },
             "name": {
-                    "id": "name",
-                    "type": "string",
-                    "minLength": 1
-                },
+                "id": "name",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9_.]+$"
+            },
             "password": {
                 "id": "password",
                 "type": "string",
@@ -157,7 +151,8 @@ user_schema = {
             },
             "roles": {
                 "id": "roles",
-                "enum": ["Administrator", "User"]
+                "type":"string",
+                "pattern": "^[a-zA-Z0-9_.,-]+$"
             },
             "plaintext": {
                 "id": "plaintext",
@@ -293,7 +288,7 @@ schema = {
             },
             "additionalProperties": False
         },
-        "partitionDetection": {
+        "partition-detection": {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
@@ -315,8 +310,8 @@ schema = {
             },
             "additionalProperties": False
         },
-        "adminMode": {
-            "id": "adminMode",
+        "admin-mode": {
+            "id": "admin-mode",
             "type": "object",
             "properties": {
                 "port": {
@@ -385,7 +380,8 @@ schema = {
                 },
                 "prefix": {
                     "id": "prefix",
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_.]+$"
                 },
                 "enabled": {
                     "id": "enabled",
@@ -409,7 +405,8 @@ schema = {
                                     "name": {
                                         "id": "name",
                                         "type": "string",
-                                        "minLength": 1
+                                        "minLength": 1,
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "password": {
                                         "id": "password",
@@ -419,7 +416,7 @@ schema = {
                                     "roles": {
                                         "id": "roles",
                                         "type": "string",
-                                        "enum": ["Administrator", "User"]
+                                        "pattern": "^[a-zA-Z0-9_.,-]+$"
                                     },
                                     "plaintext": {
                                         "id": "plaintext",
@@ -463,8 +460,8 @@ schema = {
                                                         "value": {
                                                             "id": "value",
                                                             "type": "string"
-                                                        }
-                                                    }
+                                                        },
+                                                    },"additionalProperties": False,
                                                 }
                                             ]
                                         },
@@ -473,6 +470,7 @@ schema = {
                                     "stream": {
                                         "id": "stream",
                                         "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
                                     "enabled": {
                                         "id": "enabled",
@@ -481,7 +479,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "exportconnectorclass": {
                                         "id": "exportconnectorclass",
@@ -489,13 +487,14 @@ schema = {
                                     },
 
                                 },
-                             "required": ["stream", "type"]
+                                "required": ["stream", "type", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },
+            "additionalProperties": False
 
         },
         "import": {
@@ -526,7 +525,7 @@ schema = {
                                                             "id": "value",
                                                             "type": "string"
                                                         }
-                                                    }
+                                                    },"additionalProperties": False,
                                                 }
                                             ],
                                             "required": ["value"]
@@ -543,21 +542,22 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[a-zA-Z0-9_.]+$"
                                     },
 
                                 },
-                                 "required": ["module"]
+                                 "required": ["format", "enabled"], "additionalProperties": False,
                             }
                         ]
                     }
 
                 }
-            }
+            },"additionalProperties": False
 
         },
         "commandlog": {
@@ -577,7 +577,7 @@ schema = {
                         "transactions": {
                             "id": "transactions",
                             "type": "integer",
-                            "minimum": 0,
+                            "minimum": 1,
                             "maximum": 2147483647
                         }
                     },
@@ -595,7 +595,7 @@ schema = {
                     "id": "logsize",
                     "type": "integer",
                     "minimum": 3,
-                    "maximum": 4000
+                    "maximum": 3000
                 }
             },
             "additionalProperties": False
@@ -611,8 +611,8 @@ schema = {
                         "maxsize": {
                             "id": "maxsize",
                             "type": "integer",
-                            "minimum": 0,
-                            "maxvalue": 2147483647
+                            "minimum": 1,
+                            "maximum": 2147483647
                         }
                     },
                     "additionalProperties": False
@@ -669,7 +669,6 @@ schema = {
                                 "size": {
                                     "id": "size",
                                     "type": "string",
-                                    "minimum": 0,
                                 }
                             },
                             "additionalProperties": False
@@ -687,11 +686,15 @@ schema = {
                                         "properties": {
                                             "name": {
                                                 "id": "name",
-                                                "type": "string"
+                                                "type": "string",
+                                                "enum": ["snapshots", "commandlog", "exportoverflow", "droverflow",
+                                                          "commandlogsnapshot"]
                                             },
                                             "size": {
                                                 "id": "size",
-                                                "type": "string"
+                                                "type": "string",
+                                                "minimum": 0,
+                                                "maximum": 2147483647
                                             }
                                         },
                                         "additionalProperties": False
@@ -740,13 +743,15 @@ schema = {
                     "minimum": 0,
                     "maximum": 2147483647
                 },
-                "type": {
-                    "id": "type",
-                    "type": "string",
-                },
-                "enabled": {
-                    "id": "enabled",
+                "listen": {
+                    "id": "listen",
                     "type": "boolean"
+                },
+                "port": {
+                    "id": "port",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
                 },
                 "connection": {
                     "id": "connection",
@@ -755,17 +760,12 @@ schema = {
                         "source": {
                             "id": "source",
                             "type": "string",
-                        },
-                        "servers": {
-                            "id": "servers",
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
                         }
-                    }
+                    },
+                    "additionalProperties": False
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False
@@ -788,5 +788,17 @@ class DatabaseInputs(Inputs):
         'name': [
             DataRequired('Database name is required.'),
             Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+        ]
+    }
+
+
+class ConfigValidation(Inputs):
+    """
+    Validation class for ip address used to sync cluster.
+    """
+    json = {
+        'ip_address': [
+            DataRequired('IP address is required.'),
+            IPAddress('Invalid IP address.')
         ]
     }

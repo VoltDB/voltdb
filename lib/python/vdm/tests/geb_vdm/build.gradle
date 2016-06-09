@@ -21,6 +21,14 @@ repositories {
     mavenCentral()
 }
 
+def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
+    if (project.hasProperty(projectPropertyName)) {
+        return project.getProperties()[projectPropertyName]
+    } else {
+        return defaultValue
+    }
+}
+
 dependencies {
     // If using Spock, need to depend on geb-spock
     testCompile "org.gebish:geb-spock:$gebVersion"
@@ -66,8 +74,8 @@ drivers.each { driver ->
         systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
         systemProperty "geb.env", driver
 
-        // If you wanted to set the baseUrl in your build…
-        // systemProperty "geb.build.baseUrl", "http://myapp.com"
+        // Provide url, default value is http://localhost:8000/
+        systemProperty "geb.build.baseUrl", getProjectPropertyOrDefaultValue("url", "http://localhost:8000/")
     }
 }
 

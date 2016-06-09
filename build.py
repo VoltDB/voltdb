@@ -177,10 +177,10 @@ if CTX.PLATFORM == "Darwin":
     CTX.CPPFLAGS += " -DMACOSX -arch x86_64"
     CTX.JNIEXT = "jnilib"
     CTX.JNILIBFLAGS = " -bundle"
-    CTX.JNIBINFLAGS = " -framework JavaVM,1.7"
+    CTX.JNIBINFLAGS = " -framework JavaVM,1.8"
     CTX.SOFLAGS += "-dynamiclib -undefined dynamic_lookup -single_module"
     CTX.SOEXT = "dylib"
-    CTX.JNIFLAGS = "-framework JavaVM,1.7"
+    CTX.JNIFLAGS = "-framework JavaVM,1.8"
 
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -DLINUX -fpic"
@@ -316,6 +316,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
+ partitionbynode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -327,9 +328,10 @@ CTX.INPUT['plannodes'] = """
 """
 
 CTX.INPUT['indexes'] = """
+ CoveringCellIndex.cpp
+ IndexStats.cpp
  tableindex.cpp
  tableindexfactory.cpp
- IndexStats.cpp
 """
 
 CTX.INPUT['storage'] = """
@@ -341,6 +343,7 @@ CTX.INPUT['storage'] = """
  TableStreamer.cpp
  ElasticScanner.cpp
  MaterializedViewMetadata.cpp
+ ExportMaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
  StreamedTableStats.cpp
@@ -355,12 +358,16 @@ CTX.INPUT['storage'] = """
  TupleStreamBase.cpp
  ExportTupleStream.cpp
  DRTupleStream.cpp
+ BinaryLogSinkWrapper.cpp
  BinaryLogSink.cpp
+ CompatibleBinaryLogSink.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
  ElasticIndex.cpp
  ElasticIndexReadContext.cpp
+ AbstractDRTupleStream.cpp
+ CompatibleDRTupleStream.cpp
 """
 
 CTX.INPUT['stats'] = """
@@ -465,8 +472,9 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_key_test
      index_scripted_test
      index_test
-     compacting_hash_index
+     CompactingHashIndexTest
      CompactingTreeMultiIndexTest
+     CoveringCellIndexTest
     """
 
 if whichtests in ("${eetestsuite}", "storage"):
@@ -500,6 +508,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
+     PartitionByPlanNodeTest
      PlanNodeFragmentTest
     """
 

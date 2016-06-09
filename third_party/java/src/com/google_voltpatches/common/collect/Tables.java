@@ -41,7 +41,7 @@ import javax.annotation_voltpatches.Nullable;
  * Provides static methods that involve a {@code Table}.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/CollectionUtilitiesExplained#Tables">
+ * "https://github.com/google/guava/wiki/CollectionUtilitiesExplained#tables">
  * {@code Tables}</a>.
  *
  * @author Jared Levy
@@ -67,14 +67,12 @@ public final class Tables {
     return new ImmutableCell<R, C, V>(rowKey, columnKey, value);
   }
 
-  static final class ImmutableCell<R, C, V>
-      extends AbstractCell<R, C, V> implements Serializable {
+  static final class ImmutableCell<R, C, V> extends AbstractCell<R, C, V> implements Serializable {
     private final R rowKey;
     private final C columnKey;
     private final V value;
 
-    ImmutableCell(
-        @Nullable R rowKey, @Nullable C columnKey, @Nullable V value) {
+    ImmutableCell(@Nullable R rowKey, @Nullable C columnKey, @Nullable V value) {
       this.rowKey = rowKey;
       this.columnKey = columnKey;
       this.value = value;
@@ -84,10 +82,12 @@ public final class Tables {
     public R getRowKey() {
       return rowKey;
     }
+
     @Override
     public C getColumnKey() {
       return columnKey;
     }
+
     @Override
     public V getValue() {
       return value;
@@ -100,7 +100,8 @@ public final class Tables {
     // needed for serialization
     AbstractCell() {}
 
-    @Override public boolean equals(Object obj) {
+    @Override
+    public boolean equals(Object obj) {
       if (obj == this) {
         return true;
       }
@@ -113,11 +114,13 @@ public final class Tables {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return Objects.hashCode(getRowKey(), getColumnKey(), getValue());
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "(" + getRowKey() + "," + getColumnKey() + ")=" + getValue();
     }
   }
@@ -170,8 +173,7 @@ public final class Tables {
     }
 
     @Override
-    public boolean contains(
-        @Nullable Object rowKey, @Nullable Object columnKey) {
+    public boolean contains(@Nullable Object rowKey, @Nullable Object columnKey) {
       return original.contains(columnKey, rowKey);
     }
 
@@ -240,8 +242,7 @@ public final class Tables {
         new Function<Cell<?, ?, ?>, Cell<?, ?, ?>>() {
           @Override
           public Cell<?, ?, ?> apply(Cell<?, ?, ?> cell) {
-            return immutableCell(
-                cell.getColumnKey(), cell.getRowKey(), cell.getValue());
+            return immutableCell(cell.getColumnKey(), cell.getRowKey(), cell.getValue());
           }
         };
 
@@ -334,64 +335,70 @@ public final class Tables {
     return new TransformedTable<R, C, V1, V2>(fromTable, function);
   }
 
-  private static class TransformedTable<R, C, V1, V2>
-      extends AbstractTable<R, C, V2> {
+  private static class TransformedTable<R, C, V1, V2> extends AbstractTable<R, C, V2> {
     final Table<R, C, V1> fromTable;
     final Function<? super V1, V2> function;
 
-    TransformedTable(
-        Table<R, C, V1> fromTable, Function<? super V1, V2> function) {
+    TransformedTable(Table<R, C, V1> fromTable, Function<? super V1, V2> function) {
       this.fromTable = checkNotNull(fromTable);
       this.function = checkNotNull(function);
     }
 
-    @Override public boolean contains(Object rowKey, Object columnKey) {
+    @Override
+    public boolean contains(Object rowKey, Object columnKey) {
       return fromTable.contains(rowKey, columnKey);
     }
 
-    @Override public V2 get(Object rowKey, Object columnKey) {
+    @Override
+    public V2 get(Object rowKey, Object columnKey) {
       // The function is passed a null input only when the table contains a null
       // value.
-      return contains(rowKey, columnKey)
-          ? function.apply(fromTable.get(rowKey, columnKey)) : null;
+      return contains(rowKey, columnKey) ? function.apply(fromTable.get(rowKey, columnKey)) : null;
     }
 
-    @Override public int size() {
+    @Override
+    public int size() {
       return fromTable.size();
     }
 
-    @Override public void clear() {
+    @Override
+    public void clear() {
       fromTable.clear();
     }
 
-    @Override public V2 put(R rowKey, C columnKey, V2 value) {
+    @Override
+    public V2 put(R rowKey, C columnKey, V2 value) {
       throw new UnsupportedOperationException();
     }
 
-    @Override public void putAll(
-        Table<? extends R, ? extends C, ? extends V2> table) {
+    @Override
+    public void putAll(Table<? extends R, ? extends C, ? extends V2> table) {
       throw new UnsupportedOperationException();
     }
 
-    @Override public V2 remove(Object rowKey, Object columnKey) {
+    @Override
+    public V2 remove(Object rowKey, Object columnKey) {
       return contains(rowKey, columnKey)
-          ? function.apply(fromTable.remove(rowKey, columnKey)) : null;
+          ? function.apply(fromTable.remove(rowKey, columnKey))
+          : null;
     }
 
-    @Override public Map<C, V2> row(R rowKey) {
+    @Override
+    public Map<C, V2> row(R rowKey) {
       return Maps.transformValues(fromTable.row(rowKey), function);
     }
 
-    @Override public Map<R, V2> column(C columnKey) {
+    @Override
+    public Map<R, V2> column(C columnKey) {
       return Maps.transformValues(fromTable.column(columnKey), function);
     }
 
     Function<Cell<R, C, V1>, Cell<R, C, V2>> cellFunction() {
       return new Function<Cell<R, C, V1>, Cell<R, C, V2>>() {
-        @Override public Cell<R, C, V2> apply(Cell<R, C, V1> cell) {
+        @Override
+        public Cell<R, C, V2> apply(Cell<R, C, V1> cell) {
           return immutableCell(
-              cell.getRowKey(), cell.getColumnKey(),
-              function.apply(cell.getValue()));
+              cell.getRowKey(), cell.getColumnKey(), function.apply(cell.getValue()));
         }
       };
     }
@@ -401,11 +408,13 @@ public final class Tables {
       return Iterators.transform(fromTable.cellSet().iterator(), cellFunction());
     }
 
-    @Override public Set<R> rowKeySet() {
+    @Override
+    public Set<R> rowKeySet() {
       return fromTable.rowKeySet();
     }
 
-    @Override public Set<C> columnKeySet() {
+    @Override
+    public Set<C> columnKeySet() {
       return fromTable.columnKeySet();
     }
 
@@ -414,20 +423,24 @@ public final class Tables {
       return Collections2.transform(fromTable.values(), function);
     }
 
-    @Override public Map<R, Map<C, V2>> rowMap() {
+    @Override
+    public Map<R, Map<C, V2>> rowMap() {
       Function<Map<C, V1>, Map<C, V2>> rowFunction =
           new Function<Map<C, V1>, Map<C, V2>>() {
-            @Override public Map<C, V2> apply(Map<C, V1> row) {
+            @Override
+            public Map<C, V2> apply(Map<C, V1> row) {
               return Maps.transformValues(row, function);
             }
           };
       return Maps.transformValues(fromTable.rowMap(), rowFunction);
     }
 
-    @Override public Map<C, Map<R, V2>> columnMap() {
+    @Override
+    public Map<C, Map<R, V2>> columnMap() {
       Function<Map<R, V1>, Map<R, V2>> columnFunction =
           new Function<Map<R, V1>, Map<R, V2>>() {
-            @Override public Map<R, V2> apply(Map<R, V1> column) {
+            @Override
+            public Map<R, V2> apply(Map<R, V1> column) {
               return Maps.transformValues(column, function);
             }
           };
@@ -455,8 +468,8 @@ public final class Tables {
     return new UnmodifiableTable<R, C, V>(table);
   }
   
-  private static class UnmodifiableTable<R, C, V>
-      extends ForwardingTable<R, C, V> implements Serializable {
+  private static class UnmodifiableTable<R, C, V> extends ForwardingTable<R, C, V>
+      implements Serializable {
     final Table<? extends R, ? extends C, ? extends V> delegate;
 
     UnmodifiableTable(Table<? extends R, ? extends C, ? extends V> delegate) {

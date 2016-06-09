@@ -331,4 +331,9 @@ public class CSVWriter implements Closeable {
         this.resultService = resultService;
     }
 
+    // A VoltDB extension to support reset PrintWriter
+    public void resetWriter() {
+        pw = new PrintWriter(rawWriter);
+    }
+    // End of VoltDB extension
 }

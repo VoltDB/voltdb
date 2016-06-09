@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+    n3k0 means 3 nodes and k=0 (no redundancy)
+
+    Adding hostcount="3" to the cluster element means
+    we have a 3-node cluster.
+
+    Adding kfactor="0" to the cluster element means
+    we have a k=0 (no redundancy) cluster.
+    Note this is the default value for this attribute and
+    it can be ommitted.
+
+    Start the cluster using:
+      voltdb create -d path/to/deployment-n3k0.xml -H $LEADER_HOST_OR_IP
+    where $LEADER_HOST_OR_IP is the same for all nodes joining
+    the cluster.
+-->
+<deployment>
+   <cluster hostcount="3" kfactor="0" />
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+</deployment>

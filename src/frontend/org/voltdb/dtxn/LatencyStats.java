@@ -71,7 +71,7 @@ public class LatencyStats extends SiteStatsSource {
 
     public static AbstractHistogram constructHistogram(boolean threadSafe) {
         final long highestTrackableValue = 60L * 60L * 1000000L;
-        final int numberOfSignificantValueDigits = 2;
+        final int numberOfSignificantValueDigits = 3;
         if (threadSafe) {
             return new AtomicHistogram( highestTrackableValue, numberOfSignificantValueDigits);
         } else {

@@ -1,30 +1,18 @@
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2016 VoltDB Inc.
 #
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 # Provides global meta-data that is derived from the environment.
 
 __author__ = 'scooper'
@@ -46,6 +34,7 @@ config_name_local = 'volt_local.cfg'
 # Filled in during startup.
 standalone   = None
 version      = None
+pro_version  = False
 command_dir  = None
 command_name = None
 voltdb_jar   = None
@@ -65,11 +54,13 @@ if volt_python not in sys.path:
 # Java configuration
 if 'JAVA_HOME' in os.environ:
     java = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    jar = os.path.join(os.environ['JAVA_HOME'], 'bin', 'jar')
 else:
     java = utility.find_in_path('java')
+    jar = utility.find_in_path('jar')
 if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
-java_version = utility.get_java_version()
+java_version = utility.get_java_version(java)
 java_opts = []
 
 #If this is a large memory system commit the full heap
@@ -103,6 +94,7 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
 # Set common options now.
 java_opts.append('-server')
 java_opts.append('-Djava.awt.headless=true')
+java_opts.append('-Djavax.security.auth.useSubjectCredsOnly=false')
 java_opts.append('-Dsun.net.inetaddr.ttl=300')
 java_opts.append('-Dsun.net.inetaddr.negative.ttl=3600')
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
@@ -131,7 +123,7 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     Set the VOLTDB_LIB and VOLTDB_VOLTDB environment variables based on the
     script location and the working directory.
     """
-    global command_name, command_dir, version
+    global command_name, command_dir, version, pro_version
     command_name = command_name_arg
     command_dir = command_dir_arg
     version = version_arg
@@ -208,6 +200,8 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
                         ('You may need to perform a build.',
                          'Searched the following:', lib_search_globs))
 
+    pro_version = utility.is_pro_version(voltdb_jar)
+    utility.debug('VoltDB Pro Version: %s' % pro_version)
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
         for chk_dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):

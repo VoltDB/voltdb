@@ -46,8 +46,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Timer;
 import java.util.Map.Entry;
+import java.util.Timer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -234,6 +234,7 @@ public class HTTPBenchmark {
         for (int i = 0; i < response.results.length; i++) {
             JSONObject tableJson = resultsJson.getJSONObject(i);
             response.results[i] =  VoltTable.fromJSONObject(tableJson);
+            System.out.println(response.results[i].toString());
         }
         if (jsonObj.isNull("status") == false) {
             response.status = (byte) jsonObj.getInt("status");
@@ -290,9 +291,6 @@ public class HTTPBenchmark {
                 exitWithMessageAndUsage("duration must be > 0");
             }
             if (warmup < 0) {
-                exitWithMessageAndUsage("warmup must be >= 0");
-            }
-            if (duration < 0) {
                 exitWithMessageAndUsage("warmup must be >= 0");
             }
             if (displayinterval <= 0) {

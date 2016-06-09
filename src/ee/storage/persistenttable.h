@@ -81,6 +81,8 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
+class CoveringCellIndexTest_TableCompaction;
+
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
  * normally-private stuff in PersistentTable.
@@ -136,7 +138,6 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -197,6 +198,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
+    friend class CoveringCellIndexTest_TableCompaction;
 
   private:
     // no default ctor, no copy, no assignment
@@ -244,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void deleteAllTuples(bool, bool fallible = true);
 
     virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
@@ -270,11 +272,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true,
-                                                bool updateDRTimestamp=true);
+    void updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> const &indexesToUpdate,
+                                        bool fallible=true,
+                                        bool updateDRTimestamp=true);
 
     virtual void addIndex(TableIndex *index) {
         Table::addIndex(index);
@@ -293,7 +295,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
 
-    void insertPersistentTuple(TableTuple &source, bool fallible);
+    void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
@@ -337,11 +339,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::vector<MaterializedViewMetadata *> views() const {
         return m_views;
     }
+    bool isMaterialized() { return m_isMaterialized; };
 
-    /** inlined here because it can't be inlined in base Table, as it
-     *  uses Tuple.copy.
-     */
-    TableTuple& getTempTupleInlined(TableTuple &source);
+    TableTuple& copyIntoTempTuple(TableTuple &source) {
+        assert (m_tempTuple.m_data);
+        m_tempTuple.copy(source);
+        return m_tempTuple;
+    }
 
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
@@ -595,7 +599,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock = false);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -616,7 +620,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     TBPtr allocateNextBlock();
 
-    inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
+    inline AbstractDRTupleStream *getDRTupleStream(ExecutorContext *ec) {
         if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         } else {
@@ -680,7 +684,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
 
-    //Cache config info, is this a materialized view
+    //Is this a materialized view?
     bool m_isMaterialized;
 
     // is DR enabled
@@ -881,27 +885,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void
-PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
-    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
-        if (m_table.m_partitionColumn == -1) {
-            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
-            }
-        } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
-        }
-    }
-}
-
-inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
-    assert (m_tempTuple.m_data);
-    m_tempTuple.copy(source);
-    return m_tempTuple;
-}
-
-
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
 {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
@@ -940,22 +924,27 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+        }
+        else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
+        }
+        else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
     }
 
-    if (block->isEmpty()) {
+    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
+        // Release the empty block unless it's the only remaining block and caller has requested not to do so.
+        // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
+    }
+    else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }
 }

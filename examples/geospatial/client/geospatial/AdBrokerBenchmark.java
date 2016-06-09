@@ -101,13 +101,6 @@ public class AdBrokerBenchmark {
     // that exist at any given time.
     static final int NUM_BID_REGIONS = BID_DURATION_SECONDS * BID_FREQUENCY_PER_SECOND;
 
-    // A bounding box that will contain all the bid regions, and the points
-    // corresponding to devices.  This is a 2-mile-by-2-mile square centered at (0, 0)
-    static final double BID_AREA_LNG_MIN = -0.014492753623;
-    static final double BID_AREA_LNG_MAX =  0.014492753623;
-    static final double BID_AREA_LAT_MIN = -0.014492753623;
-    static final double BID_AREA_LAT_MAX =  0.014492753623;
-
     // Devices will log in with a device id between 0 (inclusive) and
     // NUM_DEVICES (exclusive).
     static final int NUM_DEVICES = 1000000;
@@ -131,7 +124,7 @@ public class AdBrokerBenchmark {
         String servers = "localhost";
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 10000;
+        int ratelimit = 150000;
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = true;
@@ -386,11 +379,11 @@ public class AdBrokerBenchmark {
      * @return a random point
      */
     private GeographyPointValue getRandomPoint() {
-        double lngRange = BID_AREA_LNG_MAX - BID_AREA_LNG_MIN;
-        double lng = BID_AREA_LNG_MIN + lngRange * m_rand.nextDouble();
+        double lngRange = Regions.MAX_LNG - Regions.MIN_LNG;
+        double lng = Regions.MIN_LNG + lngRange * m_rand.nextDouble();
 
-        double latRange = BID_AREA_LAT_MAX - BID_AREA_LAT_MIN;
-        double lat = BID_AREA_LAT_MIN + latRange * m_rand.nextDouble();
+        double latRange = Regions.MAX_LAT - Regions.MIN_LAT;
+        double lat = Regions.MIN_LAT + latRange * m_rand.nextDouble();
 
         return new GeographyPointValue(lng, lat);
     }

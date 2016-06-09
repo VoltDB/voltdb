@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
 import org.HdrHistogram_voltpatches.Histogram;
-import org.HdrHistogram_voltpatches.HistogramData;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -344,7 +343,7 @@ public class ClientStats {
      */
     public double getAverageLatency() {
         if (m_invocationsCompleted == 0) return 0;
-        return (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0;
+        return (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0D;
     }
 
     /**
@@ -379,9 +378,8 @@ public class ClientStats {
      */
     public long[] getLatencyBucketsBy1ms() {
         final long buckets[] = new long[ONE_MS_BUCKET_COUNT];
-        final HistogramData data = m_latencyHistogram.getHistogramData();
         for (int ii = 0; ii < ONE_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = data.getCountBetweenValues(ii * 1000, (ii + 1) * 1000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 1000L, (ii + 1) * 1000L);
         }
         return buckets;
     }
@@ -401,9 +399,8 @@ public class ClientStats {
      */
     public long[] getLatencyBucketsBy10ms() {
         final long buckets[] = new long[TEN_MS_BUCKET_COUNT];
-        final HistogramData data = m_latencyHistogram.getHistogramData();
         for (int ii = 0; ii < TEN_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = data.getCountBetweenValues(ii * 10000, (ii + 1) * 10000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 10000L, (ii + 1) * 10000L);
         }
         return buckets;
     }
@@ -423,9 +420,8 @@ public class ClientStats {
      */
     public long[] getLatencyBucketsBy100ms() {
         final long buckets[] = new long[HUNDRED_MS_BUCKET_COUNT];
-        final HistogramData data = m_latencyHistogram.getHistogramData();
         for (int ii = 0; ii < HUNDRED_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = data.getCountBetweenValues(ii * 100000, (ii + 1) * 100000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 100000L, (ii + 1) * 100000L);
         }
         return buckets;
     }
@@ -467,11 +463,10 @@ public class ClientStats {
      * @return An estimate of k-percentile latency in whole milliseconds.
      */
     public int kPercentileLatency(double percentile) {
-        final HistogramData data = m_latencyHistogram.getHistogramData();
-        if (data.getTotalCount() == 0) return 0;
-        percentile = Math.max(0.0, percentile);
+        if (m_latencyHistogram.getTotalCount() == 0) return 0;
+        percentile = Math.max(0.0D, percentile);
         //Convert from micros to millis for return value, round to nearest integer
-        return (int) (Math.round(data.getValueAtPercentile(percentile * 100.0)) / 1000.0);
+        return (int) (Math.round(m_latencyHistogram.getValueAtPercentile(percentile * 100.0D)) / 1000.0);
     }
 
     /**
@@ -489,11 +484,10 @@ public class ClientStats {
      * @return An estimate of k-percentile latency in whole milliseconds.
      */
     public double kPercentileLatencyAsDouble(double percentile) {
-        final HistogramData data = m_latencyHistogram.getHistogramData();
-        if (data.getTotalCount() == 0) return 0.0;
-        percentile = Math.max(0.0, percentile);
+        if (m_latencyHistogram.getTotalCount() == 0) return 0.0;
+        percentile = Math.max(0.0D, percentile);
         //Convert from micros to millis for return value, enjoy having precision
-        return data.getValueAtPercentile(percentile * 100.0) / 1000.0;
+        return m_latencyHistogram.getValueAtPercentile(percentile * 100.0D) / 1000.0;
     }
 
     /**
@@ -512,7 +506,7 @@ public class ClientStats {
         }
 
         //Get a latency report in milliseconds
-        m_latencyHistogram.getHistogramData().outputPercentileDistributionVolt(pw, 1, 1000.0);
+        m_latencyHistogram.outputPercentileDistributionVolt(pw, 1, 1000.0);
 
         return new String(baos.toByteArray(), Charsets.UTF_8);
     }

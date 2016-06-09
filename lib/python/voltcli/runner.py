@@ -1,29 +1,18 @@
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2016 VoltDB Inc.
 #
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
 #
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 #
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 __author__ = 'scooper'
 
@@ -36,6 +25,7 @@ from verbs import *
 from voltcli import cli
 from voltcli import environment
 from voltcli import utility
+from getpass import getpass
 
 #===============================================================================
 # Global data
@@ -50,7 +40,6 @@ usage for a verb, including its options and arguments.
     usage = '%prog VERB [ OPTIONS ... ] [ ARGUMENTS ... ]',
     options = (
         cli.BooleanOption(None, '--debug', 'debug', None),
-        cli.BooleanOption(None, '--pause', 'pause', None),
         cli.BooleanOption('-v', '--verbose', 'verbose',
                           'display verbose messages and external commands'),
     )
@@ -159,8 +148,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
-                          '-classpath', self.classpath, '-d', outdir, *srcfiles)
+        utility.run_cmd('javac', '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
 class VerbRunner(object):
@@ -477,6 +465,11 @@ class VerbRunner(object):
                 kwargs['username'] = username
                 if password:
                     kwargs['password'] = password
+                else:
+                    """
+                    If a username was specified and a password was not, prompt the user for the pwd.
+                    """
+                    kwargs['password'] = getpass('Enter your password: ')
             self.client = FastSerializer(host, port, **kwargs)
         except Exception, e:
             utility.abort(e)
@@ -585,7 +578,7 @@ class VOLT(object):
         self.utility = utility
 
 #===============================================================================
-def load_verbspace(command_name, command_dir, config, version, description, package):
+def load_verbspace(command_name, command_dir, config, version, description, package, pro_version):
 #===============================================================================
     """
     Build a verb space by searching for source files with verbs in this source
@@ -627,7 +620,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs, pro_version)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -653,13 +646,15 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
+        verstr = '%%prog version %s Enterprise Edition' % verbspace.version \
+            if verbspace.pro_version else '%%prog version %s' % verbspace.version
         cli.CLIParser.__init__(self, environment.command_name,
                                      verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
-                                     '%%prog version %s' % verbspace.version)
+                                     verstr)
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
@@ -718,7 +713,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,
-                                   description, package)
+                                   description, package, environment.pro_version)
 
         # Make internal commands available to user commands via runner.verbspace().
         internal_verbspaces = {}

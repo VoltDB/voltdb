@@ -24,6 +24,7 @@
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
+#include "storage/TupleStreamException.h"
 
 #include <cstdio>
 #include <limits>
@@ -38,9 +39,9 @@ using namespace voltdb;
 
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamBase::TupleStreamBase(size_t extraHeaderSpace /*= 0*/)
+TupleStreamBase::TupleStreamBase(int defaultBufferSize, size_t extraHeaderSpace /*= 0*/)
     : m_flushInterval(MAX_BUFFER_AGE),
-      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+      m_lastFlush(0), m_defaultCapacity(defaultBufferSize),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
@@ -97,7 +98,8 @@ void TupleStreamBase::cleanupManagedBuffers()
  * This is the only function that should modify m_openSpHandle,
  * m_openTransactionUso.
  */
-void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush)
+void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t uniqueId,
+        bool sync, bool flush, DREventType eventType)
 {
     if (currentSpHandle < m_openSpHandle)
     {
@@ -155,6 +157,17 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         m_openSpHandle = currentSpHandle;
         m_openSequenceNumber++;
         m_openUniqueId = uniqueId;
+
+        if (eventType != NOT_A_EVENT) {
+            m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+            m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
+            if (UniqueId::isMpUniqueId(uniqueId)) {
+                m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+            } else {
+                m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            }
+            m_currBlock->markAsEventBuffer(eventType);
+        }
 
         if (flush) {
             extendBufferChain(0);
@@ -233,7 +246,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
     // the block that contains mark.
-    if (!(m_currBlock->uso() >= mark)) {
+    if (m_currBlock != NULL && !(m_currBlock->uso() >= mark)) {
         m_currBlock->truncateTo(mark);
     }
     else {
@@ -268,8 +281,10 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
  * be handed off
  */
 void TupleStreamBase::discardBlock(StreamBlock *sb) {
-    delete [] sb->rawPtr();
-    delete sb;
+    if (sb != NULL) {
+        delete [] sb->rawPtr();
+        delete sb;
+    }
 }
 
 /*
@@ -301,6 +316,10 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     size_t blockSize = m_defaultCapacity;
     bool openTransaction = checkOpenTransaction(oldBlock, minLength, blockSize, uso);
 
+    if (blockSize == 0) {
+        throw TupleStreamException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
+    }
+
     char *buffer = new char[blockSize];
     if (!buffer) {
         throwFatalException("Failed to claim managed buffer for Export.");
@@ -308,11 +327,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     m_currBlock = new StreamBlock(buffer, m_headerSpace, blockSize, uso);
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
-    }
-
-    if (blockSize == 0) {
-        rollbackTo(uso, SIZE_MAX);
-        throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
     }
 
     if (openTransaction) {
@@ -358,6 +372,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        commit(lastCommittedSpHandle, maxSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
+        commit(lastCommittedSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
     }
 }

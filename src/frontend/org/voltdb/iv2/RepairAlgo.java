@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.DRLogSegmentId;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -50,13 +49,9 @@ public interface RepairAlgo
     public static class RepairResult
     {
         public final long m_txnId;
-        public final long m_localDrUniqueId;
-        public final DRLogSegmentId m_binaryLogInfo;
 
-        RepairResult(long txnId, long localDrUniqueId, DRLogSegmentId binaryLogInfo) {
+        RepairResult(long txnId) {
             m_txnId = txnId;
-            m_localDrUniqueId = localDrUniqueId;
-            m_binaryLogInfo = binaryLogInfo;
         }
     }
 

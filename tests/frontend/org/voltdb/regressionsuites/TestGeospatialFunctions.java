@@ -23,9 +23,13 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
@@ -41,6 +45,24 @@ public class TestGeospatialFunctions extends RegressionSuite {
         super(name);
     }
 
+    static private void setUpSchema(VoltProjectBuilder project) throws IOException {
+        String literalSchema =
+                "CREATE TABLE places (\n"
+                + "  pk         INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  name       VARCHAR(64),\n"
+                + "  loc        GEOGRAPHY_POINT\n"
+                + ");\n"
+                + "CREATE TABLE borders (\n"
+                + "  pk         INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  name       VARCHAR(64),\n"
+                + "  message    VARCHAR(64),\n"
+                + "  region     GEOGRAPHY\n"
+                + ");\n"
+                + "\n"
+                ;
+        project.addLiteralSchema(literalSchema);
+    }
+
     /*
      * We want to store the borders table once and for all, and insert and test
      * without repeating ourselves. This class holds geometry values for us for
@@ -49,7 +71,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * The message is for holding error messages.  It is inserted into the
      * table.
      */
-    private static class Border {
+    static class Border {
         Border(long pk, String name, String message, GeographyValue region) {
             m_pk = pk;
             m_name = name;
@@ -83,7 +105,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * This is the array of borders we know about. We will insert these
      * borders and then extract them.
      */
-    private static Border borders[] = {
+    static Border borders[] = {
         new Border(0, "Colorado", null,
                    new GeographyValue("POLYGON(("
                                       + "-102.052 41.002, "
@@ -113,7 +135,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
        new Border(3, "Wonderland", null, null)
     };
 
-    private static void populateBorders(Client client, Border borders[]) throws Exception {
+    private static void populateBorders(Client client, Border borders[]) throws NoConnectionsException, IOException, ProcCallException {
         for (Border b : borders) {
             client.callProcedure("borders.Insert",
                                  b.getPk(),
@@ -123,37 +145,37 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    private static void populateTables(Client client) throws Exception {
+    private static void populateTables(Client client) throws NoConnectionsException, IOException, ProcCallException {
         // Note: These are all WellKnownText strings.  So they should
         //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
-                GeographyPointValue.geographyPointFromText("POINT(-104.959 39.704)"));
+                GeographyPointValue.fromWKT("POINT(-104.959 39.704)"));
         client.callProcedure("places.Insert", 1, "Albuquerque",
-                GeographyPointValue.geographyPointFromText("POINT(-106.599 35.113)"));
+                GeographyPointValue.fromWKT("POINT(-106.599 35.113)"));
         client.callProcedure("places.Insert", 2, "Cheyenne",
-                GeographyPointValue.geographyPointFromText("POINT(-104.813 41.134)"));
+                GeographyPointValue.fromWKT("POINT(-104.813 41.134)"));
         client.callProcedure("places.Insert", 3, "Fort Collins",
-                GeographyPointValue.geographyPointFromText("POINT(-105.077 40.585)"));
+                GeographyPointValue.fromWKT("POINT(-105.077 40.585)"));
         client.callProcedure("places.Insert", 4, "Point near N Colorado border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.04 41.002)"));
+                GeographyPointValue.fromWKT("POINT(-105.04 41.002)"));
         client.callProcedure("places.Insert", 5, "North Point Not On Colorado Border",
-                GeographyPointValue.geographyPointFromText("POINT(-109.025 41.005)"));
+                GeographyPointValue.fromWKT("POINT(-109.025 41.005)"));
         client.callProcedure("places.Insert", 6, "Point on N Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.058 44.978)"));
+                GeographyPointValue.fromWKT("POINT(-105.058 44.978)"));
         client.callProcedure("places.Insert", 7, "North Point Not On Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.060 45.119)"));
+                GeographyPointValue.fromWKT("POINT(-105.060 45.119)"));
         client.callProcedure("places.Insert", 8, "Point on E Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-104.078 42.988)"));
+                GeographyPointValue.fromWKT("POINT(-104.078 42.988)"));
         client.callProcedure("places.Insert", 9, "East Point Not On Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-104.061 42.986)"));
+                GeographyPointValue.fromWKT("POINT(-104.061 42.986)"));
         client.callProcedure("places.Insert", 10, "Point On S Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-110.998 41.099)"));
+                GeographyPointValue.fromWKT("POINT(-110.998 41.099)"));
         client.callProcedure("places.Insert", 11, "South Point Not On Colorado Border",
-                GeographyPointValue.geographyPointFromText("POINT(-103.008 37.002)"));
+                GeographyPointValue.fromWKT("POINT(-103.008 37.002)"));
         client.callProcedure("places.Insert", 12, "Point On W Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-110.998 42.999)"));
+                GeographyPointValue.fromWKT("POINT(-110.998 42.999)"));
         client.callProcedure("places.Insert", 13, "West Point Not on Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-111.052 41.999)"));
+                GeographyPointValue.fromWKT("POINT(-111.052 41.999)"));
 
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
@@ -395,9 +417,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         populateTables(client);
 
         client.callProcedure("places.Insert", 50, "San Jose",
-                GeographyPointValue.geographyPointFromText("POINT(-121.903692 37.325464)"));
+                GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
         client.callProcedure("places.Insert", 51, "Boston",
-                GeographyPointValue.geographyPointFromText("POINT(-71.069862 42.338100)"));
+                GeographyPointValue.fromWKT("POINT(-71.069862 42.338100)"));
 
         VoltTable vt;
         String sql;
@@ -535,7 +557,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *
      */
     private static String MULTI_POLYGON
-      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, -1 0, -1 -1, 0 -1, 0 0))";
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 0, 0 0))";
     /*
      *
      *  X------------------------------X
@@ -566,16 +588,19 @@ public class TestGeospatialFunctions extends RegressionSuite {
     /*
      * X-----X-----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR3
       = "POLYGON((0 0, 1 0 , 2 0 , 0 0))";
     /*
      * X-----X-----X-----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR4
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 0 0))";
     /*
      * X-----X-----X-----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR5
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 0 0))";
     /*
@@ -645,33 +670,33 @@ public class TestGeospatialFunctions extends RegressionSuite {
            + ")";
 
     private static String ISLAND_IN_A_LAKE
-    = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"
-            + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CCW.
-            + "(2 2,  8 2,  8  8, 2  8, 2 2)"  // This is CW.
+    = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"  // This is CCW
+            + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CW.
+            + "(2 2,  2 8,  8  8, 8  2, 2 2)"   // This is CW.
             + ")";
 
 
    private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
-                  GeographyValue.fromText(CROSSED_EDGES)),
-       new Border(101, "Sunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(CW_EDGES)),
+                  GeographyValue.fromWKT(CROSSED_EDGES)),
+       new Border(101, "Sunwise", "Ring 0 encloses more than half the sphere",
+                  GeographyValue.fromWKT(CW_EDGES)),
        new Border(102, "MultiPolygon", "Polygons can have only one shell",
-                  GeographyValue.fromText(MULTI_POLYGON)),
-       new Border(103, "SharedInnerVertices", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(SHARED_INNER_VERTICES)),
-       new Border(104, "SharedInnerEdges", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(SHARED_INNER_EDGES)),
-       new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(INTERSECTING_HOLES)),
-       new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(OUTER_INNER_INTERSECT)),
-       new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(TWO_NESTED_SUNWISE)),
-       new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(TWO_NESTED_WIDDERSHINS)),
-       new Border(110, "IslandInALake", "Polygons can have only one shell.",
-                  GeographyValue.fromText(ISLAND_IN_A_LAKE)),
+                  GeographyValue.fromWKT(MULTI_POLYGON)),
+       new Border(103, "SharedInnerVertices", "Ring 1 crosses ring 2",
+                  GeographyValue.fromWKT(SHARED_INNER_VERTICES)),
+       new Border(104, "SharedInnerEdges", "Ring 1 crosses ring 2",
+                  GeographyValue.fromWKT(SHARED_INNER_EDGES)),
+       new Border(105, "IntersectingHoles", "Ring 1 crosses ring 2",
+                  GeographyValue.fromWKT(INTERSECTING_HOLES)),
+       new Border(106, "OuterInnerIntersect", "Ring 0 crosses ring 1",
+                  GeographyValue.fromWKT(OUTER_INNER_INTERSECT)),
+       new Border(108, "TwoNestedSunwise", "Ring 0 encloses more than half the sphere",
+                  GeographyValue.fromWKT(TWO_NESTED_SUNWISE)),
+       new Border(109, "TwoNestedWiddershins", "Ring 0 encloses more than half the sphere",
+                  GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS)),
+       new Border(110, "IslandInALake", "Polygons can only be shells or holes",
+                  GeographyValue.fromWKT(ISLAND_IN_A_LAKE)),
       /*
        * These are apparently legal. Should they be?
        */
@@ -707,10 +732,40 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
         while (vt.advanceRow()) {
-            assertTrue(String.format("Expected error message containing \"%s\" but got \"%s\"",
-                                       vt.getString(3),
-                                       vt.getString(2)),
-                         vt.getString(2).contains(vt.getString(2)));
+            long pk = vt.getLong(0);
+            String expected = vt.getString(3);
+            String actual = vt.getString(2);
+            assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
+                                       vt.getString(1),
+                                       pk,
+                                       expected,
+                                       actual),
+                         vt.getString(2).equals(vt.getString(3)));
+        }
+    }
+
+    public void testValidPolygonFromText() throws Exception {
+        Client client = getClient();
+        populateBorders(client, invalidBorders);
+        // These should all fail.
+        for (Border b : invalidBorders) {
+            String expectedPattern = b.getMessage();
+            String sql = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
+                                       b.getRegion().toWKT());
+            verifyStmtFails(client, sql, expectedPattern);
+        }
+        // These should all succeed.
+        for (Border b : borders) {
+            if (b.getRegion() != null) {
+                String stmt = String.format("select validpolygonfromtext('%s') from borders where pk = 100",
+                                            b.getRegion().toWKT());
+                ClientResponse cr = client.callProcedure("@AdHoc", stmt);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                VoltTable vt = cr.getResults()[0];
+                while (vt.advanceRow()) {
+                    assertEquals(b.getRegion(), vt.getGeographyValue(0));
+                }
+            }
         }
     }
 
@@ -718,31 +773,40 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
-        // test for border case of rounding up the deciaml number
+        // test for border case of rounding up the decimal number
         client.callProcedure("places.Insert", 50, "Someplace1",
-                GeographyPointValue.geographyPointFromText("POINT(13.4999999999995 17)"));
-        // test for border case of rounding up the deciaml number
+                GeographyPointValue.fromWKT("POINT(13.4999999999995 17)"));
+        // test for border case of rounding up the decimal number
         client.callProcedure("places.Insert", 51, "Someplace2",
-                GeographyPointValue.geographyPointFromText("POINT(-13.499999999999999995 -17)"));
+                GeographyPointValue.fromWKT("POINT(-13.499999999999999995 -17)"));
 
-        VoltTable vt = client.callProcedure("@AdHoc",
+        // get WKT representation using asText()
+        VoltTable asTextVT = client.callProcedure("@AdHoc",
                 "select loc, asText(loc) from places order by pk").getResults()[0];
 
-        while (vt.advanceRow()) {
-            GeographyPointValue gpv = vt.getPoint(0);
+        // get WKT representation using cast(point as varchar)
+        VoltTable castVT =  client.callProcedure("@AdHoc",
+                "select loc, cast(loc as VARCHAR) from places order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
+        while (asTextVT.advanceRow()) {
+            GeographyPointValue gpv = asTextVT.getGeographyPointValue(0);
             if (gpv == null) {
-                assertEquals(null, vt.getString(1));
+                assertEquals(null, asTextVT.getString(1));
             }
             else {
-                assertEquals(gpv.toString(), vt.getString(1));
+                assertEquals(gpv.toString(), asTextVT.getString(1));
             }
         }
+        // verify WKT from asText and cast(point as varchar) results in same result WKT.
+        assertEquals(asTextVT, castVT);
     }
 
     public void testPolygonAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
-        // polygon whose co-ordinates are mix of decimal and whole numbers
+        // polygon whose co-ordinates are mix of decimal and whole numbers - test
+        // decimal rounding border cases
         Border someWhere = new Border(50, "someWhere", "someWhere",
                 new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
                                              "-14.1234567891264 10.1234567891234, " +
@@ -753,7 +817,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         VoltTable vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        // polygon with hole whose co-ordinates are whole numbers
+        // polygon with 2 holes and whose vertices are whole numbers - test for whole number rounding
         someWhere = new Border(51, "someWhereWithHoles", "someWhereWithHoles",
                 new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
                                             "(-8 9, -8 8, -9 8, -9 9, -8 9)," +
@@ -761,7 +825,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-
 
         // polygon with hole whose co-ordinates are whole numbers
         someWhere = new Border(52, "someWhereWithHoles", "someWhereWithHoles",
@@ -772,9 +835,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
+        // get WKT representation using asText()
         vt = client.callProcedure("@AdHoc",
                 "select region, asText(region) from borders order by pk").getResults()[0];
 
+        // get WKT representation using cast(polygon as varchar)
+        VoltTable castVT = client.callProcedure("@AdHoc",
+                "select region, cast(region as VARCHAR) from borders order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
         GeographyValue gv;
         while (vt.advanceRow()) {
             gv = vt.getGeographyValue(0);
@@ -786,58 +855,160 @@ public class TestGeospatialFunctions extends RegressionSuite {
             }
         }
 
+        // verify WKT from asText and cast(polygon as varchar) results are same.
+        assertEquals(vt, castVT);
     }
 
-    public void testPointPlygonAsTextNegative() throws Exception {
+    public void testPointPolygonAsTextNegative() throws Exception {
         Client client = getClient();
         populateTables(client);
 
         verifyStmtFails(client, "select asText(?) from places order by pk",
-                "data type cast needed for parameter or null literal: "
-                        + "input type to ASTEXT function is ambiguous");
+                                "data type cast needed for parameter or null literal: "
+                              + "input type to ASTEXT function is ambiguous");
         verifyStmtFails(client, "select asText(null) from places order by pk",
-                "data type cast needed for parameter or null literal: "
-                        + "input type to ASTEXT function is ambiguous");
+                                "data type cast needed for parameter or null literal: "
+                              + "input type to ASTEXT function is ambiguous");
         verifyStmtFails(client, "select asText(pk) from borders order by pk",
-                "incompatible data type in operation: "
-                        + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
+                                "incompatible data type in operation: "
+                              + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
+    }
+
+    public void testPolygonPointDWithin() throws Exception {
+        final double DISTANCE_EPSILON = 1.0e-8;
+        Client client = getClient();
+        populateTables(client);
+        String sql;
+
+        // polygon-to-point
+        sql = "create procedure DWithin_Proc as select borders.name, places.name, distance(borders.region, places.loc) as distance "
+                + "from borders, places where DWithin(borders.region, places.loc, ?) and borders.pk = 1 "
+                + "order by distance, borders.pk, places.pk;";
+        client.callProcedure("@AdHoc", sql);
+        client.callProcedure("places.Insert", 50, "San Jose",
+                GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
+        client.callProcedure("places.Insert", 51, "Boston",
+                GeographyPointValue.fromWKT("POINT(-71.069862 42.338100)"));
+
+        VoltTable vt1;
+        VoltTable vt2;
+
+        String prefix;
+
+        // polygon-to-point
+        vt1 = client.callProcedure("DWithin_Proc", 50000.1).getResults()[0];
+        assertApproximateContentOfTable(new Object[][]
+                {{"Wyoming",    "Cheyenne",                             0.0},
+                 {"Wyoming",    "Point on N Wyoming Border",            0.0},
+                 {"Wyoming",    "Point on E Wyoming Border",            0.0},
+                 {"Wyoming",    "Point On S Wyoming Border",            0.0},
+                 {"Wyoming",    "Point On W Wyoming Border",            0.0},
+                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770308670798656E-10},
+                 {"Wyoming",    "West Point Not on Wyoming Border",     495.81208205561956},
+                 {"Wyoming",    "Point near N Colorado border",         2382.072566994318},
+                 {"Wyoming",    "North Point Not On Colorado Border",   4045.11696044222},
+                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.354425089678},
+                 {"Wyoming",    "Fort Collins",                         48820.514427535185},
+                }, vt1, DISTANCE_EPSILON);
+        vt1.resetRowPosition();
+        prefix = "Assertion failed comparing results from DWithin and Distance functions: ";
+
+        // verify results of within using DISTANCE function
+        sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
+                + "from borders, places where (distance(borders.region, places.loc) <= 50000.1) and borders.pk = 1 "
+                + "order by distance, borders.pk, places.pk;";
+        vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, vt2, vt1);
+
+        // distance argument is null
+        sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, NULL);";
+        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt1.getRowCount());
+
+        // point-to-point
+        sql = "select A.name, B.name, distance(A.loc, B.loc) as distance "
+                + "from places A, places B where DWithin(A.loc, B.loc, 100000) and A.pk <> B.pk "
+                + "order by distance, A.pk, B.pk;";
+        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "select A.name, B.name, distance(A.loc, B.loc) as distance "
+                + "from places A, places B where distance(A.loc, B.loc) <= 100000 and A.pk <> B.pk "
+                + "order by distance, A.pk, B.pk;";
+        vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, vt2, vt1);
+
+        // test results of within using contains function
+        prefix = "Assertion failed comparing results from DWithin and Contains functions: ";
+        sql = "select borders.name, places.name "
+                + "from borders, places where DWithin(borders.region, places.loc, 0) "
+                + "order by borders.pk, places.pk;";
+        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "select borders.name, places.name "
+                + "from borders, places where Contains(borders.region, places.loc) "
+                + "order by borders.pk, places.pk;";
+        vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, vt2, vt1);
+
+        sql = "select borders.name, places.name "
+                + "from borders, places where NOT DWithin(borders.region, places.loc, 0) "
+                + "order by borders.pk, places.pk;";
+        vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
+
+        sql = "select borders.name, places.name "
+                + "from borders, places where NOT Contains(borders.region, places.loc) "
+                + "order by borders.pk, places.pk;";
+        vt2 = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTablesAreEqual(prefix, vt2, vt1);
+    }
+
+    public void testPolygonPointDWithinNegative() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        String sql;
+        String expectedMsg;
+
+        // DWITHIN between polygon and polygon is not supported
+        sql = "select A.name, B.name from borders A, borders B where DWithin(A.region, B.region, 100);";
+        expectedMsg = "incompatible data type in operation: DWITHIN between two POLYGONS not supported";
+        verifyStmtFails(client, sql, expectedMsg);
+
+        // types others than point and polygon in first two input arguments not supported
+        sql = "select places.name, DWithin(borders.region, borders.pk, 100) from borders, places where borders.pk = places.pk;";
+        expectedMsg = "incompatible data type in operation: DWITHIN function evaulates if geographies are within specified "
+                    + "distance of one-another for POINT-to-POINT, POINT-to-POLYGON and POLYGON-to-POINT geographies only.";
+        verifyStmtFails(client, sql, expectedMsg);
+
+        // input type for distance argument other than numeric
+        sql = "select places.name, DWithin(borders.region, places.loc, borders.name) from borders, places;";
+        expectedMsg = "incompatible data type in operation: input type DISTANCE to DWITHIN function must be non-negative numeric value";
+        verifyStmtFails(client, sql, expectedMsg);
+
+        // negative value used for input distance argument
+        sql = "select places.name from borders, places where  DWithin(borders.region, places.loc, -1) ;";
+        expectedMsg = "Invalid input to DWITHIN function: 'Value of DISTANCE argument must be non-negative'";
+        verifyStmtFails(client, sql, expectedMsg);
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeospatialFunctions.class);
-        boolean success;
-
+                new MultiConfigSuiteBuilder(TestGeospatialFunctions.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        String literalSchema =
-                "CREATE TABLE places (\n"
-                + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  name VARCHAR(64),\n"
-                + "  loc GEOGRAPHY_POINT\n"
-                + ");\n"
-                + "CREATE TABLE borders (\n"
-                + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  name VARCHAR(64),\n"
-                + "  message VARCHAR(64),\n"
-                + "  region GEOGRAPHY\n"
-                + ");\n"
-                + "\n"
-                ;
         try {
-            project.addLiteralSchema(literalSchema);
-        }
-        catch (Exception e) {
-            fail();
-        }
+            VoltServerConfig config = null;
+            boolean success;
 
-        config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
+            setUpSchema(project);
+            config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            project.setUseDDLSchema(true);
+            success = config.compile(project);
+            assertTrue(success);
+            builder.addServerConfig(config);
+        } catch  (IOException excp) {
+            assert (false);
+        }
         return builder;
     }
 }

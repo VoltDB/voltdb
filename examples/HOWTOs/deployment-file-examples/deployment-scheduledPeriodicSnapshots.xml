@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+    This deployment file config will attempt to
+    write a full disk snapshot cluster-wide every
+    30 minutes. It will keep 3 snapshots and delete
+    old snapshots on a rotating basis.
+
+    Note if you are using command logging, these
+    snapshots are in addition to periodic truncation
+    snapshots.
+
+    See:
+    https://docs.voltdb.com/UsingVoltDB/SaveSnapshotAuto.php
+-->
+<deployment>
+    <cluster hostcount="1"/>
+    <snapshot prefix="exampleprefix"
+          frequency="30m"
+          retain="3"
+    />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+</deployment>

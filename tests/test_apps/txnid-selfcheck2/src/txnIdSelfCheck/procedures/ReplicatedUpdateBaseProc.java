@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
     public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY r.cid, r.rid desc;");
 
     public final SQLStmt r_cleanUp = new SQLStmt(
             "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
@@ -38,10 +38,13 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
             "SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
 
     public final SQLStmt r_insert = new SQLStmt(
-            "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt r_export = new SQLStmt(
-            "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
+    public final SQLStmt r_getViewData = new SQLStmt(
+            "SELECT * FROM replview WHERE cid=? ORDER BY cid DESC;");
 
     // This is for DR. Make sure that the MP transaction gets inserted into the same place in the txn stream
     // at the master and replica.  If they differ, we should get a hash mismatch at the Doctor Agent since we've

@@ -293,7 +293,7 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     /**
-     *  Returns the HsqlName object fo the table
+     *  Returns the HsqlName object for the table
      */
     @Override
     public final HsqlName getName() {

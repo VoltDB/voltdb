@@ -29,8 +29,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
-import org.voltdb.ConsumerDRGateway;
-import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
@@ -76,7 +74,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           ProducerDRGateway drGateway,
-                          ConsumerDRGateway consumerDRGateway,
                           boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -87,7 +84,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
-                null, null, consumerDRGateway);
+                null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
@@ -121,13 +118,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                DRLogSegmentId drLogInfo = null;
-                long localMpUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    drLogInfo = res.m_binaryLogInfo;
-                    localMpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -163,10 +156,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-
-                    if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localMpUniqueId);
-                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -210,7 +199,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
-        m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context, csp);
     }

@@ -62,8 +62,15 @@ public:
         return pid(uid) == MP_INIT_PID;
     }
 
-    static int64_t timestampAndCounter(UniqueId uid) {
-        return (uid >> PARTITIONID_BITS) & TIMESTAMP_PLUS_COUNTER_MAX_VALUE;
+    static int64_t timestampSinceUnixEpoch(UniqueId uid) {
+        return tsCounterSinceUnixEpoch((uid >> PARTITIONID_BITS) & TIMESTAMP_PLUS_COUNTER_MAX_VALUE);
+    }
+
+    // Convert this into a microsecond-resolution timestamp based on Unix epoch;
+    // treat the time portion as the time in milliseconds, and the sequence
+    // number as if it is a time in microseconds
+    static int64_t tsCounterSinceUnixEpoch(int64_t tsCounter) {
+        return (tsCounter >> COUNTER_BITS) * 1000 + VOLT_EPOCH + (tsCounter & COUNTER_MAX_VALUE);
     }
 
     const int64_t uid;

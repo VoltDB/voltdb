@@ -23,6 +23,7 @@
 
 package com.procedures;
 
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -41,6 +42,7 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public final SQLStmt checkItemExists = new SQLStmt("SELECT * FROM ITEM LIMIT 1");
 
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
         if (items != null) {
@@ -51,9 +53,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
                 return null;
 
             // now we know the partition is not loaded yet
-            voltLoadTable("cluster", "database", "ITEM", items, false, false);
+            DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ITEM", items, false, false);
         }
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
+        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
         return null;
     }
 

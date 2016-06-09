@@ -24,10 +24,9 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google_voltpatches.common.base.Throwables;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -42,9 +41,12 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
 
+import com.google_voltpatches.common.base.Throwables;
+
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
+    private static RateLimitedLogger rateLimitedLogger;
+    private static long m_logRate;
 
     final PicoNetwork m_network;
     final FHInputHandler m_handler;
@@ -64,6 +66,10 @@ public class ForeignHost {
 
     private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
 
+    // used to immediately cut off reads from a foreign host
+    // great way to trigger a heartbeat timout / simulate a network partition
+    private AtomicBoolean m_linkCutForTest = new AtomicBoolean(false);
+
     public static final int POISON_PILL = -1;
 
     public static final int CRASH_ALL = 0;
@@ -80,6 +86,11 @@ public class ForeignHost {
 
         @Override
         public void handleMessage(ByteBuffer message, Connection c) throws IOException {
+            // if this link is "gone silent" for partition tests, just drop the message on the floor
+            if (m_linkCutForTest.get()) {
+                return;
+            }
+
             handleRead(message, c);
         }
 
@@ -119,6 +130,16 @@ public class ForeignHost {
         }
     }
 
+    private void setLogRate(long deadHostTimeout) {
+        int logRate;
+        if (deadHostTimeout < 30 * 1000)
+            logRate = (int) (deadHostTimeout / 3);
+        else
+            logRate = 10 * 1000;
+        rateLimitedLogger = new RateLimitedLogger(logRate, hostLog, Level.WARN);
+        m_logRate = logRate;
+    }
+
     /** Create a ForeignHost and install in VoltNetwork */
     ForeignHost(HostMessenger host, int hostId, SocketChannel socket, int deadHostTimeout,
             InetSocketAddress listeningAddress, PicoNetwork network)
@@ -133,6 +154,8 @@ public class ForeignHost {
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
         m_network = network;
+
+        setLogRate(deadHostTimeout);
     }
 
     public void enableRead(Set<Long> verbotenThreads) {
@@ -240,7 +263,7 @@ public class ForeignHost {
          * Try and give some warning when a connection is timing out.
          * Allows you to observe the liveness of the host receiving the heartbeats
          */
-        if (current_delta > 10 * 1000) {
+        if (current_delta > m_logRate) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
                         + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
@@ -394,5 +417,14 @@ public class ForeignHost {
 
     public void updateDeadHostTimeout(int timeout) {
         m_deadHostTimeout = timeout;
+        setLogRate(timeout);
+    }
+
+    /**
+     * used to immediately cut off reads from a foreign host
+     * great way to trigger a heartbeat timout / simulate a network partition
+     */
+    void cutLink() {
+        m_linkCutForTest.set(true);
     }
 }

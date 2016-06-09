@@ -27,6 +27,7 @@ import java.util.Random;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 @ProcInfo(
     partitionInfo = "export_partitioned_table.rowid:0",
@@ -40,7 +41,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
     public long run(long rowid, int reversed)
     {
         @SuppressWarnings("deprecation")
-        long txid = getVoltPrivateRealTransactionIdDontUseMe();
+        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(txid);
@@ -51,10 +52,11 @@ public class JiggleExportSinglePartition extends VoltProcedure {
           Uncomment this to duplicate the export data in memory.
           Useful for debugging export data correctness, but not useful
           for not running out of memory....
+         */
 
         voltQueueSQL(
                       insert
-                    , getVoltPrivateRealTransactionIdDontUseMe()
+                    , DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                     , rowid
                     , record.rowid_group
                     , record.type_null_tinyint
@@ -78,7 +80,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
-        */
+        /**/
 
         voltQueueSQL(
                      export

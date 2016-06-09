@@ -189,6 +189,22 @@ public class VoltFile extends File {
         m_voltFilePrefix = null;
     }
 
+    public static void recursivelyDelete(File file, boolean deleteRoot) throws IOException {
+        if (!file.exists()) {
+            return;
+        }
+
+        if (deleteRoot) {
+            recursivelyDelete(file);
+        } else {
+            if (file.isDirectory()) {
+                for (File f : file.listFiles()) {
+                    recursivelyDelete(f);
+                }
+            }
+        }
+    }
+
     /*
      * One of those why doesn't Java ship with this functions
      */

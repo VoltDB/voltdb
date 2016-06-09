@@ -47,7 +47,7 @@ import org.voltcore.logging.VoltLogger;
 //    )
 
 public class MatchRows extends VoltProcedure {
-    public final SQLStmt matchSelect = new SQLStmt("select key from kafkaImportTable1 as ki, kafkaMirrorTable1 as km where ki.key = km.key and ki.value = km.value order by ki.key");
+    public final SQLStmt matchSelect = new SQLStmt("select ki.key from kafkaImportTable1 as ki, kafkaMirrorTable1 as km where ki.key = km.key and ki.value = km.value order by ki.key");
 
     public VoltTable[] run()
     {

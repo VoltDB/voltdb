@@ -11,8 +11,6 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
-
-import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -89,6 +87,7 @@ class Plot:
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
+        plt.axvline(x=datetime.datetime(2016,1,11,12,00,0),color='black')
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
         xmin, xmax = plt.xlim()
@@ -177,7 +176,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 q = (ma[-1]-median)/median*100.
 
                 if failed != 0:
-                    if p<10:
+                    if abs(p) < 10:
                         color = 'yellow'
                     else:
                         color = 'red'
