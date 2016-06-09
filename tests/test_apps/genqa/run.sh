@@ -182,8 +182,7 @@ function server-pg-geo() {
     $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
     sleep 5
     wait-for-create
-    $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
-    $VOLTDB_BIN/sqlcmd < ddl-geo-nocat.sql
+    $VOLTDB_BIN/sqlcmd < ddl-nocat-geo.sql
 
 }
 
