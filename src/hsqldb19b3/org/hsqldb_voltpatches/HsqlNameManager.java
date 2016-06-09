@@ -75,7 +75,7 @@ public final class HsqlNameManager {
 
     static {
         for (int i = 0; i < autoColumnNames.length; i++) {
-            autoColumnNames[i] = new HsqlName(staticManager, makeAutoColumnName(i), 0,
+            autoColumnNames[i] = new HsqlName(staticManager, makeAutoColumnName("C", i), 0,
                                               false);
             autoNoNameColumnNames[i] = String.valueOf(i);
         }
@@ -215,24 +215,23 @@ public final class HsqlNameManager {
             return autoColumnNames[i];
         }
 
-        return new HsqlName(staticManager, "C_" + (i + 1), 0, false);
+        return new HsqlName(staticManager, makeAutoColumnName("C_", i), 0, false);
     }
 
-    /**
-     * Column index i is 0 based, returns 1 based numbered column.
-     */
     static public String getAutoColumnNameString(int i) {
 
         if (i < autoColumnNames.length) {
             return autoColumnNames[i].name;
         }
 
-        return makeAutoColumnName(i);
+        return makeAutoColumnName("C", i);
     }
 
-    private static String makeAutoColumnName(int i) {
-        // TODO Auto-generated method stub
-        return "C" + (i + 1);
+    /**
+     * Column index i is 0 based, returns 1 based numbered column.
+     */
+    private static String makeAutoColumnName(String prefix, int i) {
+        return prefix + (i + 1);
     }
 
     static public String getAutoNoNameColumnString(int i) {
@@ -551,5 +550,9 @@ public final class HsqlNameManager {
 
             return !Tokens.isKeyword(name);
         }
+    }
+
+    public static SimpleName getAutoColumnName(String realAlias) {
+        return new HsqlName(staticManager, realAlias, 0, false);
     }
 }
