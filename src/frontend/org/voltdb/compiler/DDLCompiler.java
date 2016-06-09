@@ -78,11 +78,14 @@ import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
+import org.voltdb.planner.parseinfo.BranchNode;
+import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.JoinType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -2852,6 +2855,7 @@ public class DDLCompiler {
         // this is not the optimal index candidate for now
         return false;
     }
+
     /**
      * Build the abstract expression representing the partial index predicate.
      * Verify it satisfies the rules. Throw error messages otherwise.
@@ -2895,6 +2899,26 @@ public class DDLCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
         return predicate;
+    }
+
+    /**
+     * If the view is defined on joint tables (>1 source table),
+     * check if there are self-joins.
+     *
+     * @param tableList The list of view source tables.
+     * @param compiler The VoltCompiler
+     * @throws VoltCompilerException
+     */
+    private static void checkViewSources(ArrayList<Table> tableList, VoltCompiler compiler)
+                                             throws VoltCompilerException {
+        HashSet<String> tableSet = new HashSet<String>();
+        for (Table tbl : tableList) {
+            if (! tableSet.add(tbl.getTypeName())) {
+                String errMsg = "Table " + tbl.getTypeName() + " appeared in the table list more than once: " +
+                                "materialized view does not support self-join.";
+                throw compiler.new VoltCompilerException(errMsg);
+            }
+        }
     }
 
     /**
@@ -2994,10 +3018,8 @@ public class DDLCompiler {
             throw compiler.new VoltCompilerException(msg.toString());
         }
 
-        if (stmt.m_tableList.size() != 1) {
-            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-                       "Only one source table is allowed.");
-            throw compiler.new VoltCompilerException(msg.toString());
+        if (! stmt.m_joinTree.allInnerJoins()) {
+            throw compiler.new VoltCompilerException("Materialized view only supports INNER JOIN.");
         }
 
         if (stmt.orderByColumns().size() != 0) {
@@ -3017,6 +3039,13 @@ public class DDLCompiler {
 
         if (displayColCount <= groupColCount) {
             msg.append("has too few columns.");
+            throw compiler.new VoltCompilerException(msg.toString());
+        }
+
+        checkViewSources(stmt.m_tableList, compiler);
+        if (stmt.m_tableList.size() != 1) {
+            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+                       "Only one source table is allowed.");
             throw compiler.new VoltCompilerException(msg.toString());
         }
 
