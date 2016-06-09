@@ -75,7 +75,7 @@ public final class HsqlNameManager {
 
     static {
         for (int i = 0; i < autoColumnNames.length; i++) {
-            autoColumnNames[i] = new HsqlName(staticManager, "?C" + (i + 1) + "?", 0,
+            autoColumnNames[i] = new HsqlName(staticManager, makeAutoColumnName(i), 0,
                                               false);
             autoNoNameColumnNames[i] = String.valueOf(i);
         }
@@ -227,6 +227,11 @@ public final class HsqlNameManager {
             return autoColumnNames[i].name;
         }
 
+        return makeAutoColumnName(i);
+    }
+
+    private static String makeAutoColumnName(int i) {
+        // TODO Auto-generated method stub
         return "C" + (i + 1);
     }
 
