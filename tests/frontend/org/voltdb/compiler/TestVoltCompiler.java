@@ -2484,7 +2484,7 @@ public class TestVoltCompiler extends TestCase {
         // 2. Test self-join
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in table list more than once: " +
+        checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
                                                "materialized view does not support self-join.");
         // 3. Test table join subquery.
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
