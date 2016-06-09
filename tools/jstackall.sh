@@ -21,7 +21,7 @@ do
         ls -1 ${victim}.jmap[0-9]* 2>/dev/null | sort -t. -k3 -n -r | awk -F\. '{O=$0; $(NF)++; OFS="."; system("mv "O" "$0)}'
         mv ${victim}.jmap ${victim}.jmap.1
     fi
-    jmap -heap:format=b ${victim} > ${victim}.jmap
+    jmap -dump:file=${victim}.jmap ${victim}
     if [ -e "${victim}.jstack" ]; then
         ls -1 ${victim}.jstack.[0-9]* 2>/dev/null | sort -t. -k3 -n -r | awk -F\. '{O=$0; $(NF)++; OFS="."; system("mv "O" "$0)}'
         mv ${victim}.jstack ${victim}.jstack.1
