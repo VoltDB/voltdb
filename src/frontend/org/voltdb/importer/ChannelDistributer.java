@@ -448,9 +448,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     itr.remove();
                 } else if (unregistered.contains(assignment.getImporter())) {
                     itr.remove();
-                    LOG.warn("(" + m_hostId
-                             + ") disgarding assignment to unregistered importer "
-                             + assignment);
+                    if (!assignment.getAdded().isEmpty()) {
+                        LOG.warn("(" + m_hostId
+                                + ") discarding assignment to unregistered importer "
+                                + assignment);
+                    }
                 }
             }
         }
@@ -544,7 +546,8 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 NavigableSet<String> unregistered = m_unregistered.getReference();
                 if (registered.contains(assignment.getImporter())) {
                     m_eb.post(assignment);
-                } else if (unregistered.contains(assignment.getImporter())) {
+                } else if (!assignment.getAdded().isEmpty()
+                        && unregistered.contains(assignment.getImporter())) {
                     LOG.warn("(" + m_hostId
                             + ") disgarding assignment to unregistered importer "
                             + assignment);

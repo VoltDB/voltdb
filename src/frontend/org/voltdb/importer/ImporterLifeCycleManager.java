@@ -135,7 +135,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
-            m_distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
+            m_distributer.registerChannels(m_distributerDesignation, m_configs.keySet());
         }
     }
 
@@ -259,11 +259,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         if (!m_starting.get()) return;
 
-        m_distributer.unregisterCallback(m_distributerDesignation);
-
         stopImporters(oldReference.values());
         if (!m_factory.isImporterRunEveryWhere()) {
             m_distributer.registerChannels(m_distributerDesignation, Collections.<URI> emptySet());
+            m_distributer.unregisterCallback(m_distributerDesignation);
         }
 
         if (m_executorService != null) {
