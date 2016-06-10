@@ -352,7 +352,8 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
- MaterializedViewMetadata.cpp
+ MaterializedViewInsertTrigger.cpp
+ MaterializedViewWriteTrigger.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
  RecoveryContext.cpp

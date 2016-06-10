@@ -43,13 +43,30 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
 #include <sstream>
 #include <cassert>
 #include <cstdio>
 #include <algorithm>    // std::find
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-#include "storage/persistenttable.h"
+
+#include "persistenttable.h"
+
+#include "AbstractDRTupleStream.h"
+#include "ConstraintFailureException.h"
+#include "CopyOnWriteContext.h"
+#include "DRTupleStreamUndoAction.h"
+#include "MaterializedViewWriteTrigger.h"
+#include "PersistentTableStats.h"
+#include "PersistentTableUndoInsertAction.h"
+#include "PersistentTableUndoDeleteAction.h"
+#include "PersistentTableUndoTruncateTableAction.h"
+#include "PersistentTableUndoUpdateAction.h"
+#include "TableCatalogDelegate.hpp"
+#include "tablefactory.h"
+#include "tableiterator.h"
+#include "TupleStreamException.h"
 
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -70,20 +87,6 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
-#include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
-#include "storage/TableCatalogDelegate.hpp"
-#include "storage/PersistentTableStats.h"
-#include "storage/PersistentTableUndoInsertAction.h"
-#include "storage/PersistentTableUndoDeleteAction.h"
-#include "storage/PersistentTableUndoTruncateTableAction.h"
-#include "storage/PersistentTableUndoUpdateAction.h"
-#include "storage/DRTupleStreamUndoAction.h"
-#include "storage/ConstraintFailureException.h"
-#include "storage/TupleStreamException.h"
-#include "storage/CopyOnWriteContext.h"
-#include "storage/MaterializedViewMetadata.h"
-#include "storage/AbstractDRTupleStream.h"
 
 namespace voltdb {
 void* keyTupleStorage = NULL;

@@ -15,12 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MATERIALIZEDVIEWMETADATA_H_
-#define MATERIALIZEDVIEWMETADATA_H_
+#ifndef MATERIALIZEDVIEWINSERTTRIGGER_H_
+#define MATERIALIZEDVIEWINSERTTRIGGER_H_
 
 #include "catalog/catalogmap.h"
 #include "catalog/materializedviewinfo.h"
 #include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
 
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
@@ -148,7 +149,11 @@ protected:
     // 'after' versions of a truncated source table to share the predicate
     // until the transaction ends, leaving only one of them.
     boost::shared_ptr<AbstractExpression> m_filterPredicate;
-    inline bool failsPredicate(const TableTuple& tuple) const;
+
+    inline bool failsPredicate(const TableTuple& tuple) const {
+        return (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue());
+    }
+
     std::vector<AbstractExpression *> m_groupByExprs;
     std::vector<int32_t> m_groupByColIndexes;
     // How many columns (or expressions) is the view aggregated on?
@@ -191,84 +196,12 @@ public:
                       PersistentTable *destTable,
                       catalog::MaterializedViewInfo *mvInfo);
 private:
- MaterializedViewStreamInsertTrigger(PersistentTable *destTable,
-                                     catalog::MaterializedViewInfo *mvInfo);
-};
-
-
-/**
- * Manage the inserts, deletes and updates for a materialized view table based
- * on inserts, deletes and updates to a source table. An instance sits between
- * two tables translasting changes in one table into changes in the other table.
- * The factory method, build, uses information parsed from the catalog to configure
- * initializers for the private constructor.
- */
-class MaterializedViewWriteTrigger : public MaterializedViewInsertTrigger {
-public:
-    static void build(PersistentTable *srcTable,
-                      PersistentTable *destTable,
-                      catalog::MaterializedViewInfo *mvInfo);
-    ~MaterializedViewWriteTrigger();
-
-    /**
-     * This updates the materialized view desitnation table to reflect
-     * write operations to the source table.
-     * Called when the source table is deleting a tuple,
-     * OR as a first step when the source table is updating a tuple
-     * -- followed by a compensating call to processTupleInsert.
-     */
-    void processTupleDelete(const TableTuple &oldTuple, bool fallible);
-
-    void updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-    {
-        MaterializedViewInsertTrigger::updateDefinition(destTable, mvInfo);
-        setupMinMaxRecalculation(mvInfo->indexForMinMax(),
-                                 mvInfo->fallbackQueryStmts());
-    }
-
-
-private:
-
-    MaterializedViewWriteTrigger(PersistentTable *srcTable,
-                                 PersistentTable *destTable,
-                                 catalog::MaterializedViewInfo *mvInfo);
-
-    void setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
-                                  const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
-
-    void allocateMinMaxSearchKeyTuple();
-
-    NValue findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
-                                          const NValue &existingValue,
-                                          const NValue &initialNull,
-                                          int negate_for_min,
-                                          int aggIndex,
-                                          int minMaxAggIdx);
-
-    NValue findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
-                                             const NValue &existingValue,
-                                             const NValue &initialNull,
-                                             int negate_for_min,
-                                             int aggIndex);
-
-    NValue findFallbackValueUsingPlan(const TableTuple& oldTuple,
-                                      const NValue &initialNull,
-                                      int aggIndex,
-                                      int minMaxAggIdx);
-
-    // the source persistent table
-    PersistentTable *m_srcPersistentTable;
-    TableTuple m_minMaxSearchKeyTuple;
-    boost::shared_array<char> m_minMaxSearchKeyBackingStore;
-    size_t m_minMaxSearchKeyBackingStoreSize;
-    // the index on srcTable which can be used to find each fallback min or max column.
-    std::vector<TableIndex *> m_indexForMinMax;
-    // Executor vectors to be executed when fallback on min/max value is needed (ENG-8641).
-    std::vector<boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
-    std::vector<bool> m_usePlanForAgg;
-
+    MaterializedViewStreamInsertTrigger(PersistentTable *destTable,
+                                        catalog::MaterializedViewInfo *mvInfo)
+        : MaterializedViewInsertTrigger(destTable, mvInfo)
+    { }
 };
 
 } // namespace voltdb
 
-#endif // MATERIALIZEDVIEWMETADATA_H_
+#endif // MATERIALIZEDVIEWINSERTTRIGGER_H_

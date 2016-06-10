@@ -33,7 +33,7 @@
 #include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
-#include "storage/MaterializedViewMetadata.h"
+#include "storage/MaterializedViewWriteTrigger.h"
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"

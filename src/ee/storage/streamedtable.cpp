@@ -17,10 +17,11 @@
 
 #include "streamedtable.h"
 
-#include "StreamedTableUndoAction.hpp"
 #include "ExportTupleStream.h"
+#include "MaterializedViewInsertTrigger.h"
+#include "StreamedTableUndoAction.hpp"
 #include "tableiterator.h"
-#include "MaterializedViewMetadata.h"
+
 #include "catalog/materializedviewinfo.h"
 #include "common/executorcontext.hpp"
 
