@@ -456,13 +456,14 @@ public final class InvocationDispatcher {
                         task.getSerializedSize(),
                         nowNanos);
         if (!success) {
-            // HACK: this return is for the DR agent so that it
-            // will move along on duplicate replicated transactions
-            // reported by the slave cluster.  We report "SUCCESS"
-            // to keep the agent from choking.  ENG-2334
+            // when VoltDB.crash... is called, we close off the client interface
+            // and it might not be possible to create new transactions.
+            // Return an error.
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
-                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                    + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
         }
 
