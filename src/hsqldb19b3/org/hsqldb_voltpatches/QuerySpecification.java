@@ -1682,12 +1682,16 @@ public class QuerySpecification extends QueryExpression {
         sb.append(super.toString()).append("[\n");
 
         if (sortAndSlice.limitCondition != null) {
-            sb.append("offset=[").append(
-                sortAndSlice.limitCondition.getLeftNode().describe(
-                    session)).append("]\n");
-            sb.append("limit=[").append(
-                sortAndSlice.limitCondition.getRightNode().describe(
-                    session)).append("]\n");
+        	if (sortAndSlice.limitCondition.getLeftNode() != null) {
+        		sb.append("offset=[").append(
+        				sortAndSlice.limitCondition.getLeftNode().describe(
+        						session)).append("]\n");
+        	}
+        	if (sortAndSlice.limitCondition.getRightNode() != null) {
+        		sb.append("limit=[").append(
+        				sortAndSlice.limitCondition.getRightNode().describe(
+        						session)).append("]\n");
+        	}
         }
 
         sb.append("isDistinctSelect=[").append(isDistinctSelect).append("]\n");
