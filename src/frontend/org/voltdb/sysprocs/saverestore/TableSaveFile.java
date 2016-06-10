@@ -324,7 +324,7 @@ public class TableSaveFile
         } catch (JSONException e) {
             throw new IOException(e);
         }
-            }
+    }
 
     public int[] getVersionNumber()
     {

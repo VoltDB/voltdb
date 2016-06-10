@@ -431,4 +431,15 @@ public class BranchNode extends JoinNode {
         }
         return false;
     }
+
+    /**
+     * Returns if all the join operations within this join tree are inner joins.
+     * @return true or false.
+     */
+    @Override
+    public boolean allInnerJoins() {
+        return m_joinType == JoinType.INNER &&
+               (m_leftNode == null || m_leftNode.allInnerJoins()) &&
+               (m_rightNode == null || m_rightNode.allInnerJoins());
+    }
 }

@@ -36,10 +36,11 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 /**
- * The repair log stores messages received from a PI in case they need to be
- * shared with less informed RIs should the PI shed its mortal coil.  This includes
- * recording and sharing messages starting and completing multipartition transactions
- * so that a new MPI can repair the cluster state on promotion.
+ * The repair log stores messages received from a partition initiator (leader) in case
+ * they need to be shared with less informed replica initiators should the partition
+ * initiator (leader) shed its mortal coil.  This includes recording and sharing messages
+ * starting and completing multipartition transactions so that a new MPI can repair the
+ * cluster state on promotion.
  */
 public class RepairLog
 {
