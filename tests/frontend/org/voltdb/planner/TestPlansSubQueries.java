@@ -2318,15 +2318,13 @@ public class TestPlansSubQueries extends PlannerTestCase {
 
     /*
      * ENG-10497 wants to make generated column names not conflict with
-     * user column names.  It might be possible to do this in a clever way, by
-     * gathering together all user defined columns first.  But setting the
-     * column name to "?C2?" is actually easier, and may work ok.
+     * user column names.
      */
     public void testGeneratedNamesDontConflict() {
     	String sql = "select C1 from ( select cast(a as varchar), c as c1 from r5 ) as SQ where SQ.C1 < 0;";
-		AbstractPlanNode pn = compile(sql);
-		assertNotNull(pn);
-		VoltType vt = pn.getOutputSchema().getColumns().get(0).getType();
-		assert(VoltType.INTEGER.equals(vt));
+	AbstractPlanNode pn = compile(sql);
+	assertNotNull(pn);
+	VoltType vt = pn.getOutputSchema().getColumns().get(0).getType();
+	assert(VoltType.INTEGER.equals(vt));
     }
 }
