@@ -156,7 +156,7 @@ private:
     /**
      * Only PersistentTable can call the destructor.
      */
-    virtual ~PersistentTableSurgeon();
+    ~PersistentTableSurgeon() { }
 
     PersistentTable &m_table;
 
@@ -295,9 +295,9 @@ public:
     // returned via shallow vector copy -- seems good enough.
     const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
 
-    TableIndex *index(std::string name);
+    TableIndex *index(std::string name) const;
 
-    TableIndex *primaryKeyIndex() { return m_pkeyIndex; }
+    TableIndex *primaryKeyIndex() const { return m_pkeyIndex; }
 
     void configureIndexStats(CatalogId databaseId);
 
@@ -314,8 +314,7 @@ public:
     void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
-    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
-    {
+    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
         updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
         return true;
     }
@@ -353,11 +352,19 @@ public:
 
     int partitionColumn() const { return m_partitionColumn; }
 
+    // The MatViewType typedef is required to satisfy initMaterializedViews
+    // template code that needs to identify
+    // "whatever MaterializedView*Trigger class is used by this *Table class".
+    // There's no reason to actually use MatViewType in the class definition.
+    // That would just make the code a little harder to analyze.
     typedef MaterializedViewWriteTrigger MatViewType;
+
     /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MatViewType* view);
-    void dropMaterializedView(MatViewType* targetView);
-    std::vector<MatViewType*>& views() { return m_views; }
+    void addMaterializedView(MaterializedViewWriteTrigger* view);
+
+    void dropMaterializedView(MaterializedViewWriteTrigger* targetView);
+
+    std::vector<MaterializedViewWriteTrigger*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple &source) {
         assert (m_tempTuple.m_data);
@@ -400,14 +407,14 @@ public:
     }
 
     void doIdleCompaction();
+
     void printBucketInfo();
 
-    void increaseStringMemCount(size_t bytes)
-    {
+    void increaseStringMemCount(size_t bytes) {
         m_nonInlinedMemorySize += bytes;
     }
-    void decreaseStringMemCount(size_t bytes)
-    {
+
+    void decreaseStringMemCount(size_t bytes) {
         m_nonInlinedMemorySize -= bytes;
     }
 
@@ -441,12 +448,9 @@ public:
     // for test purpose
     void setDR(bool flag) { m_drEnabled = flag; }
 
-    void setTupleLimit(int32_t newLimit) {
-        m_tupleLimit = newLimit;
-    }
+    void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
 
-    bool isPersistentTableEmpty() const
-    {
+    bool isPersistentTableEmpty() const {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
         // So, it's OK and possibly MORE correct to count active tuples and ignore the effect of
@@ -461,9 +465,7 @@ public:
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() const {
-        return m_preTruncateTable;
-    }
+    PersistentTable * getPreTruncateTable() const { return m_preTruncateTable; }
 
     PersistentTable * currentPreTruncateTable() {
         if (m_preTruncateTable != NULL) {
@@ -519,8 +521,6 @@ public:
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
-protected:
-    std::vector<uint64_t> getBlockAddresses() const;
 
 private:
     // Zero allocation size uses defaults.
@@ -581,8 +581,6 @@ private:
                                     std::vector<TableIndex*> const &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
-
-    void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
@@ -655,10 +653,10 @@ private:
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
-    std::vector<MatViewType*> m_views;
+    std::vector<MaterializedViewWriteTrigger*> m_views;
 
     // STATS
-    PersistentTableStats stats_;
+    PersistentTableStats m_stats;
     TableStats* getTableStats();
 
     // STORAGE TRACKING
@@ -716,10 +714,7 @@ private:
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
     m_table(table),
     m_indexingComplete(false)
-{}
-
-inline PersistentTableSurgeon::~PersistentTableSurgeon()
-{}
+{ }
 
 inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
@@ -899,8 +894,8 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
-{
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block,
+                                                bool deleteLastEmptyBlock) {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
 
@@ -985,8 +980,7 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock()
-{
+inline TBPtr PersistentTable::allocateNextBlock() {
     TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
     m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);

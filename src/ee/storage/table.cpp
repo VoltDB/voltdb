@@ -153,8 +153,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     // set the data to be empty
     m_tupleCount = 0;
 
-    onSetColumns(); // for more initialization
-
     m_compactionThreshold = compactionThreshold;
 }
 
@@ -420,8 +418,7 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     return true;
 }
 
-bool Table::equals(voltdb::Table *other)
-{
+bool Table::equals(voltdb::Table *other) {
     if (!(columnCount() == other->columnCount())) return false;
     if (!(activeTupleCount() == other->activeTupleCount())) return false;
     if (!(databaseId() == other->databaseId())) return false;

@@ -96,7 +96,7 @@ class Table {
     virtual ~Table();
 
     /*
-     * Table lifespan can be managed bya reference count. The
+     * Table lifespan can be managed by a reference count. The
      * reference is trivial to maintain since it is only accessed by
      * the execution engine thread. Snapshot, Export and the
      * corresponding CatalogDelegate may be reference count
@@ -338,10 +338,6 @@ protected:
     }
 
     virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
-
-    // per table-type initialization
-    virtual void onSetColumns() {
-    };
 
     // ------------------------------------------------------------------
     // DATA

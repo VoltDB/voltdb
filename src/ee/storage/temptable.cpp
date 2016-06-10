@@ -73,11 +73,6 @@ bool TempTable::insertTuple(TableTuple &source) {
     return true;
 }
 
-bool TempTable::deleteTuple(TableTuple &, bool)
-{
-    throwFatalException("TempTable does not support deleting individual tuples");
-}
-
 std::string TempTable::tableType() const { return "TempTable"; }
 
 voltdb::TableStats* TempTable::getTableStats() { return NULL; }

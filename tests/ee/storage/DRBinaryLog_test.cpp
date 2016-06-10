@@ -63,7 +63,10 @@ static int64_t addPartitionId(int64_t value) {
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId) : ExportTupleStream(partitionId, siteId) {}
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId)
+        : ExportTupleStream(partitionId, siteId)
+    { }
+
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                                            int64_t spHandle,
                                            int64_t seqNo,
@@ -74,6 +77,7 @@ public:
         receivedTuples.push_back(tuple);
         return 0;
     }
+
     std::vector<TableTuple> receivedTuples;
 };
 
@@ -136,23 +140,25 @@ public:
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
 
         m_exportStream = new MockExportTupleStream(1, 1);
-        m_conflictExportTable.reset(TableFactory::getStreamedTableForTest(0,
-                                                                          "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
-                                                                          m_exportSchema,
-                                                                          exportColumnName,
-                                                                          m_exportStream,
-                                                                          true));
+        m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
+                "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
+                m_exportSchema,
+                exportColumnName,
+                m_exportStream,
+                true));
         setHashinator(MockHashinator::newInstance());
     }
+
     ~MockVoltDBEngine() { }
 
-    Table* conflictTable() const { return m_conflictExportTable.get(); }
+    StreamedTable* getConflictStreamedTable() const { return m_conflictStreamedTable.get(); }
+
     ExportTupleStream* getExportTupleStream() { return m_exportStream; }
     ExecutorContext* getExecutorContext() { return m_context.get(); }
     void prepareContext() { m_context.get()->bindToThread(); }
 
 private:
-    boost::scoped_ptr<Table> m_conflictExportTable;
+    boost::scoped_ptr<StreamedTable> m_conflictStreamedTable;
     MockExportTupleStream* m_exportStream;
     TupleSchema* m_exportSchema;
     boost::scoped_ptr<ExecutorContext> m_context;
@@ -445,8 +451,8 @@ public:
     }
 
     void enableActiveActive() {
-        m_engine->enableActiveActiveForTest(m_engine->conflictTable(), NULL);
-        m_engineReplica->enableActiveActiveForTest(m_engineReplica->conflictTable(), NULL);
+        m_engine->enableActiveActiveForTest(m_engine->getConflictStreamedTable(), NULL);
+        m_engineReplica->enableActiveActiveForTest(m_engineReplica->getConflictStreamedTable(), NULL);
     }
 
     void createIndexes() {
@@ -517,10 +523,12 @@ public:
         createUniqueIndexes(m_table);
         createUniqueIndexes(m_tableReplica);
     }
+
     void createUniqueIndexes(PersistentTable* table) {
         createUniqueIndex(table, 0, true);
         createUniqueIndex(table, 1);
     }
+
     void createUniqueIndex(PersistentTable* table, int indexColumn, bool isPrimaryKey = false) {
         vector<int> columnIndices;
         columnIndices.push_back(indexColumn);
@@ -716,9 +724,11 @@ protected:
 class StackCleaner {
 public:
     StackCleaner(TableTuple tuple) : m_tuple(tuple) {}
+
     ~StackCleaner() {
         m_tuple.freeObjectColumns();
     }
+
 private:
     TableTuple m_tuple;
 };
