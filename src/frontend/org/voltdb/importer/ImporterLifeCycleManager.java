@@ -159,6 +159,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             s_logger.warn(msg);
             throw new IllegalStateException(msg);
         }
+
+        if (m_stopping) {
+            return;
+        }
+
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
 
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
@@ -168,16 +173,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         List<String> missingAddedURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
             if (m_configs.containsKey(removed)) {
-                try {
-                    AbstractImporter importer = oldReference.get(removed);
-                    if (importer!=null) {
-                        toStop.add(importer);
-                    }
-                } catch(Exception e) {
-                    s_logger.warn(
-                            String.format("Error calling stop on %s in importer %s", removed.toString(), m_factory.getTypeName()),
-                            e);
-                }
+               AbstractImporter importer = oldReference.get(removed);
+               if (importer != null) {
+                    toStop.add(importer);
+               }
             } else {
                 missingRemovedURLs.add(removed.toString());
             }
