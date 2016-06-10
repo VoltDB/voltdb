@@ -27,6 +27,7 @@ import java.util.Iterator;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 import com.google_voltpatches.common.collect.BoundType;
@@ -37,6 +38,7 @@ import com.google_voltpatches.common.collect.TreeRangeSet;
 
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
+    static final VoltLogger log = new VoltLogger("DRAGENT");
 
     private transient RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
@@ -238,6 +240,9 @@ public class DRConsumerDrIdTracker implements Serializable {
             final Range<Long> next = iter.next();
             if (end(next) < newTruncationPoint) {
                 iter.remove();
+                if (size() == 0) {
+                    log.warn("Removing tracker entries. Size is now 0");
+                }
             } else if (next.contains(newTruncationPoint)) {
                 iter.remove();
                 m_map.add(range(newTruncationPoint, end(next)));
