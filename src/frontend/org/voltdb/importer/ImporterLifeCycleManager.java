@@ -61,11 +61,16 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private final AtomicBoolean m_starting = new AtomicBoolean(false);
     // Safe to keep reference here as there is only and it is not susceptible to catalog changes
     private final ChannelDistributer m_distributer;
+    private final String m_distributerDesignation;
 
-    public ImporterLifeCycleManager(AbstractImporterFactory factory, final ChannelDistributer distributer)
+    public ImporterLifeCycleManager(
+            AbstractImporterFactory factory,
+            final ChannelDistributer distributer,
+            String clusterTag)
     {
         m_factory = factory;
         m_distributer = distributer;
+        m_distributerDesignation = m_factory.getTypeName() + "_" + clusterTag;
     }
 
 
@@ -94,7 +99,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     {
         m_starting.compareAndSet(false, true);
         if (!m_factory.isImporterRunEveryWhere()) {
-            m_distributer.registerCallback(m_factory.getTypeName(), this);
+            m_distributer.registerCallback(m_distributerDesignation, this);
         }
 
         if (m_stopping) return;
@@ -139,12 +144,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         for (AbstractImporter importer : importers) {
             submitAccept(importer);
         }
-    }
-
-    @Override
-    public boolean canAcceptAssignments()
-    {
-        return !m_stopping;
     }
 
     /**
@@ -260,9 +259,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         if (!m_starting.get()) return;
 
+        m_distributer.unregisterCallback(m_distributerDesignation);
+
         stopImporters(oldReference.values());
         if (!m_factory.isImporterRunEveryWhere()) {
-            m_distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
+            m_distributer.registerChannels(m_distributerDesignation, Collections.<URI> emptySet());
         }
 
         if (m_executorService != null) {

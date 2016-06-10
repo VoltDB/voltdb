@@ -19,9 +19,6 @@ package org.voltdb.importer;
 
 
 public interface ChannelChangeCallback {
-    default public boolean canAcceptAssignments() {
-        return true;
-    }
     void onChange(ImporterChannelAssignment assignment);
     void onClusterStateChange(VersionedOperationMode mode);
 }
