@@ -75,8 +75,8 @@ public class JDBCGetData {
         try {
             conn = DriverManager.getConnection(connectString, myProp);
             System.out.println("Connected!");
-            if ( config.usegeo ) { 
-                selectStmt = conn.prepareStatement(selectGeoSql); 
+            if ( config.usegeo ) {
+                selectStmt = conn.prepareStatement(selectGeoSql);
             } else {
                 selectStmt = conn.prepareStatement(selectSql);
             }
