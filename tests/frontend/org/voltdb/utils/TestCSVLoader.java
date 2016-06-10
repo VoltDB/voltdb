@@ -1177,9 +1177,9 @@ public class TestCSVLoader {
         };
         String currentTime = new TimestampType().toString();
         String []myData = {
+                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography",
                 "1 ,1,1,11111111,first,1.10,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
                 "2,2,2,222222,second,3.30,NULL,"+currentTime+",POINT(2 2),\"POLYGON((0 0, 2 0, 0 2, 0 0))\"",
-                "clm_integer,clm_tinyint,clm_smallint,clm_bigint,clm_string,clm_decimal,clm_float,clm_timestamp,clm_point,clm_geography",
                 "3,3,3,333333, third ,NULL, 3.33,"+currentTime+",POINT(3 3),\"POLYGON((0 0, 3 0, 0 3, 0 0))\"",
                 "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime+",POINT(4 4),\"POLYGON((0 0, 4 0, 0 4, 0 0))\"",
                 "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime+",POINT(5 5),\"POLYGON((0 0, 5 0, 0 5, 0 0))\"",

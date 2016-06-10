@@ -412,12 +412,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader(new InputStreamReader(System.in)), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip);
+                        config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             } else {
                 tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip);
+                        config.skip, config.header);
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
