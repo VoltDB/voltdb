@@ -76,12 +76,12 @@ function client-help() {
 # run the client that drives the example with some editable options
 function client() {
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark $SERVERS
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark --servers $SERVERS --client
 }
 
 function seed() {
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.SeedTables $SERVERS
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark --servers $SERVERS --seed
 }
 
 

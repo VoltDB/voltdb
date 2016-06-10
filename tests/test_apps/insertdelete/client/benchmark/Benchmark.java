@@ -66,12 +66,28 @@ public class Benchmark {
     public static void main(String[] args) throws Exception {
 
         String serverlist = "localhost";
-        if (args.length > 0) {
-            serverlist = args[0];
+        boolean seed = false, client = false;
+        for (int i=0; i < args.length; i++) {
+            String arg = args[i];
+            if ("--servers".equalsIgnoreCase(arg)) {
+                serverlist = args[++i];
+            } else if ("--seed".equalsIgnoreCase(arg)) {
+                seed = true;
+            } else if ("--client".equalsIgnoreCase(arg)) {
+                client = true;
+            } else {
+                System.out.println("Unknown argument: " + arg);
+            }
         }
-        Benchmark benchmark = new Benchmark(serverlist);
-        benchmark.init();
-        benchmark.runBenchmark();
+
+        if (seed) {
+            SeedTables.seedTables();
+        }
+        if (client) {
+            Benchmark benchmark = new Benchmark(serverlist);
+            benchmark.init();
+            benchmark.runBenchmark();
+        }
 
     }
 }

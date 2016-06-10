@@ -2,11 +2,14 @@ package benchmark;
 
 import java.util.Timer;
 import java.util.TimerTask;
+
 import org.voltdb.*;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.*;
 
 public class BenchmarkStats {
 
+    private final InsertDeleteConfig config;
     private Timer timer;
     private Client client;
     private long startTimeMillis;
@@ -14,10 +17,21 @@ public class BenchmarkStats {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class InsertDeleteConfig extends CLIConfig {
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+    }
+
     public BenchmarkStats(Client client) {
         this.client = client;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
+        this.config = new InsertDeleteConfig();
 
         // start benchmark
 
@@ -95,5 +109,8 @@ public class BenchmarkStats {
         System.out.println(" Latency Histogram");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(stats.latencyHistoReport());
+
+        // 4. Write stats to file if requested
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 }

@@ -5,7 +5,7 @@ import org.voltdb.client.*;
 
 public class SeedTables {
 
-    public static void main(String[] args) throws Exception {
+    public static void seedTables() throws Exception {
 
         /*
          * Instantiate a client and connect to the database.
@@ -44,5 +44,9 @@ public class SeedTables {
 
         }
         System.out.println("Finished seeding " + i + " partitions.");
+    }
+
+    public static void main(String[] args) throws Exception {
+        seedTables();
     }
 }
