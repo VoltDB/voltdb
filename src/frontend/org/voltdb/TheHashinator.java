@@ -77,6 +77,21 @@ public abstract class TheHashinator {
     public abstract byte[] getConfigBytes();
 
     /**
+     * Uncompressed configuration data accessor in JSONString.
+     * @return configuration data JSONString
+     */
+    public abstract String getConfigJSON();
+
+    /**
+     * Compressed configuration data accessor in JSONString.
+     * Default to providing raw bytes, e.g. for legacy
+     * @return configuration data in Compressed JSONString
+     */
+    public byte[] getConfigJSONCompressed(){
+        return getConfigBytes();
+    }
+
+    /**
      * A map to store hashinators, including older versions of hashinators.
      * During live rejoin sites will replay balance fragments in an order that results
      * in some sites skipping ahead to newer hashinators.
