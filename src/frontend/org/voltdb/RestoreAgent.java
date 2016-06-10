@@ -704,17 +704,17 @@ SnapshotCompletionInterest, Promotable
     {
         int partitionCount = -1;
         for (TableFiles tf : s.m_tableFiles.values()) {
-            if (tf.m_isReplicated) {
-                continue;
+            // Check if the snapshot is complete
+            if (tf.m_completed.stream().anyMatch(b->!b)) {
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                                   .append(s.getNonce())
+                                   .append(" because it was not completed.");
+                return null;
             }
 
-            for (boolean completed : tf.m_completed) {
-                if (!completed) {
-                    m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                    .append(s.getNonce())
-                                    .append(" because it was not completed.");
-                    return null;
-                }
+            // Replicated table doesn't check partition count
+            if (tf.m_isReplicated) {
+                continue;
             }
 
             // Everyone has to agree on the total partition count

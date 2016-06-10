@@ -2461,6 +2461,36 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
 
+    private void subTestDDLCompilerMatViewJoin()
+    {
+        String tableDDL;
+        String viewDDL;
+        tableDDL = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                   "CREATE TABLE T3 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n";
+        // 0. Test final guard (to be removed after the feature is done.)
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" has 2 sources. Only one source table is allowed.");
+        // 1. Test INNER JOIN
+        // 1.1 Test one join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 LEFT JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 1.2 Test multiple joins
+        viewDDL = "CREATE VIEW V (aint, bint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, T2.a, count(*), sum(T3.b) FROM T1 JOIN T2 ON T1.a=T2.a RIGHT JOIN T3 on T2.a=T3.a GROUP BY T1.a, T2.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view only supports INNER JOIN.");
+        // 2. Test self-join
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
+                                               "materialized view does not support self-join.");
+        // 3. Test table join subquery.
+        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
+                  "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2) T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
+    }
 
     public void testDDLCompilerMatView()
     {
@@ -2557,6 +2587,8 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view as select id, wage from t group by id, wage;" +
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        subTestDDLCompilerMatViewJoin();
     }
 
     public void testDDLCompilerTableLimit()
