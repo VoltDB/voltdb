@@ -23,6 +23,8 @@
 #include <cassert>
 #include <cstring>
 
+#include <boost/unordered_set.hpp>
+
 namespace voltdb
 {
 // Provide a compacting pool of objects of fixed size. Each object is assumed
@@ -50,10 +52,18 @@ namespace voltdb
         // allocate buffers of size elementSize * elementsPerBuffer bytes.
     CompactingPool(int32_t elementSize, int32_t elementsPerBuffer)
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
+            , m_deferredReleaseMode(false)
+            , m_allocationsPendingRelease()
     { }
+
+    void beginDeferredRelease()
+    {
+        m_deferredReleaseMode = true;
+    }
 
     void* malloc(char** referrer)
     {
+        assert(! m_deferredReleaseMode);
         Relocatable* result =
             Relocatable::fromAllocation(m_allocator.alloc(), referrer);
         // Going forward, the compacting pool manages the value of
@@ -75,6 +85,16 @@ namespace voltdb
 
     void free(void* element)
     {
+        if (m_deferredReleaseMode) {
+            m_allocationsPendingRelease.insert(element);
+        }
+        else {
+            doFree(element);
+        }
+    }
+
+    void doFree(void* element)
+    {
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
         if (last != vacated) {
@@ -94,6 +114,21 @@ namespace voltdb
         m_allocator.trim();
     }
 
+    void freePendingAllocations()
+    {
+        BOOST_FOREACH(void* element, m_allocationsPendingRelease) {
+            Relocatable* last;
+            while (
+
+
+
+
+            Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
+            Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+
+        }
+    }
+
     std::size_t getBytesAllocated() const
     { return m_allocator.bytesAllocated(); }
 
@@ -102,6 +137,9 @@ namespace voltdb
 
     private:
         ContiguousAllocator m_allocator;
+
+        bool m_deferredReleaseMode;
+        boost::unordered_set<void*> m_allocationsPendingRelease;
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.
