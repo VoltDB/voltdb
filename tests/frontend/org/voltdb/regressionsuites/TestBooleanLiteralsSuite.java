@@ -32,10 +32,16 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestBooleanLiteralsSuite extends RegressionSuite {
 
-    static String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2", "6-1>=0"};
+    static String[] conditions = {"1=1", "TRUE", "6-1>=0", "1=0", "FALSE", "1>2"};
+    static boolean isConditionTrue(int condId) {
+        return condId < 3;
+    }
+    static boolean isTablePartitioned(int tableId) {
+        return tableId > 2;
+    }
 
-    private void populateTable(Client client, int tableId) throws Exception{
-        String procName = "Insert" + tableId;
+    private void populateTable(int tableId, Client client) throws Exception{
+        String procName = "T" + tableId + ".Insert";
         for (int i=0; i<3; i++) {
             client.callProcedure(procName, 2*i+1);
         }
@@ -45,36 +51,41 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         String sqlBody;
         Client client = getClient();
         for (int i=1; i<=4; i++) {
-            populateTable(client, i);
+            populateTable(i, client);
         }
 
-        long[] resultsForWhere = {3, 0, 3, 0, 0, 3};
-        long[] resultsForOn = {9, 0, 9, 0, 0, 9};
-        long[] resultsForCaseWhen = {1, -1, 1, -1, -1, 1};
+        Object[][] emptyTable = {};
+        Object[][] tableResult = {{1}, {3}, {5}};
+        Object[][] joinResult = {{1,1}, {1,3}, {1,5}, {3,1}, {3,3}, {3,5}, {5,1}, {5,3}, {5,5}};
+        Object[][] caseWhenFalseResult = {{-1}, {-1}, {-1}};
         String whereQuery = "SELECT AINT FROM T%d WHERE %%s";
         String joinQuery = "SELECT * FROM T%d a JOIN T%d b ON %%s";
         String caseWhenQuery = "SELECT CASE WHEN %%s THEN AINT ELSE -1 END FROM T%d ORDER BY AINT";
-        subTestBooleanLiteralsInQuery(String.format(whereQuery, 1), resultsForWhere, client, true);
-        subTestBooleanLiteralsInQuery(String.format(whereQuery, 3), resultsForWhere, client, true);
-        subTestBooleanLiteralsInQuery(String.format(joinQuery, 1, 2), resultsForOn, client, true); // replicated join replicated.
-        subTestBooleanLiteralsInQuery(String.format(joinQuery, 2, 3), resultsForOn, client, true); // replicated join partitioned.
-        subTestBooleanLiteralsInQuery(String.format(joinQuery, 3, 2), resultsForOn, client, true); // partitioned join replicated.
-        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1), resultsForCaseWhen, client, false);
-        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3), resultsForCaseWhen, client, false);
+        subTestBooleanLiteralsInQuery(String.format(whereQuery, 1),
+                                      tableResult, emptyTable, client); // replicated
+        subTestBooleanLiteralsInQuery(String.format(whereQuery, 3),
+                                      tableResult, emptyTable, client); // partitioned
+        subTestBooleanLiteralsInQuery(String.format(joinQuery, 1, 2),
+                                      joinResult, emptyTable, client); // replicated join replicated.
+        subTestBooleanLiteralsInQuery(String.format(joinQuery, 2, 3),
+                                      joinResult, emptyTable, client); // replicated join partitioned.
+        subTestBooleanLiteralsInQuery(String.format(joinQuery, 3, 2),
+                                      joinResult, emptyTable, client); // partitioned join replicated.
+        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1),
+                                      tableResult, caseWhenFalseResult, client); // replicated
+        subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3),
+                                      tableResult, caseWhenFalseResult, client); // partitioned
     }
 
-    private void subTestBooleanLiteralsInQuery(String sqlBody, long[] expectedResults,
-                                                   Client client, boolean examineCount) throws Exception {
-        assertEquals(conditions.length, expectedResults.length);
+    private void subTestBooleanLiteralsInQuery(String sqlBody,
+                                               Object[][] conditionTrueResult,
+                                               Object[][] conditionFalseResult,
+                                               Client client) throws Exception {
         VoltTable vt;
         for (int i=0; i<conditions.length; i++) {
             String sql = String.format(sqlBody, conditions[i]);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            vt.advanceRow();
-            if (examineCount)
-                assertEquals(expectedResults[i], vt.getRowCount());
-            else
-                assertEquals(expectedResults[i], vt.getLong(0));
+            assertContentOfTable((isConditionTrue(i) ? conditionTrueResult : conditionFalseResult), vt);
         }
     }
 
@@ -90,7 +101,6 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
     static private void addTableToProject(VoltProjectBuilder project, int tableId, boolean partitioned) {
         try {
             project.addLiteralSchema(String.format(tableDDL, tableId));
-            project.addStmtProcedure("Insert" + tableId, "INSERT INTO T" + tableId + " VALUES (?)");
             if (partitioned) {
                 project.addLiteralSchema(String.format(partitionDDL, tableId));
             }
@@ -107,18 +117,18 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         // T1 and T2 are replicated table, while T3 and T4 are partitioned.
         for (int i=1; i<=4; i++) {
-            addTableToProject(project, i, i>2);
+            addTableToProject(project, i, isTablePartitioned(i));
         }
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("bool-voltdbBackend.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("bool-voltdbBackend.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         // CONFIG #2: HSQL
-        config = new LocalCluster("bool-hsqlBackend.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("bool-hsqlBackend.jar", 2, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
