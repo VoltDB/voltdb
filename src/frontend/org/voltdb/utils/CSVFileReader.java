@@ -216,10 +216,8 @@ class CSVFileReader implements Runnable {
             order = new Integer[headerlen];
             for (int fileCol = 0; fileCol < headerlen; fileCol++) {
                 String name = firstline[fileCol];
-                if (colNames.inverse().containsKey(name.toUpperCase())) {
-                    int tableCol = colNames.inverse().get(name.toUpperCase());
-                    order[fileCol] = tableCol;
-                }
+                Integer tableCol = colNames.inverse().get(name.toUpperCase());
+                order[fileCol] = tableCol;
             }
         } catch (IOException ex) {
             m_log.error("Failed to read CSV line from file: " + ex);
