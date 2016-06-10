@@ -30,6 +30,7 @@ import java.util.List;
 
 import spock.lang.*
 import vmcTest.pages.*
+import org.openqa.selenium.Keys
 
 /**
  * This class tests navigation between pages (or tabs), of the the VoltDB
@@ -117,30 +118,28 @@ class SchemaPageTest extends TestBase {
 
     // HEADER TESTS
 
-    def "header banner exists" () {
+    def headerBannerExists() {
         when:
         at SchemaPage
         then:
         waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
-
-    def "header image exists" () {
+    def headerImageExists() {
         when:
         at SchemaPage
         then:
         waitFor(waitTime) { header.image.isDisplayed() }
     }
 
-    def "header username exists" () {
+    def headerUsernameExists() {
         when:
         at SchemaPage
         then:
         waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
-
-    def "header logout exists" () {
+    def headerLogoutExists() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -150,8 +149,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
 
@@ -164,7 +162,7 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "header help exists" () {
+    def headerHelpExists() {
         when:
         at SchemaPage
         then:
@@ -186,7 +184,7 @@ class SchemaPageTest extends TestBase {
 
     // HEADER TAB TESTS
 
-    def "header tab dbmonitor exists" () {
+    def headerTabDbmonitorExists() {
         when:
         at SchemaPage
         then:
@@ -196,7 +194,7 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "header tab admin exists" () {
+    def headerTabAdminExists() {
         when:
         at SchemaPage
         then:
@@ -206,18 +204,17 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "header tab schema exists" () {
+    def headerTabSchemaExists() {
         when:
         at SchemaPage
         then:
         waitFor(waitTime) {
             header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
-
         }
     }
 
-    def "header tab sql query exists" () {
+    def headerTabSqlQueryExists() {
         when:
         at SchemaPage
         then:
@@ -226,7 +223,7 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "header username check" () {
+    def headerUsernameCheck() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -236,10 +233,10 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
+
         when: 'click the Schema Page link (if needed)'
         page.openSchemaPage()
         then:
@@ -251,7 +248,7 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "header username click and close" () {
+    def headerUsernameClickAndClose() {
         when:
         at SchemaPage
         then:
@@ -265,7 +262,7 @@ class SchemaPageTest extends TestBase {
         header.popupClose.click()
     }
 
-    def "header username click and cancel" () {
+    def headerUsernameClickAndCancel() {
         when:
         at SchemaPage
         then:
@@ -279,10 +276,9 @@ class SchemaPageTest extends TestBase {
         header.logoutPopupCancelButton.click()
     }
 
-
     // LOGOUT TEST
 
-    def "logout button test close" ()  {
+    def logoutButtonCloseTest()  {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -292,10 +288,10 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
+
         when: 'click the Schema Page link (if needed)'
         page.openSchemaPage()
         then:
@@ -313,7 +309,7 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def "logout button test cancel" ()  {
+    def logoutButtonCancelTest()  {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -323,10 +319,10 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
+
         when: 'click the Schema Page link (if needed)'
         page.openSchemaPage()
         then:
@@ -346,10 +342,10 @@ class SchemaPageTest extends TestBase {
 
     // HELP POPUP TEST
 
-    def "help popup existance" () {
-        when:
+    def helpPopupExistance() {
+        when: 'at Schema Page'
         at SchemaPage
-        then:
+        then: 'move to element help'
         waitFor(waitTime) { page.header.help.isDisplayed() }
         int count = 0
         while(count<5) {
@@ -365,26 +361,26 @@ class SchemaPageTest extends TestBase {
             }
         }
 
-        when:
+        when: 'click on showhelp'
         page.header.showHelp.click()
-        then:
+        then: 'check the popup'
         waitFor(waitTime) { page.header.popupClose.isDisplayed() }
         waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
     // FOOTER TESTS
 
-    def "footer exists" () {
-        when:
+    def footerExists() {
+        when: 'at Schema Page'
         at SchemaPage
-        then:
+        then: 'footer banner is displayed'
         waitFor(waitTime) { footer.banner.isDisplayed() }
     }
 
-    def "footer text exists and valid"() {
-        when:
+    def footerTextExistsAndValid() {
+        when: 'at Schema Page'
         at SchemaPage
-        then:
+        then: 'check the footer texts'
         waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
@@ -392,7 +388,8 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-    def 'confirm Overview tab open initially'() {
+
+    def confirmOverviewTabOpenInitially() {
         expect: 'Overview tab open initially'
         page.isSchemaPageOverviewTabOpen()
     }
@@ -503,7 +500,7 @@ class SchemaPageTest extends TestBase {
 
     // Overview Tab
 
-    def "Overview Tab:Check Schema Overview"() {
+    def overviewTabCheckSchemaOverview() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -515,7 +512,7 @@ class SchemaPageTest extends TestBase {
         page.schemaOverview.text().equals("Schema Overview")
     }
 
-    def "Overview Tab:Check Generated by VoltDB Version"() {
+    def overviewTabCheckGeneratedByVoltdbVersion() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -527,7 +524,8 @@ class SchemaPageTest extends TestBase {
         page.voltDbVersion.text().equals("Generated by VoltDB Version")
     }
 
-    def "Overview Tab:Check Last Schema Update on"() {
+
+    def overviewTabCheckLastSchemaUpdateOn() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -539,7 +537,7 @@ class SchemaPageTest extends TestBase {
         page.lastSchemaUpdate.text().equals("Last Schema Update on")
     }
 
-    def "Overview Tab:Check Table Count on"() {
+    def overviewTabCheckTableCountOn() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -551,7 +549,7 @@ class SchemaPageTest extends TestBase {
         page.tableCount.text().equals("Table Count")
     }
 
-    def "Overview Tab:Check Materialized View Count"() {
+    def overviewTabCheckMaterializedViewCount() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -563,7 +561,7 @@ class SchemaPageTest extends TestBase {
         page.materializedViewCount.text().equals("Materialized View Count")
     }
 
-    def "Overview Tab:Check Index Count"() {
+    def overviewTabCheckIndexCount() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -575,7 +573,7 @@ class SchemaPageTest extends TestBase {
         page.indexCount.text().equals("Index Count")
     }
 
-    def "Overview Tab:Check Procedure Count"() {
+    def overviewTabCheckProcedureCount() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -587,7 +585,7 @@ class SchemaPageTest extends TestBase {
         page.procedureCount.text().equals("Procedure Count")
     }
 
-    def "Overview Tab:Check SQL Statement Count"() {
+    def overviewTabCheckSqlStatementCount() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -601,7 +599,7 @@ class SchemaPageTest extends TestBase {
 
     // VALUES
 
-    def "Overview Tab:Check Generated by VoltDB Version Value"() {
+    def overviewTabCheckGeneratedByVoltdbVersionValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -620,7 +618,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check Last Schema Update On Value"() {
+    def overviewTabCheckLastSchemaUpdateOnValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -639,7 +637,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check Table Count Value"() {
+    def overviewTabCheckTableCountValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -658,7 +656,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check Materialized View Count Value"() {
+    def overviewTabCheckMaterializedViewCountValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -677,7 +675,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check Index Count Value"() {
+    def overviewTabCheckIndexCountValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -696,7 +694,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check Procedure Count Value"() {
+    def overviewTabCheckProcedureCountValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -715,7 +713,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Overview Tab:Check SQL Statement Count Value"() {
+    def overviewTabCheckSqlStatementCountValue() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -735,7 +733,7 @@ class SchemaPageTest extends TestBase {
     }
 
     // Size Worksheet Tab
-    def "Size Worksheet Tab:Check Ascending Descending in name"() {
+    def sizeWorksheetTabCheckAscendingDescendingInName() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -752,7 +750,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in type"() {
+    def sizeWorksheetTabCheckAscendingDescendingInType() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -769,7 +767,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in count"() {
+    def sizeWorksheetTabCheckAscendingDescendingInCount() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -786,7 +784,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in row min"() {
+    def sizeWorksheetTabCheckAscendingDescendingInRowMin() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -803,7 +801,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in row max"() {
+    def sizeWorksheetTabCheckAscendingDescendingInRowMax() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -820,7 +818,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in index min"() {
+    def sizeWorksheetTabCheckAscendingDescendingInIndexMin() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -837,7 +835,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in index max"() {
+    def sizeWorksheetTabCheckAscendingDescendingInIndexMax() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -854,7 +852,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in table min"() {
+    def sizeWorksheetTabCheckAscendingDescendingInTableMin() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -871,7 +869,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-    def "Size Worksheet Tab:Check Ascending Descending in table max"() {
+    def sizeWorksheetTabCheckAscendingDescendingInTableMax() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -888,9 +886,7 @@ class SchemaPageTest extends TestBase {
         page.descending.isDisplayed()
     }
 
-
-
-    def "Size Worksheet Tab:Check Size Analysis Summary title"() {
+    def sizeWorksheetTabCheckSizeAnalysisSummaryTitle() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -910,7 +906,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Size Worksheet Tab:Check Size Analysis Summary values for tables"() {
+    def sizeWorksheetTabCheckSizeAnalysisSummaryValuesForTables() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -947,7 +943,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Size Worksheet Tab:Check Size Analysis Summary values for views"() {
+    def sizeWorksheetTabCheckSizeAnalysisSummaryValuesForViews() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -977,7 +973,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Size Worksheet Tab:Check Size Analysis Summary values for index"() {
+    def sizeWorksheetTabCheckSizeAnalysisSummaryValuesForIndex() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -1009,7 +1005,7 @@ class SchemaPageTest extends TestBase {
 
     // Schema Tab
 
-    def "Schema Tab:Check Ascending Descending in Name"() {
+    def schemaTabCheckAscendingDescendingInName() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1039,7 +1035,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in Type"() {
+    def schemaTabCheckAscendingDescendingInType() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1065,7 +1061,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in Partitioning"() {
+    def schemaTabCheckAscendingDescendingInPartitioning() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1095,7 +1091,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in Columns"() {
+    def schemaTabCheckAscendingDescendingInColumns() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1125,7 +1121,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in Indexes"() {
+    def schemaTabCheckAscendingDescendingInIndexes() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1155,7 +1151,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in PKey"() {
+    def schemaTabCheckAscendingDescendingInPKey() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1185,7 +1181,7 @@ class SchemaPageTest extends TestBase {
         println()
     }
 
-    def "Schema Tab:Check Ascending Descending in Tuple Limit"() {
+    def schemaTabCheckAscendingDescendingInTupleLimit() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1217,7 +1213,7 @@ class SchemaPageTest extends TestBase {
 
     // Procedures and SQLData
 
-    def "Procedures And SQL Tab:Check Ascending Descending in Procedure Name"() {
+    def procedureAndSqlCheckAscendingDescendingInProcedureName() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1234,7 +1230,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.descending.isDisplayed() }
     }
 
-    def "Procedures And SQL Tab:Check Ascending Descending in Parameters"() {
+    def proceduresAndSqlCheckAscendingDescendingInParameters() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1251,7 +1247,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.descending.isDisplayed() }
     }
 
-    def "Procedures And SQL Tab:Check Ascending Descending in Partitioning"() {
+    def proceduresAndSqlTabCheckAscendingDescendingInPartitioning() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1268,7 +1264,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.descending.isDisplayed() }
     }
 
-    def "Procedures And SQL Tab:Check Ascending Descending in RW"() {
+    def proceduresAndSqlTabCheckAscendingDescendingInRw() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1285,7 +1281,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.descending.isDisplayed() }
     }
 
-    def "Procedures And SQL Tab:Check Ascending Descending in Access"() {
+    def proceduresAndSqlTabCheckAscendingDescendingInAccess() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1302,7 +1298,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.descending.isDisplayed() }
     }
 
-    def "Procedures And SQL Tab:Check Ascending Descending in Attributes"() {
+    def proceduresAndSqlTabCheckAscendingDescendingInAttributes() {
         when: 'go to procedures and sql tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at procedures and sql tab'
@@ -1321,7 +1317,7 @@ class SchemaPageTest extends TestBase {
 
     // DLL Source
 
-    def "DDL Source Tab:Check Download Button"() {
+    def ddlSourceTabCheckDownloadButton() {
         when: 'go to ddl source tab'
         page.openSchemaPageDdlSourceTab()
         then: 'at ddl source tab'
@@ -1333,7 +1329,7 @@ class SchemaPageTest extends TestBase {
         page.downloadButton.text().equals("Download")
     }
 
-    def "DDL Source Tab:Check Content"() {
+    def ddlSourceTabCheckContent() {
         when: 'go to ddl source tab'
         page.openSchemaPageDdlSourceTab()
         then: 'at ddl source tab'
@@ -1342,11 +1338,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) { page.sourceText.isDisplayed() }
     }
 
-    // Cleanup
-
-
-    //expand all checkbox in schema tab and procedure and sql tab
-    def "Schema tab:check expand text and check box"() {
+    def schemaTabCheckExpandTextAndCheckBox() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1362,8 +1354,7 @@ class SchemaPageTest extends TestBase {
         println("verified expand check box by double clicking in Schema tab")
     }
 
-
-    def "SQL and Procedure tab:check expand text and check box"() {
+    def sqlAndProcedureTabCheckExpandTextAndCheckBox() {
         when: 'go to SQL and Procedure tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at SQL and Procedure tab'
@@ -1379,10 +1370,8 @@ class SchemaPageTest extends TestBase {
         println("verified expand check box by double clicking in Procedure and SQL")
     }
 
-
-
     // voltdb Documentation link
-    def "Overview tab:check VoltDB Documentaion Link"() {
+    def overviewTabCheckVoltdbDocumentationLink() {
         when: 'go to SQL and Procedure tab'
         page.openSchemaPageOverviewTab()
         then: 'at SQL and Procedure tab'
@@ -1396,7 +1385,7 @@ class SchemaPageTest extends TestBase {
 
     }
 
-    def "Schema tab:check VoltDB Documentaion Link"() {
+    def schemaTabCheckVoltdbDocumentationLink() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1407,11 +1396,9 @@ class SchemaPageTest extends TestBase {
         then: 'check VoltDB Documentaion Link text'
         page.documentationLink.text().equals("VoltDB Documentation")
         println("text verified for VoltDB Documentation for Schema tab")
-        //page.documentationLink.click()
-
     }
 
-    def "SQL and Procedure tab:check VoltDB Documentaion Link"() {
+    def sqlAndProcedureTabCheckVoltdbDocumentationLink() {
         when: 'go to SQL and Procedure tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at SQL and Procedure tab'
@@ -1422,10 +1409,9 @@ class SchemaPageTest extends TestBase {
         then: 'check VoltDB Documentaion Link text'
         page.documentationLink.text().equals("VoltDB Documentation")
         println("text verified for VoltDB Documentation for SQL and Procedure tab")
-
     }
 
-    def "Size Worksheet tab:check VoltDB Documentaion Link"() {
+    def sizeWorksheetTabCheckVoltdbDocumentationLink() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -1436,10 +1422,9 @@ class SchemaPageTest extends TestBase {
         then: 'check VoltDB Documentaion Link text'
         page.documentationLink.text().equals("VoltDB Documentation")
         println("text verified for VoltDB Documentation for Size Worksheet tab")
-
     }
 
-    def "DDL Source tab:check VoltDB Documentaion Link"() {
+    def ddlSourceTabCheckVoltdbDocumentationLink() {
         when: 'go to DDL source tab'
         page.openSchemaPageDdlSourceTab()
         then: 'at DDL source tab'
@@ -1450,11 +1435,11 @@ class SchemaPageTest extends TestBase {
         then: 'check VoltDB Documentaion Link text'
         page.documentationLink.text().equals("VoltDB Documentation")
         println("text verified for VoltDB Documentation for DDL Source tab")
-
     }
 
     // generated by text
-    def "Overview tab:check generated text"() {
+
+    def overviewTabCheckGeneratedText() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
@@ -1464,11 +1449,9 @@ class SchemaPageTest extends TestBase {
         waitFor(10) { page.generatedbytxt.isDisplayed() }
         then: 'verify VoltDB generated by text'
         println(" Generated by text for Overview tab is : " +page.generatedbytxt.text())
-
-
     }
 
-    def "Schema tab:check generated text"() {
+    def schemaTabCheckGeneratedText() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1478,10 +1461,9 @@ class SchemaPageTest extends TestBase {
         waitFor(10) { page.generatedbytxt.isDisplayed() }
         then: 'verify VoltDB generated by text'
         println(" Generated by text for Schema tab is : " +page.generatedbytxt.text())
-
     }
 
-    def "SQL and Procedure tab:check generated text"() {
+    def sqlAndProcedureTabCheckGeneratedText() {
         when: 'go to SQL and Procedure tab'
         page.openSchemaPageProceduresAndSqlTab()
         then: 'at SQL and Procedure tab'
@@ -1491,10 +1473,9 @@ class SchemaPageTest extends TestBase {
         waitFor(10) { page.generatedbytxt.isDisplayed() }
         then: 'verify VoltDB generated by text'
         println(" Generated by text for SQL and Procedure tab is : " +page.generatedbytxt.text())
-
     }
 
-    def "Size Worksheet tab:check generated text"() {
+    def sizeWorksheetTabCheckGeneratedText() {
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -1504,10 +1485,9 @@ class SchemaPageTest extends TestBase {
         waitFor(10) { page.generatedbytxt.isDisplayed() }
         then: 'verify VoltDB generated by text'
         println(" Generated by text for Size Worksheet tab is : " +page.generatedbytxt.text())
-
     }
 
-    def "DDL Source tab:check generated text"() {
+    def ddlSourceTabCheckGeneratedText() {
         when: 'go to DDL source tab'
         page.openSchemaPageDdlSourceTab()
         then: 'at DDL source tab'
@@ -1517,10 +1497,9 @@ class SchemaPageTest extends TestBase {
         waitFor(10) { page.generatedbytxt.isDisplayed() }
         then: 'verify VoltDB generated by text'
         println(" Generated by text for DDL Source tab is : " +page.generatedbytxt.text())
-
     }
 
-    def "Schema tab:View DDL Source Link"() {
+    def schemaTabViewDdlSourceLink() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1534,13 +1513,11 @@ class SchemaPageTest extends TestBase {
         page.viewDdlSource.click()
         println("ddl source link clicked!")
         page.openSchemaPageSchemaTab()
-
     }
 
     // expand list inside schema tab
 
-
-    def "Schema tab:check expanded list"() {
+    def schemaTabCheckExpandedList() {
         when: 'go to schema tab'
         page.openSchemaPageSchemaTab()
         then: 'at schema tab'
@@ -1554,10 +1531,103 @@ class SchemaPageTest extends TestBase {
         if(waitFor(10) { page.expandedlistbox.isDisplayed() }){
         page.expandedlist1.click()
         println("next expanded list clicked! i.e, "+page.expandedlist1.text())}
-
     }
 
+    def sizeWorksheetTabSizeWorksheetVariations() {
+        String createQuery = page.getQueryToCreateTable()
+        String createViewQuery = page.getQueryToCreateView()
+        String idOfFirstCount = page.returnIdOfRowCount(1)
+        String idOfSecondCount = page.returnIdOfRowCount(2)
+        int tableMin, newTableMin
+        int tableMax, newTableMax
+        int viewMin, newViewMin
+        int indexMin, newIndexMin
+        int totalMin, newTotalMin
+        int totalMax, newTotalMax
 
+        when: 'click the SQL Query link (if needed)'
+        openSqlQueryPage()
+        then: 'should be on SQL Query page'
+        at SqlQueryPage
+
+        when: 'set create query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'set create view query in the box'
+        page.setQueryText(createViewQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'check for refresh button'
+        waitFor(waitTime) { page.refreshquery.isDisplayed() }
+        then: 'click the refresh button'
+        page.refreshquery.click()
+
+        when: 'click the Schema (page) link'
+        page.openSchemaPage()
+        then: 'should be on Schema page'
+        at SchemaPage
+
+        when: 'go to size worksheet tab'
+        page.openSchemaPageSizeWorksheetTab()
+        then: 'at size worksheet tab'
+        at SchemaPageSizeWorksheetTab
+
+        when: 'assign values from the page'
+        tableMin = Integer.parseInt(removeLastTwoChar(page.sizeTableMin.text()))
+        tableMax = Integer.parseInt(removeLastTwoChar(page.sizeTableMax.text()))
+        viewMin  = Integer.parseInt(removeLastTwoChar(page.sizeViewMin.text()))
+        indexMin = Integer.parseInt(removeLastTwoChar(page.sizeIndexMin.text()))
+        totalMin = Integer.parseInt(removeLastTwoChar(page.sizeTotalMin.text()))
+        totalMax = Integer.parseInt(removeLastTwoChar(page.sizeTotalMax.text()))
+        then: 'check if the values follow the rule or not'
+        totalMax == tableMax + viewMin + indexMin
+        totalMin == tableMin + viewMin + indexMin
+
+        when: 'row count is changed'
+        $(id:idOfFirstCount).value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        $(id:idOfFirstCount).value("100000")
+        then: 'click a text'
+        page.sizeTableMin.click()
+
+        report 'hello1'
+        when: 'assign new values from the page'
+        newTableMin = Integer.parseInt(removeLastTwoChar(page.sizeTableMin.text().replace(",", "")))
+        newTableMax = Integer.parseInt(removeLastTwoChar(page.sizeTableMax.text().replace(",", "")))
+        newViewMin  = Integer.parseInt(removeLastTwoChar(page.sizeViewMin.text().replace(",", "")))
+        newIndexMin = Integer.parseInt(removeLastTwoChar(page.sizeIndexMin.text().replace(",", "")))
+        newTotalMin = Integer.parseInt(removeLastTwoChar(page.sizeTotalMin.text().replace(",", "")))
+        newTotalMax = Integer.parseInt(removeLastTwoChar(page.sizeTotalMax.text().replace(",", "")))
+        and: 'compare the new values with old ones'
+        newTableMin == 100 * tableMin
+        newTableMax == 100 * tableMax
+        then: 'check if the new values follow the rule or not'
+        newTotalMax == newTableMax + newViewMin + newIndexMin
+        newTotalMin == newTableMin + newViewMin + newIndexMin
+
+        when: 'row count is changed'
+        $(id:idOfSecondCount).value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
+        $(id:idOfSecondCount).value("100000")
+        then: 'click a text'
+        page.sizeTableMin.click()
+
+        report 'hello2'
+        when: 'assign new values from the page'
+        newTableMin = Integer.parseInt(removeLastTwoChar(page.sizeTableMin.text().replace(",", "")))
+        newTableMax = Integer.parseInt(removeLastTwoChar(page.sizeTableMax.text().replace(",", "")))
+        newViewMin  = Integer.parseInt(removeLastTwoChar(page.sizeViewMin.text().replace(",", "")))
+        newIndexMin = Integer.parseInt(removeLastTwoChar(page.sizeIndexMin.text().replace(",", "")))
+        newTotalMin = Integer.parseInt(removeLastTwoChar(page.sizeTotalMin.text().replace(",", "")))
+        newTotalMax = Integer.parseInt(removeLastTwoChar(page.sizeTotalMax.text().replace(",", "")))
+        and: 'compare the new values with old ones'
+        newViewMin  == 100 * viewMin
+        newIndexMin == 100 * indexMin
+        then: 'check if the new values follow the rule or not'
+        newTotalMax == newTableMax + newViewMin + newIndexMin
+        newTotalMin == newTableMin + newViewMin + newIndexMin
+    }
 
     def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
@@ -1566,7 +1636,6 @@ class SchemaPageTest extends TestBase {
             then: 'to be on VMC page'
             at VoltDBManagementCenterPage
         }
-
         page.loginIfNeeded()
 
         when: 'click the Schema link (if needed)'
