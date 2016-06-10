@@ -659,6 +659,10 @@ public class TestPlansJoin extends PlannerTestCase {
         // Two Distributed tables join on non-partitioned column
         failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
                       "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+
+        // Two Distributed tables join on boolean constant
+        failToCompile("select * FROM P1 JOIN P2 ON 1=1",
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 
     public void testBasicOuterJoin() {
