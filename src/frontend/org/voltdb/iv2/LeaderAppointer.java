@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,16 +32,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -52,14 +47,10 @@ import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.Promotable;
-import org.voltdb.SnapshotFormat;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -83,7 +74,6 @@ public class LeaderAppointer implements Promotable
         DONE            // indicates normal running conditions, including repair
     }
 
-    private final HostMessenger m_hostMessenger;
     private final ZooKeeper m_zk;
     // This should only be accessed through getInitialPartitionCount() on cluster startup.
     private final int m_initialPartitionCount;
@@ -97,9 +87,6 @@ public class LeaderAppointer implements Promotable
     private final AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private SettableFuture<Object> m_startupLatch = null;
-    private final boolean m_partitionDetectionEnabled;
-    private boolean m_partitionDetected = false;
-    private boolean m_usingCommandLog = false;
     private final AtomicBoolean m_replayComplete = new AtomicBoolean(false);
     private final boolean m_expectingDrSnapshot;
     private final AtomicBoolean m_snapshotSyncComplete = new AtomicBoolean(false);
@@ -117,37 +104,6 @@ public class LeaderAppointer implements Promotable
     // handling of callbacks in LeaderAppointer.
     private final ExecutorService m_es =
         CoreUtils.getCachedSingleThreadExecutor("LeaderAppointer-Babysitters", 15000);
-    private final SnapshotSchedule m_partSnapshotSchedule;
-
-    private final SnapshotResponseHandler m_snapshotHandler =
-        new SnapshotResponseHandler() {
-            @Override
-            public void handleResponse(ClientResponse resp)
-            {
-                if (resp == null) {
-                    VoltDB.crashLocalVoltDB("Received a null response to a snapshot initiation request.  " +
-                            "This should be impossible.", true, null);
-                }
-                else if (resp.getStatus() != ClientResponse.SUCCESS) {
-                    tmLog.info("Failed to complete partition detection snapshot, status: " + resp.getStatus() +
-                            ", reason: " + resp.getStatusString());
-                    tmLog.info("Retrying partition detection snapshot...");
-                    SnapshotUtil.requestSnapshot(0L,
-                            m_partSnapshotSchedule.getPath(),
-                            m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
-                            true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
-                            true);
-                }
-                else if (!SnapshotUtil.didSnapshotRequestSucceed(resp.getResults())) {
-                    VoltDB.crashGlobalVoltDB("Unable to complete partition detection snapshot: " +
-                        resp.getResults()[0], false, null);
-                }
-                else {
-                    VoltDB.crashGlobalVoltDB("Partition detection snapshot completed. Shutting down.",
-                            false, null);
-                }
-            }
-        };
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -237,10 +193,6 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashGlobalVoltDB("Detected node failure during DR snapshot sync. Cluster will shut down.",
                                              false, null);
                 }
-                // Check to see if there's been a possible network partition and we're not already handling it
-                if (m_partitionDetectionEnabled && !m_partitionDetected) {
-                    doPartitionDetectionActivities(hostsOnRing);
-                }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
                 if (missingHSIds.contains(m_currentLeader)) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
@@ -309,14 +261,15 @@ public class LeaderAppointer implements Promotable
         }
     };
 
-    public LeaderAppointer(HostMessenger hm, int numberOfPartitions,
-            int kfactor, boolean partitionDetectionEnabled,
-            SnapshotSchedule partitionSnapshotSchedule,
-            boolean usingCommandLog,
-            JSONObject topology, MpInitiator mpi,
-            KSafetyStats stats, boolean expectingDrSnapshot)
+    public LeaderAppointer(HostMessenger hm,
+                           int numberOfPartitions,
+                           int kfactor,
+                           SnapshotSchedule partitionSnapshotSchedule,
+                           JSONObject topology,
+                           MpInitiator mpi,
+                           KSafetyStats stats,
+                           boolean expectingDrSnapshot)
     {
-        m_hostMessenger = hm;
         m_zk = hm.getZK();
         m_kfactor = kfactor;
         m_topo = topology;
@@ -326,18 +279,8 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers = new HashMap<Integer, BabySitter>();
         m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
         m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
-        m_partitionDetectionEnabled = partitionDetectionEnabled;
-        m_partSnapshotSchedule = partitionSnapshotSchedule;
-        m_usingCommandLog = usingCommandLog;
         m_stats = stats;
         m_expectingDrSnapshot = expectingDrSnapshot;
-        if (m_partitionDetectionEnabled) {
-            if (!testPartitionDetectionDirectory(m_partSnapshotSchedule))
-            {
-                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at " +
-                        m_partSnapshotSchedule.getPath(), false, null);
-            }
-        }
     }
 
     @Override
@@ -401,7 +344,6 @@ public class LeaderAppointer implements Promotable
             // LeaderCache callback will count it down once it has seen all the
             // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = SettableFuture.create();
-            writeKnownLiveNodes(new HashSet<Integer>(m_hostMessenger.getLiveHostIds()));
 
             // Theoretically, the whole try/catch block below can be removed because the leader
             // appointer now watches the parent dir for any new partitions. It doesn't have to
@@ -562,175 +504,6 @@ public class LeaderAppointer implements Promotable
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
         }
         return masterHSId;
-    }
-
-    private void writeKnownLiveNodes(Set<Integer> liveNodes)
-    {
-        try {
-            if (m_zk.exists(VoltZK.lastKnownLiveNodes, null) == null)
-            {
-                // VoltZK.createPersistentZKNodes should have done this
-                m_zk.create(VoltZK.lastKnownLiveNodes, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            }
-            JSONStringer stringer = new JSONStringer();
-            stringer.object();
-            stringer.key("liveNodes").array();
-            for (Integer node : liveNodes) {
-                stringer.value(node);
-            }
-            stringer.endArray();
-            stringer.endObject();
-            JSONObject obj = new JSONObject(stringer.toString());
-            tmLog.debug("Writing live nodes to ZK: " + obj.toString(4));
-            m_zk.setData(VoltZK.lastKnownLiveNodes, obj.toString(4).getBytes("UTF-8"), -1);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to update known live nodes at ZK path: " +
-                    VoltZK.lastKnownLiveNodes, true, e);
-        }
-    }
-
-    private Set<Integer> readPriorKnownLiveNodes()
-    {
-        Set<Integer> nodes = new HashSet<Integer>();
-        try {
-            byte[] data = m_zk.getData(VoltZK.lastKnownLiveNodes, false, null);
-            String jsonString = new String(data, "UTF-8");
-            tmLog.debug("Read prior known live nodes: " + jsonString);
-            JSONObject jsObj = new JSONObject(jsonString);
-            JSONArray jsonNodes = jsObj.getJSONArray("liveNodes");
-            for (int ii = 0; ii < jsonNodes.length(); ii++) {
-                nodes.add(jsonNodes.getInt(ii));
-            }
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to read prior known live nodes at ZK path: " +
-                    VoltZK.lastKnownLiveNodes, true, e);
-        }
-        return nodes;
-    }
-
-    /*
-     * Check if the directory specified for the snapshot on partition detection
-     * exists, and has permissions set correctly.
-     */
-    private boolean testPartitionDetectionDirectory(SnapshotSchedule schedule) {
-        if (m_partitionDetectionEnabled) {
-            File partitionPath = new File(schedule.getPath());
-            if (!partitionPath.exists()) {
-                tmLog.error("Directory " + partitionPath + " for partition detection snapshots does not exist");
-                return false;
-            }
-            if (!partitionPath.isDirectory()) {
-                tmLog.error("Directory " + partitionPath + " for partition detection snapshots is not a directory");
-                return false;
-            }
-            File partitionPathFile = new File(partitionPath, Long.toString(System.currentTimeMillis()));
-            try {
-                partitionPathFile.createNewFile();
-                partitionPathFile.delete();
-            } catch (IOException e) {
-                tmLog.error(
-                        "Could not create a test file in " +
-                        partitionPath +
-                        " for partition detection snapshots");
-                e.printStackTrace();
-                return false;
-            }
-            return true;
-        } else {
-            return true;
-        }
-    }
-
-    /**
-     * Given a set of the known host IDs before a fault, and the known host IDs in the
-     * post-fault cluster, determine whether or not we think a network partition may have happened.
-     * NOTE: this assumes that we have already done the k-safety validation for every partition and already failed
-     * if we weren't a viable cluster.
-     * ALSO NOTE: not private so it may be unit-tested.
-     */
-    static boolean makePPDDecision(Set<Integer> previousHosts, Set<Integer> currentHosts)
-    {
-        // Real partition detection stuff would go here
-        // find the lowest hostId between the still-alive hosts and the
-        // failed hosts. Which set contains the lowest hostId?
-        int blessedHostId = Integer.MAX_VALUE;
-        boolean blessedHostIdInFailedSet = true;
-
-        // This should be all the pre-partition hosts IDs.  Any new host IDs
-        // (say, if this was triggered by rejoin), will be greater than any surviving
-        // host ID, so don't worry about including it in this search.
-        for (Integer hostId : previousHosts) {
-            if (hostId < blessedHostId) {
-                blessedHostId = hostId;
-            }
-        }
-
-        for (Integer hostId : currentHosts) {
-            if (hostId.equals(blessedHostId)) {
-                blessedHostId = hostId;
-                blessedHostIdInFailedSet = false;
-            }
-        }
-
-        // Evaluate PPD triggers.
-        boolean partitionDetectionTriggered = false;
-        // Exact 50-50 splits. The set with the lowest survivor host doesn't trigger PPD
-        // If the blessed host is in the failure set, this set is not blessed.
-        if (currentHosts.size() * 2 == previousHosts.size()) {
-            if (blessedHostIdInFailedSet) {
-                tmLog.info("Partition detection triggered for 50/50 cluster failure. " +
-                        "This survivor set is shutting down.");
-                partitionDetectionTriggered = true;
-            }
-            else {
-                tmLog.info("Partition detected for 50/50 failure. " +
-                        "This survivor set is continuing execution.");
-            }
-        }
-
-        // A strict, viable minority is always a partition.
-        if (currentHosts.size() * 2 < previousHosts.size()) {
-            tmLog.info("Partition detection triggered. " +
-                         "This minority survivor set is shutting down.");
-            partitionDetectionTriggered = true;
-        }
-
-        return partitionDetectionTriggered;
-    }
-
-    private void doPartitionDetectionActivities(Set<Integer> currentNodes)
-    {
-        // We should never re-enter here once we've decided we're partitioned and doomed
-        assert(!m_partitionDetected);
-
-        Set<Integer> currentHosts = new HashSet<Integer>(currentNodes);
-        Set<Integer> previousHosts = readPriorKnownLiveNodes();
-
-        boolean partitionDetectionTriggered = makePPDDecision(previousHosts, currentHosts);
-
-        if (partitionDetectionTriggered) {
-            m_partitionDetected = true;
-            if (m_usingCommandLog) {
-                // Just shut down immediately
-                VoltDB.crashGlobalVoltDB("Use of command logging detected, no additional database snapshot will " +
-                        "be generated.  Please use the 'recover' action to restore the database if necessary.",
-                        false, null);
-            }
-            else {
-                SnapshotUtil.requestSnapshot(0L,
-                        m_partSnapshotSchedule.getPath(),
-                        m_partSnapshotSchedule.getPrefix() + System.currentTimeMillis(),
-                        true, SnapshotFormat.NATIVE, null, m_snapshotHandler,
-                        true);
-            }
-        }
-        // If the cluster host set has changed, then write the new set to ZK
-        // NOTE: we don't want to update the known live nodes if we've decided that our subcluster is
-        // dying, otherwise a poorly timed subsequent failure might reverse this decision.  Any future promoted
-        // LeaderAppointer should make their partition detection decision based on the pre-partition cluster state.
-        else if (!currentHosts.equals(previousHosts)) {
-            writeKnownLiveNodes(currentNodes);
-        }
     }
 
     private boolean isClusterKSafe(Set<Integer> hostsOnRing)

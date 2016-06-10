@@ -89,7 +89,7 @@ public class AsyncCompilerAgentHelper
                     newCatalogBytes = context.getCatalogJarBytes();
                 }
                 catch (IOException ioe) {
-                    retval.errorMsg = "Unexpected exception retrieving internal catalog bytes: " +
+                    retval.errorMsg = "Unexpected IO exception retrieving internal catalog bytes: " +
                         ioe.getMessage();
                     return retval;
                 }
@@ -100,7 +100,7 @@ public class AsyncCompilerAgentHelper
                             work.operationBytes);
                 }
                 catch (IOException e) {
-                    retval.errorMsg = "Unexpected exception @UpdateClasses modifying classes " +
+                    retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
                         "from catalog: " + e.getMessage();
                     return retval;
                 }
@@ -120,14 +120,22 @@ public class AsyncCompilerAgentHelper
                     return retval;
                 }
                 catch (IOException ioe) {
-                    retval.errorMsg = "Unexpected exception applying DDL statements to " +
+                    retval.errorMsg = "Unexpected IO exception applying DDL statements to " +
                         "original catalog: " + ioe.getMessage();
                     return retval;
                 }
+                catch (Throwable t) {
+                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " +
+                        t.toString();
+                    compilerLog.error(retval.errorMsg);
+                    return retval;
+                }
+                assert(newCatalogBytes != null);
                 if (newCatalogBytes == null) {
                     // Shouldn't ever get here
                     retval.errorMsg =
                         "Unexpected failure in applying DDL statements to original catalog";
+                    compilerLog.error(retval.errorMsg);
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null

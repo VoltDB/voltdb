@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
@@ -489,18 +490,18 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_skip_null_predicate != null) {
+            collected.addAll(m_skip_null_predicate.findAllSubexpressionsOfClass(aeClass));
+        }
         for (AbstractExpression ae : m_searchkeyExpressions) {
-            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+            collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
         if (m_bindings != null) {
             for (AbstractExpression ae : m_bindings) {
-                collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+                collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
             }
         }
-        return collected;
     }
 }

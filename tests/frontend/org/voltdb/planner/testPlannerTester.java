@@ -81,7 +81,7 @@ public class testPlannerTester extends PlannerTestCase {
 
             assert(pnList.size() == 2);
             assert(pnList.get(1) instanceof SendPlanNode);
-            if (pnList.get(0).reattachFragment((SendPlanNode)pnList.get(1))) {
+            if (pnList.get(0).reattachFragment(pnList.get(1))) {
                 AbstractPlanNode pn = pnList.get(0);
                 System.out.println(pn.toExplainPlanString());
                 assertTrue(pn.toExplainPlanString().contains("SEND PARTITION RESULTS TO COORDINATOR"));
@@ -101,9 +101,9 @@ public class testPlannerTester extends PlannerTestCase {
 
         System.out.println(pnList.size());
 
-        assert(pnList.get(1) instanceof SendPlanNode);
-        pnList.get(0).reattachFragment((SendPlanNode) pnList.get(1));
         pn = pnList.get(0);
+        assert(pnList.get(1) instanceof SendPlanNode);
+        pn.reattachFragment(pnList.get(1));
         System.out.println(pn.toJSONString());
         System.out.println(pn.toExplainPlanString());
         plannerTester.writePlanToFile(pn, m_homeDir, "prettyJson.txt", "");

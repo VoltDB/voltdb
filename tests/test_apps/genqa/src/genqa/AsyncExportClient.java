@@ -64,6 +64,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
@@ -188,7 +189,7 @@ public class AsyncExportClient
             else
             {
                 TrackingResults.incrementAndGet(1);
-                final String trace = String.format("%d:-1:%d\n", m_rowid, now);
+                final String trace = String.format("%d:-1:%d:%s\n", m_rowid, now,((ClientResponseImpl)clientResponse).toJSONString());
                 try
                 {
                     m_writer.write(-1,trace);

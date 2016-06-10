@@ -93,6 +93,7 @@ public:
     static int32_t getTestDRBuffer(int32_t partitionId,
                                    std::vector<int32_t> partitionKeyValueList,
                                    std::vector<int32_t> flagList,
+                                   long startSequenceNumber,
                                    char *out);
 
 private:

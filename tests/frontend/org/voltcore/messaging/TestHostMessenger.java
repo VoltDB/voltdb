@@ -24,11 +24,15 @@
 package org.voltcore.messaging;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
@@ -54,17 +58,18 @@ public class TestHostMessenger {
     }
 
     private HostMessenger createHostMessenger(int index, StartAction action) throws Exception {
-        return createHostMessenger(index, action, true);
+        return createHostMessenger(index, action, null, true);
     }
 
-    private HostMessenger createHostMessenger(int index, StartAction action, boolean start) throws Exception {
+    private HostMessenger createHostMessenger(int index, StartAction action, HostMessenger.MembershipAcceptor acceptor,
+                                              boolean start) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        HostMessenger hm = new HostMessenger(config);
+        HostMessenger hm = new HostMessenger(config, acceptor, null);
         createdMessengers.add(hm);
         if (start) {
-            hm.start();
+            hm.start(action.name());
         }
         return hm;
     }
@@ -93,16 +98,16 @@ public class TestHostMessenger {
     public void testMultiHost() throws Exception {
         HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE);
 
-        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, false);
+        final HostMessenger hm2 = createHostMessenger(1, StartAction.CREATE, null, false);
 
-        final HostMessenger hm3 = createHostMessenger(2, StartAction.CREATE, false);
+        final HostMessenger hm3 = createHostMessenger(2, StartAction.CREATE, null, false);
 
         final AtomicReference<Exception> exception = new AtomicReference<Exception>();
         Thread hm2Start = new Thread() {
             @Override
             public void run() {
                 try {
-                    hm2.start();
+                    hm2.start(null);
                 } catch (Exception e) {
                     e.printStackTrace();
                     exception.set(e);
@@ -113,7 +118,7 @@ public class TestHostMessenger {
             @Override
             public void run() {
                 try {
-                    hm3.start();
+                    hm3.start(null);
                 } catch (Exception e) {
                     e.printStackTrace();
                     exception.set(e);
@@ -168,4 +173,128 @@ public class TestHostMessenger {
         hm3.waitForGroupJoin(2);
     }
 
+    @Test
+    public void testPartitionDetectionMinoritySet() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 5 hosts.
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        previous.add(4);
+        // this should trip partition detection
+        assertTrue(HostMessenger.makePPDDecision(-1, previous, current, true));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(2);
+        current.add(3);
+        // the pre-fail cluster had 4 hosts and the lowest host ID
+        previous.addAll(current);
+        previous.add(0);
+        previous.add(1);
+        // this should trip partition detection
+        assertTrue(HostMessenger.makePPDDecision(-1, previous, current, true));
+    }
+
+    @Test
+    public void testPartitionDetection5050KillNonBlessed() throws Exception
+    {
+        Set<Integer> previous = new HashSet<Integer>();
+        Set<Integer> current = new HashSet<Integer>();
+
+        // current cluster has 2 hosts
+        current.add(0);
+        current.add(1);
+        // the pre-fail cluster had 4 hosts but not the lowest host ID
+        previous.addAll(current);
+        previous.add(2);
+        previous.add(3);
+        // this should not trip partition detection
+        assertFalse(HostMessenger.makePPDDecision(-1, previous, current, true));
+    }
+
+    @Test
+    public void testMembershipAcceptor() throws Exception
+    {
+        // Retry immediately
+        System.setProperty("MESH_JOIN_RETRY_INTERVAL", "0");
+        System.setProperty("MESH_JOIN_RETRY_INTERVAL_SALT", "1");
+
+        final AtomicInteger hm1CallCount = new AtomicInteger(0);
+        final AtomicInteger hm2CallCount = new AtomicInteger(0);
+        HostMessenger.MembershipAcceptor acceptor = new HostMessenger.MembershipAcceptor() {
+            @Override
+            public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
+            {
+                final AtomicInteger acceptorCallCount;
+                // hack to embed the hm index in the request
+                if (request.endsWith("1")) {
+                    acceptorCallCount = hm1CallCount;
+                } else if (request.endsWith("2")) {
+                    acceptorCallCount = hm2CallCount;
+                } else {
+                    acceptorCallCount = null;
+                }
+                final int called = acceptorCallCount.getAndIncrement();
+                // reject the first time, accept the second time
+                return called != 0;
+            }
+        };
+
+        final HostMessenger hm1 = createHostMessenger(0, StartAction.CREATE, acceptor, true);
+        // Don't start hm2 and hm3 immediately, we'll start them at the same time.
+        final HostMessenger hm2 = createHostMessenger(1, null, null, false);
+        final HostMessenger hm3 = createHostMessenger(2, null, null, false);
+
+        Thread hm2Start = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    hm2.start(StartAction.LIVE_REJOIN.name()+"1");
+                } catch (Exception e) {
+                }
+            }
+        };
+        Thread hm3Start = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    hm3.start(StartAction.LIVE_REJOIN.name()+"2");
+                } catch (Exception e) {
+                }
+            }
+        };
+
+        hm2Start.start();
+        hm3Start.start();
+        hm2Start.join();
+        hm3Start.join();
+
+        assertEquals(2, hm1CallCount.get());
+        assertEquals(2, hm2CallCount.get());
+
+        List<String> root1 = hm1.getZK().getChildren("/", false );
+        List<String> root2 = hm2.getZK().getChildren("/", false );
+        List<String> root3 = hm3.getZK().getChildren("/", false );
+        assertTrue(root1.equals(root2));
+        assertTrue(root1.equals(root3));
+
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
+        assertTrue(hostids1.equals(hostids2));
+        assertTrue(hostids1.equals(hostids3));
+    }
 }

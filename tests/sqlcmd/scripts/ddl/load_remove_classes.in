@@ -41,4 +41,7 @@ show classes;
 remove classes sqlcmdtest.InsertEmployee;
 show classes;
 
+remove classes sqlcmdtest.*;
+show classes;
+
 drop table EMPLOYEE;

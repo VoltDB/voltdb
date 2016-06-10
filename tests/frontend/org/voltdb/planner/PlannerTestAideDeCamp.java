@@ -31,8 +31,6 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -175,14 +173,6 @@ public class PlannerTestAideDeCamp {
         nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
         if (plan.subPlanGraph != null) {
             nodeLists.add(new PlanNodeList(plan.subPlanGraph));
-        }
-
-        //Store the list of parameters types and indexes in the plan node list.
-        List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (int i = 0; i < plan.parameters.length; ++i) {
-            ParameterValueExpression pve = plan.parameters[i];
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, pve.getValueType());
-            parameters.add(parameter);
         }
 
         // Now update our catalog information
