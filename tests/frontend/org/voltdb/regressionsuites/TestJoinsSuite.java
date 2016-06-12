@@ -1064,7 +1064,7 @@ public class TestJoinsSuite extends RegressionSuite {
         //  NULL,NULL,5,6       inner no match
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 2 OFFSET 3";
+                "R1.A = R2.A ORDER BY R1.A, R2.C LIMIT 2 OFFSET 5";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {2, 3, 2, 3},
@@ -1072,18 +1072,18 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 2 OFFSET 4";
+                "R1.A = R2.A ORDER BY R1.A, R2.C LIMIT 2 OFFSET 6";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
-            {3, 4, 3, 4L},
+            {3, 4, 3, 4},
             {4,5,MINVAL,MINVAL}
         });
 
         sql = "SELECT R1.A, R1.C, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
-                "R1.A = R2.A LIMIT 3 OFFSET 4";
+                "R1.A = R2.A ORDER BY COALESCE(R1.C, 10), R2.C LIMIT 3 OFFSET 4";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
-            {3, 4, 3, 4L},
+            {3, 4, 3, 4},
             {4,5,MINVAL,MINVAL},
             {MINVAL,MINVAL, 5, 5}
         });
@@ -1104,7 +1104,7 @@ public class TestJoinsSuite extends RegressionSuite {
         //  NULL,NULL,5,6       inner no match
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A  LIMIT 2 OFFSET 3";
+                "R1.A = R3.A ORDER BY COALESCE(R1.A, 10), R3.C LIMIT 2 OFFSET 3";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {2, 3, 2, 3},
@@ -1112,7 +1112,7 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A LIMIT 2 OFFSET 4";
+                "R1.A = R3.A ORDER BY R1.A, R3.C LIMIT 2 OFFSET 6";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {3, 4, 3, 4L},
@@ -1120,7 +1120,7 @@ public class TestJoinsSuite extends RegressionSuite {
         });
 
         sql = "SELECT R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON " +
-                "R1.A = R3.A LIMIT 3 OFFSET 4";
+                "R1.A = R3.A ORDER BY COALESCE(R1.A, 10), R3.C LIMIT 3 OFFSET 4";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(client, sql, new long[][]{
             {3, 4, 3, 4L},

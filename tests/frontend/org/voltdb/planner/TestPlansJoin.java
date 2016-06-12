@@ -1309,8 +1309,14 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals("C", col.getColumnAlias());
         AbstractExpression colExp = col.getExpression();
         assertEquals(ExpressionType.OPERATOR_CASE_WHEN, colExp.getExpressionType());
-        List<AbstractExpression> caseWhenExpr = colExp.findAllSubexpressionsOfType(ExpressionType.OPERATOR_CASE_WHEN);
-        assertEquals(2, caseWhenExpr.size());
+        List<OperatorExpression> caseWhenExprs = colExp.findAllSubexpressionsOfClass(OperatorExpression.class);
+        int caseWhenCount = 0;
+        for (OperatorExpression caseWhen : caseWhenExprs) {
+            if (caseWhen.getExpressionType() == ExpressionType.OPERATOR_CASE_WHEN) {
+                ++caseWhenCount;
+            }
+        }
+        assertEquals(2, caseWhenCount);
 
         // Test three table INNER join. USING C column should be resolved
         pn = compile("SELECT C FROM R1 JOIN R2 USING (C) JOIN R3 USING (C)");

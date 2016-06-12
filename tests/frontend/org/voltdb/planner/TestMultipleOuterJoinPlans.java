@@ -556,7 +556,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
 
         // FULL join of two partition tables on non-partition column
         failToCompile("select * FROM  P1 FULL JOIN P4 ON P1.C = P4.A ",
-                "Join of multiple partitioned tables has insufficient join criteria");
+                "The planner cannot guarantee that all rows would be in a single partition.");
 }
 
     @Override
