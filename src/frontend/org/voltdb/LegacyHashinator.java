@@ -22,12 +22,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
     private final byte m_configBytes[];
+    private final String m_configJSON;
     private final long m_signature;
     @SuppressWarnings("unused")
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
@@ -60,6 +63,12 @@ public class LegacyHashinator extends TheHashinator {
     public LegacyHashinator(byte configBytes[], boolean cooked) {
         catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
         m_configBytes = Arrays.copyOf(configBytes, configBytes.length);
+        try {
+            m_configJSON = new JSONStringer().
+                    array().value(catalogPartitionCount).endArray().toString();
+        } catch (JSONException e) {
+            throw new RuntimeException("Failed to serialized Hashinator Configuration to JSON.", e);
+        }
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
@@ -106,6 +115,16 @@ public class LegacyHashinator extends TheHashinator {
     public byte[] getConfigBytes()
     {
         return m_configBytes;
+    }
+
+    /**
+     * Returns raw config JSONString.
+     * @return config JSONString
+     */
+    @Override
+    public String getConfigJSON()
+    {
+        return m_configJSON;
     }
 
     @Override
