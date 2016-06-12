@@ -1137,6 +1137,12 @@ public class TestVoltTable extends TestCase {
         // add a row of nulls the easy way
         t1.addRow(null, null, null, null, null, null, null, null, null);
 
+        // add a row with NaN
+        t1.addRow(null, null, null, null, Double.NaN, null, null, null, null);
+
+        // add a row with +inf
+        t1.addRow(null, null, null, null, Double.POSITIVE_INFINITY, null, null, null, null);
+
         // add a row with all defaults
         t1.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
                 VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,

@@ -1668,6 +1668,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         else
                             row[j] = VoltDecimalHelper.deserializeBigDecimalFromString(decVal);
                         break;
+                    case FLOAT:
+                        if (row[j] instanceof String) {
+                            row[j] = Double.parseDouble((String) row[j]);
+                        }
+                        assert(row[j] instanceof Number);
+                        break;
                     default:
                         // empty fallthrough to make the warning go away
                     }
