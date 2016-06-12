@@ -22,7 +22,7 @@
 
 #include <cassert>
 #include <cstring>
-
+#include <boost/foreach.hpp>
 #include <boost/unordered_set.hpp>
 
 namespace voltdb
@@ -52,18 +52,12 @@ namespace voltdb
         // allocate buffers of size elementSize * elementsPerBuffer bytes.
     CompactingPool(int32_t elementSize, int32_t elementsPerBuffer)
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
-            , m_deferredReleaseMode(false)
             , m_allocationsPendingRelease()
     { }
 
-    void beginDeferredRelease()
-    {
-        m_deferredReleaseMode = true;
-    }
-
     void* malloc(char** referrer)
     {
-        assert(! m_deferredReleaseMode);
+        assert(! ThreadLocalPool::isDeferredReleaseMode());
         Relocatable* result =
             Relocatable::fromAllocation(m_allocator.alloc(), referrer);
         // Going forward, the compacting pool manages the value of
@@ -85,7 +79,7 @@ namespace voltdb
 
     void free(void* element)
     {
-        if (m_deferredReleaseMode) {
+        if (! ThreadLocalPool::isDeferredReleaseMode()) {
             m_allocationsPendingRelease.insert(element);
         }
         else {
@@ -114,19 +108,48 @@ namespace voltdb
         m_allocator.trim();
     }
 
+    bool trimAllocationsPendingRelease() {
+        if (m_allocator.count() == 0)
+            return true;
+
+        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+        auto trimIt = m_allocationsPendingRelease.find(last->data());
+        auto end = m_allocationsPendingRelease.end();
+        while (trimIt != end) {
+            m_allocator.trim();
+            m_allocationsPendingRelease.erase(trimIt);
+
+            if (m_allocator.count() == 0) {
+                assert (m_allocationsPendingRelease.empty());
+                return true;
+            }
+
+            last = reinterpret_cast<Relocatable*>(m_allocator.last());
+            trimIt = m_allocationsPendingRelease.find(last->data());
+        }
+
+        return m_allocationsPendingRelease.empty();
+    }
+
     void freePendingAllocations()
     {
-        BOOST_FOREACH(void* element, m_allocationsPendingRelease) {
-            Relocatable* last;
-            while (
+        assert (ThreadLocalPool::isDeferredReleaseMode());
 
+        auto end = m_allocationsPendingRelease.end();
+        decltype(end) it;
+        do {
+            if (trimAllocationsPendingRelease()) {
+                break;
+            }
 
-
-
-            Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
-            Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
-
+            it = m_allocationsPendingRelease.begin();
+            assert (it != end);
+            doFree(*it);
+            it = m_allocationsPendingRelease.erase(it);
         }
+        while (it != end);
+
+        assert (m_allocationsPendingRelease.size() == 0);
     }
 
     std::size_t getBytesAllocated() const
@@ -138,7 +161,6 @@ namespace voltdb
     private:
         ContiguousAllocator m_allocator;
 
-        bool m_deferredReleaseMode;
         boost::unordered_set<void*> m_allocationsPendingRelease;
 
     /// The layout of a relocatable allocation,
@@ -171,6 +193,10 @@ namespace voltdb
             // the data addresses should line up perfectly.
             assert(data == result->m_data);
             return result;
+        }
+
+        void* data() {
+            return m_data;
         }
     };
 };

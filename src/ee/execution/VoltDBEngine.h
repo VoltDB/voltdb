@@ -298,6 +298,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void releaseUndoToken(int64_t undoToken)
         {
+            ThreadLocalPool::enableDeferredReleaseMode();
             if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
                 m_currentUndoQuantum = NULL;
                 m_executorContext->setupForPlanFragments(NULL);
@@ -310,13 +311,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             if (m_executorContext->drReplicatedStream()) {
                 m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
             }
+            ThreadLocalPool::enableImmediateReleaseMode();
         }
 
         void undoUndoToken(int64_t undoToken)
         {
+            ThreadLocalPool::enableDeferredReleaseMode();
             m_currentUndoQuantum = NULL;
             m_executorContext->setupForPlanFragments(NULL);
             m_undoLog.undo(undoToken);
+            ThreadLocalPool::enableImmediateReleaseMode();
         }
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }

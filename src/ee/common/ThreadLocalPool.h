@@ -34,6 +34,10 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
+    static void enableDeferredReleaseMode();
+    static void enableImmediateReleaseMode();
+    static bool isDeferredReleaseMode();
+
     /// The layout of an allocation segregated by size,
     /// including overhead to help identify the size-specific
     /// pool from which the allocation must be freed.
