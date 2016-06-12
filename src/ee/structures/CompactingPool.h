@@ -57,7 +57,6 @@ namespace voltdb
 
     void* malloc(char** referrer)
     {
-        assert(! ThreadLocalPool::isDeferredReleaseMode());
         Relocatable* result =
             Relocatable::fromAllocation(m_allocator.alloc(), referrer);
         // Going forward, the compacting pool manages the value of
@@ -77,17 +76,11 @@ namespace voltdb
         return result->m_data;
     }
 
-    void free(void* element)
-    {
-        if (! ThreadLocalPool::isDeferredReleaseMode()) {
+    void markAllocationAsPendingRelease(void* element) {
             m_allocationsPendingRelease.insert(element);
-        }
-        else {
-            doFree(element);
-        }
     }
 
-    void doFree(void* element)
+    void free(void* element)
     {
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
@@ -133,8 +126,6 @@ namespace voltdb
 
     void freePendingAllocations()
     {
-        assert (ThreadLocalPool::isDeferredReleaseMode());
-
         auto end = m_allocationsPendingRelease.end();
         decltype(end) it;
         do {
@@ -144,7 +135,7 @@ namespace voltdb
 
             it = m_allocationsPendingRelease.begin();
             assert (it != end);
-            doFree(*it);
+            free(*it);
             it = m_allocationsPendingRelease.erase(it);
         }
         while (it != end);

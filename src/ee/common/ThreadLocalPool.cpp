@@ -200,6 +200,8 @@ void ThreadLocalPool::freeRelocatable(Sized* data)
 
 ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
 {
+    assert(! isDeferredReleaseMode());
+
     // The size provided to this function determines the
     // approximate-size-specific pool selection. It gets
     // reflected (after rounding and padding) in the size
@@ -256,8 +258,14 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
                             alloc_size);
     }
-    // Free the raw allocation from the found pool.
-    iter->second->free(sized);
+
+    if (! isDeferredReleaseMode()) {
+        // Free the raw allocation from the found pool.
+        iter->second->free(sized);
+    }
+    else {
+        iter->second->markAllocationAsPendingRelease(sized);
+    }
 }
 
 #endif
