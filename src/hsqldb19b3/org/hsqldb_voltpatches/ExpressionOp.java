@@ -130,7 +130,7 @@ public class ExpressionOp extends Expression {
     }
 
     @Override
-	public String getSQL() {
+        public String getSQL() {
 
         StringBuffer sb    = new StringBuffer(64);
         String       left  = getContextSQL(nodes.length > 0 ? nodes[LEFT]
@@ -200,7 +200,7 @@ public class ExpressionOp extends Expression {
     }
 
     @Override
-	protected String describe(Session session, int blanks) {
+        protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
 
@@ -254,7 +254,7 @@ public class ExpressionOp extends Expression {
     }
 
     @Override
-	public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
+        public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
         if (opType == OpTypes.VALUE) {
@@ -281,7 +281,7 @@ public class ExpressionOp extends Expression {
     }
 
     @Override
-	public void resolveTypes(Session session, Expression parent) {
+        public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
@@ -434,7 +434,7 @@ public class ExpressionOp extends Expression {
     }
 
     @Override
-	public Object getValue(Session session) {
+        public Object getValue(Session session) {
 
         switch (opType) {
 
@@ -444,7 +444,7 @@ public class ExpressionOp extends Expression {
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
                     session.sessionContext
-				    .rangeIterators[rangePosition].getCurrent();
+                                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
