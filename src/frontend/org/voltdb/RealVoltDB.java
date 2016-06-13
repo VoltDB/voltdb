@@ -2336,8 +2336,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Integer partition = siteTracker.getPartitionForSite(site);
                 partitions.add(partition);
             }
-            // Update catalog for import processor this should be just/stop start and updat partitions.
-            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
@@ -2376,6 +2374,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
+
+            // Update catalog for import processor this should be just/stop start and updat partitions.
+            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 6. Perform updates required by the DR subsystem
 
