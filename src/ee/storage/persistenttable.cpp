@@ -43,13 +43,22 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <cassert>
-#include <cstdio>
-#include <algorithm>    // std::find
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-#include "storage/persistenttable.h"
+#include "persistenttable.h"
+
+#include "AbstractDRTupleStream.h"
+#include "ConstraintFailureException.h"
+#include "CopyOnWriteContext.h"
+#include "DRTupleStreamUndoAction.h"
+#include "MaterializedViewTriggerForWrite.h"
+#include "PersistentTableStats.h"
+#include "PersistentTableUndoInsertAction.h"
+#include "PersistentTableUndoDeleteAction.h"
+#include "PersistentTableUndoTruncateTableAction.h"
+#include "PersistentTableUndoUpdateAction.h"
+#include "TableCatalogDelegate.hpp"
+#include "tablefactory.h"
+#include "tableiterator.h"
+#include "TupleStreamException.h"
 
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -70,20 +79,15 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
-#include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
-#include "storage/TableCatalogDelegate.hpp"
-#include "storage/PersistentTableStats.h"
-#include "storage/PersistentTableUndoInsertAction.h"
-#include "storage/PersistentTableUndoDeleteAction.h"
-#include "storage/PersistentTableUndoTruncateTableAction.h"
-#include "storage/PersistentTableUndoUpdateAction.h"
-#include "storage/DRTupleStreamUndoAction.h"
-#include "storage/ConstraintFailureException.h"
-#include "storage/TupleStreamException.h"
-#include "storage/CopyOnWriteContext.h"
-#include "storage/MaterializedViewMetadata.h"
-#include "storage/AbstractDRTupleStream.h"
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
+#include <sstream>
+#include <cassert>
+#include <cstdio>
+#include <algorithm>    // std::find
 
 namespace voltdb {
 void* keyTupleStorage = NULL;
@@ -311,9 +315,9 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         // call decrement reference count on the newly constructed view table
@@ -346,9 +350,9 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         targetTable->decrementRefcount();
     }
@@ -411,14 +415,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     // add matView
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, m_views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
         targetTcd->init(*engine->getDatabase(), *catalogViewTable);
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
-        MaterializedViewWriteTrigger::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+        MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -1135,7 +1139,7 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void PersistentTable::addMaterializedView(MaterializedViewWriteTrigger* view) {
+void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view) {
     m_views.push_back(view);
 }
 
@@ -1143,12 +1147,12 @@ void PersistentTable::addMaterializedView(MaterializedViewWriteTrigger* view) {
  * drop a view. the table is no longer feeding it.
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
  */
-void PersistentTable::dropMaterializedView(MaterializedViewWriteTrigger* targetView) {
+void PersistentTable::dropMaterializedView(MaterializedViewTriggerForWrite* targetView) {
     assert( ! m_views.empty());
-    MaterializedViewWriteTrigger* lastView = m_views.back();
+    MaterializedViewTriggerForWrite* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewWriteTrigger*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
@@ -1512,9 +1516,8 @@ bool PersistentTable::doForcedCompaction() {
     int64_t pendingCompactions = 0;
 
     char msg[512];
-    snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
-             ((intmax_t)allocatedTupleCount()));
-    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+
+    boost::posix_time::ptime startTime(boost::posix_time::microsec_clock::universal_time());
 
     int failedCompactionCountBefore = m_failedCompactionCount;
     while (compactionPredicate()) {
@@ -1570,8 +1573,10 @@ bool PersistentTable::doForcedCompaction() {
     }
 
     assert(!compactionPredicate());
-    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd",
-            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()));
+    boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
+    boost::posix_time::time_duration duration = endTime - startTime;
+    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms",
+            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     return (notPendingCompactions + pendingCompactions) > 0;
 }

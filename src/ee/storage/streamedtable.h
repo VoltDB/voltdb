@@ -34,7 +34,7 @@ namespace voltdb {
 // forward decl.
 class ExecutorContext;
 class ExportTupleStream;
-class MaterializedViewStreamInsertTrigger;
+class MaterializedViewTriggerForStreamInsert;
 
 /**
  * A streamed table does not store data. It may not be read. It may
@@ -77,11 +77,17 @@ public:
     virtual void flushOldTuples(int64_t timeInMillis);
     void setSignatureAndGeneration(std::string signature, int64_t generation);
 
-    typedef MaterializedViewStreamInsertTrigger MatViewType;
+    // The MatViewType typedef is required to satisfy initMaterializedViews
+    // template code that needs to identify
+    // "whatever MaterializedView*Trigger class is used by this *Table class".
+    // There's no reason to actually use MatViewType in the class definition.
+    // That would just make the code a little harder to analyze.
+    typedef MaterializedViewTriggerForStreamInsert MatViewType;
+
     /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MatViewType* view);
-    void dropMaterializedView(MatViewType* targetView);
-    std::vector<MatViewType*>& views() { return m_views; }
+    void addMaterializedView(MaterializedViewTriggerForStreamInsert* view);
+    void dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView);
+    std::vector<MaterializedViewTriggerForStreamInsert*>& views() { return m_views; }
     bool hasViews() { return (m_views.size() > 0); }
 
     virtual std::string tableType() const { return "StreamedTable"; }
@@ -133,7 +139,7 @@ private:
     const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewStreamInsertTrigger*> m_views;
+    std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
 
 };
 

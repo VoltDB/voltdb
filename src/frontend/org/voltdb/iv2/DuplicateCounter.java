@@ -78,7 +78,7 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismathInformation(long hash, VoltMessage recentMessage) {
+    void logRelevantMismatchInformation(long hash, VoltMessage recentMessage) {
         String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
@@ -138,7 +138,7 @@ public class DuplicateCounter
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismathInformation(hash, message);
+                logRelevantMismatchInformation(hash, message);
                 return MISMATCH;
             }
             m_lastResponse = message;

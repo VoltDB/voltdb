@@ -82,7 +82,7 @@ class MaterializedViewInfo;
 namespace voltdb {
 
 class CoveringCellIndexTest_TableCompaction;
-class MaterializedViewWriteTrigger;
+class MaterializedViewTriggerForWrite;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
@@ -357,14 +357,14 @@ public:
     // "whatever MaterializedView*Trigger class is used by this *Table class".
     // There's no reason to actually use MatViewType in the class definition.
     // That would just make the code a little harder to analyze.
-    typedef MaterializedViewWriteTrigger MatViewType;
+    typedef MaterializedViewTriggerForWrite MatViewType;
 
     /** Add/drop/list materialized views to this table */
-    void addMaterializedView(MaterializedViewWriteTrigger* view);
+    void addMaterializedView(MaterializedViewTriggerForWrite* view);
 
-    void dropMaterializedView(MaterializedViewWriteTrigger* targetView);
+    void dropMaterializedView(MaterializedViewTriggerForWrite* targetView);
 
-    std::vector<MaterializedViewWriteTrigger*>& views() { return m_views; }
+    std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
     TableTuple& copyIntoTempTuple(TableTuple &source) {
         assert (m_tempTuple.m_data);
@@ -653,7 +653,7 @@ private:
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewWriteTrigger*> m_views;
+    std::vector<MaterializedViewTriggerForWrite*> m_views;
 
     // STATS
     PersistentTableStats m_stats;

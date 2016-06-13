@@ -17,10 +17,11 @@
 
 #include "streamedtable.h"
 
-#include "StreamedTableUndoAction.hpp"
 #include "ExportTupleStream.h"
+#include "MaterializedViewTriggerForInsert.h"
+#include "StreamedTableUndoAction.hpp"
 #include "tableiterator.h"
-#include "MaterializedViewMetadata.h"
+
 #include "catalog/materializedviewinfo.h"
 #include "common/executorcontext.hpp"
 
@@ -74,18 +75,18 @@ bool StreamedTable::enableStream() {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void StreamedTable::addMaterializedView(MaterializedViewStreamInsertTrigger* view)
+void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view)
 {
     m_views.push_back(view);
 }
 
-void StreamedTable::dropMaterializedView(MaterializedViewStreamInsertTrigger* targetView)
+void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView)
 {
     assert( ! m_views.empty());
-    MaterializedViewStreamInsertTrigger* lastView = m_views.back();
+    MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewStreamInsertTrigger*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
