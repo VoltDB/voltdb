@@ -135,6 +135,18 @@ class CSVFileReader implements Runnable {
                 }
 
                 String[] lineValues = lineList.toArray(new String[0]);
+                if (m_config.header) {
+                    if (lineValues.length != headerlen) {
+                        String errMsg = String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
+                        final RowWithMetaData metaData = new RowWithMetaData(m_listReader.getUntokenizedRow(),
+                                m_totalLineCount.get() + 1);
+                        if (m_errHandler.handleError(metaData, null, errMsg)) {
+                            break;
+                        }
+                        continue;
+                    }
+                    lineValues = reorderCols(lineValues);
+                }
                 String lineCheckResult;
                 if ((lineCheckResult = checkparams_trimspace(lineValues)) != null) {
                     final RowWithMetaData metaData
@@ -144,10 +156,6 @@ class CSVFileReader implements Runnable {
                         break;
                     }
                     continue;
-                }
-
-                if (m_config.header) {
-                    lineValues = reorderCols(lineValues);
                 }
 
                 RowWithMetaData lineData
@@ -226,6 +234,10 @@ class CSVFileReader implements Runnable {
     }
 
     private String[] reorderCols(String[] lineValues) {
+        if (lineValues.length != headerlen && m_config.header) {
+            return null;
+        }
+
         String[] reorderValues = new String[m_columnCount];
         for (int fileCol = 0; fileCol < lineValues.length; fileCol++) {
             if (order[fileCol] != null) {
@@ -239,10 +251,6 @@ class CSVFileReader implements Runnable {
     private String checkparams_trimspace(String[] lineValues) {
         if (lineValues.length != m_columnCount && !m_config.header) {
             return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
-        }
-
-        if (lineValues.length != headerlen && m_config.header) {
-            return String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
         }
 
         for (int i = 0; i<lineValues.length; i++) {

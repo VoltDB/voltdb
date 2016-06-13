@@ -121,7 +121,7 @@ public class Tokenizer extends AbstractTokenizer {
         return false; // EOF
         }
     }
-    while( line.length() == 0 || (commentMatcher != null && commentMatcher.isComment(line))
+    while( line.length() == 0 || line.trim().isEmpty() || (commentMatcher != null && commentMatcher.isComment(line))
             || (!header && skip >= getLineNumber()));
 
 	if (header) {

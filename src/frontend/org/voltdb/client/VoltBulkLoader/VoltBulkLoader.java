@@ -36,6 +36,8 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
+
 /**
  * VoltBulkLoader is meant to run for long periods of time. Multiple threads can
  * operate on a single instance of the VoltBulkLoader to feed and bulk load a
@@ -449,6 +451,6 @@ public class VoltBulkLoader {
     }
 
     public Map<Integer, String> getColumnNames() {
-        return m_colNames;
+        return ImmutableSortedMap.copyOf(m_colNames);
     }
 }
