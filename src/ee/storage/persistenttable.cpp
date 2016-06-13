@@ -57,7 +57,7 @@
 #include "ConstraintFailureException.h"
 #include "CopyOnWriteContext.h"
 #include "DRTupleStreamUndoAction.h"
-#include "MaterializedViewWriteTrigger.h"
+#include "MaterializedViewTriggerForWrite.h"
 #include "PersistentTableStats.h"
 #include "PersistentTableUndoInsertAction.h"
 #include "PersistentTableUndoDeleteAction.h"

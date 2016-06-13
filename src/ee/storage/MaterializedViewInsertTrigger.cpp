@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "MaterializedViewInsertTrigger.h"
+#include "MaterializedViewTriggerForInsert.h"
 
 #include "persistenttable.h"
 #include "streamedtable.h"
@@ -25,16 +25,13 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 
-#include <cassert>
-#include <cstdio>
-
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
 typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
 
 using namespace std;
 namespace voltdb {
 
-MaterializedViewInsertTrigger::MaterializedViewInsertTrigger(PersistentTable *destTable,
+MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTable *destTable,
                                                              catalog::MaterializedViewInfo *mvInfo)
     : m_target(destTable)
     , m_index(destTable->primaryKeyIndex())
@@ -43,7 +40,7 @@ MaterializedViewInsertTrigger::MaterializedViewInsertTrigger(PersistentTable *de
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
 {
-    VOLT_TRACE("construct materializedViewMetadataBase...");
+    VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
     m_mvInfo = mvInfo;
 
@@ -75,10 +72,10 @@ MaterializedViewInsertTrigger::MaterializedViewInsertTrigger(PersistentTable *de
     if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
         initializeTupleHavingNoGroupBy();
     }
-    VOLT_TRACE("Finish initialization...");
+    VOLT_TRACE("Finished MaterializedViewTriggerForInsert initialization...");
 }
 
-MaterializedViewInsertTrigger::~MaterializedViewInsertTrigger() {
+MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
     for (int ii = 0; ii < m_groupByExprs.size(); ++ii) {
         delete m_groupByExprs[ii];
     }
@@ -88,8 +85,8 @@ MaterializedViewInsertTrigger::~MaterializedViewInsertTrigger() {
     m_target->decrementRefcount();
 }
 
-NValue MaterializedViewInsertTrigger::getAggInputFromSrcTuple(int aggIndex,
-        const TableTuple& tuple) {
+NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
+                                                              const TableTuple& tuple) {
     if (m_aggExprs.size() != 0) {
         AbstractExpression* aggExpr = m_aggExprs[aggIndex];
         return aggExpr->eval(&tuple, NULL);
@@ -99,8 +96,8 @@ NValue MaterializedViewInsertTrigger::getAggInputFromSrcTuple(int aggIndex,
     return tuple.getNValue(srcColIdx);
 }
 
-void MaterializedViewInsertTrigger::processTupleInsert(const TableTuple &newTuple,
-        bool fallible) {
+void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
+                                                       bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(newTuple)) {
         return;
@@ -197,7 +194,7 @@ void MaterializedViewInsertTrigger::processTupleInsert(const TableTuple &newTupl
     }
 }
 
-void MaterializedViewInsertTrigger::setTargetTable(PersistentTable * target) {
+void MaterializedViewTriggerForInsert::setTargetTable(PersistentTable * target) {
     PersistentTable * oldTarget = m_target;
     m_target = target;
     target->incrementRefcount();
@@ -210,7 +207,7 @@ void MaterializedViewInsertTrigger::setTargetTable(PersistentTable * target) {
     oldTarget->decrementRefcount();
 }
 
-void MaterializedViewInsertTrigger::allocateBackedTuples() {
+void MaterializedViewTriggerForInsert::allocateBackedTuples() {
     uint32_t storeLength;
     char* backingStore;
     // The materialized view will have no index if there is no group by column.
@@ -244,7 +241,7 @@ void MaterializedViewInsertTrigger::allocateBackedTuples() {
     m_emptyTuple.move(backingStore);
 }
 
-AbstractExpression* MaterializedViewInsertTrigger::parsePredicate(catalog::MaterializedViewInfo *mvInfo) {
+AbstractExpression* MaterializedViewTriggerForInsert::parsePredicate(catalog::MaterializedViewInfo *mvInfo) {
     const string& hexString = mvInfo->predicate();
     if (hexString.size() == 0) {
         return NULL;
@@ -262,7 +259,7 @@ AbstractExpression* MaterializedViewInsertTrigger::parsePredicate(catalog::Mater
     return AbstractExpression::buildExpressionTree(expr);
 }
 
-std::size_t MaterializedViewInsertTrigger::parseGroupBy(catalog::MaterializedViewInfo *mvInfo) {
+std::size_t MaterializedViewTriggerForInsert::parseGroupBy(catalog::MaterializedViewInfo *mvInfo) {
     const string& expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
         // set up the group by columns from the catalog info
@@ -280,7 +277,7 @@ std::size_t MaterializedViewInsertTrigger::parseGroupBy(catalog::MaterializedVie
     return m_groupByExprs.size();
 }
 
-std::size_t MaterializedViewInsertTrigger::parseAggregation(catalog::MaterializedViewInfo *mvInfo) {
+std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::MaterializedViewInfo *mvInfo) {
     const string& expressionsAsText = mvInfo->aggregationExpressionsJson();
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
@@ -330,7 +327,7 @@ std::size_t MaterializedViewInsertTrigger::parseAggregation(catalog::Materialize
     return m_aggTypes.size();
 }
 
-NValue MaterializedViewInsertTrigger::getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple) {
+NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colIndex, const TableTuple& tuple) {
     if (m_groupByExprs.size() != 0) {
         AbstractExpression* gbExpr = m_groupByExprs[colIndex];
         return gbExpr->eval(&tuple, NULL);
@@ -341,7 +338,7 @@ NValue MaterializedViewInsertTrigger::getGroupByValueFromSrcTuple(int colIndex, 
 
 }
 
-void MaterializedViewInsertTrigger::initializeTupleHavingNoGroupBy() {
+void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
     // COUNT(*) column will be zero.
@@ -360,7 +357,7 @@ void MaterializedViewInsertTrigger::initializeTupleHavingNoGroupBy() {
     m_target->insertPersistentTuple(m_updatedTuple, true);
 }
 
-bool MaterializedViewInsertTrigger::findExistingTuple(const TableTuple &tuple) {
+bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
@@ -385,14 +382,14 @@ bool MaterializedViewInsertTrigger::findExistingTuple(const TableTuple &tuple) {
 }
 
 
-void MaterializedViewStreamInsertTrigger::build(StreamedTable *srcTable,
-                                                PersistentTable *destTable,
-                                                catalog::MaterializedViewInfo *mvInfo) {
+void MaterializedViewTriggerForStreamInsert::build(StreamedTable *srcTable,
+                                                   PersistentTable *destTable,
+                                                   catalog::MaterializedViewInfo *mvInfo) {
     VOLT_TRACE("construct MaterializedViewStreamInsertTrigger...");
-    MaterializedViewStreamInsertTrigger* view =
-        new MaterializedViewStreamInsertTrigger(destTable, mvInfo);
+    MaterializedViewTriggerForStreamInsert* view =
+        new MaterializedViewTriggerForStreamInsert(destTable, mvInfo);
     srcTable->addMaterializedView(view);
-    VOLT_TRACE("finished initialization...");
+    VOLT_TRACE("finished initialization.");
 }
 
 } // namespace voltdb

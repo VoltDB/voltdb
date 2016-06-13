@@ -14,19 +14,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "storage/MaterializedViewWriteTrigger.h"
+#include "MaterializedViewTriggerForWrite.h"
+
+#include "persistenttable.h"
 
 #include "catalog/indexref.h"
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
-#include "indexes/tableindex.h"
-#include "storage/persistenttable.h"
 #include "execution/ExecutorVector.h"
-#include "plannodes/indexscannode.h"
 #include "executors/abstractexecutor.h"
-
-//#include <cassert>
-//#include <cstdio>
+#include "indexes/tableindex.h"
+#include "plannodes/indexscannode.h"
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
 typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
@@ -34,7 +32,7 @@ typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
 using namespace std;
 namespace voltdb {
 
-MaterializedViewWriteTrigger::MaterializedViewWriteTrigger(PersistentTable *srcTable,
+MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable *srcTable,
                                                            PersistentTable *destTable,
                                                            catalog::MaterializedViewInfo *mvInfo)
     : MaterializedViewInsertTrigger(destTable, mvInfo)
@@ -54,20 +52,20 @@ MaterializedViewWriteTrigger::MaterializedViewWriteTrigger(PersistentTable *srcT
     }
 }
 
-void MaterializedViewWriteTrigger::build(PersistentTable *srcTable,
+void MaterializedViewTriggerForWrite::build(PersistentTable *srcTable,
                                          PersistentTable *destTable,
                                          catalog::MaterializedViewInfo *mvInfo)
 {
-    VOLT_TRACE("construct MaterializedViewWriteTrigger...");
-    MaterializedViewWriteTrigger* view =
-        new MaterializedViewWriteTrigger(srcTable, destTable, mvInfo);
+    VOLT_TRACE("construct MaterializedViewTriggerForWrite...");
+    MaterializedViewTriggerForWrite* view =
+        new MaterializedViewTriggerForWrite(srcTable, destTable, mvInfo);
     srcTable->addMaterializedView(view);
-    VOLT_TRACE("finished initialization...");
+    VOLT_TRACE("finished initialization.");
 }
 
-MaterializedViewWriteTrigger::~MaterializedViewWriteTrigger() { }
+MaterializedViewTriggerForWrite::~MaterializedViewTriggerForWrite() { }
 
-void MaterializedViewWriteTrigger::setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
+void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
                                                             const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts)
 {
     std::vector<TableIndex*> candidates = m_srcPersistentTable->allIndexes();
@@ -157,7 +155,7 @@ static bool minMaxIndexIncludesAggCol(TableIndex * index, size_t groupByColumnCo
     return index && index->getColumnIndices().size() > groupByColumnCount;
 }
 
-void MaterializedViewWriteTrigger::allocateMinMaxSearchKeyTuple()
+void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple()
 {
     uint32_t nextIndexStoreLength;
     size_t minMaxSearchKeyBackingStoreSize = 0;
@@ -185,7 +183,7 @@ void MaterializedViewWriteTrigger::allocateMinMaxSearchKeyTuple()
     m_minMaxSearchKeyBackingStore.reset(backingStore);
 }
 
-NValue MaterializedViewWriteTrigger::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
+NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
                                                                 const NValue &existingValue,
                                                                 const NValue &initialNull,
                                                                 int negate_for_min,
@@ -277,7 +275,7 @@ NValue MaterializedViewWriteTrigger::findMinMaxFallbackValueIndexed(const TableT
     return newVal;
 }
 
-NValue MaterializedViewWriteTrigger::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
+NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
                                                                    const NValue &existingValue,
                                                                    const NValue &initialNull,
                                                                    int negate_for_min,
@@ -332,7 +330,7 @@ NValue MaterializedViewWriteTrigger::findMinMaxFallbackValueSequential(const Tab
     return newVal;
 }
 
-NValue MaterializedViewWriteTrigger::findFallbackValueUsingPlan(const TableTuple& oldTuple,
+NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTuple& oldTuple,
                                                                 const NValue &initialNull,
                                                                 int aggIndex,
                                                                 int minMaxAggIdx) {
@@ -374,7 +372,7 @@ NValue MaterializedViewWriteTrigger::findFallbackValueUsingPlan(const TableTuple
     return newVal;
 }
 
-void MaterializedViewWriteTrigger::processTupleDelete(const TableTuple &oldTuple,
+void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTuple,
         bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(oldTuple)) {
@@ -383,7 +381,7 @@ void MaterializedViewWriteTrigger::processTupleDelete(const TableTuple &oldTuple
 
     if ( ! findExistingTuple(oldTuple)) {
         std::string name = m_target->name();
-        throwFatalException("MaterializedViewWriteTrigger for table %s went"
+        throwFatalException("MaterializedViewTriggerForWrite for table %s went"
                             " looking for a tuple in the view and"
                             " expected to find it but didn't", name.c_str());
     }

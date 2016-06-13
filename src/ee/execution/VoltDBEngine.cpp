@@ -77,7 +77,7 @@
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/MaterializedViewWriteTrigger.h"
+#include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"

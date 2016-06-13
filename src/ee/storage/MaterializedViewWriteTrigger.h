@@ -15,10 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MATERIALIZEDVIEWWRITETRIGGER_H_
-#define MATERIALIZEDVIEWWRITETRIGGER_H_
+#ifndef MATERIALIZEDVIEWTRIGGERFORWRITE_H_
+#define MATERIALIZEDVIEWTRIGGERFORWRITE_H_
 
-#include "MaterializedViewInsertTrigger.h"
+#include "MaterializedViewTriggerForInsert.h"
 
 namespace voltdb {
 
@@ -29,12 +29,12 @@ namespace voltdb {
  * The factory method, build, uses information parsed from the catalog to configure
  * initializers for the private constructor.
  */
-class MaterializedViewWriteTrigger : public MaterializedViewInsertTrigger {
+class MaterializedViewTriggerForWrite : public MaterializedViewTriggerForInsert {
 public:
     static void build(PersistentTable *srcTable,
                       PersistentTable *destTable,
                       catalog::MaterializedViewInfo *mvInfo);
-    ~MaterializedViewWriteTrigger();
+    ~MaterializedViewTriggerForWrite();
 
     /**
      * This updates the materialized view desitnation table to reflect
@@ -47,16 +47,16 @@ public:
 
     void updateDefinition(PersistentTable *destTable,
                           catalog::MaterializedViewInfo *mvInfo) {
-        MaterializedViewInsertTrigger::updateDefinition(destTable, mvInfo);
+        MaterializedViewTriggerForInsert::updateDefinition(destTable, mvInfo);
         setupMinMaxRecalculation(mvInfo->indexForMinMax(),
                                  mvInfo->fallbackQueryStmts());
     }
 
 
 private:
-    MaterializedViewWriteTrigger(PersistentTable *srcTable,
-                                 PersistentTable *destTable,
-                                 catalog::MaterializedViewInfo *mvInfo);
+    MaterializedViewTriggerForWrite(PersistentTable *srcTable,
+                                    PersistentTable *destTable,
+                                    catalog::MaterializedViewInfo *mvInfo);
 
     void setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
                                   const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
@@ -96,4 +96,4 @@ private:
 
 } // namespace voltdb
 
-#endif // MATERIALIZEDVIEWMETADATA_H_
+#endif // MATERIALIZEDVIEWTRIGGERFORWRITE_H_

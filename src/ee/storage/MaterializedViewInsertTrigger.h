@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MATERIALIZEDVIEWINSERTTRIGGER_H_
-#define MATERIALIZEDVIEWINSERTTRIGGER_H_
+#ifndef MATERIALIZEDVIEWTRIGGERFORINSERT_H_
+#define MATERIALIZEDVIEWTRIGGERFORINSERT_H_
 
 #include "catalog/catalogmap.h"
 #include "catalog/materializedviewinfo.h"
@@ -49,9 +49,9 @@ class TableIndex;
  * into changes in another table. It loads all this information from the catalog in its
  * constructor.
  */
-class MaterializedViewInsertTrigger {
+class MaterializedViewTriggerForInsert {
 public:
-    virtual ~MaterializedViewInsertTrigger();
+    virtual ~MaterializedViewTriggerForInsert();
     /**
      * Called when the source table is inserting a tuple. This will update the materialized view
      * destination table to reflect this change.
@@ -105,7 +105,7 @@ public:
 
 
 protected:
-    MaterializedViewInsertTrigger(PersistentTable *destTable,
+    MaterializedViewTriggerForInsert(PersistentTable *destTable,
                                   catalog::MaterializedViewInfo *mvInfo);
     void setTargetTable(PersistentTable * target);
 
@@ -190,18 +190,18 @@ protected:
  * The factory method, build, uses information parsed from the catalog to configure
  * initializers for the private constructor.
  */
-class MaterializedViewStreamInsertTrigger : public  MaterializedViewInsertTrigger {
+class MaterializedViewTriggerForStreamInsert : public  MaterializedViewTriggerForInsert {
 public:
     static void build(StreamedTable *srcTable,
                       PersistentTable *destTable,
                       catalog::MaterializedViewInfo *mvInfo);
 private:
-    MaterializedViewStreamInsertTrigger(PersistentTable *destTable,
+    MaterializedViewTriggerForStreamInsert(PersistentTable *destTable,
                                         catalog::MaterializedViewInfo *mvInfo)
-        : MaterializedViewInsertTrigger(destTable, mvInfo)
+        : MaterializedViewTriggerForInsert(destTable, mvInfo)
     { }
 };
 
 } // namespace voltdb
 
-#endif // MATERIALIZEDVIEWINSERTTRIGGER_H_
+#endif // MATERIALIZEDVIEWTRIGGERFORINSERT_H_

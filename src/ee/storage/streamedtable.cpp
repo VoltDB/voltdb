@@ -18,7 +18,7 @@
 #include "streamedtable.h"
 
 #include "ExportTupleStream.h"
-#include "MaterializedViewInsertTrigger.h"
+#include "MaterializedViewTriggerForInsert.h"
 #include "StreamedTableUndoAction.hpp"
 #include "tableiterator.h"
 
