@@ -80,8 +80,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Simple sub-query
      * @throws Exception
      */
-    public void testSimpleFromClause() throws Exception
-    {
+    public void testSimpleFromClause() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -140,8 +139,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * SELECT FROM SELECT FROM GROUP BY
      * @throws Exception
      */
-    public void testFromClauseAggregation() throws Exception
-    {
+    public void testFromClauseAggregation() throws Exception {
         Client client = getClient();
         loadData(true);
 
@@ -217,8 +215,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Join two sub queries
      * @throws Exception
      */
-    public void testJoinsOfSubselects() throws Exception
-    {
+    public void testJoinsOfSubselects() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -272,8 +269,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    public void testFromReplicated() throws Exception
-    {
+    public void testFromReplicated() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -304,8 +300,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // This got a wrong answer when partitioned GROUP in subquery is joined with replicated parent table
-    public void testENG6276() throws Exception
-    {
+    public void testENG6276() throws Exception {
         Client client = getClient();
         String sql;
 
@@ -348,8 +343,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Simple sub-query expression
      * @throws Exception
      */
-    public void testInExistsSimple() throws Exception
-    {
+    public void testInExistsSimple() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -421,8 +415,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    public void testLhsScalarInSubquery() throws Exception
-    {
+    public void testLhsScalarInSubquery() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -478,8 +471,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * Join two sub queries
      * @throws Exception
      */
-    public void testJoinsOfInExists() throws Exception
-    {
+    public void testJoinsOfInExists() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -521,8 +513,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * SELECT WHERE IN/EXISTS SELECT GROUP BY
      * @throws Exception
      */
-    public void testInExistsGroupBy() throws Exception
-    {
+    public void testInExistsGroupBy() throws Exception {
         Client client = getClient();
         loadData(true);
         VoltTable vt;
@@ -616,8 +607,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * SELECT ... HAVING ... SELECT
      * @throws Exception
      */
-    public void testHavingSubselect() throws Exception
-    {
+    public void testHavingSubselect() throws Exception {
         Client client = getClient();
         loadData(true);
         String sql;
@@ -654,8 +644,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * SELECT ... WHERE ... SELECT UNION SELECT
      * @throws Exception
      */
-    public void testUnions() throws Exception
-    {
+    public void testUnions() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -691,8 +680,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    public void testRowInOrOpAnyNonNull() throws Exception
-    {
+    public void testRowInOrOpAnyNonNull() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -900,8 +888,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testRowEqualityIsNull() throws Exception
-    {
+    public void testRowEqualityIsNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
@@ -979,8 +966,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *       and there are "near misses" involving NULLs
      * @throws Exception
      */
-    public void testRowInOrOpAnyWithInnerNull() throws Exception
-    {
+    public void testRowInOrOpAnyWithInnerNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
@@ -1228,8 +1214,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testRowNotOrIsNullInOrOpAnyWithInnerNull() throws Exception
-    {
+    public void testRowNotOrIsNullInOrOpAnyWithInnerNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
@@ -1459,8 +1444,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testRowOpAllWithInnerNull() throws Exception
-    {
+    public void testRowOpAllWithInnerNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert",  10,  100, 1, "2013-07-18 02:00:00.123457");
@@ -1805,8 +1789,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     *
      * @throws Exception
      */
-    public void testRowOpAllNoNull() throws Exception
-    {
+    public void testRowOpAllNoNull() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -1960,8 +1943,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
 
-    public void testInExistsOrOpAnyWithInnerNull() throws Exception
-    {
+    public void testInExistsOrOpAnyWithInnerNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
@@ -2043,8 +2025,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * to prevent IN-to-EXISTS optimization
      * @throws Exception
      */
-    public void testOuterNullInOpAny() throws Exception
-    {
+    public void testOuterNullInOpAny() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
@@ -2178,8 +2159,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testOpAllWithInnerNull() throws Exception
-    {
+    public void testOpAllWithInnerNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
@@ -2251,8 +2231,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * If outer_expr is NULL and inner_expr produces any row => NULL
      * @throws Exception
      */
-    public void testOpAllWithOuterNull() throws Exception
-    {
+    public void testOpAllWithOuterNull() throws Exception {
         Client client = getClient();
         //                                 id, wage, dept, tm
         client.callProcedure("R1.insert", 100, 1000, 2, "2013-07-18 02:00:00.123457");
@@ -2304,9 +2283,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    // Test subqueries on partitioned table cases not yet supported
-    public void testSubSelects_from_partitioned() throws Exception
-    {
+    // Test subqueries on partitioned table cases
+    public void testSubSelects_from_partitioned() throws Exception {
         Client client = getClient();
         loadData(false);
         String sql;
@@ -2377,60 +2355,74 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // Test scalar subqueries
-    public void testSelectScalar() throws Exception
-    {
+    public void testSelectScalar() throws Exception {
         Client client = getClient();
         loadData(true);
+
+        for (String tb : new String[] { "R1", "P1"} ) {
+            subtestSelectScalarwithParentTable(tb, client);
+            subTestGroupByScalarSubqueryWithParentTable(tb, client);
+        }
+
+        // ENG-8145
+        subTestScalarSubqueryWithParentOrderByOrGroupBy(client);
+
+        // ENG-8159, ENG-8160
+        // test Scalar sub-query with non-integer type
+        subTestScalarSubqueryWithNonIntegerType(client);
+    }
+
+    private void subtestSelectScalarwithParentTable(String tb, Client client)
+            throws Exception {
         VoltTable vt;
         String sql;
-
         // Non-correlated
-        sql =   "select R1.ID, R1.DEPT," +
+        sql =   "select T1.ID, T1.DEPT," +
                 "       (select ID from R2 " +
                 "        where ID = 2) " +
-                "from R1 " +
-                "where R1.ID < 3 " +
-                "order by R1.ID desc;";
+                "from " + tb + " T1 " +
+                "where T1.ID < 3 " +
+                "order by T1.ID desc;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1, 2}, {1, 1, 2}});
 
         // User-parameter-correlated
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID, R1.DEPT, " +
+                "select T1.ID, T1.DEPT, " +
                 "       (select ID from R2 " +
                 "        where ID = ?) " +
-                "from R1 " +
-                "where R1.ID < 3 " +
-                "order by R1.ID desc;",
+                "from " + tb + " T1 " +
+                "where T1.ID < 3 " +
+                "order by T1.ID desc;",
                 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{2, 1, 2}, {1, 1, 2}});
 
         // Correlated
-        sql =   "select R1.ID, R1.DEPT, " +
+        sql =   "select T1.ID, T1.DEPT, " +
                 "       (select ID from R2 " +
-                "        where R2.ID = R1.ID and R2.WAGE = 50) " +
-                "from R1 " +
-                "where R1.ID > 3 " +
-                "order by R1.ID desc;";
+                "        where R2.ID = T1.ID and R2.WAGE = 50) " +
+                "from " + tb + " T1 " +
+                "where T1.ID > 3 " +
+                "order by T1.ID desc;";
         validateTableOfLongs(client, sql, new long[][] {
                 {7, 2, Long.MIN_VALUE}, {6, 2, Long.MIN_VALUE},
                 {5, 2, 5}, {4, 2, Long.MIN_VALUE}});
 
         // Uncorreleted on simple seq scan
-        sql =   "select R1.DEPT, " +
+        sql =   "select T1.DEPT, " +
                 "       (select ID from R2 " +
                 "        where R2.ID = 1) " +
-                "from R1 " +
-                "where R1.DEPT = 2;";
+                "from " + tb + " T1 " +
+                "where T1.DEPT = 2;";
         validateTableOfLongs(client, sql, new long[][] {{2, 1}, {2, 1}, {2, 1}, {2, 1}});
 
         // check for cardinality error
         try {
-            sql =   "select R1.ID, R1.DEPT, " +
+            sql =   "select T1.ID, T1.DEPT, " +
                     "       (select ID from R2 " +
-                    "        where R2.ID < R1.ID) " +
-                    "from R1 " +
-                    "where R1.ID > 3 " +
-                    "order by R1.ID desc;";
+                    "        where R2.ID < T1.ID) " +
+                    "from " + tb + " T1 " +
+                    "where T1.ID > 3 " +
+                    "order by T1.ID desc;";
             client.callProcedure("@AdHoc", sql);
             fail("Did not get expected cardinality error from :" + sql);
         }
@@ -2443,49 +2435,39 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // scalar value expression correlated by group by column
         // Hsqldb back end bug: ENG-8273 NPE
         if (!isHSQL()) {
-            sql =   "select R1.DEPT, count(*), " +
+            sql =   "select T1.DEPT, count(*), " +
                     "       (select max(dept) from R2 " +
-                    "        where R2.wage = R1.wage) " +
-                    "from R1 " +
+                    "        where R2.wage = T1.wage) " +
+                    "from " + tb + " T1 " +
                     "group by dept, wage " +
                     "order by dept, wage;";
             validateTableOfLongs(client, sql, new long[][] {
                     {1, 1, 2}, {1, 1, 1}, {1, 1, 1}, {2, 1, 2}, {2, 2, 2}, {2,1,2}});
 
-            sql =   "select R1.DEPT, count(*), " +
+            sql =   "select T1.DEPT, count(*), " +
                     "       (select sum(dept) from R2" +
-                    "        where R2.wage > r1.dept * 10) " +
-                    "from R1 " +
+                    "        where R2.wage > T1.dept * 10) " +
+                    "from " + tb + " T1 " +
                     "group by dept " +
                     "order by dept;";
             validateTableOfLongs(client, sql, new long[][] {{1,3,8}, {2, 4, 7}});
         }
-
-        subTestGroupByScalarSubquery(client);
-
-        // ENG-8145
-        subTestScalarSubqueryWithParentOrderByOrGroupBy(client);
-
-        //
-        // ENG-8159, ENG-8160
-        // test Scalar sub-query with non-integer type
-        //
-        subTestScalarSubqueryWithNonIntegerType(client);
     }
 
-    private void subTestGroupByScalarSubquery(Client client) throws Exception {
+    private void subTestGroupByScalarSubqueryWithParentTable(String tb, Client client)
+            throws Exception {
         String sql;
 
         // group by scalar value expression
-        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, count(*) as ct from " + tb + " T1 " +
                 "group by dept, " +
                 "         (select count(dept) from R2 " +
-                "          where R2.wage = R1.wage) " +
+                "          where R2.wage = T1.wage) " +
                 "order by dept, ct;";
         validateTableOfLongs(client, sql, new long[][] {{1, 1}, {1, 2}, {2, 1}, {2, 3}});
 
         // dumb edge case -- non-correlated so constant group by expression
-        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, count(*) as ct from " + tb + " T1 " +
                 "group by dept, " +
                 "         (select count(dept) from R2 " +
                 "          where R2.wage > 15) " +
@@ -2493,16 +2475,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
 
         // group by scalar in a complex expression all referenced by tag
-        sql =   "select R1.DEPT, " +
+        sql =   "select T1.DEPT, " +
                 "       abs((select count(dept) from R2 " +
-                "            where R2.wage > R1.wage) / 2 - 3) as tag," +
-                "       count(*) as ct from R1 " +
+                "            where R2.wage > T1.wage) / 2 - 3) as tag," +
+                "       count(*) as ct from " + tb + " T1 " +
                 "group by dept, tag " +
                 "order by dept, ct;";
         validateTableOfLongs(client, sql, new long[][] {{1,2,1}, {1,1,2}, {2,1,1}, {2,3,3}});
 
         // duplicates the subquery expression
-        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, count(*) as ct from " + tb + " T1 " +
                 "group by dept, " +
                 "         (select count(dept) from R2 where R2.wage > 15), " +
                 "         (select count(dept) from R2 where R2.wage > 15) " +
@@ -2510,7 +2492,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
 
         // changes a little bit on the subquery
-        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, count(*) as ct from " + tb + " T1 " +
                 "group by dept, " +
                 "         (select count(dept) from R2 where R2.wage > 15), " +
                 "         (select count(dept) from R2 where R2.wage > 14) " +
@@ -2518,7 +2500,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
 
         // expression with subquery
-        sql =   "select R1.DEPT, count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, count(*) as ct from " + tb + " T1 " +
                 "group by dept,"
                 + "       (select count(dept) from R2 where R2.wage > 15), " +
                 "         (1 + (select count(dept) from R2 where R2.wage > 14) ) " +
@@ -2526,30 +2508,30 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1,3}, {2, 4}});
 
         // duplicates the subquery expression
-        sql =   "select R1.DEPT, " +
-                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag1, " +
-                "       abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag2, " +
+        sql =   "select T1.DEPT, " +
+                "       abs((select count(dept) from R2 where R2.wage > T1.wage) / 2 - 3) as tag1, " +
+                "       abs((select count(dept) from R2 where R2.wage > T1.wage) / 2 - 3) as tag2, " +
                 "       count(*) as ct " +
-                "from R1 " +
+                "from " + tb + " T1 " +
                 "group by dept, tag1 " +
                 "order by dept, ct;";
         validateTableOfLongs(client, sql, new long[][] {{1,2,2,1}, {1,1,1,2}, {2,1,1,1}, {2,3,3,3}});
 
         // expression with subquery
-        sql =   "select R1.DEPT, " +
-                "abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3) as tag1, " +
-                "(5 + abs((select count(dept) from R2 where R2.wage > R1.wage) / 2 - 3)) as tag2, " +
-                "count(*) as ct from R1 " +
+        sql =   "select T1.DEPT, " +
+                "abs((select count(dept) from R2 where R2.wage > T1.wage) / 2 - 3) as tag1, " +
+                "(5 + abs((select count(dept) from R2 where R2.wage > T1.wage) / 2 - 3)) as tag2, " +
+                "count(*) as ct from " + tb + " T1 " +
                 "group by dept, tag1 " +
                 "order by dept, ct;";
         validateTableOfLongs(client, sql, new long[][] {{1,2,7,1}, {1,1,6,2}, {2,1,6,1}, {2,3,8,3}});
 
         // check for cardinality error from grouped by scalar
         try {
-            sql =   "select max(R1.ID), R1.DEPT " +
-                    "from R1 where R1.ID > 3 " +
-                    "group by DEPT, (select ID from R2 where R2.ID < R1.ID)" +
-                    "order by R1.DEPT desc;";
+            sql =   "select max(T1.ID), T1.DEPT " +
+                    "from " + tb + " T1 where T1.ID > 3 " +
+                    "group by DEPT, (select ID from R2 where R2.ID < T1.ID)" +
+                    "order by T1.DEPT desc;";
             client.callProcedure("@AdHoc", sql);
             fail("Did not get expected cardinality error from :" + sql);
         }
@@ -2560,7 +2542,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
     }
 
-    private void subTestScalarSubqueryWithParentOrderByOrGroupBy(Client client) throws Exception {
+    private void subTestScalarSubqueryWithParentOrderByOrGroupBy(Client client)
+            throws Exception {
         String sql;
         int len = 100;
 
@@ -2666,7 +2649,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
         assertFalse(vt.advanceRow());
     }
 
-    private void subTestScalarSubqueryWithNonIntegerType(Client client) throws Exception {
+    private void subTestScalarSubqueryWithNonIntegerType(Client client)
+            throws Exception {
 
         client.callProcedure("@AdHoc", "truncate table R4");
         client.callProcedure("R4.insert", 1, "foo1", -1, 1.1);
@@ -2696,81 +2680,88 @@ public class TestSubQueriesSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0)); assertEquals("foo1", vt.getString(1));
     }
 
-    public void testWhereScalarSubSelects() throws Exception
-    {
+    public void testWhereScalarSubSelects() throws Exception {
         Client client = getClient();
         loadData(false);
+
+        for (String tb : new String[] { "R1", "P1"} ) {
+            subtestWhereScalarForParentTable(tb, client);
+        }
+    }
+
+    private void subtestWhereScalarForParentTable(String tb, Client client)
+            throws Exception {
         VoltTable vt;
         String sql;
 
         // Index Scan
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.ID = " +
+                "select T1.ID from " + tb + " T1 " +
+                "where T1.ID = " +
                 "      (select ID from R2 where ID = ?);",
                 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{2}});
 
         // Index Scan correlated
-        sql =   "select R1.ID from R1 " +
-                "where R1.ID = " +
-                "      (select ID/2 from R2 where ID = R1.ID * 2) " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.ID = " +
+                "      (select ID/2 from R2 where ID = T1.ID * 2) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
         // Seq Scan
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.DEPT = " +
+                "select T1.ID from " + tb + " T1 " +
+                "where T1.DEPT = " +
                 "      (select DEPT from R2 where ID = ?) " +
                 "order by id;",
                 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}});
 
         // Seq Scan correlated
-        sql =   "select R1.ID from R1 " +
-                "where R1.DEPT = " +
-                "      (select DEPT from R2 where ID = R1.ID * 2);";
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.DEPT = " +
+                "      (select DEPT from R2 where ID = T1.ID * 2);";
         validateTableOfLongs(client, sql, new long[][] {{1}});
 
         // Different comparison operators
-        sql =   "select R1.ID from R1 " +
-                "where R1.DEPT > " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.DEPT > " +
                 "      (select DEPT from R2 where ID = 3) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where (select DEPT from R2 where ID = 3) != " +
-                "      R1.DEPT " +
+                "      T1.DEPT " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
         // NLIJ
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID, R2.ID from R1, R2 " +
-                "where R1.DEPT = " +
+                "select T1.ID, R2.ID from " + tb + " T1, R2 " +
+                "where T1.DEPT = " +
                 "      R2.DEPT + (select DEPT from R2 where ID = ?) " +
-                "order by R1.ID, R2.ID limit 2;",
+                "order by T1.ID, R2.ID limit 2;",
                 1).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{4, 1}, {4, 2}});
 
         // @TODO NLIJ correlated
-        sql =   "select R1.ID, R2.ID from R1, R2 " +
+        sql =   "select T1.ID, R2.ID from " + tb + " T1, R2 " +
                 "where R2.ID = " +
-                "      (select ID from R2 where ID = R1.ID) " +
-                "order by R1.ID;";
+                "      (select ID from R2 where ID = T1.ID) " +
+                "order by T1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1, 1}, {2,2}, {3,3}, {4,4}, {5,5}});
 
         // NLJ correlated
-        sql =   "select R1.ID, R2.ID from R1, R2 " +
-                "where R2.DEPT = (select DEPT from R2 where ID = R1.ID + 4) " +
-                "order by R1.ID, R2.ID;";
+        sql =   "select T1.ID, R2.ID from " + tb + " T1, R2 " +
+                "where R2.DEPT = (select DEPT from R2 where ID = T1.ID + 4) " +
+                "order by T1.ID, R2.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1, 4}, {1,5}});
 
         // Having
-        sql =   "select max(R1.ID) from R1 " +
-                "group by R1.DEPT " +
+        sql =   "select max(T1.ID) from " + tb + " T1 " +
+                "group by T1.DEPT " +
                 "having count(*) = " +
                 "       (select R2.ID from R2 where R2.ID = ?);";
         // Uncomment these tests when ENG-8306 is finished
@@ -2779,24 +2770,24 @@ public class TestSubQueriesSuite extends RegressionSuite {
         verifyAdHocFails(client, TestPlansInExistsSubQueries.HavingErrorMsg, sql, 2);
 
         // Having correlated -- parent TVE in the aggregated child expression
-        sql =   "select max(R1.ID) from R1 " +
-                "group by R1.DEPT " +
+        sql =   "select max(T1.ID) from " + tb + " T1 " +
+                "group by T1.DEPT " +
                 "having count(*) = " +
-                "       (select R2.ID from R2 where R2.ID = R1.DEPT);";
+                "       (select R2.ID from R2 where R2.ID = T1.DEPT);";
         // Uncomment these tests when ENG-8306 is finished
         //        validateTableOfScalarLongs(vt, new long[] {5});
         verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
-        sql =   "select DEPT, max(R1.ID) from R1 " +
-                "group by R1.DEPT " +
+        sql =   "select DEPT, max(T1.ID) from " + tb + " T1 " +
+                "group by T1.DEPT " +
                 "having count(*) = " +
-                "       (select R2.ID from R2 where R2.ID = R1.DEPT);";
+                "       (select R2.ID from R2 where R2.ID = T1.DEPT);";
         // Uncomment these tests when ENG-8306 is finished
         //        validateTableOfLongs(client, sql, new long[][] {{2,5}});
         verifyStmtFails(client, sql, TestPlansInExistsSubQueries.HavingErrorMsg);
 
         try {
-            sql =   "select R1.ID from R1 where R1.ID = (select ID from R2);";
+            sql =   "select T1.ID from " + tb + " T1 where T1.ID = (select ID from R2);";
             client.callProcedure("@AdHoc", sql);
             fail("Did not get expected cardinality violation from: " + sql);
         }
@@ -2810,21 +2801,28 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testSingleColumnOpAll() throws Exception {
         Client client = getClient();
         loadData(false);
+
+        for (String tb : new String[] { "R1", "P1"} ) {
+            subtestSingleColumnOpAllForParentTable(tb, client);
+        }
+    }
+
+    private void subtestSingleColumnOpAllForParentTable(String tb, Client client)
+            throws Exception {
         String sql;
         VoltTable vt;
-
         // Subquery with limit/offset parameter
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.ID > ALL " +
+                "select T1.ID from " + tb + " T1 " +
+                "where T1.ID > ALL " +
                 "      (select ID from R2 " +
                 "       order by ID limit ? offset ?);",
                 2, 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{5}});
 
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.ID > ALL " +
+                "select T1.ID from " + tb + " T1 " +
+                "where T1.ID > ALL " +
                 "      (select ID from R2 " +
                 "       order by ID limit ? offset ?) " +
                 "order by 1;",
@@ -2832,40 +2830,39 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
-                "where R1.ID > ALL " +
+                "select T1.ID from " + tb + " T1 " +
+                "where T1.ID > ALL " +
                 "      (select ID from R2 " +
                 "       order by ID limit ? offset ?) " +
                 "order by 1;",
                 1, 2).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{4}, {5}});
 
-        sql =   "select R1.ID from R1 " +
-                "where R1.DEPT >= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.DEPT >= ALL " +
                 "      (select DEPT from R2) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
         // Index scan
-        sql =   "select R1.ID from R1 " +
-                "where R1.ID > ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.ID > ALL " +
                 "      (select ID from R2 where R2.ID < 4) " +
                 "order by id;";
         validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
-        sql =   "select R1.ID from R1 " +
-                "where R1.ID >= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.ID >= ALL " +
                 "      (select ID from R2);";
         validateTableOfLongs(client, sql, new long[][] {{5}});
 
-        sql =   "select R1.ID from R1 " +
-                "where R1.ID <= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where T1.ID <= ALL " +
                 "      (select ID from R2);";
         validateTableOfLongs(client, sql, new long[][] {{1}});
     }
 
-    public void testWhereRowSubSelects() throws Exception
-    {
+    public void testWhereRowSubSelects() throws Exception {
         if (isHSQL()) {
             // hsqldb has back end error for these cases
             return;
@@ -2873,103 +2870,111 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         Client client = getClient();
         //                               id,wage,dept,tm
-        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
-
         client.callProcedure("R2.insert", 3,  5, 1, "2013-07-18 10:40:01.123457");
         client.callProcedure("R2.insert", 4, 10, 1, "2013-08-18 02:00:00.123457");
         client.callProcedure("R2.insert", 5, 10, 1, "2013-08-18 02:00:00.123457");
         client.callProcedure("R2.insert", 6, 10, 2, "2013-08-18 02:00:00.123457");
         client.callProcedure("R2.insert", 7, 50, 2, "2013-09-18 02:00:00.123457");
+
+        for (String tb : new String[] { "R1", "P1" }) {
+            subtestWhereRowSubSelectsForParentTable(tb, client);
+        }
+    }
+
+    public void subtestWhereRowSubSelectsForParentTable(String tb, Client client)
+            throws Exception {
         String sql;
 
-        // R1 2, 10, 1 = R2 4, 10, 1
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) = " +
+        //                               id,wage,dept,tm
+        client.callProcedure(tb + ".insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure(tb + ".insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure(tb + ".insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
+
+        // T1 2, 10, 1 = R2 4, 10, 1
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) = " +
                 "      (select WAGE, DEPT from R2 where ID = 4);";
         validateTableOfLongs(client, sql, new long[][] {{2}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) != " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) != " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {3}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) > " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) > " +
                 "      (select WAGE, DEPT from R2 where ID = 4);";
         validateTableOfLongs(client, sql, new long[][] {{3}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) < " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) < " +
                 "      (select WAGE, DEPT from R2 where ID = 4);";
         validateTableOfLongs(client, sql, new long[][] {{1}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) >= " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) >= " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{2}, {3}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) <= " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) <= " +
                 "      (select WAGE, DEPT from R2 where ID = 4) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        // R1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) = ALL " +
+        // T1 2, 10, 1 = R2 4, 10, 1 and 5, 10, 1
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) = ALL " +
                 "      (select WAGE, DEPT from R2 where ID in (4,5));";
         validateTableOfLongs(client, sql, new long[][] {{2}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) = ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) = ALL " +
                 "      (select WAGE, DEPT from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        // R1 3, 10, 2 >= ALL R2 except R2.7
-        sql =   "select R1.ID from R1 " +
-                "where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL " +
+        // T1 3, 10, 2 >= ALL R2 except R2.7
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where ID = 3 and (T1.WAGE, T1.DEPT) >= ALL " +
                 "                 (select WAGE, DEPT from R2 where ID < 7 " +
                 "                  order by WAGE, DEPT DESC);";
         validateTableOfLongs(client, sql, new long[][] {{3}});
 
-        // R1 3, 10, 2 < R2 except R2.7 50 2
-        sql =   "select R1.ID from R1 " +
-                "where (R1.WAGE, R1.DEPT) >= ALL " +
+        // T1 3, 10, 2 < R2 except R2.7 50 2
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.WAGE, T1.DEPT) >= ALL " +
                 "      (select WAGE, DEPT from R2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.DEPT, R1.TM) < ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.DEPT, T1.TM) < ALL " +
                 "      (select DEPT, TM from R2);";
         validateTableOfLongs(client, sql, new long[][] {{1}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.DEPT, R1.TM) <= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.DEPT, T1.TM) <= ALL " +
                 "      (select DEPT, TM from R2) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.DEPT, R1.TM) <= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.DEPT, T1.TM) <= ALL " +
                 "      (select DEPT, TM from R2 " +
                 "       order by DEPT, TM ASC) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
 
-        sql =   "select R1.ID from R1 " +
-                "where (R1.DEPT, R1.TM) <= ALL " +
+        sql =   "select T1.ID from " + tb + " T1 " +
+                "where (T1.DEPT, T1.TM) <= ALL " +
                 "      (select DEPT, TM from R2 " +
                 "       order by DEPT, TM DESC) " +
                 "order by ID;";
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}});
     }
 
-    public void testRepeatedQueriesDifferentData() throws Exception
-    {
+    public void testRepeatedQueriesDifferentData() throws Exception {
         Client client = getClient();
         //                               id,wage,dept,tm
         client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
@@ -2988,8 +2993,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 new long[] {35});
     }
 
-    public void testSubqueryWithExceptions() throws Exception
-    {
+    public void testSubqueryWithExceptions() throws Exception {
         Client client = getClient();
         //                               id,wage,dept,tm
         client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
@@ -3037,18 +3041,32 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 new long[] {200, 300});
     }
 
-    public void testExistsSimplification() throws Exception
-    {
+    public void testExistsSimplification() throws Exception {
         Client client = getClient();
-        //                               id,wage,dept,tm
-        client.callProcedure("R1.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
-        client.callProcedure("R1.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
-        VoltTable vt;
+        for (String tb : new String[] { "R1", "P1" }) {
+            subtestExistsSimplificationForParentTable(tb, client);
+        }
+
+        client.callProcedure("R2.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure("R2.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
+
+        for (String tb : new String[] { "R1", "P1" }) {
+            subtestExistsSimplificationWithMoreDataForParentTable(tb, client);
+        }
+    }
+
+    private void subtestExistsSimplificationForParentTable(String tb, Client client)
+    throws Exception {
         String sql;
+        VoltTable vt;
+        //                               id,wage,dept,tm
+        client.callProcedure(tb + ".insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+        client.callProcedure(tb + ".insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+        client.callProcedure(tb + ".insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
 
         // EXISTS(table-agg-without-having-groupby) => EXISTS(TRUE)
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select max(ID) from R2) " +
                 "order by ID;";
@@ -3056,20 +3074,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // EXISTS(SELECT...LIMIT 0) => EXISTS(FALSE)
         if (!isHSQL()) {
-            sql =   "select R1.ID from R1 " +
+            sql =   "select T1.ID from " + tb + " T1 " +
                     "where exists " +
                     "      (select max(id) from R2 limit 0)";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
 
             // count(*) limit 0
-            sql =   "select R1.ID from R1 " +
+            sql =   "select T1.ID from " + tb + " T1 " +
                     "where exists " +
                     "      (select count(*) from R2 limit 0)";
             validateTableOfLongs(client, sql, EMPTY_TABLE);
 
             // EXISTS(SELECT...limit ?) => EXISTS(TRUE/FALSE)
             vt = client.callProcedure("@AdHoc",
-                    "select R1.ID from R1 " +
+                    "select T1.ID from " + tb + " T1 " +
                     "where exists " +
                     "      (select count(id) from R2 limit ?)",
                     0).getResults()[0];
@@ -3077,7 +3095,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         }
 
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
+                "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select count(*) from R2 limit ?) " +
                 "order by id;",
@@ -3085,20 +3103,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}});
 
         // EXISTS(able-agg-without-having-groupby offset 1) => EXISTS(FALSE)
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select max(ID) from R2 offset 1);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // count(*) offset 1
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select count(*) from R2 offset 1);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // join on EXISTS(FALSE)
         sql =   "select T1.ID " +
-                "from R1 T1 join R1 T2 " +
+                "from " + tb + " T1 join R1 T2 " +
                 "    ON exists " +
                 "       (select max(ID) from R2 offset 1)" +
                 "    and T1.ID = 1;";
@@ -3106,7 +3124,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // join on EXISTS(TRUE)
         sql =   "select T1.ID " +
-                "from R1 T1 join R1 T2 " +
+                "from " + tb + " T1 join R1 T2 " +
                 "     ON exists " +
                 "        (select max(ID) from R2)" +
                 "     or T1.ID = 25 " +
@@ -3116,7 +3134,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 {1}, {1}, {1}, {2}, {2}, {2}, {3}, {3}, {3}});
 
         // having TRUE
-        sql =   "select max(ID), WAGE from R1 " +
+        sql =   "select max(ID), WAGE from " + tb + " T1 " +
                 "group by WAGE " +
                 "having exists " +
                 "       (select max(ID) from R2)" +
@@ -3125,7 +3143,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1}, {3}});
 
         // having FALSE
-        sql =   "select max(ID), WAGE from R1 " +
+        sql =   "select max(ID), WAGE from " + tb + " T1 " +
                 "group by WAGE " +
                 "having exists " +
                 "       (select max(ID) from R2 offset 1)" +
@@ -3133,13 +3151,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "order by max(ID) asc";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
-        client.callProcedure("R2.insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
-        client.callProcedure("R2.insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
-        client.callProcedure("R2.insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
+    }
 
+    private void subtestExistsSimplificationWithMoreDataForParentTable(String tb, Client client)
+            throws Exception {
+        VoltTable vt;
+        String sql;
         // EXISTS(SELECT ... OFFSET ?)
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
+                "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID from R2" +
                 "       offset ?)",
@@ -3147,7 +3167,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, EMPTY_TABLE);
 
         vt = client.callProcedure("@AdHoc",
-                "select R1.ID from R1 " +
+                "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID from R2" +
                 "       offset ?) " +
@@ -3156,7 +3176,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] {{1}, {2}, {3}});
 
         // Subquery subquery-without-having with group by and no limit => select .. from r2 limit 1
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select WAGE from R2" +
                 "       group by WAGE ) " +
@@ -3164,7 +3184,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}});
 
         // Subquery subquery-without-having with group by and offset => select .. from r2 group by offset
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select WAGE from R2" +
                 "       group by WAGE" +
@@ -3172,7 +3192,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // Subquery subquery-without-having with group by => select .. from r2 limit 1
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID, MAX(WAGE) from R2" +
                 "       group by ID) " +
@@ -3180,7 +3200,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}});
 
         // Subquery subquery-with-having with group by => select .. from r2 group by having agg
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID, MAX(WAGE) from R2 " +
                 "       group by ID " +
@@ -3188,7 +3208,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
         // Subquery subquery-with-having with group by => select .. from r2 group by having limit 1
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID, MAX(WAGE) from R2 " +
                 "       group by ID " +
@@ -3197,13 +3217,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][] {{1}, {2}, {3}});
 
         // Subquery subquery-with-having with group by offset => select .. from r2 group by having limit 1 offset
-        sql =   "select R1.ID from R1 " +
+        sql =   "select T1.ID from " + tb + " T1 " +
                 "where exists " +
                 "      (select ID, MAX(WAGE) from R2 " +
                 "       group by ID " +
                 "       having MAX(WAGE) > 9 offset 2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
-
     }
 
     public void testAmbiguousColumns() throws Exception {
@@ -3384,8 +3403,32 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 expectedError);
     }
 
-    static public junit.framework.Test suite()
-    {
+    public void testNPEbug() throws Exception {
+        Client client = getClient();
+        //VoltTable vt;
+        String sql;
+
+        for (String tb : new String[] { "R1", "P1" }) {
+
+            //                                  id,wage,dept,tm
+            client.callProcedure(tb + ".insert", 1,  5, 1, "2013-06-18 02:00:00.123457");
+            client.callProcedure(tb + ".insert", 2, 10, 1, "2013-07-18 10:40:01.123457");
+            client.callProcedure(tb + ".insert", 3, 10, 2, "2013-08-18 02:00:00.123457");
+
+            // The simplest case that repros a lingering NPE bug found just before
+            // release of universal support for subqueries on replicated tables
+            // involved grouping by a scalar subquery and specifically calculating
+            // an average on a partitioned parent table column -- the bug was in the
+            // feature interaction with the code that considers pushing down avg
+            // calculations to the partitions.
+            sql =   "select (select ID from R2 WHERE DEPT = 7) C0, AVG(WAGE) " +
+                    "from " + tb + " T1 " +
+                    "group by C0;";
+            validateTableOfLongs(client, sql, new long[][] {{Long.MIN_VALUE, 8}});
+        }
+    }
+
+    static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSubQueriesSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();

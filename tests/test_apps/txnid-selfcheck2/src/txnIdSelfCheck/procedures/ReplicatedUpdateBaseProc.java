@@ -38,10 +38,10 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
             "SELECT * FROM adhocr ORDER BY ts DESC, id LIMIT 1");
 
     public final SQLStmt r_insert = new SQLStmt(
-            "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt r_export = new SQLStmt(
-            "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            "INSERT INTO replicated_export (txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocinc, adhocjmp, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     public final SQLStmt r_getViewData = new SQLStmt(
             "SELECT * FROM replview WHERE cid=? ORDER BY cid DESC;");

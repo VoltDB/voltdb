@@ -23,10 +23,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -34,6 +32,7 @@ import java.util.regex.Pattern;
 
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -62,7 +61,7 @@ public class SQLParser extends SQLPatternFactory
             super(String.format(message, args), cause);
         }
 
-        private static final long serialVersionUID = -4043500523038225173L;
+        private static final long serialVersionUID  = -4043500523038225173L;
     }
 
     //========== Private Parsing Data ==========
@@ -540,7 +539,9 @@ public class SQLParser extends SQLPatternFactory
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat DayDateParser = new SimpleDateFormat("yyyy-MM-dd");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
     private static final Map<String, String> FRIENDLY_TYPE_NAMES =
@@ -1477,23 +1478,26 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
-     * Parse a date string.
+     * Parse a date string.  We parse the documented forms, which are:
+     * <ul>
+     *   <li>YYYY-MM-DD</li>
+     *   <li>YYYY-MM-DD HH:MM:SS</li>
+     *   <li>YYYY-MM-DD HH:MM:SS.SSSSSS</li>
+     * </ul>
+     *
+     * As it turns out, TimestampType takes string parameters in just this
+     * format.  So, we defer to TimestampType, and return what it
+     * constructs.  This has microsecond granularity.
+     *
      * @param dateIn  input date string
-     * @return        Date object
+     * @return        TimestampType object
      * @throws SQLParser.Exception
      */
-    public static Date parseDate(String dateIn) throws SQLParser.Exception
+    public static TimestampType parseDate(String dateIn)
     {
-        // Don't ask... Java is such a crippled language!
-        DateParser.setLenient(true);
-
         // Remove any quotes around the timestamp value.  ENG-2623
-        try {
-            return DateParser.parse(dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
-        }
-        catch (ParseException e) {
-            throw new SQLParser.Exception(e);
-        }
+        String dateRepled = dateIn.replaceAll("^\"|\"$", "").replaceAll("^'|'$", "");
+        return new TimestampType(dateRepled);
     }
 
     public static GeographyPointValue parseGeographyPoint(String param) {

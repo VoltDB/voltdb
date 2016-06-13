@@ -386,6 +386,16 @@ public:
         return std::string(retval, 0, retval.length() - 1);
     }
 
+    std::string toJsonString(const std::vector<std::string>& columnNames) const {
+        Json::Value object;
+        for (int i = 0; i < sizeInValues(); i++) {
+            object[columnNames[i]] = getNValue(i).toString();
+        }
+        std::string retval = Json::FastWriter().write(object);
+        // The FastWritter always writes a newline at the end, ignore it
+        return std::string(retval, 0, retval.length() - 1);
+    }
+
     /** Copy values from one tuple into another (uses memcpy) */
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL) const;
     // The vector "output" arguments detail the non-inline object memory management

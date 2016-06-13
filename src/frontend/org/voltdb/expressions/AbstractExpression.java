@@ -35,6 +35,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
 /**
+ * @param <aeClass>
  *
  */
 public abstract class AbstractExpression implements JSONString, Cloneable {
@@ -840,77 +841,30 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return this;
     }
 
-    public ArrayList<AbstractExpression> findBaseTVEs() {
-        return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
-    }
-
     /**
-     * @param type expression type to search for
-     * @return a list of contained expressions that are of the desired type
+     * @param <aeClass>
+     * @param aeClass AbstractExpression-based class of instances to search for.
+     * @return a list of contained expressions that are instances of the desired class
      */
-    public ArrayList<AbstractExpression> findAllSubexpressionsOfType(ExpressionType type) {
-        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
-        findAllSubexpressionsOfType_recurse(type, collected);
-        return collected;
-    }
-
-    private void findAllSubexpressionsOfType_recurse(ExpressionType type,ArrayList<AbstractExpression> collected) {
-        if (getExpressionType() == type)
-            collected.add(this);
-
-        if (m_left != null) {
-            m_left.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-        if (m_right != null) {
-            m_right.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-        if (m_args != null) {
-        for (AbstractExpression argument : m_args) {
-            argument.findAllSubexpressionsOfType_recurse(type, collected);
-        }
-    }
-    }
-
-    /**
-     * @param type expression type to search for
-     * @return whether the expression or any contained expressions are of the desired type
-     */
-    public boolean hasAnySubexpressionOfType(ExpressionType type) {
-        if (getExpressionType() == type) {
-            return true;
-        }
-
-        if (m_left != null && m_left.hasAnySubexpressionOfType(type)) {
-            return true;
-        }
-
-        if (m_right != null && m_right.hasAnySubexpressionOfType(type)) {
-            return true;
-        }
-        if (m_args != null) {
-            for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionOfType(type)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @param type expression type to search for
-     * @return a list of contained expressions that are of the desired type
-     */
-    public ArrayList<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<AbstractExpression> collected = new ArrayList<AbstractExpression>();
+    public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        ArrayList<aeClass> collected = new ArrayList<aeClass>();
         findAllSubexpressionsOfClass_recurse(aeClass, collected);
         return collected;
     }
 
-    public void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
-            ArrayList<AbstractExpression> collected) {
-        if (aeClass.isInstance(this))
-            collected.add(this);
+    public <aeClass> void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
+            ArrayList<aeClass> collected) {
+        if (aeClass.isInstance(this)) {
+            // Suppress the expected warning for the "unchecked" cast.
+            // The runtime isInstance check ensures that it is typesafe.
+            @SuppressWarnings("unchecked")
+            aeClass e = (aeClass) this;
+            collected.add(e);
+            // Don't return early, because in a few rare cases,
+            // like when searching for function expressions,
+            // an instance CAN be a parent expression of another instance.
+            // It's probably not worth optimizing for the special cases.
+        }
 
         if (m_left != null) {
             m_left.findAllSubexpressionsOfClass_recurse(aeClass, collected);
@@ -949,6 +903,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
         }
         return false;
+    }
+
+    public boolean hasTVE() {
+        return hasAnySubexpressionOfClass(TupleValueExpression.class);
     }
 
     /**
@@ -1197,18 +1155,51 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
-        } else if (!findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty()) {
+        }
+        if (hasSubquerySubexpression()) {
             // There may not be any of these in HSQL1.9.3b.  However, in
             // HSQL2.3.2 subqueries are stored as expressions.  So, we may
             // find some here.  We will keep it here for the moment.
             msg.append(String.format("with subquery sources is not supported."));
             return false;
-        } else if (!findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+        }
+        if (hasAggregateSubexpression()) {
             msg.append("with aggregate expression(s) is not supported.");
             return false;
-        } else {
-            return true;
         }
+        return true;
+    }
+
+    public boolean hasSubquerySubexpression() {
+        return !findAllSubexpressionsOfClass(SelectSubqueryExpression.class).isEmpty();
+    }
+
+    public boolean hasAggregateSubexpression() {
+        return !findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty();
+    }
+
+    public boolean hasParameterSubexpression() {
+        return !findAllSubexpressionsOfClass(ParameterValueExpression.class).isEmpty();
+    }
+
+    public boolean hasTupleValueSubexpression() {
+        return !findAllSubexpressionsOfClass(TupleValueExpression.class).isEmpty();
+    }
+
+    public List<AbstractExpression> findAllSubquerySubexpressions() {
+        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
+    }
+
+    public List<AbstractExpression> findAllAggregateSubexpressions() {
+        return findAllSubexpressionsOfClass(AggregateExpression.class);
+    }
+
+    public List<AbstractExpression> findAllParameterSubexpressions() {
+        return findAllSubexpressionsOfClass(ParameterValueExpression.class);
+    }
+
+    public List<AbstractExpression> findAllTupleValueSubexpressions() {
+        return findAllSubexpressionsOfClass(TupleValueExpression.class);
     }
 
     /**
@@ -1244,7 +1235,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return false;
         }
 
-        List<AbstractExpression> functionsList = findAllSubexpressionsOfClass(FunctionExpression.class);
+        List<AbstractExpression> functionsList = findAllFunctionSubexpressions();
         for (AbstractExpression funcExpr: functionsList) {
             assert(funcExpr instanceof FunctionExpression);
             if (((FunctionExpression)funcExpr).hasFunctionId(functionId)) {
@@ -1253,6 +1244,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return false;
+    }
+
+    private List<AbstractExpression> findAllFunctionSubexpressions() {
+        return findAllSubexpressionsOfClass(FunctionExpression.class);
     }
 
 

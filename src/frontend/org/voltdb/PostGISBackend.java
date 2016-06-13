@@ -299,16 +299,18 @@ public class PostGISBackend extends PostgreSQLBackend {
 
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS with other, similar terms. */
-    static public String transformDDL(String ddl) {
-        return transformQuery(PostgreSQLBackend.transformDDL(ddl),
+    @Override
+    public String transformDDL(String ddl) {
+        return transformQuery(super.transformDDL(ddl),
                 geographyPointDdlTransformer, geographyDdlTransformer);
     }
 
     /** For a SQL query, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS, or which behave differently in PostgreSQL/PostGIS
      *  than in VoltDB, with other, similar terms, so that the results will match. */
-    static public String transformDML(String dml) {
-        return transformQuery(PostgreSQLBackend.transformDML(dml),
+    @Override
+    public String transformDML(String dml) {
+        return transformQuery(super.transformDML(dml),
                 asTextQueryTransformer,        castGeoAsVarcharQueryTransformer,
                 pointFromTextQueryTransformer, polygonFromTextQueryTransformer,
                 longitudeQueryTransformer,     latitudeQueryTransformer,

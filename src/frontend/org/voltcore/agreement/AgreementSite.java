@@ -612,15 +612,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     null);
         }
         Set<Long> unknownFaultedHosts = new TreeSet<>();
+
+        // This one line is a biggie. Gets agreement on what the post-fault cluster will be.
         Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage, unknownFaultedHosts);
-        Set<Long> failedSites;
-        if (!initiatorSafeInitPoint.isEmpty()) {
-            failedSites = initiatorSafeInitPoint.keySet();
-            handleSiteFaults(failedSites, initiatorSafeInitPoint);
-        } else if (unknownFaultedHosts.isEmpty()) {
+
+        ImmutableSet<Long> failedSites = ImmutableSet.copyOf(initiatorSafeInitPoint.keySet());
+
+        // check if nothing actually happened
+        if (initiatorSafeInitPoint.isEmpty() && unknownFaultedHosts.isEmpty()) {
             return;
-        } else {
-            failedSites = ImmutableSet.of();
         }
 
         ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
@@ -633,6 +633,14 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
         m_failedHostsCallback.disconnect(failedHosts.build());
+
+        // Handle the failed sites after the failedHostsCallback to ensure
+        // that partition detection is run first -- as this might release
+        // work back to a client waiting on a failure notice. That's unsafe
+        // if we partitioned.
+        if (!initiatorSafeInitPoint.isEmpty()) {
+            handleSiteFaults(failedSites, initiatorSafeInitPoint);
+        }
 
         m_hsIds.removeAll(failedSites);
     }

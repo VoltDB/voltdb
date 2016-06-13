@@ -324,7 +324,7 @@ public class TableSaveFile
         } catch (JSONException e) {
             throw new IOException(e);
         }
-            }
+    }
 
     public int[] getVersionNumber()
     {
@@ -579,6 +579,7 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
+                    fileInputBufferC.discard();
                     return;
                 }
                 boolean expectedAnotherChunk = false;

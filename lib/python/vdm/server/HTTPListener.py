@@ -59,11 +59,11 @@ ALLOWED_EXTENSIONS = ['xml']
 
 
 def receive_signal(signum, stack):
-
     config_path = os.path.join(Global.CONFIG_PATH, 'voltdeploy.xml')
     Configuration.validate_and_convert_xml_to_json(config_path)
     thread.start_new(sync_configuration, ())
     # print 'Received:', signum
+
 
 signal.signal(signal.SIGHUP, receive_signal)
 
@@ -293,7 +293,8 @@ def map_deployment(request, database_id):
             'resourcemonitor'] is None:
             deployment['systemsettings']['resourcemonitor'] = {}
 
-        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and request.json['systemsettings']['resourcemonitor']['memorylimit']:
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor'] and \
+                request.json['systemsettings']['resourcemonitor']['memorylimit']:
             deployment['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                     and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
@@ -427,8 +428,8 @@ def map_deployment(request, database_id):
                     deployment['dr']['connection'] = {}
 
                 if 'source' not in request.json['dr']['connection'] or \
-                        ('source' in request.json['dr']['connection'] and
-                         request.json['dr']['connection']['source'].strip() == ''):
+                   ('source' in request.json['dr']['connection'] and
+                        request.json['dr']['connection']['source'].strip() == ''):
                     deployment['dr']['connection'] = None
                 else:
                     deployment['dr']['connection']['source'] = request.json['dr']['connection']['source']
@@ -766,10 +767,10 @@ class ServerAPI(MethodView):
         sync_configuration()
         Configuration.write_configuration_file()
         url = 'http://%s:%u/api/1.0/databases/%u/servers/%u/' % \
-                                  (__IP__, __PORT__, database_id, server_id)
+              (__IP__, __PORT__, database_id, server_id)
 
         resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'server': Global.SERVERS[server_id],
-                              'members': current_database['members']}), 201)
+                                      'members': current_database['members']}), 201)
         resp.headers['Location'] = url
 
         return resp
@@ -879,7 +880,7 @@ class ServerAPI(MethodView):
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
         else:
             return jsonify({'statusString': 'Given server with id %u doesn\'t belong to database with id %u.' % (
-            server_id, database_id)})
+                server_id, database_id)})
 
 
 class DatabaseAPI(MethodView):
@@ -916,7 +917,8 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is saved otherwise the error message.
         """
         if 'id' in request.json or 'members' in request.json:
-            return make_response(jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
+            return make_response(
+                jsonify({'error': 'You cannot specify \'Id\' or \'Members\' while creating database.'}), 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -945,9 +947,10 @@ class DatabaseAPI(MethodView):
 
         Configuration.write_configuration_file()
         url = 'http://%s:%u/api/1.0/databases/%u' % \
-                                  (__IP__, __PORT__, database_id)
+              (__IP__, __PORT__, database_id)
 
-        resp = make_response(jsonify({'status': 201, 'statusString': 'OK', 'database': Global.DATABASES.get(database_id)}), 201)
+        resp = make_response(
+            jsonify({'status': 201, 'statusString': 'OK', 'database': Global.DATABASES.get(database_id)}), 201)
         resp.headers['Location'] = url
 
         return resp
@@ -964,7 +967,8 @@ class DatabaseAPI(MethodView):
         if 'members' in request.json:
             return make_response(jsonify({'error': 'You cannot specify \'Members\' while updating database.'}), 404)
         if 'id' in request.json and database_id != request.json['id']:
-            return make_response(jsonify({'error': 'Database Id mentioned in the payload and url doesn\'t match.'}), 404)
+            return make_response(jsonify({'error': 'Database Id mentioned in the payload and url doesn\'t match.'}),
+                                 404)
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -1157,8 +1161,14 @@ class StartDatabaseAPI(MethodView):
         """
 
         try:
+
+            if 'pause' in request.args:
+                is_pause = request.args.get('pause').lower()
+            else:
+                is_pause = "false"
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database()
+            response = database.start_database(is_pause)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1180,8 +1190,11 @@ class RecoverDatabaseAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             database = voltdbserver.VoltDatabase(database_id)
-            response = database.start_database(True)
+            response = database.start_database(True, pause)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1301,12 +1314,17 @@ class StartServerAPI(MethodView):
         """
 
         try:
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+            else:
+                pause = "false"
+
             if 'blocking' in request.args:
                 is_blocking = int(request.args.get('blocking'))
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, False, is_blocking)
+            response = server.start_server(server_id, pause, False, is_blocking)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
@@ -1333,6 +1351,9 @@ class StartLocalServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             if 'blocking' in request.args:
@@ -1340,7 +1361,7 @@ class StartLocalServerAPI(MethodView):
             else:
                 is_blocking = -1
             server = voltdbserver.VoltDatabase(database_id)
-            return server.check_and_start_local_server(sid, False, is_blocking )
+            return server.check_and_start_local_server(sid, pause, database_id, False, is_blocking)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'status': 500, 'statusString': str(err)}),
@@ -1362,10 +1383,13 @@ class RecoverServerAPI(MethodView):
 
         try:
             sid = -1
+            if 'pause' in request.args:
+                pause = request.args.get('pause')
+
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.check_and_start_local_server(sid, True)
+            response = server.check_and_start_local_server(sid, pause, database_id, True)
             return response
         except Exception, err:
             print traceback.format_exc()
@@ -1387,7 +1411,7 @@ class AddServerAPI(MethodView):
         """
         try:
             server = voltdbserver.VoltDatabase(database_id)
-            response = server.start_server(server_id, False, -1, True)
+            response = server.start_server(server_id, 'false', False, -1, True)
             resp_json = json.loads(response.data)
             if response.status_code == 500:
                 return make_response(jsonify({'status': '500', 'statusString': resp_json['statusString']}), 500)
@@ -1626,7 +1650,9 @@ class StatusDatabaseAPI(MethodView):
 
             isFreshStart = voltdbserver.check_snapshot_folder(database_id)
 
-            return jsonify({'status': 200, 'statusString': 'OK', 'dbStatus': {'status': status, 'serverStatus': serverDetails, 'isFreshStart': isFreshStart}})
+            return jsonify({'status': 200, 'statusString': 'OK',
+                            'dbStatus': {'status': status, 'serverStatus': serverDetails,
+                                         'isFreshStart': isFreshStart}})
 
 
 class StatusDatabaseServerAPI(MethodView):
@@ -1675,6 +1701,23 @@ class StatusDatabaseServerAPI(MethodView):
                                                                                           'details': success,
                                                                                           'isInitialized': not isFreshStart
                                                                                           }})
+                    success = ''
+                    try:
+                        success = Log.get_error_log_details()
+                    except:
+                        pass
+                    isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
+                    voltProcess = voltdbserver.VoltDatabase(database_id)
+                    if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
+                        return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "running",
+                                                                                              'details': success,
+                                                                                              'isInitialized': not isFreshStart
+                                                                                              }})
+                    else:
+                        return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stopped",
+                                                                                              'details': success,
+                                                                                              'isInitialized': not isFreshStart
+                                                                                              }})
                 except:
                     voltProcess = voltdbserver.VoltDatabase(database_id)
                     error = ''
@@ -1683,7 +1726,7 @@ class StatusDatabaseServerAPI(MethodView):
                     except:
                         pass
                     isFreshStart = voltdbserver.check_snapshot_folder_for_server(database_id, server_id)
-                    if voltProcess.Get_Voltdb_Process().isProcessRunning:
+                    if voltProcess.Get_Voltdb_Process(database_id).isProcessRunning:
                         return jsonify({'status': 200, 'statusString': 'OK', 'serverStatus': {'status': "stalled",
                                                                                               'details': error,
                                                                                               'isInitialized': not isFreshStart
@@ -1693,6 +1736,7 @@ class StatusDatabaseServerAPI(MethodView):
                                                                                               'details': error,
                                                                                               'isInitialized': not isFreshStart
                                                                                               }})
+
 
 
 def main(runner, amodule, config_dir, data_dir, server):
@@ -1812,7 +1856,8 @@ def main(runner, amodule, config_dir, data_dir, server):
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/voltdeploy/sync_configuration/', strict_slashes=False,
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False, view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', strict_slashes=False,
+                     view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET', 'PUT'])
     APP.add_url_rule('/api/1.0/voltdeploy/', strict_slashes=False, view_func=VDM_VIEW,
                      methods=['GET'])

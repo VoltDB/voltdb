@@ -250,17 +250,20 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
             AbstractExpression expr = entry.getValue();
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
-                if(tve.getOrigStmtId() == parentStmt.m_stmtId) {
+                if (tve.getOrigStmtId() == parentStmt.m_stmtId) {
                     // TVE originates from the statement that this SubqueryExpression belongs to
                     addArgumentParameter(paramIdx, expr);
-                } else {
+                }
+                else {
                     // TVE originates from a statement above this parent. Move it up.
                     parentStmt.m_parameterTveMap.put(paramIdx, expr);
                 }
-            } else if (expr instanceof AggregateExpression) {
+            }
+            else if (expr instanceof AggregateExpression) {
                 // An aggregate expression is always from THIS parent statement.
                 addArgumentParameter(paramIdx, expr);
-            } else {
+            }
+            else {
                 // so far it should be either AggregateExpression or TupleValueExpression types
                 assert(false);
             }

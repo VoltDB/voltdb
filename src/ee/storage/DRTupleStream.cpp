@@ -551,7 +551,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 
 int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     std::vector<int32_t> partitionKeyValueList,
-    std::vector<int32_t> flagList,
+    std::vector<int32_t> flagList, long startSequenceNumber,
     char *outBytes) {
 
     DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
@@ -575,6 +575,8 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     TableTuple tuple(tupleMemory, schema);
 
     int64_t lastUID = UniqueId::makeIdFromComponents(-5, 0, partitionId);
+    // Override start sequence number
+    stream.m_openSequenceNumber = startSequenceNumber - 1;
     for (int ii = 0; ii < flagList.size(); ii++) {
         int64_t uid = UniqueId::makeIdFromComponents(ii * 5, 0, (flagList[ii] == TXN_PAR_HASH_MULTI || flagList[ii] == TXN_PAR_HASH_SPECIAL) ? 16383 : partitionId);
         tuple.setNValue(0, ValueFactory::getIntegerValue(partitionKeyValueList[ii]));

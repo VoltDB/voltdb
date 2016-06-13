@@ -1,0 +1,77 @@
+[Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
+   caused by:
+   java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+Undefined procedure: Trivial
+Unexpected IO exception @UpdateClasses modifying classes from catalog: DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
+   caused by:
+   java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+[Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
+   caused by:
+   java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+VOLTDB ERROR: UNEXPECTED FAILURE:
+  java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged
+	at sqlcmdtest.Breakable0.run(Breakable0.java:#)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:#)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:#)
+	at java.lang.reflect.Method.invoke(Method.java:#)
+	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
+	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
+	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
+	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
+	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
+	at java.lang.Thread.run(Thread.java:#)
+Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at sun.misc.Launcher$AppClassLoader.loadClass(Launcher.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
+	... 11 more
+
+VOLTDB ERROR: UNEXPECTED FAILURE:
+  org.voltdb.VoltProcedure$VoltAbortException: sqlcmdtest/Breakable1$NestedGetsKilled
+	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	at org.voltdb.ProcedureRunner.executeSysProcPlanFragment(ProcedureRunner.java:#)
+	at org.voltdb.iv2.Site.executeSysProcPlanFragment(Site.java:#)
+	at org.voltdb.iv2.SysprocFragmentTask.processFragmentTask(SysprocFragmentTask.java:#)
+	at org.voltdb.iv2.SysprocFragmentTask.run(SysprocFragmentTask.java:#)
+	at org.voltdb.iv2.Site.run(Site.java:#)
+	at java.lang.Thread.run(Thread.java:#)
+Caused by: java.lang.NoClassDefFoundError: sqlcmdtest/Breakable1$NestedGetsKilled
+	at sqlcmdtest.Breakable1.<clinit>(Breakable1.java:#)
+	at java.lang.Class.forName0(Native Method)
+	at java.lang.Class.forName(Class.java:#)
+	at org.voltdb.CatalogContext.classForProcedure(CatalogContext.java:#)
+	at org.voltdb.sysprocs.UpdateApplicationCatalog$JavaClassForTest.forName(UpdateApplicationCatalog.java:#)
+	at org.voltdb.sysprocs.UpdateApplicationCatalog.executePlanFragment(UpdateApplicationCatalog.java:#)
+	... 6 more
+Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable1$NestedGetsKilled
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at sun.misc.Launcher$AppClassLoader.loadClass(Launcher.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
+	... 12 more
+
+VOLTDB ERROR: UNEXPECTED FAILURE:
+  java.lang.NoClassDefFoundError: sqlcmdtest/Breakable0$NestedGetsSabotaged
+	at sqlcmdtest.Breakable0.run(Breakable0.java:#)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:#)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:#)
+	at java.lang.reflect.Method.invoke(Method.java:#)
+	at org.voltdb.ProcedureRunner.call(ProcedureRunner.java:#)
+	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
+	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
+	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
+	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
+	at java.lang.Thread.run(Thread.java:#)
+Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at sun.misc.Launcher$AppClassLoader.loadClass(Launcher.java:#)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:#)
+	at org.voltdb.utils.InMemoryJarfile$JarLoader.loadClass(InMemoryJarfile.java:#)
+	... 11 more
+

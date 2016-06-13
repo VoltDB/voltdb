@@ -168,7 +168,8 @@ public class QueryPlanner {
         // this is much easier to parse than SQL and is checked against the catalog
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
-        } catch (HSQLParseException e) {
+        }
+        catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
             throw new PlanningErrorException(e.getMessage());
         }
@@ -263,15 +264,14 @@ public class QueryPlanner {
                     if (plan.extractParamValues(m_paramzInfo)) {
                         return plan;
                     }
-                } else {
-                    if (m_debuggingStaticModeToRetryOnError) {
-                         plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
-                                               m_paramzInfo.paramLiteralValues);
-                    }
+                }
+                else if (m_debuggingStaticModeToRetryOnError) {
+                    compileFromXML(m_paramzInfo.parameterizedXmlSQL,
+                                   m_paramzInfo.paramLiteralValues);
                 }
                 // fall through to try replan without parameterization.
             }
-            catch (Exception e) {
+            catch (Exception | StackOverflowError e) {
                 // ignore any errors planning with parameters
                 // fall through to re-planning without them
                 m_hasExceptionWhenParameterized = true;
@@ -294,7 +294,6 @@ public class QueryPlanner {
         if (m_isUpsert) {
             replacePlanForUpsert(plan);
         }
-
         return plan;
     }
 

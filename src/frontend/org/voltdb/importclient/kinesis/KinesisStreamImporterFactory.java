@@ -24,7 +24,7 @@ import java.util.Properties;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 /**
  * A factory class makes the KinesisStreamImporter available using an OSGi bundle.
@@ -38,9 +38,9 @@ public class KinesisStreamImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, AbstractFormatterFactory formatterFactory)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, FormatterBuilder formatterBuilder)
     {
-        return KinesisStreamImporterConfig.createConfigEntries(props, formatterFactory);
+        return KinesisStreamImporterConfig.createConfigEntries(props, formatterBuilder);
     }
 
     @Override

@@ -91,7 +91,7 @@ def launch_and_wait_on_voltdb(reportout):
     # Launch a single local voltdb server to serve all scripted sqlcmd runs.
     # The scripts are expected to clean up after themselves  -- and/or defensively
     # drop and create all of their tables up front.
-    subprocess.Popen(['../../bin/voltdb', 'create'], shell=False)
+    subprocess.Popen(['../../bin/voltdb', 'create', '--force'], shell=False)
     # give server a little startup time.
     time.sleep(5)
 
@@ -174,6 +174,15 @@ def clean_output(parent, path):
             [0-9]                                    # final digit, replaced with #
             (\sseconds)                              # survives as \g<2>
             """, re.VERBOSE)
+    # 4. Allow stack trace differences that might normally arise from different versions of
+    # voltdb or other library (e.g. reflection) source code.
+    stack_frame_matcher = re.compile(r"""
+            (at\s.+\.java\:)                         # required to match a stack trace line
+                                                     # line, survives as \g<1>
+            [0-9]+                                   # line number digits, replaced with #
+            (\))                                     # survives as \g<2>
+            """, re.VERBOSE)
+
     for line in outbackin:
         # Note len(cleanedline) here counts 1 EOL character.
         # Preserve blank lines as is -- there's no need to try cleaning them.
@@ -183,6 +192,7 @@ def clean_output(parent, path):
         cleanedline = memory_check_matcher.sub("", line)
         cleanedline = latency_matcher.sub("\g<1>#.##s", cleanedline)
         cleanedline = query_timeout_matcher.sub("\g<1>#\g<2>", cleanedline)
+        cleanedline = stack_frame_matcher.sub("\g<1>#\g<2>", cleanedline)
         # # enable for debug print "DEBUG line length %d" % (len(cleanedline))
         # # enable for debug #print cleanedline
         # Here, a blank line resulted from a total text replacement,

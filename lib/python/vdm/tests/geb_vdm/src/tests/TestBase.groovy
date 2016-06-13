@@ -51,4 +51,19 @@ class TestBase extends GebReportingSpec {
         def winSize = driver.manage().window().size
         driver.manage().window().setSize(new Dimension(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT))
     }
+
+    def String getTestingUrl() {
+        String testingName
+        baseUrl = System.getProperty("geb.build.baseUrl")
+
+        if(baseUrl.contains("localhost")) {
+            testingName = "127.0.0.1"
+        }
+        else {
+            String[] temp = baseUrl.split(':')
+            testingName = temp[1]
+            testingName = testingName.substring(2)
+        }
+        return testingName
+    }
 }

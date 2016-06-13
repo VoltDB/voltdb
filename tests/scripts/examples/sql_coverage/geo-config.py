@@ -22,13 +22,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# This SQL coverage configuration set represents tests of the Geospatial
-# features (added to version 6.0); as such, it must be run against PostgreSQL
-# with the PostGIS extension, and not against HSQL. Hence, to run it, use
+# This SQL coverage configuration set represents tests that are only intended
+# to run against PostgreSQL, not against HSQL. Originally, this was limited
+# to the Geospatial features (added in version 6.0), but it now includes other
+# features, such as UPSERT statements. Hence, to run it, use
 # something like the following:
 #     ant -Dpostgis=1 -Dsql_coverage_suite=geo-config.py sqlcoverage
 
 {
+    # Geospatial Tests
     "geo-basic": {"schema": "geo-schema.py",
                   "ddl": "geo-DDL.sql",
                   "template": "geo-basic.sql",
@@ -49,4 +51,17 @@
                              "ddl": "geo-DDL.sql",
                              "template": "geo-advanced-polygon.sql",
                              "normalizer": "geo-normalizer.py"},
+    # UPSERT tests
+    "upsert": {"schema": "schema.py",
+               "ddl": "DDL.sql",
+               "template": "upsert.sql",
+               "normalizer": "nulls-lowest-normalizer.py"},
+    "upsert-ints": {"schema": "int-schema.py",
+                    "ddl": "int-DDL-null.sql",
+                    "template": "upsert-ints.sql",
+                    "normalizer": "nulls-lowest-normalizer.py"},
+    "upsert-strings": {"schema": "strings-schema.py",
+                       "ddl": "strings-DDL-null.sql",
+                       "template": "upsert-strings.sql",
+                       "normalizer": "nulls-lowest-normalizer.py"},
 }

@@ -84,6 +84,7 @@ public abstract class AdHocQueryTester extends TestCase {
                 "create view V_REPPED1 (REPPEDVAL, num_rows, sum_bigint) as " +
                 "select REPPEDVAL, count(*), sum(NONPART) from REPPED1 group by REPPEDVAL;" +
 
+                "create table long_query_table (id INTEGER NOT NULL, NAME VARCHAR(16));" +
                 "";
 
         builder.addLiteralSchema(schema);
@@ -264,6 +265,18 @@ public abstract class AdHocQueryTester extends TestCase {
         // runQueryTest(String.format("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;"), hashableB, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
 
         // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
+    }
+
+    protected static String getQueryForLongQueryTable(int numberOfPredicates) {
+        StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
+        if (numberOfPredicates > 0) {
+            string.append("WHERE ID = 123 ");
+            for (int i = 1; i < numberOfPredicates; i++) {
+                string.append("AND ID > 100 ");
+            }
+        }
+        string.append(";");
+        return string.toString();
     }
 
 }

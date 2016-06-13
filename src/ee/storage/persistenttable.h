@@ -246,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible = true);
+    virtual void deleteAllTuples(bool, bool fallible = true);
 
     virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
@@ -599,7 +599,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock = false);
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -885,7 +885,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
 {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
@@ -924,22 +924,27 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
         //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+        }
+        else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
             block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
+        }
+        else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
     }
 
-    if (block->isEmpty()) {
+    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
+        // Release the empty block unless it's the only remaining block and caller has requested not to do so.
+        // The intent of doing so is to avoid block allocation cost at time tuple insertion into the table
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
+    }
+    else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }
 }

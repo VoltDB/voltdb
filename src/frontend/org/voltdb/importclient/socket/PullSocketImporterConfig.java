@@ -27,7 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -46,13 +46,13 @@ public class PullSocketImporterConfig implements ImporterConfig
 
     private final URI m_resourceID;
     private final String m_procedure;
-    private final AbstractFormatterFactory m_formatterFactory;
+    private final FormatterBuilder m_formatterBuilder;
 
-    public PullSocketImporterConfig(URI resourceID, String procedure, AbstractFormatterFactory formatterFactory)
+    public PullSocketImporterConfig(URI resourceID, String procedure, FormatterBuilder formatterBuilder)
     {
         m_resourceID = resourceID;
         m_procedure = procedure;
-        m_formatterFactory = formatterFactory;
+        m_formatterBuilder = formatterBuilder;
     }
 
     @Override
@@ -61,17 +61,11 @@ public class PullSocketImporterConfig implements ImporterConfig
         return m_resourceID;
     }
 
-    @Override
-    public AbstractFormatterFactory getFormatterFactory()
-    {
-        return m_formatterFactory;
-    }
-
     String getProcedure() {
         return m_procedure;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, AbstractFormatterFactory formatterFactory)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, FormatterBuilder formatterBuilder)
     {
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
@@ -84,7 +78,7 @@ public class PullSocketImporterConfig implements ImporterConfig
 
         ImmutableMap.Builder<URI, ImporterConfig> sbldr = ImmutableMap.builder();
         for (String host: COMMA_SPLITTER.split(hosts)) {
-            checkHostAndAddConfig(host, procedure, sbldr, formatterFactory);
+            checkHostAndAddConfig(host, procedure, sbldr, formatterBuilder);
         }
         try {
             return sbldr.build();
@@ -95,7 +89,7 @@ public class PullSocketImporterConfig implements ImporterConfig
     }
 
     private static void checkHostAndAddConfig(String hspec, String procedure, ImmutableMap.Builder<URI, ImporterConfig> builder,
-            AbstractFormatterFactory formatterFactory) {
+            FormatterBuilder formatterBuilder) {
         Matcher mtc = HOST_RE.matcher(hspec);
         if (!mtc.matches()) {
             throw new IllegalArgumentException(String.format("Address spec %s is malformed", hspec));
@@ -119,8 +113,14 @@ public class PullSocketImporterConfig implements ImporterConfig
             InetSocketAddress sa = new InetSocketAddress(a, p);
             PullSocketImporterConfig config =
                     new PullSocketImporterConfig(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"), procedure,
-                            formatterFactory);
+                            formatterBuilder);
             builder.put(config.getResourceID(), config);
         }
+    }
+
+    @Override
+    public FormatterBuilder getFormatterBuilder()
+    {
+        return m_formatterBuilder;
     }
 }

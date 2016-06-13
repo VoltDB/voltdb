@@ -732,6 +732,7 @@ var loadPage = function (serverName, portid) {
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
                 var licInfo = $.parseJSON(licenseInfo);
+                $("#addNewConfigLink").show();
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
@@ -741,6 +742,7 @@ var loadPage = function (serverName, portid) {
                 $("#tdCommandLogging").html(licInfo.commandlogging == undefined ? '' : licInfo.commandlogging.toString());
                 $("#tdTrial").html(licInfo.trial == undefined ? '' : licInfo.trial.toString());
             } else {
+                $("#addNewConfigLink").hide();
                 $(".licenseInfo").hide();
                 $("#tdLicenseInfo").show();
             }
