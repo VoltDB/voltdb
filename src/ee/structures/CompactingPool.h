@@ -25,8 +25,7 @@
 #include <boost/foreach.hpp>
 #include <boost/unordered_set.hpp>
 
-namespace voltdb
-{
+namespace voltdb {
 // Provide a compacting pool of objects of fixed size. Each object is assumed
 // to have a single char* pointer referencing it in the caller for the lifetime
 // of the allocation.
@@ -45,14 +44,14 @@ namespace voltdb
 // it reserves the right to relocate past allocations on the thread and reset
 // their forward pointers to copied versions of their allocations.
 // Currently, this only happens when (other) allocations are freed.
-    class CompactingPool
-    {
-    public:
-        // Create a compacting pool.  As memory is required, it will
-        // allocate buffers of size elementSize * elementsPerBuffer bytes.
+class CompactingPool
+{
+  public:
+    // Create a compacting pool.  As memory is required, it will
+    // allocate buffers of size elementSize * elementsPerBuffer bytes.
     CompactingPool(int32_t elementSize, int32_t elementsPerBuffer)
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
-            , m_allocationsPendingRelease()
+      , m_allocationsPendingRelease()
     { }
 
     void* malloc(char** referrer)
@@ -76,10 +75,6 @@ namespace voltdb
         return result->m_data;
     }
 
-    void markAllocationAsPendingRelease(void* element) {
-            m_allocationsPendingRelease.insert(element);
-    }
-
     void free(void* element)
     {
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
@@ -101,42 +96,42 @@ namespace voltdb
         m_allocator.trim();
     }
 
-    bool trimAllocationsPendingRelease() {
-        if (m_allocator.count() == 0)
-            return true;
-
-        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
-        auto trimIt = m_allocationsPendingRelease.find(last->data());
-        auto end = m_allocationsPendingRelease.end();
-        while (trimIt != end) {
-            m_allocator.trim();
-            m_allocationsPendingRelease.erase(trimIt);
-
-            if (m_allocator.count() == 0) {
-                assert (m_allocationsPendingRelease.empty());
-                return true;
-            }
-
-            last = reinterpret_cast<Relocatable*>(m_allocator.last());
-            trimIt = m_allocationsPendingRelease.find(last->data());
-        }
-
-        return m_allocationsPendingRelease.empty();
+    /**
+     * Put this pointer to allocated data in a set of items
+     * that will be freed when client calls freePendingAllocations().
+     */
+    void markAllocationAsPendingRelease(void* element)
+    {
+        m_allocationsPendingRelease.insert(element);
     }
 
+    /**
+     * Free all the allocations in the allocationsPendingRelease set.
+     *
+     * There is a performance advantage to freeing large numbers of
+     * allocations at once because we can minimize the amount of
+     * memove'ing we need to do---we can avoid moving allocations that
+     * are about to be freed anyway.
+     */
     void freePendingAllocations()
     {
         auto end = m_allocationsPendingRelease.end();
         decltype(end) it;
         do {
             if (trimAllocationsPendingRelease()) {
+                // This function returns true if there are no
+                // allocations pending release.
                 break;
             }
 
             it = m_allocationsPendingRelease.begin();
             assert (it != end);
-            free(*it);
-            it = m_allocationsPendingRelease.erase(it);
+
+            auto toBeReleased = it;
+            ++it;
+
+            free(*toBeReleased);
+            m_allocationsPendingRelease.erase(toBeReleased);
         }
         while (it != end);
 
@@ -149,10 +144,41 @@ namespace voltdb
     static int32_t FIXED_OVERHEAD_PER_ENTRY()
     { return static_cast<int32_t>(sizeof(Relocatable)); }
 
-    private:
-        ContiguousAllocator m_allocator;
+  private:
 
-        boost::unordered_set<void*> m_allocationsPendingRelease;
+    /**
+     * If the last() references an item that is pending release, then
+     * trim it.  Do this until last() references an item that is not
+     * pending release, or until there are no more allocations.
+     *
+     * Returns true if all allocations pending release have been freed.
+     */
+    bool trimAllocationsPendingRelease() {
+        if (m_allocator.count() == 0)
+            return true;
+
+        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+        auto trimIt = m_allocationsPendingRelease.find(last->m_data);
+        auto end = m_allocationsPendingRelease.end();
+        while (trimIt != end) {
+            m_allocator.trim();
+            m_allocationsPendingRelease.erase(trimIt);
+
+            if (m_allocator.count() == 0) {
+                assert (m_allocationsPendingRelease.empty());
+                return true;
+            }
+
+            last = reinterpret_cast<Relocatable*>(m_allocator.last());
+            trimIt = m_allocationsPendingRelease.find(last->m_data);
+        }
+
+        return m_allocationsPendingRelease.empty();
+    }
+
+    ContiguousAllocator m_allocator;
+
+    boost::unordered_set<void*> m_allocationsPendingRelease;
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.
@@ -184,10 +210,6 @@ namespace voltdb
             // the data addresses should line up perfectly.
             assert(data == result->m_data);
             return result;
-        }
-
-        void* data() {
-            return m_data;
         }
     };
 };

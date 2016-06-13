@@ -128,11 +128,10 @@ void ThreadLocalPool::enableImmediateReleaseMode() {
     pthread_setspecific(m_releaseModeKey, &IMMEDIATE_RELEASE);
 }
 
-bool ThreadLocalPool::isDeferredReleaseMode() {
+static bool isDeferredReleaseMode() {
     bool* v = static_cast<bool*>(pthread_getspecific(m_releaseModeKey));
     return *v == DEFERRED_RELEASE;
 }
-
 static int32_t getAllocationSizeForObject(int length)
 {
     static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
@@ -194,7 +193,12 @@ int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
 }
 
 void ThreadLocalPool::freeRelocatable(Sized* data)
-{ delete [] reinterpret_cast<char*>(data); }
+{
+    // Following line exists just to silence warnings about "unused
+    // function" in memcheck build.
+    (void) isDeferredReleaseMode();
+    delete [] reinterpret_cast<char*>(data);
+}
 
 #else // not MEMCHECK
 

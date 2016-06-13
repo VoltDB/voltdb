@@ -28,16 +28,26 @@
 
 #include <chrono>
 
+/**
+ * A simple class for timing various operations in EE unit tests.
+ */
 struct SimpleTimer {
 
     typedef std::chrono::microseconds microseconds;
     typedef std::chrono::high_resolution_clock::time_point time_point;
 
+    /**
+     * Construct a SimpleTimer with a start time of right now.
+     */
     SimpleTimer()
         : m_start(std::chrono::high_resolution_clock::now())
     {
     }
 
+    /**
+     * Return the elapsed time (since construction or since last call to reset())
+     * as a string.
+     */
     std::string elapsedAsString() {
         std::ostringstream oss;
         auto end = std::chrono::high_resolution_clock::now();
@@ -56,6 +66,9 @@ struct SimpleTimer {
         return oss.str();
     }
 
+    /**
+     * Reset the start time of this timer to the current time.
+     */
     void reset() {
         m_start = std::chrono::high_resolution_clock::now();
     }

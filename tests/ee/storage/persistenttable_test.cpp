@@ -41,18 +41,14 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 
-using voltdb::AbstractExpression;
-using voltdb::BALANCED_TREE_INDEX;
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
 using voltdb::Table;
 using voltdb::TableFactory;
-using voltdb::TableIndex;
-using voltdb::TableIndexFactory;
-using voltdb::TableIndexScheme;
 using voltdb::TableIterator;
 using voltdb::TableTuple;
+using voltdb::TupleSchema;
 using voltdb::TupleSchemaBuilder;
 using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
@@ -176,11 +172,6 @@ protected:
             "set $PREV foreignkeytable null\n"
             "");
         return payload;
-    }
-
-    const std::vector<int32_t>& OBJECT_SIZES() {
-        const static std::vector<int32_t> sizes{4069, 8192, 10240};
-        return sizes;
     }
 
     static const std::string& catalogPayloadForTableWithManyObjects() {
@@ -440,13 +431,25 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     assert(tableutil::addRandomTuples(table, tuplesToInsert));
     table->truncateTable(engine);
     commit();
-        // refresh table pointer by fetching the table from catalog as in truncate old table
+
+    // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
     table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
 }
 
+/**
+ * This test creates a table with several non-inline string columns,
+ * and fills it with data.  Then it updates the table a bunch of times,
+ * creating and deleting non-inline string column values.
+ * Finally, it truncates the table.
+ *
+ * For each operation, print out how long it took.
+ *
+ * The purpose of this test is measure performance of the truncation
+ * operation, which must free all the allocated strings.
+ */
 TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
 
     getEngine()->loadCatalog(0, catalogPayloadForTableWithManyObjects());
@@ -455,20 +458,23 @@ TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
     ASSERT_NE(nullptr, table);
 
     const int NUMROWS = 10000;
+    const TupleSchema* schema = table->schema();
+    std::vector<uint32_t> varcharColLengths {
+        schema->getColumnInfo(1)->length,
+        schema->getColumnInfo(2)->length,
+        schema->getColumnInfo(3)->length
+    };
 
     std::cout << "\n           Loading table...";
-
     SimpleTimer timer;
-
-    // Insert lots of rows.
     TableTuple tempTuple = table->tempTuple();
     for (int i = 0; i < NUMROWS; ++i) {
         char fillChar = (i % 26) + 'A';
 
         tempTuple.setNValue(0, ValueFactory::getIntegerValue(i));
-        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
-        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
-        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(varcharColLengths[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(varcharColLengths[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(varcharColLengths[2], fillChar)));
 
         table->insertTuple(tempTuple);
         commit();
@@ -477,16 +483,16 @@ TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
     std::cout << "  " << timer.elapsedAsString() << "\n";
 
     std::cout << "           Updating tuples...";
-
     timer.reset();
     for (int i = 0; i < NUMROWS; ++i) {
         char fillChar = (i % 26) + 'a';
 
         int64_t whichRow = std::rand() % NUMROWS;
         tempTuple.setNValue(0, ValueFactory::getIntegerValue(whichRow));
-        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[0], fillChar)));
-        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[1], fillChar)));
-        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(OBJECT_SIZES()[2], fillChar)));
+        tempTuple.setNValue(1, ValueFactory::getTempStringValue(std::string(varcharColLengths[0], fillChar)));
+        tempTuple.setNValue(2, ValueFactory::getTempStringValue(std::string(varcharColLengths[1], fillChar)));
+        tempTuple.setNValue(3, ValueFactory::getTempStringValue(std::string(varcharColLengths[2], fillChar)));
+
         TableTuple tupleToUpdate = table->lookupTupleByValues(tempTuple);
         ASSERT_FALSE(tupleToUpdate.isNullTuple());
 
