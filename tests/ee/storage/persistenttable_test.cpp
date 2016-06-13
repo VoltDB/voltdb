@@ -319,16 +319,18 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     voltdb::StandAloneTupleStorage storage(schema);
     TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
 
-    NValue bigintNValues[] = {
+    std::vector<NValue> bigintNValues {
         ValueFactory::getBigIntValue(1900),
         ValueFactory::getBigIntValue(1901),
         ValueFactory::getBigIntValue(1902)
     };
 
-    NValue stringNValues[] = {
-        ValueFactory::getTempStringValue("Je me souviens"),
-        ValueFactory::getTempStringValue("Ut Incepit Fidelis Sic Permanet"),
-        ValueFactory::getTempStringValue("Splendor sine occasu")
+    // These cannot be temp strings, since we need to commit transactions
+    // in this test.
+    std::vector<NValue> stringNValues {
+        ValueFactory::getStringValue("Je me souviens"),
+        ValueFactory::getStringValue("Ut Incepit Fidelis Sic Permanet"),
+        ValueFactory::getStringValue("Splendor sine occasu")
     };
 
     // Let's do some inserts into the table.
@@ -409,6 +411,10 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
         EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
 
         ++i;
+    }
+
+    BOOST_FOREACH(NValue& nval, stringNValues) {
+        nval.free();
     }
 }
 
