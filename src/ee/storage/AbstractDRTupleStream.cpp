@@ -73,7 +73,7 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
 }
 
 void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
-    assert(m_committedSequenceNumber == m_openSequenceNumber);
+    assert(m_committedSequenceNumber <= m_openSequenceNumber);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
 }

@@ -109,13 +109,15 @@ public class JDBC4ClientConnection implements Closeable {
      *            allows 3,000 open transactions before preventing the client from posting more
      *            work, thus preventing server fire-hosing. In some cases however, with very fast,
      *            small transactions, this limit can be raised.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
      * @throws IOException
      * @throws UnknownHostException
      */
     protected JDBC4ClientConnection(
             String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
-            int maxOutstandingTxns)
+            int maxOutstandingTxns, boolean reconnectOnConnectionLoss)
                     throws UnknownHostException, IOException
     {
         // Save the list of trimmed non-empty server names.
@@ -138,6 +140,8 @@ public class JDBC4ClientConnection implements Closeable {
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
+
+        this.config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
 
         // Create client and connect.
         createClientAndConnect();

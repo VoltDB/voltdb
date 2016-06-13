@@ -154,7 +154,7 @@ class Table {
 
     /**
      * Includes tuples that are pending any kind of delete.
-     * Used by iterators to determine how many tupels to expect while scanning
+     * Used by iterators to determine how many tuples to expect while scanning
      */
     virtual int64_t activeTupleCount() const {
         return m_tupleCount;

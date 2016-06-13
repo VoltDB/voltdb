@@ -274,6 +274,42 @@ class SchemaPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#name") {
         }
 
+        while ((line = br.readLine()) != "#index") {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+     * get query to create index
+     */
+    def String getQueryToCreateIndex() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#index") {
+        }
+
+        while ((line = br.readLine()) != "#view") {
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+    * get query to create index
+    */
+    def String getQueryToCreateView() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#view") {
+        }
+
         while ((line = br.readLine()) != null) {
             query = query + line + "\n"
         }
@@ -295,5 +331,16 @@ class SchemaPage extends VoltDBManagementCenterPage {
 
     def boolean gotoSchemaSubTab() {
         schemaSubLink.click()
+    }
+
+    public String removeLastTwoChar(String s) {
+        if (s == null || s.length() == 0) {
+            return s;
+        }
+        return s.substring(0, s.length()-2);
+    }
+
+    public String returnIdOfRowCount(int index) {
+        return "s-size-" + String.valueOf(index) + "-count"
     }
 }

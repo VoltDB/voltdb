@@ -22,41 +22,31 @@ import java.util.Properties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 
-
 /**
  * Factory class that formatter bundles should extend, extending classes
  * should implement a create method to construct the class that implements Formatter.
  */
 public abstract class AbstractFormatterFactory implements BundleActivator {
-    protected String m_formatName;
-    protected Properties m_formatProps;
-
-    public final void configureFormatterFactory(String formatName, Properties formatProps) {
-        m_formatName = formatName;
-        m_formatProps = formatProps;
-    }
 
     /**
      * Registers this as an OSGi service. At startup, the server will look
      * for this factory service within the configured importer bundles.
      */
     @Override
-    public final void start(BundleContext context) throws Exception
-    {
+    public final void start(BundleContext context) throws Exception {
         context.registerService(this.getClass().getName(), this, null);
     }
 
     @Override
-    public final void stop(BundleContext context) throws Exception
-    {
+    public final void stop(BundleContext context) throws Exception {
         // Nothing to do for now.
     }
 
     /**
      * Abstract method for constructing the class implementing Formatter
-     * @param name - name of formatter service
-     * @param prop - formatter properties
-     * @return formatter instance created with the given name and properties
+     * @param formatName  the type of the formatter
+     * @param props - the properties used for the construction of formatter.
+     * @return formatter instance created with the importer id
      */
-    public abstract Formatter<?> create();
+    public abstract Formatter<?> create(String  formatName, Properties props);
 }

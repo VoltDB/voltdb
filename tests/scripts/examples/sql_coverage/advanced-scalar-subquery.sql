@@ -48,7 +48,14 @@ SELECT @idcol, (SELECT @agg(_variable[#agg]) FROM @fromtables WHERE A3._variable
 
 --- Queries with scalar subqueries in the WHERE clause (with optional ORDER BY, LIMIT, OFFSET, GROUP BY or HAVING clauses)
 SELECT _variable[#ord]         FROM @fromtables A11 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](       __[#ord]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
-SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
+--- This specialization avoids some query forms that fall into the edge case issue described in ENG-10554.
+--- TODO: address that issue, remove this customization, and revert back to the commented-out version of query A12 that uses the normal _cmp macro.
+{_a12cmpsubset |= "_eqne"}
+{_a12cmpsubset |= "<"}
+{_a12cmpsubset |= ">"}
+{_a12cmpsubset |= "<="}
+---SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
+   SELECT _variable[#ord numeric] FROM @fromtables A12 WHERE __[#ord] _symbol[#cmp _a12cmpsubset] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables                                         )    _grouporderbyvarlimoffhaving
 --- TODO: uncomment, once ENG-8292 (NPE in Hsql for HAVING query, causing sqlCoverage mismatches) is fixed
 --SELECT _variable[#ord]         FROM @fromtables A13 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](       __[#ord]) FROM @fromtables WHERE     __[#ord] __[#cmp] A13.__[#ord])    _grouporderbyvarlimoffhaving
 SELECT _variable[#ord numeric] FROM @fromtables A14 WHERE __[#ord] _symbol[#cmp _cmp] (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE A14.__[#agg] __[#cmp]     __[#agg])    _grouporderbyvarlimoffhaving

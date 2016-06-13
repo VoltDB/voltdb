@@ -856,6 +856,54 @@ paths:
               statusString:
                 type: string
 
+  /databases/{database_id}/start?pause={pause_status}:
+    put:
+      description:
+        Starts database
+      parameters:
+        - name: database_id
+          in: path
+          type: integer
+          required: true
+        - name: pause_status
+          in: path
+          type: boolean
+          required: true
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+              statusString:
+                type: string
+
+  /databases/{database_id}/recover?pause={pause_status}:
+    put:
+      description:
+        Starts database
+      parameters:
+        - name: database_id
+          in: path
+          type: integer
+          required: true
+        - name: pause_status
+          in: path
+          type: boolean
+          required: true
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              status:
+                type: integer
+              statusString:
+                type: string
+
 
 
 definitions:

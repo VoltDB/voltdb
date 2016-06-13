@@ -25,7 +25,7 @@ import java.util.Properties;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
@@ -58,7 +58,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
     private final long m_idleTimeBetweenReadsInMillis;
     private final long m_maxReadBatchSize;
     private final long m_taskBackoffTimeMillis;
-    private final AbstractFormatterFactory m_formatterFactory;
+    private final FormatterBuilder m_formatterBuilder;
 
     /**
      * Kinesis stream importer configurations
@@ -72,12 +72,12 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
      * @param maxReadBatchSize Max records to read per Kinesis get request
      * @param resourceId The URI per stream, per shard, per app
      * @param taskBackoffTimeMillis  Backoff period when tasks encounter an exception
-     * @param formatterFactory AbstractFormatterFactory
+     * @param formatterBuilder FormatterBuilder
      */
     private KinesisStreamImporterConfig(final String appName, final String region, final String streamName,
             final String procedure, final String secretKey, final String accessKey,
             final long idleTimeBetweenReadsInMillis, final long maxReadBatchSize, final URI resourceId,
-            final long taskBackoffTimeMillis, final AbstractFormatterFactory formatterFactory) {
+            final long taskBackoffTimeMillis, final FormatterBuilder formatterBuilder) {
 
         m_appName = appName;
         m_region = region;
@@ -89,17 +89,12 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         m_maxReadBatchSize = maxReadBatchSize;
         m_resourceID = resourceId;
         m_taskBackoffTimeMillis = taskBackoffTimeMillis;
-        m_formatterFactory = formatterFactory;
+        m_formatterBuilder = formatterBuilder;
     }
 
     @Override
     public URI getResourceID() {
         return m_resourceID;
-    }
-
-    @Override
-    public AbstractFormatterFactory getFormatterFactory() {
-        return m_formatterFactory;
     }
 
     String getProcedure() {
@@ -138,8 +133,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         return m_taskBackoffTimeMillis;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props,
-            AbstractFormatterFactory formatterFactory) {
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, FormatterBuilder formatterBuilder) {
 
         Map<URI, ImporterConfig> configs = new HashMap<>();
 
@@ -155,6 +149,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
 
         List<Shard> shards = discoverShards(region, streamName, accessKey, secretKey, appName);
         if (shards == null || shards.isEmpty()) {
+            LOGGER.warn(String.format("Kinesis stream %s or regions %s are not configured.", streamName, region));
             return configs;
         }
 
@@ -169,7 +164,7 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
             URI uri = URI.create(builder.toString());
 
             ImporterConfig config = new KinesisStreamImporterConfig(appName, region, streamName, procedure, secretKey,
-                    accessKey, readInterval, maxReadBatchSize, uri, taskBackoffTimeMillis, formatterFactory);
+                    accessKey, readInterval, maxReadBatchSize, uri, taskBackoffTimeMillis, formatterBuilder);
 
             configs.put(uri, config);
         }
@@ -259,5 +254,12 @@ public class KinesisStreamImporterConfig implements ImporterConfig {
         userAgent.append(" ").append(appName).append("/").append(APP_VERSION);
         config.setUserAgent(userAgent.toString());
         return config;
+    }
+
+
+    @Override
+    public FormatterBuilder getFormatterBuilder()
+    {
+        return m_formatterBuilder;
     }
 }

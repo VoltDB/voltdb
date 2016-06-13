@@ -36,14 +36,16 @@ import org.openqa.selenium.WebElement
  */
 class SqlQueryPage extends VoltDBManagementCenterPage {
     static content = {
-        // Tables, Views & Stored Procedures elements
+        // Tables, Streams, Views & Stored Procedures elements
         tabArea     { $('#tabMain') }
         tabControls { tabArea.find('.tabs') }
         tablesTab   { tabControls.find("a[href='#tab1']") }
-        viewsTab    { tabControls.find("a[href='#tab2']") }
-        storedProcsTab  { tabControls.find("a[href='#tab3']") }
+        streamsTab  { tabControls.find("a[href='#tab2']") }
+        viewsTab    { tabControls.find("a[href='#tab3']") }
+        storedProcsTab  { tabControls.find("a[href='#tab4']") }
         listsArea   { tabArea.find('#tabScroller') }
         tablesNames { listsArea.find('#accordionTable').find('h3') }
+        streamsNames{ listsArea.find('#accordionStreamedTable').find('h3') }
         viewsNames  { listsArea.find('#accordionViews').find('h3') }
         storedProcs { listsArea.find('#accordionProcedures') }
         systemStoredProcsHeader  { storedProcs.find('.systemHeader').first() }
@@ -101,6 +103,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         sqlQueryTab.displayed
         sqlQueryTab.attr('class') == 'active'
         tablesTab.displayed
+        streamsTab.displayed
         viewsTab.displayed
         storedProcsTab.displayed
         listsArea.displayed
@@ -113,15 +116,20 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
      */
-
     def showTables() {
         clickToDisplay(tablesTab, tablesNames)
     }
 
     /**
+     * Displays the list of Streams (by clicking the "Streams" tab).
+     */
+    def showStreams() {
+        clickToDisplay(streamsTab, streamsNames)
+    }
+
+    /**
      * Displays the list of Views (by clicking the "Views" tab).
      */
-
     def showViews() {
         clickToDisplay(viewsTab, viewsNames)
     }
@@ -129,7 +137,6 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Displays the list of Stored Procedures (by clicking the "Stored Procedures" tab).
      */
-
     def showStoredProcedures() {
         clickToDisplay(storedProcsTab, allStoredProcs)
     }
@@ -143,6 +150,21 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         def names = []
         showTables()
         tablesNames.each {
+            scrollIntoView(it);
+            names.add(it.text())
+        }
+        return names
+    }
+
+    /**
+     * Returns the list of Streams (as displayed on the "Streams" tab).<p>
+     * Note: as a side effect, the "Streams" tab is opened.
+     * @return the list of Stream names.
+     */
+    def List<String> getStreamNames() {
+        def names = []
+        showStreams()
+        streamsNames.each {
             scrollIntoView(it);
             names.add(it.text())
         }
@@ -260,21 +282,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
-     * Returns the list of Columns (as displayed on the "Tables" or "Views"
-     * tab), for the specified table or view; each column returned includes
-     * both the column name and type, e.g. "CONTESTANT_NUMBER (integer)".<p>
-     * Note: as a side effect, the "Tables" or "Views" tab is opened (if
-     * needed), and the specified table or view is opened (if needed), and
-     * then closed.
-     * @param tableOrViewName - the name of the table or view whose columns
-     * are to be returned.
-     * @param getViewColumns - if true, get columns for the specified view,
-     * rather than table.
-     * @return the list of (table or view) Column names and data types.
+     * Returns the list of Columns (as displayed on the "Tables", "Streams",
+     * or "Views" tab), for the specified table or view; each column returned
+     * includes both the column name and type, e.g. "ROWID (bigint)".
+     * <p>
+     * Note: as a side effect, the "Tables", "Streams", or "Views" tab is opened
+     * (if needed), and the specified table, stream, or view is opened (if
+     * needed), and then closed.
+     * @param name - the name of the table, stream, or view whose columns are
+     * to be returned.
+     * @param type - the type of object whose columns are to be returned; should
+     * be 'table' (default value), 'stream', or 'view'
+     * @return the list of (table, stream, or view) Column names and data types.
      */
-    private def List<String> getColumns(String tableOrViewName, boolean getViewColumns) {
+    private def List<String> getColumns(String name, String type='table') {
         def names = null
-        if (getViewColumns) {
+        if ("stream".equalsIgnoreCase(type)) {
+            showStreams()
+            names = streamsNames
+        } else if ("view".equalsIgnoreCase(type)) {
             showViews()
             names = viewsNames
         } else {
@@ -284,7 +310,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         def columns = []
         names.each {
             scrollIntoView(it)
-            if (it.text() == tableOrViewName) {
+            if (it.text() == name) {
                 def columnList = it.next()
                 clickToDisplay(it, columnList)
                 columnList.find('ul').find('li').each {
@@ -300,27 +326,40 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     /**
      * Returns the list of Columns (as displayed on the "Tables" tab), for the
      * specified table; each column returned includes both the column name and
-     * type, e.g. "CONTESTANT_NUMBER (integer)".<p>
+     * type, e.g. "ROWID (bigint)".<p>
      * Note: as a side effect, the "Tables" tab is opened (if needed), and the
      * specified table is opened (if needed), and then closed.
      * @param tableName - the name of the table whose columns are to be returned.
      * @return the list of table Column names and data types.
      */
     def List<String> getTableColumns(String tableName) {
-        return getColumns(tableName, false)
+        return getColumns(tableName)
+    }
+
+    /**
+     * Returns the list of Columns (as displayed on the "Streams" tab), for the
+     * specified stream; each column returned includes both the column name and
+     * type, e.g. "ROWID (bigint)".<p>
+     * Note: as a side effect, the "Streams" tab is opened (if needed), and the
+     * specified stream is opened (if needed), and then closed.
+     * @param streamName - the name of the stream whose columns are to be returned.
+     * @return the list of stream Column names and data types.
+     */
+    def List<String> getStreamColumns(String streamName) {
+        return getColumns(streamName, 'stream')
     }
 
     /**
      * Returns the list of Columns (as displayed on the "Views" tab), for the
      * specified view; each column returned includes both the column name and
-     * type, e.g. "CONTESTANT_NUMBER (integer)".<p>
+     * type, e.g. "RECORD_COUNT (integer)".<p>
      * Note: as a side effect, the "Views" tab is opened (if needed), and the
      * specified view is opened (if needed), and then closed.
      * @param viewName - the name of the view whose columns are to be returned.
      * @return the list of view Column names and data types.
      */
     def List<String> getViewColumns(String viewName) {
-        return getColumns(viewName, true)
+        return getColumns(viewName, 'view')
     }
 
     /**
@@ -349,6 +388,36 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      */
     def List<String> getTableColumnTypes(String tableName) {
         def columns = getTableColumns(tableName)
+        columns = columns.collect { it.substring(it.indexOf('(')+1).replace(")", "").trim() }
+        return columns
+    }
+
+    /**
+     * Returns the list of Column names (as displayed on the "Streams" tab), for
+     * the specified stream.<p>
+     * Note: as a side effect, the "Streams" tab is opened (if needed), and the
+     * specified stream is opened (if needed), and then closed.
+     * @param streamName - the name of the stream whose column names are to be
+     * returned.
+     * @return the list of stream Column names.
+     */
+    def List<String> getStreamColumnNames(String streamName) {
+        def columns = getStreamColumns(streamName)
+        columns = columns.collect { it.substring(0, it.indexOf('(')).trim() }
+        return columns
+    }
+
+    /**
+     * Returns the list of Column data types (as displayed on the "Streams"
+     * tab), for the specified stream.<p>
+     * Note: as a side effect, the "Streams" tab is opened (if needed), and the
+     * specified stream is opened (if needed), and then closed.
+     * @param streamName - the name of the stream whose column types are to be
+     * returned.
+     * @return the list of stream Column data types.
+     */
+    def List<String> getStreamColumnTypes(String streamName) {
+        def columns = getStreamColumns(streamName)
         columns = columns.collect { it.substring(it.indexOf('(')+1).replace(")", "").trim() }
         return columns
     }

@@ -212,10 +212,12 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  indexref.cpp
+ materializedviewhandler.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
  table.cpp
+ viewtrigger.cpp
 """
 
 CTX.INPUT['structures'] = """

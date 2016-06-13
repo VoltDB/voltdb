@@ -1,5 +1,5 @@
 DDL:
-../../../tests/frontend/org/voltdb/planner/testjoinorder-ddl.sql
+../../../tests/frontend/org/voltdb/planner/testplans-joinorder-ddl.sql
 
 SQL:
 JOIN:T7,T6,T5,T4,T3,T2,T1:select * from T1, T2, T3, T4, T5, T6, T7;

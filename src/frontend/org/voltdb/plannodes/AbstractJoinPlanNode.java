@@ -19,7 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.JoinType;
@@ -155,20 +156,21 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // Index join will have to override this method.
         // Assert and provide functionality for generic join
         assert(m_children.size() == 2);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.generateOutputSchema(db);
         }
+
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> subqueryExpressions = findAllSubquerySubexpressions();
+        for (AbstractExpression expr : subqueryExpressions) {
+            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        }
+
         // Join the schema together to form the output schema
         m_outputSchemaPreInlineAgg =
             m_children.get(0).getOutputSchema().
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
-
-        // Generate the output schema for subqueries
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
         generateRealOutputSchema(db);
     }
@@ -195,8 +197,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         IndexScanPlanNode index_scan =
             (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(m_children.size() == 2 && index_scan == null);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
@@ -207,6 +208,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
+
+        // Resolve subquery expression indexes
+        resolveSubqueryColumnIndexes();
 
         // Resolve TVE indexes for each schema column.
         for (int i = 0; i < m_outputSchemaPreInlineAgg.size(); ++i) {
@@ -221,7 +225,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
             else {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-
             }
 
             if (index == -1) {
@@ -239,16 +242,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_outputSchemaPreInlineAgg.sortByTveIndex(0, outer_schema.size());
         m_outputSchemaPreInlineAgg.sortByTveIndex(outer_schema.size(), m_outputSchemaPreInlineAgg.size());
         m_hasSignificantOutputSchema = true;
-
-        // Finally, resolve predicates
-        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
-
-        // Resolve subquery expression indexes
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
         resolveRealOutputSchema();
     }
@@ -386,13 +379,36 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
-
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_preJoinPredicate, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_joinPredicate, aeClass));
-        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_wherePredicate, aeClass));
-        return collected;
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        super.findAllExpressionsOfClass(aeClass, collected);
+        if (m_preJoinPredicate != null) {
+            collected.addAll(m_preJoinPredicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_joinPredicate != null) {
+            collected.addAll(m_joinPredicate.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_wherePredicate != null) {
+            collected.addAll(m_wherePredicate.findAllSubexpressionsOfClass(aeClass));
+        }
     }
 
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * Resolution of columns produced by "SELECT *" is not a problem for joins because
+     * there is always a sequential scan at the top of plans that have this problem,
+     * so just return the passed-in differentiator here.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    @Override
+    public int adjustDifferentiatorField(int differentiator) {
+        return differentiator;
+    }
 }

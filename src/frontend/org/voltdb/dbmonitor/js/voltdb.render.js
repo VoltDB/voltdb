@@ -275,6 +275,10 @@ function alertNodeClicked(obj) {
                                 tryAutoLogin();
                                 return;
                             }
+                            else if (response.status == 401){
+                                $("#unAuthorized").trigger("click");
+                                return;
+                            }
                                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
                             else if (response.status != -3) {
                                 $("#serUnavailablePopup").trigger("click");

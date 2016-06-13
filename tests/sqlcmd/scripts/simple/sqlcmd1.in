@@ -1,7 +1,0 @@
-drop table t if exists;
-create table t ( c integer );
-insert into t values (0);
-insert into t values (1);
-insert into t values (2);
-select * from t;
-drop table t;

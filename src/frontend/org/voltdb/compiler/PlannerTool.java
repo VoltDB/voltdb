@@ -268,7 +268,8 @@ public class PlannerTool {
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 /*
                  * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
                  * they are at least somewhat expected.
