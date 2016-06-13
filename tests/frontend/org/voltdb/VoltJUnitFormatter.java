@@ -29,12 +29,12 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.AssertionFailedError;
-import junit.framework.Test;
-
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.optional.junit.JUnitResultFormatter;
 import org.apache.tools.ant.taskdefs.optional.junit.JUnitTest;
+
+import junit.framework.AssertionFailedError;
+import junit.framework.Test;
 
 public class VoltJUnitFormatter implements JUnitResultFormatter {
 
@@ -78,7 +78,19 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
         m_currentSuite = suite;
         m_tests = m_errs = m_failures = 0;
         m_start = System.currentTimeMillis();
-        out.println("  Running " + suite.getName());
+
+        // this code is 10 lines instead of 1 because it's safely trying to get information
+        // from ant about where we are in the set of unit tests with a graceful fallback
+        String testIndexStr = System.getProperty("testindex");
+        String testCountStr = System.getProperty("testcount");
+        try {
+            long testIndex = Long.parseLong(testIndexStr);
+            long testCount = Long.parseLong(testCountStr);
+            out.printf("  Running test %d of %d: %s\n", testIndex, testCount, suite.getName());
+        }
+        catch (Exception e) {
+            out.printf("  Running %s\n", suite.getName());
+        }
 
         // print a message to the console every few minutes so you know
         // roughly how long you've been running a test
