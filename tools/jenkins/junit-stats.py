@@ -6,11 +6,9 @@
 # A command line tool for getting junit job statistics from Jenkins CI
 # usage: junit-stats help
 
-import re
 import json
 import sys
 import time
-import getpass
 import mysql.connector
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
@@ -22,22 +20,11 @@ class Stats():
     def __init__(self):
         self.jhost='http://ci.voltdb.lan'
         self.dbhost='volt2.voltdb.lan'
-
-    # TODO: print what filenames data are saved to
-    def runCommand(self, command, branch=None, job=None, build_range=None):
-        cmdHelp = """
+        self.cmdHelp = """
         usage: junit-stats <branch> <job> <range>
         ex: junit-stats A-master branch-2-pro-junit-master 800-802
         ex: junit-stats A-master branch-2-community-junit-master 550-550
         """
-        if command == 'help':
-            print(cmdHelp)
-        elif command == 'build-history':
-            self.build_history(branch, job, build_range)
-        else:
-            print(cmdHelp)
-            exit(0)
-
 
     def read_url(self, url):
         """
@@ -60,8 +47,9 @@ class Stats():
         Displays build history for a job on a branch. Can specify an inclusive build range.
         For every build specified on the branch, prints the full test results of the
         """
+
         if branch is None or job is None or build_range is None:
-            self.runCommand('help')
+            print(self.cmdHelp)
             return
         else:
             try:
@@ -72,7 +60,7 @@ class Stats():
                     raise Exception('Error: Left number must be lesser than or equal to right')
             except:
                 print(sys.exc_info()[1])
-                self.runCommand('help')
+                print(self.cmdHelp)
                 return
 
         url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/lastCompletedBuild/api/python'
@@ -83,32 +71,10 @@ class Stats():
         latestBuild = build['number']
         host = build['builtOn']
 
-        test_map = {}
-        job_map = {}
-
         db = mysql.connector.connect(host=self.dbhost, user='oolukoya', password='oolukoya', database='qa')
         cursor = db.cursor()
 
         for build in range(build_low, build_high+1):
-            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/api/python'
-            report = self.read_url(url)
-            if report is None:
-                print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                'exist on Jenkins' % build)
-            job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
-            job_data = {
-                'name': job,
-                'stamp': job_stamp,
-                'url': url,
-                'build': build
-            }
-            add_job = ('INSERT INTO `junit-job-results` '
-                        '(name, stamp, url, build) '
-                        'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s)')
-            job_map.get(job, []).append(job_data)
-            cursor.execute(add_job, job_data)
-            db.commit()
-
             url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             report = self.read_url(url)
             if report is None:
@@ -118,7 +84,22 @@ class Stats():
                 continue
 
             try:
-                childReports = report['childReports']
+                fails = report.get('failCount', 0)
+                skips = report.get('skipCount', 0)
+                passes = report.get('passCount', 0)
+                total = report.get('totalCount', 0)
+                if total == 0:
+                    total = fails + skips + passes
+                childReports = report.get('childReports', None)
+                if childReports is None:
+                    childReports = [
+                        {
+                            'result': report,
+                            'child': {
+                                'url': url.replace('testReport/api/python','')
+                            }
+                        }
+                    ]
                 for child in childReports:
                     suites = child['result']['suites']
                     report_url = child['child']['url'] + 'testReport'
@@ -145,12 +126,32 @@ class Stats():
                                 cursor.execute(add_test, test_data)
                                 db.commit()
 
-                            test_map.get(name, []).append(test_data)
             except KeyError as e:
                 print(e)
                 print('Error retriving test data for this particular build: %d\n' % build)
             except:
                 print(e)
+
+            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/api/python'
+            report = self.read_url(url)
+            if report is None:
+                print('Could not retrieve report because url is invalid. This may be because the build %d might not '
+                'exist on Jenkins' % build)
+            job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
+            job_data = {
+                'name': job,
+                'stamp': job_stamp,
+                'url': report['url'] + 'testReport',
+                'build': build,
+                'fails': fails,
+                'total': total,
+                'percent': fails*100.0/total
+            }
+            add_job = ('INSERT INTO `junit-job-results` '
+                        '(name, stamp, url, build, fails, total, percent) '
+                        'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
+            cursor.execute(add_job, job_data)
+            db.commit()
 
         cursor.close()
         db.close()
@@ -160,20 +161,16 @@ if __name__ == '__main__':
     branch = None
     job = None
     build_range = None
-    command = 'help'
 
     args = sys.argv
 
     if len(args) > 1:
-        command = args[1]
+        branch = args[1]
 
     if len(args) > 2:
-        branch = args[2]
+        job = args[2]
 
     if len(args) > 3:
-        job = args[3]
+        build_range = args[3]
 
-    if len(args) > 4:
-        build_range = args[4]
-
-    stats.runCommand(command, branch, job, build_range)
+    stats.build_history(branch, job, build_range)
