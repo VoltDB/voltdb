@@ -46,6 +46,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -67,6 +68,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -1044,6 +1046,12 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
+        // If we have a windowed expression in the display list we want to
+        // add a PartitionByPlanNode here.
+        if (m_parsedSelect.hasWindowedExpression()) {
+            root = handleWindowedOperators(root);
+        }
+
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
@@ -1079,6 +1087,9 @@ public class PlanAssembler {
             }
         }
 
+        // Add a project node if we need one.  Some types of nodes can have their
+        // own inline projection nodes, while others need an out-of-line projection
+        // node.
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
@@ -1115,8 +1126,7 @@ public class PlanAssembler {
      * @return true if a project node is required
      */
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( root instanceof AggregatePlanNode ||
-             root.getPlanNodeType() == PlanNodeType.PROJECTION) {
+        if (!root.planNodeClassNeedsProjectionNode()) {
             return false;
         }
         // If there is a complexGroupby at his point, it means that
@@ -1679,7 +1689,10 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
-        // if the projection can be done inline...
+        // If the projection can be done inline. then add the
+        // projection node inline.  Even if the rootNode is a
+        // scan, if we have a windowed expression we need to
+        // add it out of line.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;
@@ -2091,6 +2104,48 @@ public class PlanAssembler {
 
         // parent is null and switched to index scan from sequential scan
         return true;
+    }
+
+    /**
+     * Create nodes for windowed operations.
+     *
+     * @param root
+     * @return
+     */
+    private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
+        // Get the windowed expression.  We need to set its output
+        // schema from the display list.
+        ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
+        assert(colInfo != null);
+        SchemaColumn windowedSchemaColumn = colInfo.asSchemaColumn();
+
+        // This will set the output schema to contain the
+        // windowed schema column only.  In generateOutputSchema
+        // we will add the input columns.
+        PartitionByPlanNode pnode = new PartitionByPlanNode();
+        pnode.setWindowedColumn(windowedSchemaColumn);
+        OrderByPlanNode onode = new OrderByPlanNode();
+        // We need to extract more information from the windowed expression.
+        // to construct the output schema.
+        WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
+        List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
+        for (AbstractExpression partitionByExpression : partitionByExpressions) {
+            SortDirectionType pdir = SortDirectionType.DESC;
+            onode.addSort(partitionByExpression, pdir);
+        }
+        for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
+            AbstractExpression orderByExpr = windowedExpression.getOrderByExpressions().get(idx);
+            SortDirectionType  orderByDir  = windowedExpression.getOrderByDirections().get(idx);
+            // If the order by expression is in the partition by list
+            // we don't need to sort by it.  It's already sorted on that
+            // column, and in the proper order.
+            if (false == windowedExpression.getPartitionByExpressions().contains(orderByExpr)) {
+                onode.addSort(orderByExpr, orderByDir);
+            }
+        }
+        onode.addAndLinkChild(root);
+        pnode.addAndLinkChild(onode);
+        return pnode;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

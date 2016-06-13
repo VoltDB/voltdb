@@ -172,4 +172,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     protected String explainPlanForNode(String indent) {
         return "PROJECTION";
     }
+
+    @Override
+    /**
+     * ProjectionPlanNodes don't need projection nodes.
+     */
+    public boolean planNodeClassNeedsProjectionNode() {
+        return false;
+    }
 }
