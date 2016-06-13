@@ -639,6 +639,15 @@ public class VoltDB {
            return m_config.m_queryTimeout;
         }
 
+        public static Consistency.ReadLevel getDefaultReadConsistencyLevel() {
+            // try to get the global default setting for read consistency, but fall back to SAFE
+            if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
+                return VoltDB.instance().getConfig().m_consistencyReadLevel;
+            }
+            else {
+                return Consistency.ReadLevel.SAFE;
+            }
+        }
     }
 
     /* helper functions to access current configuration values */
