@@ -1192,7 +1192,10 @@ public abstract class StatementDMQL extends Statement {
             if (isGroupByColumn(select, i)) {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
-                orderByCols.add(expr);
+                if (select.sortAndSlice.hasOrder())
+                    // If the selectQuerySpecification's sort structure has been reset,
+                    // do not add orderByCols.
+                    orderByCols.add(expr);
             } else if (expr.equals(select.getHavingCondition())) {
                 // Having
                 if( !(expr instanceof ExpressionLogical && expr.isAggregate) ) {

@@ -359,6 +359,14 @@ public class VoltProjectBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void configureLogging(Boolean commandLogSync, Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
+        m_commandLogSync = commandLogSync;
+        m_commandLogEnabled = commandLogEnabled;
+        m_commandLogFsyncInterval = fsyncInterval;
+        m_commandLogMaxTxnsBeforeFsync = maxTxnsBeforeFsync;
+        m_commandLogSize = logSize;
+    }
+
     /**
      * Produce all catalogs this project builder knows how to produce.
      * Written to allow BenchmarkController to cause compilation of multiple

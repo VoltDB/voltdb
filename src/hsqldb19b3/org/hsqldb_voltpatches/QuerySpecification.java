@@ -57,6 +57,7 @@ import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowSetNavigatorData;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -620,6 +621,11 @@ public class QuerySpecification extends QueryExpression {
 
         Expression e = orderBy.getLeftNode();
 
+        if (e.dataType != null && e.dataType.isBooleanType()) {
+            // Give "invalid ORDER BY expression" error if ORDER BY boolean.
+            throw Error.error(ErrorCode.X_42576);
+        }
+
         if (e.getType() != OpTypes.VALUE) {
             return;
         }
@@ -702,60 +708,73 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
-            // A VoltDB extension to guard against abuse of aggregates in subqueries.
-            // Make sure no aggregates in WHERE clause
-            tempSet.clear();
-            Expression.collectAllExpressions(
-                    tempSet, queryCondition, Expression.aggregateFunctionSet,
-                    Expression.subqueryExpressionSet);
-            if (!tempSet.isEmpty()) {
+            if (queryCondition.opType == OpTypes.VALUE) {
+                if (!((boolean)queryCondition.valueData)) { // WHERE false => LIMIT 0
+                    SortAndSlice sortAndSlice = new SortAndSlice();
+                    ExpressionValue limit0 = new ExpressionValue(ValuePool.INTEGER_0, Type.SQL_INTEGER);
+                    ExpressionValue offset = new ExpressionValue(ValuePool.INTEGER_0, Type.SQL_INTEGER);
+                    sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, offset, limit0));
+                    addSortAndSlice(sortAndSlice);
+                }
+                // Leave out the original WHERE condition no matter it is WHERE true or WHERE false.
+                queryCondition = null;
+            }
+            else {
+                // A VoltDB extension to guard against abuse of aggregates in subqueries.
+                // Make sure no aggregates in WHERE clause
+                tempSet.clear();
+                Expression.collectAllExpressions(
+                        tempSet, queryCondition, Expression.aggregateFunctionSet,
+                        Expression.subqueryExpressionSet);
+                if (!tempSet.isEmpty()) {
 
-                // A top level WHERE clause can't have aggregate expressions.
-                // In theory, a subquery WHERE clause may have aggregate
-                // expressions in some edge cases where they reference only
-                // columns from parent query(s).
-                // Even these should be restricted to cases where the subquery
-                // is evaluated after the parent agg, such as from the HAVING
-                // or SELECT clause of the parent query defining the columns.
-                // TO be safe, VoltDB doesn't support ANY cases of aggs of
-                // parent columns. All this code block does is choose between
-                // two error messages for two different unsupported cases.
-                if ( ! isTopLevel) {
-                    HsqlList columnSet = new OrderedHashSet();
-                    Iterator aggIt = tempSet.iterator();
-                    while (aggIt.hasNext()) {
-                        Expression nextAggr = (Expression) aggIt.next();
-                        Expression.collectAllExpressions(columnSet, nextAggr,
-                                Expression.columnExpressionSet, Expression.emptyExpressionSet);
-                    }
-                    Iterator columnIt = columnSet.iterator();
-                    while (columnIt.hasNext()) {
-                        Expression nextColumn = (Expression) columnIt.next();
-                        assert(nextColumn instanceof ExpressionColumn);
-                        ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
-                        String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
-                        String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
-                                nextColumnEx.rangeVariable.tableAlias.name : null;
-                        boolean resolved = false;
-                        for (RangeVariable rv : rangeVariables) {
-                            if (rv.rangeTable.tableName.name.equals(tableName)) {
-                                if (rv.tableAlias == null && tableAlias == null) {
-                                    resolved = true;
-                                } else if (rv.tableAlias != null && tableAlias != null) {
-                                    resolved = tableAlias.equals(rv.tableAlias.name);
+                    // A top level WHERE clause can't have aggregate expressions.
+                    // In theory, a subquery WHERE clause may have aggregate
+                    // expressions in some edge cases where they reference only
+                    // columns from parent query(s).
+                    // Even these should be restricted to cases where the subquery
+                    // is evaluated after the parent agg, such as from the HAVING
+                    // or SELECT clause of the parent query defining the columns.
+                    // TO be safe, VoltDB doesn't support ANY cases of aggs of
+                    // parent columns. All this code block does is choose between
+                    // two error messages for two different unsupported cases.
+                    if ( ! isTopLevel) {
+                        HsqlList columnSet = new OrderedHashSet();
+                        Iterator aggIt = tempSet.iterator();
+                        while (aggIt.hasNext()) {
+                            Expression nextAggr = (Expression) aggIt.next();
+                            Expression.collectAllExpressions(columnSet, nextAggr,
+                                    Expression.columnExpressionSet, Expression.emptyExpressionSet);
+                        }
+                        Iterator columnIt = columnSet.iterator();
+                        while (columnIt.hasNext()) {
+                            Expression nextColumn = (Expression) columnIt.next();
+                            assert(nextColumn instanceof ExpressionColumn);
+                            ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
+                            String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
+                            String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
+                                    nextColumnEx.rangeVariable.tableAlias.name : null;
+                            boolean resolved = false;
+                            for (RangeVariable rv : rangeVariables) {
+                                if (rv.rangeTable.tableName.name.equals(tableName)) {
+                                    if (rv.tableAlias == null && tableAlias == null) {
+                                        resolved = true;
+                                    } else if (rv.tableAlias != null && tableAlias != null) {
+                                        resolved = tableAlias.equals(rv.tableAlias.name);
+                                    }
                                 }
                             }
-                        }
-                        if (!resolved) {
-                            throw Error.error(ErrorCode.X_47001);
+                            if (!resolved) {
+                                throw Error.error(ErrorCode.X_47001);
+                            }
                         }
                     }
+                    // If we get here it means that WHERE expression has an aggregate expression
+                    // with local columns
+                    throw Error.error(ErrorCode.X_47000);
                 }
-                // If we get here it means that WHERE expression has an aggregate expression
-                // with local columns
-                throw Error.error(ErrorCode.X_47000);
+                // End of VoltDB extension
             }
-            // End of VoltDB extension
         }
 
         if (havingCondition != null) {
