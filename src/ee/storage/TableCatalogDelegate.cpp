@@ -607,12 +607,12 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
                          std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<MaterializedViewWriteTrigger*> survivingViews;
-    std::vector<MaterializedViewWriteTrigger*> obsoleteViews;
+    std::vector<MaterializedViewTriggerForWrite*> survivingViews;
+    std::vector<MaterializedViewTriggerForWrite*> obsoleteViews;
 
     // Now, it's safe to transfer the wholesale state of the surviving
     // dependent materialized views.
-    MaterializedViewInsertTrigger::segregateMaterializedViews(existingTable->views(),
+    MaterializedViewTriggerForWrite::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
 
@@ -624,7 +624,7 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
     // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
     // At this point, the materialized view makes a best effort to use the
     // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewInsertTrigger constructor.
+    // "old" version's primary key index, which is used in the MaterializedViewTriggerForInsert constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
     // an obsolete target table needs to be brought forward to reference the replacement table.
     // See initMaterializedViews
@@ -644,7 +644,7 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
             }
         }
         // This guards its targetTable from accidental deletion with a refcount bump.
-        MaterializedViewWriteTrigger::build(newTable, targetTable, currInfo);
+        MaterializedViewTriggerForWrite::build(newTable, targetTable, currInfo);
     }
 }
 
@@ -653,12 +653,12 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
                   std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<MaterializedViewStreamInsertTrigger*> survivingViews;
-    std::vector<MaterializedViewStreamInsertTrigger*> obsoleteViews;
+    std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
+    std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
 
     // Now, it's safe to transfer the wholesale state of the surviving
     // dependent materialized views.
-    MaterializedViewInsertTrigger::segregateMaterializedViews(existingTable->views(),
+    MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
 
@@ -668,9 +668,6 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
     // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
     // there needs to be a way to handle cases where the target table HAS been redefined already and
     // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
-    // At this point, the materialized view makes a best effort to use the
-    // current/latest version of the table -- particularly, because it will have made off with the
-    // "old" version's primary key index, which is used in the MaterializedViewInsertTrigger constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
     // an obsolete target table need to be brought forward to reference the replacement table.
     // See initMaterializedViews
@@ -690,7 +687,7 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
             }
         }
         // This guards its targetTable from accidental deletion with a refcount bump.
-        MaterializedViewStreamInsertTrigger::build(newTable, targetTable, currInfo);
+        MaterializedViewTriggerForStreamInsert::build(newTable, targetTable, currInfo);
     }
 }
 

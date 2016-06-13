@@ -32,7 +32,7 @@ using namespace std;
 namespace voltdb {
 
 MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTable *destTable,
-                                                             catalog::MaterializedViewInfo *mvInfo)
+                                                                   catalog::MaterializedViewInfo *mvInfo)
     : m_target(destTable)
     , m_index(destTable->primaryKeyIndex())
     , m_filterPredicate(parsePredicate(mvInfo))
@@ -86,7 +86,7 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
-                                                              const TableTuple& tuple) {
+                                                                 const TableTuple& tuple) {
     if (m_aggExprs.size() != 0) {
         AbstractExpression* aggExpr = m_aggExprs[aggIndex];
         return aggExpr->eval(&tuple, NULL);
@@ -97,7 +97,7 @@ NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
 }
 
 void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
-                                                       bool fallible) {
+                                                          bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(newTuple)) {
         return;

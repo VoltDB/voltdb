@@ -139,7 +139,7 @@ private:
     const int m_partitionColumn;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewStreamInsertTrigger*> m_views;
+    std::vector<MaterializedViewTriggerForStreamInsert*> m_views;
 
 };
 

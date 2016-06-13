@@ -653,7 +653,7 @@ private:
     boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
-    std::vector<MaterializedViewWriteTrigger*> m_views;
+    std::vector<MaterializedViewTriggerForWrite*> m_views;
 
     // STATS
     PersistentTableStats m_stats;

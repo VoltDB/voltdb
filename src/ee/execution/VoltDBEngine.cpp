@@ -790,12 +790,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 m_exportingTables[catalogTable->signature()] = streamedtable;
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-                std::vector<MaterializedViewStreamInsertTrigger*> survivingViews;
-                std::vector<MaterializedViewStreamInsertTrigger*> obsoleteViews;
+                std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
+                std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
 
                 const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
 
-                MaterializedViewInsertTrigger::segregateMaterializedViews(streamedtable->views(),
+                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
                         views.begin(), views.end(),
                         survivingInfos, survivingViews, obsoleteViews);
 
@@ -815,11 +815,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                         }
                     }
                     // This guards its targetTable from accidental deletion with a refcount bump.
-                    MaterializedViewStreamInsertTrigger::build(streamedtable, targetTable, currInfo);
+                    MaterializedViewTriggerForStreamInsert::build(streamedtable, targetTable, currInfo);
                     obsoleteViews.push_back(survivingViews[ii]);
                 }
 
-                BOOST_FOREACH (MaterializedViewStreamInsertTrigger* toDrop, obsoleteViews) {
+                BOOST_FOREACH (MaterializedViewTriggerForStreamInsert* toDrop, obsoleteViews) {
                     streamedtable->dropMaterializedView(toDrop);
                 }
 
@@ -856,12 +856,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 
                 // Deal with views
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-                std::vector<MaterializedViewStreamInsertTrigger*> survivingViews;
-                std::vector<MaterializedViewStreamInsertTrigger*> obsoleteViews;
+                std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
+                std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
 
                 const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
 
-                MaterializedViewInsertTrigger::segregateMaterializedViews(streamedtable->views(),
+                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
                         views.begin(), views.end(),
                         survivingInfos, survivingViews, obsoleteViews);
 
@@ -882,11 +882,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     }
                     // This is not a leak -- the view metadata is self-installing into the new table.
                     // Also, it guards its targetTable from accidental deletion with a refcount bump.
-                    MaterializedViewStreamInsertTrigger::build(streamedtable, targetTable, currInfo);
+                    MaterializedViewTriggerForStreamInsert::build(streamedtable, targetTable, currInfo);
                     obsoleteViews.push_back(survivingViews[ii]);
                 }
 
-                BOOST_FOREACH (MaterializedViewStreamInsertTrigger * toDrop, obsoleteViews) {
+                BOOST_FOREACH (MaterializedViewTriggerForStreamInsert * toDrop, obsoleteViews) {
                     streamedtable->dropMaterializedView(toDrop);
                 }
                 // note, this is the end of the line for export tables for now,
@@ -894,14 +894,14 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 continue;
             }
 
-            PersistentTable *persistenttable = tcd->getPersistentTable();
+            PersistentTable *persistentTable = tcd->getPersistentTable();
             //////////////////////////////////////////
             // if the table schema has changed, build a new
             // table and migrate tuples over to it, repopulating
             // indexes as we go
             //////////////////////////////////////////
 
-            if (haveDifferentSchema(catalogTable, persistenttable)) {
+            if (haveDifferentSchema(catalogTable, persistentTable)) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
@@ -923,13 +923,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // Because there is no table rebuilt work next, no special need to take care of
             // the new tuple limit.
             //
-            persistenttable->setTupleLimit(catalogTable->tuplelimit());
+            persistentTable->setTupleLimit(catalogTable->tuplelimit());
 
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            const std::vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
+            const std::vector<TableIndex*> currentIndexes = persistentTable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
@@ -955,7 +955,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     TableIndexScheme scheme;
                     bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
                                                                         *foundIndex,
-                                                                        persistenttable->schema(),
+                                                                        persistentTable->schema(),
                                                                         &scheme);
                     if (!success) {
                         VOLT_ERROR("Failed to initialize index '%s' from catalog",
@@ -967,11 +967,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     assert(index);
 
                     // all of the data should be added here
-                    persistenttable->addIndex(index);
+                    persistentTable->addIndex(index);
 
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
-                                                      persistenttable->name(),
+                                                      persistentTable->name(),
                                                       foundIndex->relativeIndex());
                 }
             }
@@ -999,7 +999,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 // if the table has an index that the catalog doesn't,
                 // then remove the index
                 if (!found) {
-                    persistenttable->removeIndex(currIndex);
+                    persistentTable->removeIndex(currIndex);
                 }
             }
 
@@ -1008,11 +1008,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             ///////////////////////////////////////////////////
 
             std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-            std::vector<MaterializedViewWriteTrigger*> survivingViews;
-            std::vector<MaterializedViewWriteTrigger*> obsoleteViews;
+            std::vector<MaterializedViewTriggerForWrite*> survivingViews;
+            std::vector<MaterializedViewTriggerForWrite*> obsoleteViews;
 
             const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
-            MaterializedViewInsertTrigger::segregateMaterializedViews(persistenttable->views(),
+            MaterializedViewTriggerForWrite::segregateMaterializedViews(persistentTable->views(),
                     views.begin(), views.end(),
                     survivingInfos, survivingViews, obsoleteViews);
 
@@ -1043,12 +1043,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     }
                 }
                 // This guards its targetTable from accidental deletion with a refcount bump.
-                MaterializedViewWriteTrigger::build(persistenttable, targetTable, currInfo);
+                MaterializedViewTriggerForWrite::build(persistentTable, targetTable, currInfo);
                 obsoleteViews.push_back(survivingViews[ii]);
             }
 
-            BOOST_FOREACH (MaterializedViewWriteTrigger* toDrop, obsoleteViews) {
-                persistenttable->dropMaterializedView(toDrop);
+            BOOST_FOREACH (MaterializedViewTriggerForWrite* toDrop, obsoleteViews) {
+                persistentTable->dropMaterializedView(toDrop);
             }
         }
     }
@@ -1287,8 +1287,8 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
 // Initialization Functions
 // -------------------------------------------------
 // Parameter MATVIEW is the materialized view class,
-// either MaterializedViewStreamInsertTrigger for views on streams or
-// MaterializedViewWriteTrigger for views on persistent tables.
+// either MaterializedViewTriggerForStreamInsert for views on streams or
+// MaterializedViewTriggerForWrite for views on persistent tables.
 template <class MATVIEW>
 static bool updateMaterializedViewTargetTable(std::vector<MATVIEW*> & views,
                                               PersistentTable* target,
@@ -1338,7 +1338,7 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *srcCatal
         if ( ! updateMaterializedViewTargetTable(srcTable->views(),
                                                  destTable,
                                                  catalogView)) {
-            // This is a new view, a connection needs to be made using a new MaterializedView*Trigger..
+            // This is a new view, a connection needs to be made using a new MaterializedViewTrigger..
             TABLE::MatViewType::build(srcTable, destTable, catalogView);
         }
 

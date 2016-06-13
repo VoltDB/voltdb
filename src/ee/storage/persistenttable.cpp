@@ -315,9 +315,9 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
         unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         // call decrement reference count on the newly constructed view table
@@ -350,9 +350,9 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
         unsetPreTruncateTable();
     }
 
-    std::vector<MaterializedViewWriteTrigger*> views = originalTable->views();
+    std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
     // reset all view table pointers
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, views) {
         PersistentTable * targetTable = originalView->targetTable();
         targetTable->decrementRefcount();
     }
@@ -415,14 +415,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     // add matView
-    BOOST_FOREACH(MaterializedViewWriteTrigger* originalView, m_views) {
+    BOOST_FOREACH(MaterializedViewTriggerForWrite* originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
         catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
         targetTcd->init(*engine->getDatabase(), *catalogViewTable);
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
-        MaterializedViewWriteTrigger::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
+        MaterializedViewTriggerForWrite::build(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -1139,7 +1139,7 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void PersistentTable::addMaterializedView(MaterializedViewWriteTrigger* view) {
+void PersistentTable::addMaterializedView(MaterializedViewTriggerForWrite* view) {
     m_views.push_back(view);
 }
 
@@ -1147,12 +1147,12 @@ void PersistentTable::addMaterializedView(MaterializedViewWriteTrigger* view) {
  * drop a view. the table is no longer feeding it.
  * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
  */
-void PersistentTable::dropMaterializedView(MaterializedViewWriteTrigger* targetView) {
+void PersistentTable::dropMaterializedView(MaterializedViewTriggerForWrite* targetView) {
     assert( ! m_views.empty());
-    MaterializedViewWriteTrigger* lastView = m_views.back();
+    MaterializedViewTriggerForWrite* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewWriteTrigger*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewTriggerForWrite*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;

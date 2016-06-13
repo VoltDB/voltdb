@@ -33,9 +33,9 @@ using namespace std;
 namespace voltdb {
 
 MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable *srcTable,
-                                                           PersistentTable *destTable,
-                                                           catalog::MaterializedViewInfo *mvInfo)
-    : MaterializedViewInsertTrigger(destTable, mvInfo)
+                                                                 PersistentTable *destTable,
+                                                                 catalog::MaterializedViewInfo *mvInfo)
+    : MaterializedViewTriggerForInsert(destTable, mvInfo)
     , m_srcPersistentTable(srcTable)
     , m_minMaxSearchKeyBackingStoreSize(0)
 {
@@ -53,9 +53,8 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
 }
 
 void MaterializedViewTriggerForWrite::build(PersistentTable *srcTable,
-                                         PersistentTable *destTable,
-                                         catalog::MaterializedViewInfo *mvInfo)
-{
+                                            PersistentTable *destTable,
+                                            catalog::MaterializedViewInfo *mvInfo) {
     VOLT_TRACE("construct MaterializedViewTriggerForWrite...");
     MaterializedViewTriggerForWrite* view =
         new MaterializedViewTriggerForWrite(srcTable, destTable, mvInfo);
@@ -66,8 +65,7 @@ void MaterializedViewTriggerForWrite::build(PersistentTable *srcTable,
 MaterializedViewTriggerForWrite::~MaterializedViewTriggerForWrite() { }
 
 void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
-                                                            const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts)
-{
+                                                               const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
     std::vector<TableIndex*> candidates = m_srcPersistentTable->allIndexes();
     m_indexForMinMax.clear();
     for (catalog::CatalogMap<catalog::IndexRef>::field_map_iter idxIterator = indexForMinOrMax.begin();
@@ -150,13 +148,11 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
 }
 
 // See if the index is just built on group by columns or it also includes min/max agg (ENG-6511)
-static bool minMaxIndexIncludesAggCol(TableIndex * index, size_t groupByColumnCount)
-{
+static bool minMaxIndexIncludesAggCol(TableIndex * index, size_t groupByColumnCount) {
     return index && index->getColumnIndices().size() > groupByColumnCount;
 }
 
-void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple()
-{
+void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple() {
     uint32_t nextIndexStoreLength;
     size_t minMaxSearchKeyBackingStoreSize = 0;
     BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
@@ -184,11 +180,11 @@ void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple()
 }
 
 NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const TableTuple& oldTuple,
-                                                                const NValue &existingValue,
-                                                                const NValue &initialNull,
-                                                                int negate_for_min,
-                                                                int aggIndex,
-                                                                int minMaxAggIdx) {
+                                                                       const NValue &existingValue,
+                                                                       const NValue &initialNull,
+                                                                       int negate_for_min,
+                                                                       int aggIndex,
+                                                                       int minMaxAggIdx) {
     AbstractExpression *aggExpr = NULL;
     int srcColIdx = -1;
     if (m_aggExprs.size() != 0) {
@@ -276,10 +272,10 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
 }
 
 NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const TableTuple& oldTuple,
-                                                                   const NValue &existingValue,
-                                                                   const NValue &initialNull,
-                                                                   int negate_for_min,
-                                                                   int aggIndex) {
+                                                                          const NValue &existingValue,
+                                                                          const NValue &initialNull,
+                                                                          int negate_for_min,
+                                                                          int aggIndex) {
     AbstractExpression *aggExpr = NULL;
     int srcColIdx = -1;
     if (m_aggExprs.size() != 0) {
@@ -331,9 +327,9 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueSequential(const 
 }
 
 NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTuple& oldTuple,
-                                                                const NValue &initialNull,
-                                                                int aggIndex,
-                                                                int minMaxAggIdx) {
+                                                                   const NValue &initialNull,
+                                                                   int aggIndex,
+                                                                   int minMaxAggIdx) {
     // build parameters.
     // the parameters are the groupby columns and the aggregation column.
     ExecutorContext* context = ExecutorContext::getExecutorContext();
