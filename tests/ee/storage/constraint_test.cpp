@@ -89,9 +89,9 @@ public:
     }
 
 protected:
-    voltdb::Table* table;
-    voltdb::CatalogId database_id;
-    voltdb::VoltDBEngine m_engine;
+    PersistentTable* table;
+    CatalogId database_id;
+    VoltDBEngine m_engine;
     char signature[20];
 
     char *m_exceptionBuffer;
@@ -108,7 +108,7 @@ protected:
         columnNullables.push_back(allow_null);
     };
 
-    void setTable(voltdb::TableIndexScheme *pkey = NULL) {
+    void setTable(TableIndexScheme *pkey = NULL) {
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
@@ -116,7 +116,7 @@ protected:
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
-        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature);
+        table = static_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames, signature));
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);
@@ -125,7 +125,7 @@ protected:
         }
     };
 
-    void setTable(voltdb::TableIndexScheme &pkey) {
+    void setTable(TableIndexScheme &pkey) {
         setTable(&pkey);
     };
 };
@@ -155,10 +155,10 @@ TEST_F(ConstraintTest, NotNull) {
                 for (int ctr3 = 0; ctr3 <= 1; ctr3++) {
                     TableTuple &tuple = this->table->tempTuple();
                     tuple.setAllNulls();
-                    if (ctr0) tuple.setNValue(0, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr1) tuple.setNValue(1, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr2) tuple.setNValue(2, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr3) tuple.setNValue(3, voltdb::ValueFactory::getBigIntValue(value++));
+                    if (ctr0) tuple.setNValue(0, ValueFactory::getBigIntValue(value++));
+                    if (ctr1) tuple.setNValue(1, ValueFactory::getBigIntValue(value++));
+                    if (ctr2) tuple.setNValue(2, ValueFactory::getBigIntValue(value++));
+                    if (ctr3) tuple.setNValue(3, ValueFactory::getBigIntValue(value++));
 
                     bool expected = (ctr0 + ctr1 + ctr2 == 3);
                     bool threwException = false;
@@ -198,7 +198,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
     setTable(pkey);
 
     for (int64_t ctr = 0; ctr < NUM_OF_TUPLES; ctr++) {
-        voltdb::TableTuple &tuple = this->table->tempTuple();
+        TableTuple &tuple = this->table->tempTuple();
         tuple.setAllNulls();
         tuple.setNValue(0, ValueFactory::getBigIntValue(ctr));
         tuple.setNValue(1, ValueFactory::getBigIntValue(ctr));
@@ -225,7 +225,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
             //
             // Even if we change just one value that isn't the primary key, it should still fail!
             //
-            tuple.setNValue(1, voltdb::ValueFactory::getBigIntValue(ctr + ctr));
+            tuple.setNValue(1, ValueFactory::getBigIntValue(ctr + ctr));
             EXPECT_EQ(false, this->table->insertTuple(tuple));
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
@@ -251,7 +251,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
 
     std::vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
-    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                                   pkey_column_indices, TableIndex::simplyIndexColumns(),
                                   true, true, NULL);
 
