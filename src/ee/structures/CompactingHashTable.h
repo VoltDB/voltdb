@@ -180,8 +180,6 @@ namespace voltdb {
         bool verify();
         /** Do we have a cached last buffer?  This is used in testing. */
         bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
-        /** Are we caching the last buffer?  This is used in testing. */
-        bool isCachingLastBuffer() const { return (m_allocator.isCachingLastBuffer()); }
 
     protected:
         /** find, given a bucket/key */
@@ -252,7 +250,7 @@ namespace voltdb {
     m_count(0),
     m_uniqueCount(0),
     m_sizeIndex(BUCKET_INITIAL_INDEX),
-    m_allocator((int32_t)(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)), ALLOCATOR_CHUNK_SIZE, true),
+    m_allocator((int32_t)(unique ? sizeof(HashNodeSmall) : sizeof(HashNode)), ALLOCATOR_CHUNK_SIZE),
     m_hasher(hasher),
     m_keyEq(keyEq),
     m_dataEq(dataEq)

@@ -189,9 +189,7 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
-    // We are always caching the last buffer, but
-    // we don't actually have one now.
-    ASSERT_TRUE(volt.isCachingLastBuffer());
+    // We don't have a cached last buffer yet.
     ASSERT_FALSE(volt.hasCachedLastBuffer());
     ASSERT_TRUE(volt.size() == 0);
     for (int i = 0; i < ITERATIONS; i++) {

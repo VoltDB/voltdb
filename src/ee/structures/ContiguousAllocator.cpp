@@ -21,13 +21,12 @@
 
 using namespace voltdb;
 
-ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize, bool cacheLast)
+ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
     : m_count(0),
-      m_allocSize(allocSize),
-      m_chunkSize(chunkSize),
+      m_allocationSize(allocSize),
+      m_numberAllocationsPerBlock(chunkSize),
       m_tail(NULL),
       m_blockCount(0),
-      m_cacheLast(cacheLast),
       m_cachedBuffer(0) {}
 
 ContiguousAllocator::~ContiguousAllocator() {
@@ -45,7 +44,7 @@ void *ContiguousAllocator::alloc() {
     m_count++;
 
     // determine where in the current block the new alloc will go
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
+    int64_t blockOffset = (m_count - 1) % m_numberAllocationsPerBlock;
 
     // if a new block is needed...
     if (blockOffset == 0) {
@@ -54,7 +53,7 @@ void *ContiguousAllocator::alloc() {
             memory = static_cast<void *>(m_cachedBuffer);
             m_cachedBuffer = NULL;
         } else {
-            memory = static_cast<void *>(malloc(sizeof(Buffer) + m_allocSize * m_chunkSize));
+            memory = static_cast<void *>(malloc(sizeof(Buffer) + m_allocationSize * m_numberAllocationsPerBlock));
         }
 
         Buffer *buf = reinterpret_cast<Buffer*>(memory);
@@ -68,7 +67,7 @@ void *ContiguousAllocator::alloc() {
     }
 
     // get a pointer to where the new alloc will live
-    void *retval = m_tail->data + (m_allocSize * blockOffset);
+    void *retval = m_tail->data + (m_allocationSize * blockOffset);
     assert(retval == last());
     return retval;
 }
@@ -78,8 +77,8 @@ void *ContiguousAllocator::last() const {
     assert(m_tail != NULL);
 
     // determine where in the current block the last alloc is
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
-    return m_tail->data + (m_allocSize * blockOffset);
+    int64_t blockOffset = (m_count - 1) % m_numberAllocationsPerBlock;
+    return m_tail->data + (m_allocationSize * blockOffset);
 }
 
 void ContiguousAllocator::trim() {
@@ -92,13 +91,13 @@ void ContiguousAllocator::trim() {
     m_count--;
 
     // determine where in the current block the last alloc is
-    int64_t blockOffset = m_count % m_chunkSize;
+    int64_t blockOffset = m_count % m_numberAllocationsPerBlock;
 
     // yay! kill a block
     if (blockOffset == 0) {
         Buffer *buf = m_tail->prev;
         m_blockCount--;
-        if (m_blockCount == 0 && m_cacheLast) {
+        if (m_blockCount == 0) {
             m_cachedBuffer = m_tail;
         } else {
             free(m_tail);
@@ -109,7 +108,7 @@ void ContiguousAllocator::trim() {
 
 size_t ContiguousAllocator::bytesAllocated() const {
     size_t total = static_cast<size_t>(m_blockCount) *
-        static_cast<size_t>(m_allocSize) *
-        static_cast<size_t>(m_chunkSize);
+        static_cast<size_t>(m_allocationSize) *
+        static_cast<size_t>(m_numberAllocationsPerBlock);
     return total;
 }

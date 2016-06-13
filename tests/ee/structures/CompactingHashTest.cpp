@@ -560,7 +560,6 @@ TEST_F(CompactingHashTest, Trivial) {
     // UNIQUE MAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m(true);
     ASSERT_FALSE(m.hasCachedLastBuffer());
-    ASSERT_TRUE(m.isCachingLastBuffer());
     success = (m.insert(two,two) == NULL);
     ASSERT_TRUE(success);
     success = (m.insert(one,one) == NULL);
