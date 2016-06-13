@@ -98,9 +98,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     public final void readyForData()
     {
         m_starting.compareAndSet(false, true);
-        if (!m_factory.isImporterRunEveryWhere()) {
-            m_distributer.registerCallback(m_distributerDesignation, this);
-        }
 
         if (m_stopping) return;
 
@@ -125,8 +122,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         m_executorService = MoreExecutors.listeningDecorator(tpe);
 
-        ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         if (m_factory.isImporterRunEveryWhere()) {
+            ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
                 builder.put(importer.getResourceID(), importer);
@@ -135,6 +132,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
+            m_distributer.registerCallback(m_distributerDesignation, this);
             m_distributer.registerChannels(m_distributerDesignation, m_configs.keySet());
         }
     }
