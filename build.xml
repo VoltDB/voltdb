@@ -1661,6 +1661,8 @@ TEST CASES
     for( j=0; j < files.length; j++) {
         jfile = self.project.createTask("antcall");
         project.setProperty("testfilename", files[j]);
+        project.setProperty("testindex", j + 1);
+        project.setProperty("testcount", files.length);
         jfile.setTarget("junit_onesuite");
         jfile.execute();
     }
@@ -1737,6 +1739,9 @@ TEST CASES
             <jvmarg value="-Demma.coverage.out.merge=true" />
             <!-- junit log4j settings, generates log output of last suite -->
             <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
+
+            <jvmarg value="-Dtestindex=${testindex}" />
+            <jvmarg value="-Dtestcount=${testcount}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>
