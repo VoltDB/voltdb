@@ -1071,11 +1071,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
-        Set<Integer> hostsOnRing = new HashSet<Integer>();
-        if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
-            VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
-                    false, null);
-        }
         final ScheduledExecutorService es = getSES(true);
         if (es != null) {
             es.submit(new Runnable() {
