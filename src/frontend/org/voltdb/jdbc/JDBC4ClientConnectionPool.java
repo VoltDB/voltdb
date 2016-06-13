@@ -64,6 +64,8 @@ public class JDBC4ClientConnectionPool {
      *            allows 3,000 open transactions before preventing the client from posting more
      *            work, thus preventing server fire-hosing. In some cases however, with very fast,
      *            small transactions, this limit can be raised.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
      * @return the client connection object the caller should use to post requests.
      * @see #get(String servers, int port)
      * @see #get(String[] servers, int port)
@@ -71,16 +73,16 @@ public class JDBC4ClientConnectionPool {
      *      maxOutstandingTxns)
      */
     public static JDBC4ClientConnection get(String[] servers, String user,
-            String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception {
+            String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
-                isHeavyWeight, maxOutstandingTxns);
+                isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
 
         synchronized (ClientConnections) {
             if (!ClientConnections.containsKey(clientConnectionKey))
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
-                        password, isHeavyWeight, maxOutstandingTxns));
+                        password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }
@@ -119,16 +121,18 @@ public class JDBC4ClientConnectionPool {
      * @param maxOutstandingTxns
      *            the number of transactions the client application may push against a specific
      *            connection before getting blocked on back-pressure.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
      * @return the base hash/key for the given connection parameter
      */
     private static String getClientConnectionKeyBase(String[] servers, String user,
-            String password, boolean isHeavyWeight, int maxOutstandingTxns) {
+            String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) {
         String clientConnectionKeyBase = user + ":" + password + "@";
         for (int i = 0; i < servers.length; i++)
             clientConnectionKeyBase += servers[i].trim() + ",";
         clientConnectionKeyBase += "{"
                 + Boolean.toString(isHeavyWeight) + ":" + Integer.toString(maxOutstandingTxns)
-                + "}";
+                + ":" + Boolean.toString(reconnectOnConnectionLoss) + "}";
         return clientConnectionKeyBase;
     }
 

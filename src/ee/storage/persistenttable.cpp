@@ -43,14 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-
-#include <sstream>
-#include <cassert>
-#include <cstdio>
-#include <algorithm>    // std::find
-
 #include "persistenttable.h"
 
 #include "AbstractDRTupleStream.h"
@@ -87,6 +79,15 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
+#include <sstream>
+#include <cassert>
+#include <cstdio>
+#include <algorithm>    // std::find
 
 namespace voltdb {
 void* keyTupleStorage = NULL;
@@ -1515,9 +1516,8 @@ bool PersistentTable::doForcedCompaction() {
     int64_t pendingCompactions = 0;
 
     char msg[512];
-    snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
-             ((intmax_t)allocatedTupleCount()));
-    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+
+    boost::posix_time::ptime startTime(boost::posix_time::microsec_clock::universal_time());
 
     int failedCompactionCountBefore = m_failedCompactionCount;
     while (compactionPredicate()) {
@@ -1573,8 +1573,10 @@ bool PersistentTable::doForcedCompaction() {
     }
 
     assert(!compactionPredicate());
-    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd",
-            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()));
+    boost::posix_time::ptime endTime(boost::posix_time::microsec_clock::universal_time());
+    boost::posix_time::time_duration duration = endTime - startTime;
+    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd in %zd ms",
+            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()), ((intmax_t)duration.total_milliseconds()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     return (notPendingCompactions + pendingCompactions) > 0;
 }

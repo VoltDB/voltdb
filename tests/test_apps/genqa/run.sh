@@ -163,6 +163,29 @@ function server-pg() {
     $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
 }
 
+# to run the postgres jdbc geo export test manually:
+# voltadmin shutdown
+# ./run.sh clean
+# ./run.sh start-postgres ; # start postgres with correct database name and user credentials
+# ./run.sh server-pg-geo # start volt with a export stream to postgress
+# ./run.sh async-export-geo; #populate the database tables and export streams
+# ./run.sh export-jdbc-postgres-geo-verify ; # verify the tables are conistent between volt and postgres
+# ./run.sh stop-postgres;
+
+function server-pg-geo() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+
+    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
+
+    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
+    sleep 5
+    wait-for-create
+    $VOLTDB_BIN/sqlcmd < ddl-nocat-geo.sql
+
+}
+
 # run the voltdb server locally
 function server-legacy() {
     # if a catalog doesn't exist, build one
@@ -247,6 +270,26 @@ function async-export() {
         --duration=10 \
         --servers=localhost \
         --port=21212 \
+        --procedure=JiggleExportSinglePartition \
+        --poolsize=100000 \
+        --autotune=false \
+        --catalogswap=false \
+        --latencytarget=10 \
+        --ratelimit=500 \
+        --timeout=300
+}
+
+function async-export-geo() {
+    srccompile
+    rm -rf $CLIENTLOG/*
+    mkdir $CLIENTLOG
+    echo file:/${PWD}/../../log4j-allconsole.xml
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncExportClient \
+        --displayinterval=5 \
+        --duration=10 \
+        --servers=localhost \
+        --port=21212 \
+        --procedure=JiggleExportGeoSinglePartition \
         --poolsize=100000 \
         --autotune=false \
         --catalogswap=false \
@@ -317,6 +360,21 @@ function export-jdbc-postgres-verify() {
         --jdbcDBMS=postgresql
 }
 
+function export-jdbc-postgres-geo-verify() {
+    set_pgpaths
+    echo $CLASSPATH
+    # postgres connection string should be like : jdbc:postgresql://host:port/database -> jdbc:postgresql://localhost:5432:/vexport?user=vexport
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj genqa.JDBCVoltVerifier \
+        --vdbServers=localhost \
+        --driver=org.postgresql.Driver \
+        --host_port=localhost:5432 \
+        --jdbcUser=vexport \
+        --jdbcDatabase=vexport \
+        --jdbcDBMS=postgresql \
+        --usegeo=true
+}
+
+
 # vertica host_port is volt15d:5433
 function export-jdbc-vertica-verify() {
     CLASSPATH=$CLASSPATH:/home/test/jdbc/vertica-jdbc-7.2.1-0.jar
@@ -378,6 +436,7 @@ function start-postgres() {
     sudo su - postgres -c "$PG_PATH/psql -c \"create role vexport with superuser createdb login\""
     sudo su - postgres -c "$PG_PATH/psql -c \"create database vexport\""
 }
+
 function stop-postgres() {
     set_pgpaths
     if [ -d "$PGTMPDIR" ]; then

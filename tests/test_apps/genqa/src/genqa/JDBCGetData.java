@@ -36,6 +36,7 @@ import genqa.VerifierUtils.Config;
 public class JDBCGetData {
     static Connection conn;
     static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
+    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
     static PreparedStatement selectStmt = null;
 
     /**
@@ -74,7 +75,11 @@ public class JDBCGetData {
         try {
             conn = DriverManager.getConnection(connectString, myProp);
             System.out.println("Connected!");
-            selectStmt = conn.prepareStatement(selectSql);
+            if ( config.usegeo ) {
+                selectStmt = conn.prepareStatement(selectGeoSql);
+            } else {
+                selectStmt = conn.prepareStatement(selectSql);
+            }
         } catch (SQLException e) {
             System.err.println("Could not connect to the database with connect string " + connectString + ", exception: " + e);
             e.printStackTrace();
