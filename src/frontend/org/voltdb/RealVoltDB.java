@@ -1071,17 +1071,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
-        Set<Integer> hostsOnRing = new HashSet<Integer>();
-        if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
-            VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
-                    false, null);
-        }
         final ScheduledExecutorService es = getSES(true);
         if (es != null) {
             es.submit(new Runnable() {
                 @Override
                 public void run()
                 {
+                    // First check to make sure that the cluster still is viable before
+                    // before allowing the fault log to be updated by the notifications
+                    // generated below.
+                    Set<Integer> hostsOnRing = new HashSet<Integer>();
+                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                        VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                                false, null);
+                    }
                     // Cleanup the rejoin blocker in case the rejoining node failed.
                     // This has to run on a separate thread because the callback is
                     // invoked on the ZooKeeper server thread.
