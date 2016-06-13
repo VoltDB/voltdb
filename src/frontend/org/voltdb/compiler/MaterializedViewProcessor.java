@@ -103,7 +103,7 @@ public class MaterializedViewProcessor {
             assert(stmt != null);
 
             String viewName = destTable.getTypeName();
-            // throw an error if the view isn't within voltdb's limited worldview
+            // throw an error if the view isn't within voltdb's limited world view
             checkViewMeetsSpec(viewName, stmt);
 
             // Allow only non-unique indexes other than the primary key index.
@@ -427,7 +427,6 @@ public class MaterializedViewProcessor {
             Column srcColumn = srcTable.getColumns().getIgnoreCase(srcColName);
             destColumn.setMatviewsource(srcColumn);
         }
-        destColumn.setMatview(info);
         destColumn.setAggregatetype(type.getValue());
     }
 
