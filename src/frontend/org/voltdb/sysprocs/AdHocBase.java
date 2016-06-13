@@ -108,7 +108,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         String sql = new String(statement.sql, Charsets.UTF_8);
         sb.append(sql);
 
-        Object[] params = paramsForStatment(statement, userparams);
+        Object[] params = paramsForStatement(statement, userparams);
         // convert params to strings of a certain max length
         for (int i = 0; i < params.length; i++) {
             Object param = params[i];
@@ -152,7 +152,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * Get the params for a specific SQL statement within a batch.
      * Note that there is usually a batch size of one.
      */
-    static Object[] paramsForStatment(AdHocPlannedStatement statement, Object[] userparams) {
+    static Object[] paramsForStatement(AdHocPlannedStatement statement, Object[] userparams) {
         // When there are no user-provided parameters, statements may have parameterized constants.
         if (userparams.length > 0) {
             return userparams;
@@ -213,7 +213,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.core.parameterTypes,
                     m_site);
 
-            Object[] params = paramsForStatment(statement, userparams);
+            Object[] params = paramsForStatement(statement, userparams);
             voltQueueSQL(stmt, params);
         }
 

@@ -1677,23 +1677,6 @@ public class Expression {
                 return exp;
             }
 
-            if (dataType.isBooleanType()) {
-                // FIXME: Since BOOLEAN is not a valid user data type a BOOLEAN VALUE is always the result of a constant logical
-                // expression (WHERE clause) like "2 > 1" that HSQL has optimized to a constant value.
-                // VoltDB could someday be enabled to support a Boolean-valued ConstantExpression.
-                // OR VoltDB's native representation for logical values (BIG INT 1 or 0) could be substituted here
-                // and MAYBE that would solve this whole problem.
-                // There used to be VoltDB code to deserialize an expression into a (BIGINT 1 or 0) ConstantExpression.
-                // BIGINT IS the VoltDB planner's native type for logical expressions.
-                // That code was only triggered by an impossible case of (essentially) optype=="boolean"
-                // -- a victim of past ambiguity in the "type" attributes -- sometimes meaning "optype" sometimes "valuetype"
-                // -- so that code got dropped.
-                // Going forward, it seems to make more sense to leverage the surviving VoltDB code path by hard-wiring here:
-                // valueType="BIGINT", value="1"/"0".
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                        "VoltDB does not support constant Boolean values, like TRUE or FALSE");
-            }
-
             exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
 
             if (valueData instanceof TimestampData) {

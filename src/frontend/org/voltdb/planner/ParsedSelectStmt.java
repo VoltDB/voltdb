@@ -806,8 +806,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ExpressionUtil.finalizeValueTypes(groupbyCol.expression);
         groupbyCol.groupBy = true;
 
-        if (groupByNode.name.equals("columnref"))
-        {
+        if (groupbyCol.expression.getValueType() == VoltType.BOOLEAN) {
+            throw new PlanningErrorException("A GROUP BY clause does not allow a BOOLEAN expression.");
+        }
+        if (groupByNode.name.equals("columnref")) {
             groupbyCol.alias = groupByNode.attributes.get("alias");
             groupbyCol.columnName = groupByNode.attributes.get("column");
             groupbyCol.tableName = groupByNode.attributes.get("table");
@@ -824,8 +826,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 groupbyCol.index = catalogColumn.getIndex();
             }
         }
-        else
-        {
+        else {
             // XXX hacky, assume all non-column refs come from a temp table
             groupbyCol.tableName = "VOLT_TEMP_TABLE";
             groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
