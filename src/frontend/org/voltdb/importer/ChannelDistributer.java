@@ -41,6 +41,7 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -90,6 +91,7 @@ import com.google_voltpatches.common.eventbus.EventBus;
 import com.google_voltpatches.common.eventbus.Subscribe;
 import com.google_voltpatches.common.eventbus.SubscriberExceptionContext;
 import com.google_voltpatches.common.eventbus.SubscriberExceptionHandler;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
  *  An importer channel distributer that uses zookeeper to coordinate how importer channels are
@@ -263,6 +265,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
     final HostsRef m_hosts = new HostsRef();
     final ChannelsRef m_channels = new ChannelsRef();
     final CallbacksRef m_callbacks = new CallbacksRef();
+    final UnregisteredRef m_unregistered = new UnregisteredRef();
     final AtomicStampedReference<OperationMode> m_mode;
 
     /**
@@ -405,6 +408,11 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 importer != null && !importer.trim().isEmpty(),
                 "importer is null or empty"
                 );
+        Preconditions.checkArgument(
+                !m_unregistered.getReference().contains(importer),
+                "cannot re-register importer %s as it was already unregistered",
+                importer
+                );
         callback = checkNotNull(callback, "callback is null");
 
         if (m_done.get()) return;
@@ -424,6 +432,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
             } while (!m_callbacks.compareAndSet(prev, next, stamp[0], stamp[0]+1));
 
             NavigableSet<String> registered = next.navigableKeySet();
+            NavigableSet<String> unregistered = m_unregistered.getReference();
 
             Iterator<ImporterChannelAssignment> itr = m_undispatched.iterator();
             while (itr.hasNext()) {
@@ -436,6 +445,62 @@ public class ChannelDistributer implements ChannelChangeCallback {
                             dispatch.onChange(assignment);
                         }
                     });
+                    itr.remove();
+                } else if (unregistered.contains(assignment.getImporter())) {
+                    itr.remove();
+                    if (!assignment.getAdded().isEmpty()) {
+                        LOG.warn("(" + m_hostId
+                                + ") discarding assignment to unregistered importer "
+                                + assignment);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Unregisters the callback assigned to given importer. Once it is
+     * unregistered it can no longer be re-registered
+     *
+     * @param importer
+     */
+    public void unregisterCallback(String importer) {
+        if (   importer == null
+            || !m_callbacks.getReference().containsKey(importer)
+            || m_unregistered.getReference().contains(importer))
+        {
+            return;
+        }
+        if (m_done.get()) return;
+
+        int [] rstamp = new int[]{0};
+        NavigableMap<String,ChannelChangeCallback> rprev = null;
+        NavigableMap<String,ChannelChangeCallback> rnext = null;
+
+        int [] ustamp = new int[]{0};
+        NavigableSet<String> uprev = null;
+        NavigableSet<String> unext = null;
+
+        synchronized(m_undispatched) {
+            do {
+                rprev = m_callbacks.get(rstamp);
+                rnext = ImmutableSortedMap.<String,ChannelChangeCallback>naturalOrder()
+                        .putAll(Maps.filterKeys(rprev, not(equalTo(importer))))
+                        .build();
+            } while (rprev.containsKey(importer) && !m_callbacks.compareAndSet(rprev, rnext, rstamp[0], rstamp[0]+1));
+
+            do {
+                uprev = m_unregistered.get(ustamp);
+                unext = ImmutableSortedSet.<String>naturalOrder()
+                        .addAll(Sets.filter(uprev, not(equalTo(importer))))
+                        .add(importer)
+                        .build();
+            } while (!uprev.contains(importer) && m_unregistered.compareAndSet(uprev, unext, ustamp[0], ustamp[0]+1));
+
+            Iterator<ImporterChannelAssignment> itr = m_undispatched.iterator();
+            while (itr.hasNext()) {
+                final ImporterChannelAssignment assignment = itr.next();
+                if (unext.contains(assignment.getImporter())) {
                     itr.remove();
                 }
             }
@@ -478,8 +543,14 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
             synchronized (m_undispatched) {
                 NavigableSet<String> registered = m_callbacks.getReference().navigableKeySet();
+                NavigableSet<String> unregistered = m_unregistered.getReference();
                 if (registered.contains(assignment.getImporter())) {
                     m_eb.post(assignment);
+                } else if (!assignment.getAdded().isEmpty()
+                        && unregistered.contains(assignment.getImporter())) {
+                    LOG.warn("(" + m_hostId
+                            + ") disgarding assignment to unregistered importer "
+                            + assignment);
                 } else {
                     m_undispatched.add(assignment);
                 }
@@ -490,17 +561,29 @@ public class ChannelDistributer implements ChannelChangeCallback {
     @Override
     @Subscribe
     public void onChange(ImporterChannelAssignment assignment) {
+        if (m_done.get()) {
+            return;
+        }
         ChannelChangeCallback cb = m_callbacks.getReference().get(assignment.getImporter());
-        if (cb != null && !m_done.get()) try {
-            cb.onChange(assignment);
-        } catch (Exception callbackException) {
-            throw loggedDistributerException(
-                    callbackException,
-                    "failed to invoke the onChange() calback for importer %s",
-                    assignment.getImporter()
-                    );
-        } else synchronized(m_undispatched) {
-            m_undispatched.add(assignment);
+        if (cb != null) {
+            try {
+                cb.onChange(assignment);
+            } catch (Exception callbackException) {
+                throw loggedDistributerException(
+                        callbackException,
+                        "failed to invoke the onChange() calback for importer %s",
+                        assignment.getImporter()
+                        );
+            }
+        } else if (   !assignment.getAdded().isEmpty()
+                   && m_unregistered.getReference().contains(assignment.getImporter())) {
+            LOG.warn("(" + m_hostId
+                    + ") disgarding assignment to unregistered importer "
+                    + assignment);
+        } else {
+            synchronized(m_undispatched) {
+                m_undispatched.add(assignment);
+            }
         }
     }
 
@@ -647,6 +730,53 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 LOG.fatal("unable to create json document to assign imported channels to nodes", e);
             }
         }
+    }
+
+    class ClusterTagCallback implements StatCallback {
+        final SettableFuture<Stat> m_fut = SettableFuture.create();
+
+        @Override
+        public void processResult(int rc, String path, Object ctx, Stat stat) {
+            Code code = Code.get(rc);
+            if (code == Code.OK) {
+                m_fut.set(stat);
+            } else if (code != Code.NONODE) {
+                KeeperException e = KeeperException.create(code);
+                m_fut.setException(new DistributerException("failed to stat cluster tags for " + path, e));
+            }
+        }
+
+        public Stat getStat() {
+            try {
+                return m_fut.get();
+            } catch (InterruptedException e) {
+                throw new DistributerException("interrupted while stating cluster tags");
+            } catch (ExecutionException e) {
+                DistributerException de = (DistributerException)e.getCause();
+                throw de;
+            }
+        }
+    }
+
+    /**
+     * @return a string tag that summarizes the zk versions of opmode and catalog
+     */
+    public String getClusterTag() {
+        ClusterTagCallback forCatalog = new ClusterTagCallback();
+        ClusterTagCallback forOpMode = new ClusterTagCallback();
+
+        m_zk.exists(VoltZK.catalogbytes, false, forCatalog, null);
+        m_zk.exists(VoltZK.operationMode, false, forOpMode, null);
+
+        Stat catalogStat = forCatalog.getStat();
+        Stat opModeStat = forOpMode.getStat();
+
+        StringBuilder sb = new StringBuilder(16)
+                .append('c')
+                .append(catalogStat != null ? catalogStat.getVersion() : 0)
+                .append("_o")
+                .append(opModeStat != null ? opModeStat.getVersion() : 0);
+        return sb.toString().intern();
     }
 
     /**
@@ -1404,6 +1534,19 @@ public class ChannelDistributer implements ChannelChangeCallback {
     }
 
     // a form of type alias
+    final static class UnregisteredRef extends AtomicStampedReference<NavigableSet<String>> {
+        static final NavigableSet<String> EMPTY_SET = ImmutableSortedSet.of();
+
+        public UnregisteredRef(NavigableSet<String> initialRef, int initialStamp) {
+            super(initialRef, initialStamp);
+        }
+
+        public UnregisteredRef() {
+            this(EMPTY_SET, 0);
+        }
+    }
+
+    // a form of type alias
     final static class SpecsRef extends AtomicStampedReference<NavigableMap<ChannelSpec,String>> {
         static final NavigableMap<ChannelSpec,String> EMPTY_MAP = ImmutableSortedMap.of();
 
@@ -1486,6 +1629,15 @@ public class ChannelDistributer implements ChannelChangeCallback {
             @Override
             public boolean apply(ImporterChannelAssignment assignment) {
                 return importers.contains(assignment.getImporter());
+            }
+        };
+    }
+
+    public final static <T> Predicate<T> in(final Set<T> set) {
+        return new Predicate<T>() {
+            @Override
+            public boolean apply(T m) {
+                return set.contains(m);
             }
         };
     }
