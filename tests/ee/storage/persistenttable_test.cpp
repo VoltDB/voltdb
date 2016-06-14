@@ -455,7 +455,7 @@ TEST_F(PersistentTableTest, TruncateTableWithManyObjects) {
     getEngine()->loadCatalog(0, catalogPayloadForTableWithManyObjects());
     PersistentTable *table = dynamic_cast<PersistentTable*>(
         getEngine()->getTable("TEST_TABLE"));
-    ASSERT_NE(nullptr, table);
+    ASSERT_NE(NULL, table);
 
     const int NUMROWS = 10000;
     const TupleSchema* schema = table->schema();
