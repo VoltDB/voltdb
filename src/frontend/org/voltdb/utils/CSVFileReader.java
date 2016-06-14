@@ -135,20 +135,9 @@ class CSVFileReader implements Runnable {
                 }
 
                 String[] lineValues = lineList.toArray(new String[0]);
-                if (m_config.header) {
-                    if (lineValues.length != headerlen) {
-                        String errMsg = String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
-                        final RowWithMetaData metaData = new RowWithMetaData(m_listReader.getUntokenizedRow(),
-                                m_totalLineCount.get() + 1);
-                        if (m_errHandler.handleError(metaData, null, errMsg)) {
-                            break;
-                        }
-                        continue;
-                    }
-                    lineValues = reorderCols(lineValues);
-                }
                 String lineCheckResult;
-                if ((lineCheckResult = checkparams_trimspace(lineValues)) != null) {
+                String[] reorderValues = new String[m_columnCount];
+                if ((lineCheckResult = checkparams_trimspace_reorder(lineValues, reorderValues)) != null) {
                     final RowWithMetaData metaData
                             = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                     m_totalLineCount.get() + 1);
@@ -161,7 +150,7 @@ class CSVFileReader implements Runnable {
                 RowWithMetaData lineData
                         = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_listReader.getLineNumber());
-                m_loader.insertRow(lineData, lineValues);
+                m_loader.insertRow(lineData, reorderValues);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
@@ -233,54 +222,52 @@ class CSVFileReader implements Runnable {
         return true;
     }
 
-    private String[] reorderCols(String[] lineValues) {
-        if (lineValues.length != headerlen && m_config.header) {
-            return null;
-        }
-
-        String[] reorderValues = new String[m_columnCount];
-        for (int fileCol = 0; fileCol < lineValues.length; fileCol++) {
-            if (order[fileCol] != null) {
-                int tableCol = order[fileCol];
-                reorderValues[tableCol] = lineValues[fileCol];
-            }
-        }
-        return reorderValues;
-    }
-
-    private String checkparams_trimspace(String[] lineValues) {
+    private String checkparams_trimspace_reorder(String[] lineValues, String[] reorderValues) {
         if (lineValues.length != m_columnCount && !m_config.header) {
             return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
         }
 
-        for (int i = 0; i<lineValues.length; i++) {
+        if (lineValues.length != headerlen && m_config.header) {
+            return String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
+        }
+
+        for (int fileCol = 0; fileCol<lineValues.length; fileCol++) {
+            int i = fileCol;
+            if (m_config.header) {
+                if (order[fileCol] != null) {
+                    i = order[fileCol];
+                } else {
+                    continue;
+                }
+            }
+            reorderValues[i] = lineValues[fileCol];
             //supercsv read "" to null
-            if (lineValues[i] == null) {
+            if (reorderValues[i] == null) {
                 if (m_config.blank.equalsIgnoreCase("error")) {
                     return String.format(BLANK_ERROR, i + 1);
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    lineValues[i] = m_blankStrings.get(m_columnTypes[i]);
+                    reorderValues[i] = m_blankStrings.get(m_columnTypes[i]);
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
             else {
                 if (m_config.nowhitespace
-                        && (lineValues[i].charAt(0) == ' ' || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
+                        && (reorderValues[i].charAt(0) == ' ' || reorderValues[i].charAt(reorderValues[i].length() - 1) == ' ')) {
                     return String.format(WHITESPACE_ERROR, i + 1);
                 } else {
-                    lineValues[i] = lineValues[i].trim();
+                    reorderValues[i] = reorderValues[i].trim();
                 }
 
                 if(!m_config.customNullString.isEmpty()){
                     if(lineValues[i].equals(m_config.customNullString)){
-                        lineValues[i] = null;
+                        reorderValues[i] = null;
                     }
                 }
                 // treat NULL, \N and "\N" as actual null value
-                else if (lineValues[i].equals("NULL")
-                        || lineValues[i].equals(Constants.CSV_NULL)
-                        || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
-                    lineValues[i] = null;
+                else if (reorderValues[i].equals("NULL")
+                        || reorderValues[i].equals(Constants.CSV_NULL)
+                        || reorderValues[i].equals(Constants.QUOTED_CSV_NULL)) {
+                    reorderValues[i] = null;
                 }
             }
         }
