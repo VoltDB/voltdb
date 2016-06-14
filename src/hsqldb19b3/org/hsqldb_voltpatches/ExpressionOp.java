@@ -129,6 +129,7 @@ public class ExpressionOp extends Expression {
         this.alias = e.alias;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb    = new StringBuffer(64);
@@ -198,6 +199,7 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -236,13 +238,13 @@ public class ExpressionOp extends Expression {
                 break;
         }
 
-        if (nodes[LEFT] != null) {
+        if (LEFT < nodes.length && nodes[LEFT] != null) {
             sb.append(" arg1=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
 
-        if (nodes[RIGHT] != null) {
+        if (RIGHT < nodes.length && nodes[RIGHT] != null) {
             sb.append(" arg2=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
@@ -251,6 +253,7 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -277,6 +280,7 @@ public class ExpressionOp extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -429,6 +433,7 @@ public class ExpressionOp extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -438,8 +443,8 @@ public class ExpressionOp extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }

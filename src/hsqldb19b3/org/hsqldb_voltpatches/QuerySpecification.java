@@ -1450,7 +1450,12 @@ public class QuerySpecification extends QueryExpression {
         accessibleColumns = new boolean[indexLimitVisible];
 
         IntValueHashMap aliases = new IntValueHashMap();
-
+        // Bundle up all the user defined aliases here.
+        // We can't import java.util.Set because there is a Set
+        // already imported into this class from Hsql itself.
+        java.util.Set<String> userAliases = new java.util.HashSet<String>();
+        // Bundle up all the generated aliases here.
+        java.util.Map<String, Integer> genAliases = new java.util.HashMap<String, Integer>();
         for (int i = 0; i < indexLimitVisible; i++) {
             Expression expression = exprColumns[i];
             String     alias      = expression.getAlias();
@@ -1460,17 +1465,32 @@ public class QuerySpecification extends QueryExpression {
 
                 expression.setAlias(name);
 
+                genAliases.put(name.name, i);
+
                 continue;
+
             }
 
             int index = aliases.get(alias, -1);
 
+            userAliases.add(alias);
             if (index == -1) {
                 aliases.put(alias, i);
 
                 accessibleColumns[i] = true;
             } else {
                 accessibleColumns[index] = false;
+            }
+        }
+        for (java.util.Map.Entry<String, Integer> genAlias : genAliases.entrySet()) {
+            String alias = genAlias.getKey();
+            while (userAliases.contains(alias)) {
+                alias = "_" + alias;
+            }
+            if (!alias.equals(genAlias.getKey())) {
+                int idx = genAlias.getValue();
+                SimpleName realAlias = HsqlNameManager.getAutoColumnName(alias);
+                exprColumns[idx].setAlias(realAlias);
             }
         }
     }
@@ -1701,12 +1721,16 @@ public class QuerySpecification extends QueryExpression {
         sb.append(super.toString()).append("[\n");
 
         if (sortAndSlice.limitCondition != null) {
-            sb.append("offset=[").append(
-                sortAndSlice.limitCondition.getLeftNode().describe(
-                    session)).append("]\n");
-            sb.append("limit=[").append(
-                sortAndSlice.limitCondition.getRightNode().describe(
-                    session)).append("]\n");
+        	if (sortAndSlice.limitCondition.getLeftNode() != null) {
+        		sb.append("offset=[").append(
+        				sortAndSlice.limitCondition.getLeftNode().describe(
+        						session)).append("]\n");
+        	}
+        	if (sortAndSlice.limitCondition.getRightNode() != null) {
+        		sb.append("limit=[").append(
+        				sortAndSlice.limitCondition.getRightNode().describe(
+        						session)).append("]\n");
+        	}
         }
 
         sb.append("isDistinctSelect=[").append(isDistinctSelect).append("]\n");
