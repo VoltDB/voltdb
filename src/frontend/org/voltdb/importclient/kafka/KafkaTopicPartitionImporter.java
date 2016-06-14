@@ -28,16 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltcore.logging.Level;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
-import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.Invocation;
-import org.voltdb.importer.formatter.FormatException;
-import org.voltdb.importer.formatter.Formatter;
-
 import kafka.api.ConsumerMetadataRequest;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
@@ -59,6 +49,16 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
+
+import org.voltcore.logging.Level;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
+import org.voltdb.importer.AbstractImporter;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -432,12 +432,20 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 sleepCounter = 1;
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
+
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
                     long currentOffset = messageAndOffset.offset();
+
                     //if currentOffset is less means we have already pushed it and also check pending queue.
                     if (currentOffset < m_currentOffset.get()) {
                         continue;
+                    }
+
+                    if (currentOffset > m_currentOffset.get()) {
+                        if (isDebugEnabled()) {
+                            debug(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
+                          }
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
 
@@ -455,7 +463,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                          }
                      } catch (FormatException e){
                         rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
-                        messageAndOffset.nextOffset();
                         m_gapTracker.commit(currentOffset);
                     }
                     submitCount++;
@@ -493,6 +500,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 + " Last commit point is: " + m_lastCommittedOffset
                 + " Callback Rcvd: " + cbcnt.get()
                 + " Submitted: " + submitCount);
+
     }
 
     public boolean commitOffset() {
