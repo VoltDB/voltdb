@@ -4,16 +4,15 @@
 # Copyright (C) 2008-2016 VoltDB Inc.
 
 # A command line tool for getting junit job statistics from Jenkins CI
-# usage: junit-stats help
 
-import json
+import mysql.connector
 import sys
 import time
-import mysql.connector
+
+from datetime import datetime
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.error import URLError
 from six.moves.urllib.request import urlopen
-from datetime import datetime
 
 
 class Stats():
@@ -90,6 +89,12 @@ class Stats():
                 total = report.get('totalCount', 0)
                 if total == 0:
                     total = fails + skips + passes
+                if total == 0:
+                    percent = 0
+                else:
+                    percent = fails*100.0/total
+
+                # Some of the test results are structured differently, depending on the matrix configurations.
                 childReports = report.get('childReports', None)
                 if childReports is None:
                     childReports = [
@@ -100,6 +105,8 @@ class Stats():
                             }
                         }
                     ]
+
+                # Traverse through reports into test suites and get failed test case data to write to database.
                 for child in childReports:
                     suites = child['result']['suites']
                     report_url = child['child']['url'] + 'testReport'
@@ -125,19 +132,22 @@ class Stats():
                                             'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, %(url)s, %(build)s, %(host)s)')
                                 cursor.execute(add_test, test_data)
                                 db.commit()
-
             except KeyError as e:
                 print(e)
                 print('Error retriving test data for this particular build: %d\n' % build)
             except:
-                print(e)
+                print(sys.exc_info()[1])
 
+            # Get timestamp job ran on.
             url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/api/python'
             report = self.read_url(url)
             if report is None:
                 print('Could not retrieve report because url is invalid. This may be because the build %d might not '
                 'exist on Jenkins' % build)
+                continue
             job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
+
+            # Compile job data to write to database
             job_data = {
                 'name': job,
                 'stamp': job_stamp,
@@ -145,7 +155,7 @@ class Stats():
                 'build': build,
                 'fails': fails,
                 'total': total,
-                'percent': fails*100.0/total
+                'percent': percent
             }
             add_job = ('INSERT INTO `junit-job-results` '
                         '(name, stamp, url, build, fails, total, percent) '
