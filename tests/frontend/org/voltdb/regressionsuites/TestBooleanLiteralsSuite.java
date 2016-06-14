@@ -71,6 +71,9 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
                                       joinResult, emptyTable, client); // replicated join partitioned.
         subTestBooleanLiteralsInQuery(String.format(joinQuery, 3, 2),
                                       joinResult, emptyTable, client); // partitioned join replicated.
+        // We do not test a partitioned table joining another partitioned table on a constant boolean value here.
+        // Instead, we test this case in TestPlansJoin for proper error message.
+        // The query is not plannable because the planner cannot guarantee that all rows would be in a single partition.
         subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 1),
                                       tableResult, caseWhenFalseResult, client); // replicated
         subTestBooleanLiteralsInQuery(String.format(caseWhenQuery, 3),

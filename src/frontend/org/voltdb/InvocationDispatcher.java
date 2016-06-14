@@ -224,12 +224,7 @@ public final class InvocationDispatcher {
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         // try to get the global default setting for read consistency, but fall back to SAFE
-        if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
-            m_defaultConsistencyReadLevel = VoltDB.instance().getConfig().m_consistencyReadLevel;
-        }
-        else {
-            m_defaultConsistencyReadLevel = Consistency.ReadLevel.SAFE;
-        }
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     /*
@@ -1521,7 +1516,7 @@ public final class InvocationDispatcher {
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
             hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
-                    + "This is likely due VoltDB ceasing client communication as it "
+                    + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
         }
