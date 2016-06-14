@@ -43,6 +43,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -145,6 +146,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasComplexAgg = false;
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
+    private boolean m_hasWindowedExpression = false;
     private boolean m_hasAverage = false;
 
     public MaterializedViewFixInfo m_mvFixInfo = new MaterializedViewFixInfo();
@@ -242,7 +244,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (mayNeedAvgPushdown()) {
             processAvgPushdownOptimization(displayElement, groupbyElement, havingElement, orderbyElement);
         }
-
         prepareMVBasedQueryFix();
     }
 
@@ -356,7 +357,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean needComplexAggregation () {
-        if (!hasAggregateExpression() && !isGrouped()) {
+        if (!m_hasAggregateExpression && !isGrouped()) {
             m_hasComplexAgg = false;
             return false;
         }
@@ -705,6 +706,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         assert(colExpr != null);
 
+        // Check for windowed expressions.
+        List<AbstractExpression> windowedExprs = colExpr.findAllSubexpressionsOfClass(WindowedExpression.class);
+        if (windowedExprs != null && !windowedExprs.isEmpty()) {
+            if (m_hasWindowedExpression || (windowedExprs.size() > 1)) {
+                throw new PlanningErrorException(
+                        "At most one windowed display column is supported.");
+            }
+            m_hasWindowedExpression = true;
+        }
+
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
             updateAvgExpressions();
@@ -794,6 +805,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
+        if (m_hasWindowedExpression) {
+            throw new PlanningErrorException(
+                    "Use of both windowed operations and GROUP BY is not supported.");
+        }
         for (VoltXMLElement child : columnsNode.children) {
             parseGroupByColumn(child);
         }
@@ -806,8 +821,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ExpressionUtil.finalizeValueTypes(groupbyCol.expression);
         groupbyCol.groupBy = true;
 
-        if (groupByNode.name.equals("columnref"))
-        {
+        if (groupbyCol.expression.getValueType() == VoltType.BOOLEAN) {
+            throw new PlanningErrorException("A GROUP BY clause does not allow a BOOLEAN expression.");
+        }
+        if (groupByNode.name.equals("columnref")) {
             groupbyCol.alias = groupByNode.attributes.get("alias");
             groupbyCol.columnName = groupByNode.attributes.get("column");
             groupbyCol.tableName = groupByNode.attributes.get("table");
@@ -824,8 +841,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 groupbyCol.index = catalogColumn.getIndex();
             }
         }
-        else
-        {
+        else {
             // XXX hacky, assume all non-column refs come from a temp table
             groupbyCol.tableName = "VOLT_TEMP_TABLE";
             groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
@@ -966,7 +982,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // DISTINCT without GROUP BY
         if (groupbyElement == null || groupbyElement.children.isEmpty()) {
             // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
-            if ( ! hasAggregateExpression()) {
+            if ( ! m_hasAggregateExpression) {
                 // attribute "id" is the only one that differs from a real GROUP BY query
                 groupbyElement = displayElement.duplicate();
             }
@@ -1481,6 +1497,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
+    public boolean hasWindowedExpression() {
+        return m_hasWindowedExpression;
+    }
+
     public boolean hasAggregateExpression() {
         return m_hasAggregateExpression;
     }
@@ -1526,6 +1546,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     @Override
+    /**
+     * Return true if this ParsedSelectStmt has order by columns
+     */
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }
@@ -2049,5 +2072,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return false; }
+
+    /**
+     * Walk through the display columns and pick out
+     * the only windowed expression.
+     *
+     * @return
+     */
+    public ParsedColInfo getWindowedColinfo() {
+        for (ParsedColInfo colInfo : m_displayColumns) {
+            AbstractExpression colExpr = colInfo.expression;
+            if (colExpr instanceof WindowedExpression) {
+                return colInfo;
+            }
+        }
+        return null;
+    }
 
 }

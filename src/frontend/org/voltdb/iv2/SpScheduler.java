@@ -164,12 +164,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
 
         // try to get the global default setting for read consistency, but fall back to SAFE
-        if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
-            m_defaultConsistencyReadLevel = VoltDB.instance().getConfig().m_consistencyReadLevel;
-        }
-        else {
-            m_defaultConsistencyReadLevel = Consistency.ReadLevel.SAFE;
-        }
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     @Override

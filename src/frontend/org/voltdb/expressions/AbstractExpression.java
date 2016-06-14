@@ -33,6 +33,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.SortDirectionType;
 
 /**
  * @param <aeClass>
@@ -587,6 +588,44 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
     }
 
+    /**
+     * We need some enumerals which are common to PartitionByPlanNode and OrderByPlanNode
+     * and maybe others.  These are used as keys to create JSON.
+     */
+    public enum SortMembers {
+        SORT_COLUMNS,
+        SORT_DIRECTION,
+        SORT_EXPRESSION
+    }
+
+    /**
+     * Given a JSONStringer and a sequence of sort expressions and directions,
+     * serialize the sort expressions.  These will be in an array which is
+     * the value of SortMembers.SORT_COLUMNS in the current object of
+     * the JSONString.  The JSONString should be in object state, not
+     * array state.
+     *
+     * @param stringer         The stringer used to serialize the sort list.
+     * @param sortExpressions  The sort expressions.
+     * @param sortDirections   The sort directions.
+     * @throws JSONException
+     */
+    public static void toJSONArrayFromSortList(JSONStringer             stringer,
+                                               List<AbstractExpression> sortExpressions,
+                                               List<SortDirectionType>  sortDirections) throws JSONException {
+        stringer.key(SortMembers.SORT_COLUMNS.name()).array();
+        for (int ii = 0; ii < sortExpressions.size(); ii++) {
+            stringer.object();
+            stringer.key(SortMembers.SORT_EXPRESSION.name());
+            stringer.object();
+            sortExpressions.get(ii).toJSONString(stringer);
+            stringer.endObject();
+            stringer.key(SortMembers.SORT_DIRECTION.name()).value(sortDirections.get(ii).toString());
+            stringer.endObject();
+        }
+        stringer.endArray();
+    }
+
     protected void loadFromJSONObject(JSONObject obj) throws JSONException { }
     protected void loadFromJSONObject(JSONObject obj, StmtTableScan tableScan) throws JSONException
     {
@@ -603,7 +642,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     /**
      * For TVEs, it is only serialized column index and table index. In order to match expression,
-     * there needs more information to revert back the table name, table alisa and column name.
+     * there needs more information to revert back the table name, table alias and column name.
      * Without adding extra information, TVEs will only have column index and table index available.
      * This function is only used for various of plan nodes, except AbstractScanPlanNode.
      * @param jobj
@@ -663,6 +702,34 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         expr.loadFromJSONObject(obj, tableScan);
         return expr;
+    }
+
+    /**
+     * Load two lists from a JSONObject.  One list is for sort expressions and the other is for sort directions.
+     * The lists are cleared before they are filled in.  This is the inverse of toJSONArrayFromSortList.
+     *
+     * The JSONObject should be in object state, not array state.  It should have a member
+     * named SORT_COLUMNS, which is an array with the <expression, direction> pairs.
+     *
+     * @param sortExpressions
+     * @param sortDirections
+     * @param jarray
+     * @throws JSONException
+     */
+    public static void loadSortListFromJSONArray(List<AbstractExpression> sortExpressions,
+                                                 List<SortDirectionType>  sortDirections,
+                                                 JSONObject               jobj) throws JSONException {
+        if (jobj.has(AbstractExpression.SortMembers.SORT_COLUMNS.name())) {
+            sortExpressions.clear();
+            sortDirections.clear();
+            JSONArray jarray = jobj.getJSONArray(SortMembers.SORT_COLUMNS.name());
+            int size = jarray.length();
+            for (int ii = 0; ii < size; ii += 1) {
+                JSONObject tempObj = jarray.getJSONObject(ii);
+                sortDirections.add( SortDirectionType.get(tempObj.getString( SortMembers.SORT_DIRECTION.name())) );
+                sortExpressions.add( AbstractExpression.fromJSONChild(tempObj, SortMembers.SORT_EXPRESSION.name()) );
+            }
+        }
     }
 
     public static List<AbstractExpression> fromJSONArrayString(String jsontext, StmtTableScan tableScan) throws JSONException

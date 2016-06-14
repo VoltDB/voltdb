@@ -94,6 +94,10 @@ public class TestPlansJoin extends PlannerTestCase {
                       "user lacks privilege or object not found: X");
         failToCompile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X",
                       "user lacks privilege or object not found: R1.X");
+        failToCompile("select * FROM R1 JOIN R2 ON R1.C = R2.C AND 1",
+                          "data type of expression is not boolean");
+        failToCompile("select * FROM R1 JOIN R2 ON R1.C = R2.C AND MOD(3,1)=1",
+                          "Join with filters that do not depend on joined tables is not supported in VoltDB");
     }
 
     public void testBasicThreeTableInnerJoin() {
@@ -654,6 +658,10 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Two Distributed tables join on non-partitioned column
         failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
+                      "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
+
+        // Two Distributed tables join on boolean constant
+        failToCompile("select * FROM P1 JOIN P2 ON 1=1",
                       "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
     }
 

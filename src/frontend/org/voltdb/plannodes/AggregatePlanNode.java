@@ -470,7 +470,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
             aggType = "Partial";
         } else {
-            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE);
+            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE
+                    || getPlanNodeType() == PlanNodeType.PARTITIONBY);
         }
 
         sb.append(aggType + " AGGREGATION ops: ");
@@ -636,5 +637,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         destination.setOutputSchema(origin.getOutputSchema());
         return destination;
+    }
+
+    @Override
+    /**
+     * AggregatePlanNodes don't need projection nodes.
+     */
+    public boolean planNodeClassNeedsProjectionNode() {
+        return false;
     }
 }
