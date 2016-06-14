@@ -7,6 +7,7 @@
 
 import mysql.connector
 import sys
+import os
 import time
 
 from datetime import datetime
@@ -168,9 +169,9 @@ class Stats():
 
 if __name__ == '__main__':
     stats = Stats()
-    branch = None
-    job = None
-    build_range = None
+    branch = os.environ.get('branch', None)
+    job = os.environ.get('job', None)
+    build_range = os.environ.get('build_range', None)
 
     args = sys.argv
 
