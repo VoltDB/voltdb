@@ -38,11 +38,11 @@ import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.common.Constants;
-import org.voltdb.deploy.JoinerConfig;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -275,12 +275,17 @@ public class VoltDB {
         /** configuration UUID */
         public final UUID m_configUUID = UUID.randomUUID();
 
-        /** holds a list of comma separated cluster members */
+        /** holds a list of comma separated mesh formation coordinators */
         public String m_meshBrokers = null;
 
+        /** holds a set of mesh formation coordinators */
         public NavigableSet<String> m_coordinators = ImmutableSortedSet.of();
 
+        /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
+
+        /** allow elastic joins */
+        public boolean m_enableAdd = false;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -408,6 +413,15 @@ public class VoltDB {
                         sbld.append(args[i]);
                     }
                     m_meshBrokers = sbld.toString();
+                } else if (arg.startsWith("mesh ")) {
+                    StringBuilder sbld = new StringBuilder(64).append(arg.substring("mesh ".length()));
+                    while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
+                        sbld.append(args[i]);
+                    }
+                    if (i < args.length) {
+                        sbld.append(args[i]);
+                    }
+                    m_meshBrokers = sbld.toString();
                 } else if (arg.equals("clustersize")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
@@ -491,9 +505,9 @@ public class VoltDB {
                     m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
-                }
-
-                else if (arg.equals("replica")) {
+                } else if (arg.equals("noadd")) {
+                    m_enableAdd = false;
+                } else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -602,66 +616,11 @@ public class VoltDB {
             }
 
             if (m_startAction == StartAction.PROBE) {
-
-                File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-                File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
-                File configCFH = null;
-                File optCFH = null;
-
-                if (m_pathToDeployment != null && !m_pathToDeployment.trim().isEmpty()) {
-                    try {
-                        configCFH = deploymentFH.getCanonicalFile();
-                    } catch (IOException e) {
-                        hostLog.fatal("Could not resolve file location " + deploymentFH, e);
-                        referToDocAndExit();
-                    }
-                    try {
-                        optCFH = new VoltFile(m_pathToDeployment).getCanonicalFile();
-                    } catch (IOException e) {
-                        hostLog.fatal("Could not resolve file location " + optCFH, e);
-                        referToDocAndExit();
-                    }
-                    if (!configCFH.equals(optCFH)) {
-                        hostLog.fatal("In probe startup mode you may only specify " + deploymentFH + " for deployment");
-                        referToDocAndExit();
-                    }
-                } else {
-                    m_pathToDeployment = deploymentFH.getPath();
-                }
-
-                if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                    hostLog.fatal("Probe startup mode requires an already initialized VoltDB instance");
-                    referToDocAndExit();
-                }
-                String stagedName = null;
-                try (BufferedReader br = new BufferedReader(new FileReader(inzFH))) {
-                    stagedName = br.readLine();
-                } catch (IOException e) {
-                    hostLog.fatal("Unable to access initialization marker at " + inzFH, e);
-                    referToDocAndExit();
-                }
-                if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
-                    hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
-                    referToDocAndExit();
-                } else {
-                    m_clusterName = stagedName;
-                }
-                try {
-                    if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                        File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
-                        if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
-                            try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
-                                m_meshBrokers = br.readLine();
-                            } catch (IOException e) {
-                                hostLog.fatal("Unable to read cluster name given at initialization from " + inzFH, e);
-                                referToDocAndExit();
-                            }
-                        }
-                    }
-                } catch (IllegalArgumentException e) {
-                    hostLog.fatal("Unable to validate mesh argument \"" + m_meshBrokers + "\"", e);
-                    referToDocAndExit();
-                }
+                checkInitializationMarker();
+            } else if (m_startAction == StartAction.JOIN) {
+                checkInitializationMarker();
+                m_startAction = StartAction.PROBE;
+                m_enableAdd = true;
             } else if (m_startAction == StartAction.INITIALIZE) {
                 File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
                 if (inzFH.exists() && !m_forceVoltdbCreate) {
@@ -676,13 +635,81 @@ public class VoltDB {
                 }
             }
             if (m_meshBrokers != null && !m_meshBrokers.trim().isEmpty()) {
-                m_coordinators = JoinerConfig.hosts(m_meshBrokers);
+                m_coordinators = JoinerCriteria.hosts(m_meshBrokers);
                 if (m_leader == null || m_leader.trim().isEmpty()) {
                     m_leader = m_coordinators.first();
                 }
             }
             if (m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
                 m_hostCount = m_coordinators.size();
+            }
+        }
+
+        /**
+         * Checks for the initialization marker on initialized voltdbroot directory
+         */
+        private void checkInitializationMarker() {
+
+            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
+            File configCFH = null;
+            File optCFH = null;
+
+            if (m_pathToDeployment != null && !m_pathToDeployment.trim().isEmpty()) {
+                try {
+                    configCFH = deploymentFH.getCanonicalFile();
+                } catch (IOException e) {
+                    hostLog.fatal("Could not resolve file location " + deploymentFH, e);
+                    referToDocAndExit();
+                }
+                try {
+                    optCFH = new VoltFile(m_pathToDeployment).getCanonicalFile();
+                } catch (IOException e) {
+                    hostLog.fatal("Could not resolve file location " + optCFH, e);
+                    referToDocAndExit();
+                }
+                if (!configCFH.equals(optCFH)) {
+                    hostLog.fatal("In probe startup mode you may only specify " + deploymentFH + " for deployment");
+                    referToDocAndExit();
+                }
+            } else {
+                m_pathToDeployment = deploymentFH.getPath();
+            }
+
+            if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
+                hostLog.fatal("Probe startup mode requires an already initialized VoltDB instance");
+                referToDocAndExit();
+            }
+
+            String stagedName = null;
+            try (BufferedReader br = new BufferedReader(new FileReader(inzFH))) {
+                stagedName = br.readLine();
+            } catch (IOException e) {
+                hostLog.fatal("Unable to access initialization marker at " + inzFH, e);
+                referToDocAndExit();
+            }
+
+            if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
+                hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
+                referToDocAndExit();
+            } else {
+                m_clusterName = stagedName;
+            }
+            try {
+                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                    File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
+                    if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
+                        try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
+                            m_meshBrokers = br.readLine();
+                        } catch (IOException e) {
+                            hostLog.fatal("Unable to read cluster name given at initialization from " + inzFH, e);
+                            referToDocAndExit();
+                        }
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                hostLog.fatal("Unable to validate mesh argument \"" + m_meshBrokers + "\"", e);
+                referToDocAndExit();
             }
         }
 

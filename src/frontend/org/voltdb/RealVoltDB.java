@@ -82,11 +82,13 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -107,7 +109,6 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.deploy.JoinerConfig;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -162,7 +163,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.MembershipAcceptor, HostMessenger.HostWatcher {
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -557,32 +558,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_buildStringOverrideForTest != null) {
                 m_buildString = m_config.m_buildStringOverrideForTest;
             }
+
+            HostMessenger.Determination determination = buildClusterMesh(readDepl);
+
+            m_config.m_startAction = determination.startAction;
+            m_config.m_hostCount = determination.hostCount;
+
+            modifyIfNecessaryDeploymentHostCount(readDepl.deployment, determination.hostCount);
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = m_config.m_startAction.doesRejoin();
             m_rejoining = isRejoin;
-            m_rejoinDataPending = isRejoin || m_config.m_startAction == StartAction.JOIN;
+            m_rejoinDataPending = m_config.m_startAction.doesJoin();
 
             m_joining = m_config.m_startAction == StartAction.JOIN;
-
-            final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                    || managedPathsWithFiles(readDepl.deployment).isEmpty();
-
-            JoinerConfig joinerConfig = new JoinerConfig(
-                    m_config.m_coordinators,
-                    m_buildString,
-                    m_versionString,
-                    m_config.m_isEnterprise,
-                    m_config.m_startAction,
-                    bareAtStartup,
-                    CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes),
-                    m_config.m_hostCount,
-                    readDepl.deployment.getCluster().getKfactor(),
-                    m_config.m_isPaused,
-                    m_statusTracker.getNodeStateSupplier()
-                    );
-
-            buildClusterMesh(isRejoin || m_joining);
 
             if (isRejoin || m_joining) {
                 m_statusTracker.setNodeState(NodeState.REJOINING);
@@ -1121,36 +1110,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    /**
-     * This is currently used to prevent simultaneous rejoins and rejoins during network partition.
-     * It returns true for non-rejoin cases.
-     */
-    @Override
-    public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
-    {
-        Preconditions.checkNotNull(m_messenger);
-
-        StartAction action = null;
-        try {
-            action = StartAction.valueOf(request);
-        } catch (IllegalArgumentException e) {}
-
-        if (action != null && action.doesRejoin()) {
-            final int rejoiningHost = VoltZK.createRejoinNodeIndicator(m_messenger.getZK(), hostId);
-
-            if (rejoiningHost == -1) {
-                return true;
-            } else {
-                errMsg.append("Only one host can rejoin at a time. Host ")
-                      .append(rejoiningHost)
-                      .append(" is still rejoining.");
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
@@ -1180,7 +1139,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // can clean things up. It's okay to skip this if the executor
                     // services are not set up yet.
                     for (int hostId : failedHosts) {
-                        VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                        CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
                     }
                 }
             });
@@ -2169,9 +2128,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    void buildClusterMesh(boolean isRejoin) {
-        final String leaderAddress = m_config.m_leader;
-        HostAndPort hostAndPort = MiscUtils.getHostAndPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
+    HostMessenger.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
+        final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
+                || managedPathsWithFiles(readDepl.deployment).isEmpty();
+
+        JoinerCriteria criteria = JoinerCriteria.builder()
+                .coordinators(m_config.m_coordinators)
+                .versionChecker(m_versionChecker)
+                .enterprise(m_config.m_isEnterprise)
+                .startAction(m_config.m_startAction)
+                .bare(bareAtStartup)
+                .configHash(CatalogUtil.makeDeploymentHashForConfig(readDepl.deploymentBytes))
+                .hostCount(m_config.m_hostCount)
+                .kfactor(readDepl.deployment.getCluster().getKfactor())
+                .paused(m_config.m_isPaused)
+                .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
+                .addAllowed(m_config.m_enableAdd)
+                .build();
+
+        HostAndPort hostAndPort = criteria.getLeader();
         String hostname = hostAndPort.getHostText();
         int port = hostAndPort.getPort();
 
@@ -2187,14 +2162,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
-        hmconfig.isPaused.set(m_config.m_isPaused);
+        hmconfig.criteria = criteria;
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, this);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
         try {
-            m_messenger.start(m_config.m_startAction.name());
+            m_messenger.start();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -2206,14 +2181,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
         consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
 
+        HostMessenger.Determination determination = m_messenger.waitForDetermination();
+
         // Semi-hacky check to see if we're attempting to rejoin to ourselves.
         // The leader node gets assigned host ID 0, always, so if we're the
         // leader and we're rejoining, this is clearly bad.
-        if (m_myHostId == 0 && isRejoin) {
+        if (m_myHostId == 0 && determination.startAction.doesJoin()) {
             VoltDB.crashLocalVoltDB("Unable to rejoin a node to itself.  " +
                     "Please check your command line and start action and try again.", false, null);
         }
         m_clusterCreateTime = m_messenger.getInstanceId().getTimestamp();
+        return determination;
     }
 
     void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
@@ -2388,7 +2366,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
         catch (Exception ignored2) {
-            logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+            if (logger != null) {
+                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+            }
             return new String[] { m_defaultVersionString, "VoltDB" };
         }
     }
@@ -2826,11 +2806,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_versionString;
     }
 
+    public final VersionChecker m_versionChecker = new VersionChecker() {
+        @Override
+        public boolean isCompatibleVersionString(String other) {
+            return RealVoltDB.this.isCompatibleVersionString(other);
+        }
+
+        @Override
+        public String getVersionString() {
+            return RealVoltDB.this.getVersionString();
+        }
+
+        @Override
+        public String getBuildString() {
+            return RealVoltDB.this.getBuildString();
+        }
+    };
+
     /**
      * Used for testing when you don't have an instance. Should do roughly what
      * {@link #isCompatibleVersionString(String)} does.
      */
-    static boolean staticIsCompatibleVersionString(String versionString) {
+    public static boolean staticIsCompatibleVersionString(String versionString) {
         return versionString.matches(m_defaultHotfixableRegexPattern);
     }
 
@@ -2998,7 +2995,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
                 if (m_rejoining) {
-                    VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
+                    CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                     m_rejoining = false;
                 }
 
@@ -3202,7 +3199,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 // remove the rejoin blocker
-                VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
+                CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;

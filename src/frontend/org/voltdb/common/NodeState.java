@@ -17,6 +17,8 @@
 
 package org.voltdb.common;
 
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+
 import java.util.EnumSet;
 import java.util.List;
 
@@ -59,5 +61,19 @@ public enum NodeState {
 
     public boolean catalogued() {
         return catalogued.contains(this);
+    }
+
+    public byte byteOrdinal() {
+        return new Integer(ordinal()).byteValue();
+    }
+
+    public static NodeState fromOrdinal(int ordinal) {
+        checkArgument(ordinal >= 0 || ordinal < values.size(),
+                "ordinal %s is out of range", ordinal);
+        return values.get(ordinal);
+    }
+
+    public static NodeState fromOrdinal(byte oridinal) {
+        return fromOrdinal(new Byte(oridinal).intValue());
     }
 }

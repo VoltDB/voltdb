@@ -17,9 +17,10 @@
 package org.voltdb;
 
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
 import org.voltdb.common.NodeState;
+
+import com.google_voltpatches.common.base.Supplier;
 
 public class StatusTracker {
 

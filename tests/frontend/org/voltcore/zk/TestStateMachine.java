@@ -27,11 +27,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -41,6 +41,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.JoinerCriteria;
+import org.voltdb.StartAction;
+import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.base.Charsets;
 
@@ -67,6 +70,9 @@ public class TestStateMachine extends ZKTestBase {
                                                 ByteBuffer.wrap(new byte[]{rawByteStates[1]}),
                                                 ByteBuffer.wrap(new byte[]{rawByteStates[2]})};
     final String defaultTaskResult = "FINISHED THE WORK";
+
+    private String [] coordinators;
+    private JoinerCriteria criteria;
 
 
     byte getNextByteState(byte oldState) {
@@ -120,6 +126,14 @@ public class TestStateMachine extends ZKTestBase {
     @Before
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
+        coordinators = IntStream.range(0, NUM_AGREEMENT_SITES)
+                .mapToObj(i -> ":" + (i+VoltDB.DEFAULT_INTERNAL_PORT))
+                .toArray(s -> new String[s]);
+        criteria = JoinerCriteria.builder()
+                .coordinators(coordinators)
+                .startAction(StartAction.PROBE)
+                .hostCount(NUM_AGREEMENT_SITES)
+                .build();
         ZooKeeper zk = m_messengers.get(0).getZK();
         ZKUtil.addIfMissing(zk, "/test", CreateMode.PERSISTENT, null);
         ZKUtil.addIfMissing(zk, "/test/db", CreateMode.PERSISTENT, null);
@@ -146,15 +160,15 @@ public class TestStateMachine extends ZKTestBase {
 
     public void recoverSite(int site) throws Exception {
         HostMessenger.Config config = new HostMessenger.Config();
-        int recoverPort = config.internalPort + NUM_AGREEMENT_SITES - 1;
         config.internalPort += site;
+        config.criteria = criteria;
         int clientPort = m_ports.next();
         config.zkInterface = "127.0.0.1:" + clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
-        config.coordinatorIp = new InetSocketAddress( recoverPort );
-        HostMessenger hm = new HostMessenger(config, null, null);
-        hm.start(null);
+        HostMessenger hm = new HostMessenger(config, null);
+        hm.start();
+        hm.waitForDetermination();
         m_messengers.set(site, hm);
         addStateMachinesFor(site);
     }
