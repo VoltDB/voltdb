@@ -236,22 +236,23 @@ public class DRConsumerDrIdTracker implements Serializable {
     public void truncate(long newTruncationPoint) {
         if (newTruncationPoint < getFirstDrId()) return;
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
-        while (iter.hasNext()) {
-            final Range<Long> next = iter.next();
-            if (end(next) < newTruncationPoint) {
-                iter.remove();
-                if (size() == 0) {
-                    log.warn("Removing tracker entries. Size is now 0");
+        // Get a lock so that getSafePointDrId will not see empty map
+        // if another thread calls it while this is in the middle of truncation
+        synchronized(m_map) {
+            while (iter.hasNext()) {
+                final Range<Long> next = iter.next();
+                if (end(next) < newTruncationPoint) {
+                    iter.remove();
+                } else if (next.contains(newTruncationPoint)) {
+                    iter.remove();
+                    m_map.add(range(newTruncationPoint, end(next)));
+                    return;
+                } else {
+                    break;
                 }
-            } else if (next.contains(newTruncationPoint)) {
-                iter.remove();
-                m_map.add(range(newTruncationPoint, end(next)));
-                return;
-            } else {
-                break;
             }
+            m_map.add(range(newTruncationPoint, newTruncationPoint));
         }
-        m_map.add(range(newTruncationPoint, newTruncationPoint));
     }
 
     /**
@@ -284,8 +285,11 @@ public class DRConsumerDrIdTracker implements Serializable {
      * @return The current safe-to-ack DrId
      */
     public long getSafePointDrId() {
-        assert (!m_map.isEmpty());
-        return end(m_map.asRanges().iterator().next());
+        // Acquire lock to avoid seeing bad data while another thread is in truncate()
+        synchronized (m_map) {
+            assert (!m_map.isEmpty());
+            return end(m_map.asRanges().iterator().next());
+        }
     }
 
     public long getLastSpUniqueId() {
