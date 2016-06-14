@@ -46,7 +46,10 @@ import com.google_voltpatches.common.net.InternetDomainName;
 public class JoinerCriteria {
 
     public static ImmutableSortedSet<String> hosts(String option) {
-        checkArgument(option != null && !option.trim().isEmpty(),"option is null, empty or blank");
+        checkArgument(option != null, "option is null");
+        if (option.trim().isEmpty()) {
+            return ImmutableSortedSet.of("");
+        }
         Splitter commaSplitter = Splitter.on(',').omitEmptyStrings().trimResults();
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (String h: commaSplitter.split(option)) {

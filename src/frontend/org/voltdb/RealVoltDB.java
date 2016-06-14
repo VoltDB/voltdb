@@ -1928,11 +1928,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // adjust deployment host count when the cluster members are given by mesh configuration
             // providers
             if (config.m_startAction == StartAction.PROBE) {
+                if (config.m_hostCount == VoltDB.UNDEFINED) {
+                    config.m_hostCount = 1;
+                }
                 Optional<byte[]> changed = modifyIfNecessaryDeploymentHostCount(
                         deployment, config.m_hostCount);
                 if (changed.isPresent()) {
                     deploymentBytes = changed.get();
                 }
+            } else if (config.m_hostCount == VoltDB.UNDEFINED) {
+                config.m_hostCount = deployment.getCluster().getHostcount();
             }
             /*
              * if it is a legacy statup initialize config.m_voltdbRoot if it the value

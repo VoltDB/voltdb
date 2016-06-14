@@ -422,7 +422,7 @@ public class VoltDB {
                         sbld.append(args[i]);
                     }
                     m_meshBrokers = sbld.toString();
-                } else if (arg.equals("clustersize")) {
+                } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
@@ -611,19 +611,16 @@ public class VoltDB {
              */
             if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
-            } else if (m_leader != null && m_leader.trim().isEmpty()) {
-                m_leader = "0.0.0.0";
             }
 
             if (m_startAction == StartAction.PROBE) {
                 checkInitializationMarker();
-            } else if (m_startAction == StartAction.JOIN) {
-                checkInitializationMarker();
+            } else if (m_startAction == StartAction.JOIN && isInitialized()) {
                 m_startAction = StartAction.PROBE;
                 m_enableAdd = true;
+                checkInitializationMarker();
             } else if (m_startAction == StartAction.INITIALIZE) {
-                File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-                if (inzFH.exists() && !m_forceVoltdbCreate) {
+                if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"
                             + "\nUse the start command to start the initialized database or use init --force"
                             + " to initialize a new database overwriting existing files.");
@@ -634,7 +631,7 @@ public class VoltDB {
                     m_meshBrokers = m_leader;
                 }
             }
-            if (m_meshBrokers != null && !m_meshBrokers.trim().isEmpty()) {
+            if (m_meshBrokers != null) {
                 m_coordinators = JoinerCriteria.hosts(m_meshBrokers);
                 if (m_leader == null || m_leader.trim().isEmpty()) {
                     m_leader = m_coordinators.first();
@@ -643,6 +640,11 @@ public class VoltDB {
             if (m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
                 m_hostCount = m_coordinators.size();
             }
+        }
+
+        private boolean isInitialized() {
+            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
         }
 
         /**

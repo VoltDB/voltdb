@@ -438,11 +438,11 @@ class ServerBundle(JavaBundle):
             cli.StringOption('-g', '--placement-group', 'placementgroup',
                              'placement group',
                              default = '0'))
-        if self.default_host:
+        if self.is_legacy_verb and self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
                 default='localhost:3021'))
-        else:
+        elif self.is_legacy_verb:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] host must be specified (default HOST=localhost, PORT=3021)'))
         if self.supports_live:
@@ -516,9 +516,9 @@ class ServerBundle(JavaBundle):
             final_args.extend(['deployment', runner.opts.deployment])
         if runner.opts.placementgroup:
             final_args.extend(['placementgroup', runner.opts.placementgroup])
-        if runner.opts.host:
+        if self.is_legacy_verb and runner.opts.host:
             final_args.extend(['host', runner.opts.host])
-        elif not self.subcommand in ('initialize'):
+        elif not self.subcommand in ('initialize', 'probe'):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])

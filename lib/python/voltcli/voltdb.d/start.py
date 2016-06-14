@@ -24,11 +24,13 @@
                                 supports_multiple_daemons=True,
                                 check_environment_config=True,
                                 force_voltdb_create=False,
-                                supports_paused=True),
+                                supports_paused=True,
+                                is_legacy_verb=False),
     options = (
-        VOLT.StringListOption('-C', '--cluster', 'mesh',
-                             'specify a comman delimited list of cluster members',
-                             default = None)
+        VOLT.StringListOption('-H', '--hosts', 'mesh',
+                              'HOST1[:PORT], HOST2:PORT, ..., HOSTn:PORT, (default HOST=localhost, PORT=3021)',
+                              default = ''),
+        VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster', default=1)
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -36,4 +38,5 @@ def start(runner):
     if not runner.opts.mesh:
         runner.abort_with_help('You must specify the --cluster option.')
     runner.args.extend(['mesh', ','.join(runner.opts.mesh)])
+    runner.args.extend(['hostcount', runner.opts.hostcount])
     runner.go()
