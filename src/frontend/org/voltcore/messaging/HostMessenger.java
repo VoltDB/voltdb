@@ -549,8 +549,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         new InetSocketAddress(
                                 m_config.zkInterface.split(":")[0],
                                 Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                        m_config.backwardsTimeForgivenessWindow,
-                        m_failedHostsCallback);
+                                m_config.backwardsTimeForgivenessWindow,
+                                m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
@@ -895,8 +895,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     new InetSocketAddress(
                             m_config.zkInterface.split(":")[0],
                             Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                    m_config.backwardsTimeForgivenessWindow,
-                    m_failedHostsCallback);
+                            m_config.backwardsTimeForgivenessWindow,
+                            m_failedHostsCallback);
 
         /*
          * Now that the agreement site mailbox has been created it is safe
