@@ -34,9 +34,11 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.IndexRef;
+import org.voltdb.catalog.MaterializedViewHandler;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.ViewTrigger;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -117,23 +119,35 @@ public class MaterializedViewProcessor {
                 }
             }
 
-            // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.m_tableList.get(0);
-            if (viewTableNames.contains(srcTable.getTypeName())) {
-                String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
-                        viewName, srcTable.getTypeName());
-                throw m_compiler.new VoltCompilerException(msg);
+            // Add mvHandler to the destTable:
+            MaterializedViewHandler mvHandler = destTable.getMvhandler().add("mvHandler");
+            Table srcTable = null;
+            for (int i=0; i<stmt.m_tableList.size(); i++) {
+                srcTable = stmt.m_tableList.get(i);
+                if (viewTableNames.contains(srcTable.getTypeName())) {
+                    String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
+                            viewName, srcTable.getTypeName());
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                // Add ViewTrigger to each source table, pointing to the handler
+                ViewTrigger vTrigger = srcTable.getViewtriggers().add(viewName);
+                vTrigger.setDesttable(destTable);
+                vTrigger.setTablepos(i);
             }
-
+            // create the materializedviewinfo catalog node for the source table
+            srcTable = stmt.m_tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
+            mvHandler.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {
                 String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
+                mvHandler.setPredicate(hex);
             }
             else {
                 matviewinfo.setPredicate("");
+                mvHandler.setPredicate("");
             }
             destTable.setMaterializer(srcTable);
 
@@ -155,6 +169,7 @@ public class MaterializedViewProcessor {
                             "expressions for group by expressions: " + e.toString());
                 }
                 matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+                mvHandler.setGroupbyexpressionsjson(groupbyExprsJson);
             }
             else {
                 // add the group by columns from the src table
@@ -168,13 +183,16 @@ public class MaterializedViewProcessor {
                     // in a meaningless sequence.
                     cref.setIndex(i);           // the column offset in the view's grouping order
                     cref.setColumn(srcCol);     // the source column from the base (non-view) table
+                    cref = mvHandler.getGroupbycols().add(srcCol.getTypeName());
+                    cref.setIndex(i);           // the column offset in the view's grouping order
+                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
                 }
 
                 // parse out the group by columns into the dest table
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
                     ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                    processMaterializedViewColumn(srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
                 }
             }
@@ -183,7 +201,7 @@ public class MaterializedViewProcessor {
             ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable,
+            processMaterializedViewColumn(srcTable,
                     destColumnArray.get(stmt.m_groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
@@ -220,12 +238,15 @@ public class MaterializedViewProcessor {
                 if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
                         col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
                     minMaxAggs.add(aggExpr);
-                }            }
+                }
+            }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
             compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, matviewinfo);
+            compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, mvHandler);
+            compileCreateQueryAndUpdateCatalog(db, xmlquery, mvHandler);
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -237,12 +258,19 @@ public class MaterializedViewProcessor {
                             "expressions for aggregation expressions: " + e.toString());
                 }
                 matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
+                mvHandler.setAggregationexpressionsjson(aggregationExprsJson);
             }
 
             // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
             for (Integer i=0; i<minMaxAggs.size(); ++i) {
                 Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
                 IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                if (found != null) {
+                    refFound.setName(found.getTypeName());
+                } else {
+                    refFound.setName("");
+                }
+                refFound = mvHandler.getIndexforminmax().add(i.toString());
                 if (found != null) {
                     refFound.setName(found.getTypeName());
                 } else {
@@ -260,7 +288,7 @@ public class MaterializedViewProcessor {
                 if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
                     tve = (TupleValueExpression)colExpr;
                 }
-                processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                processMaterializedViewColumn(srcTable, destColumn,
                         col.expression.getExpressionType(), tve);
 
                 // Correctly set the type of the column so that it's consistent.
@@ -413,16 +441,16 @@ public class MaterializedViewProcessor {
         if (stmt.m_tableList.size() != 1) {
             msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
                        "Only one source table is allowed.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+//            throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
      }
 
-    private static void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
+    private static void processMaterializedViewColumn(Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr) {
 
         if (colExpr != null) {
-            assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
+//            assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
             String srcColName = colExpr.getColumnName();
             Column srcColumn = srcTable.getColumns().getIgnoreCase(srcColName);
             destColumn.setMatviewsource(srcColumn);
@@ -458,6 +486,59 @@ public class MaterializedViewProcessor {
                               DeterminismMode.FASTER,
                               StatementPartitioning.forceSP());
         }
+    }
+
+    // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
+    private void compileFallbackQueriesAndUpdateCatalog(Database db,
+                                                List<VoltXMLElement> fallbackQueryXMLs,
+                                                MaterializedViewHandler mvHandler) throws VoltCompilerException {
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
+            String key = String.valueOf(i);
+            Statement fallbackQueryStmt = mvHandler.getFallbackquerystmts().add(key);
+            VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
+            // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
+            // Normally for select statements, the unique names will start with "Eselect".
+            // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
+            // (StatementCompiler.java, line 159)
+            fallbackQueryStmt.setSqltext( fallbackQueryXML.getUniqueName().substring(2) );
+            // For debug:
+            // System.out.println(fallbackQueryXML.toString());
+            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                              m_hsql,
+                              db.getCatalog(),
+                              db,
+                              estimates,
+                              fallbackQueryStmt,
+                              fallbackQueryXML,
+                              fallbackQueryStmt.getSqltext(),
+                              null, // no user-supplied join order
+                              DeterminismMode.FASTER,
+                              StatementPartitioning.forceSP());
+        }
+    }
+
+    private void compileCreateQueryAndUpdateCatalog(Database db,
+                                                    VoltXMLElement xmlquery,
+                                                    MaterializedViewHandler mvHandler) throws VoltCompilerException {
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        Statement createQuery = mvHandler.getCreatequery().add("createQuery");
+        // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
+        // Normally for select statements, the unique names will start with "Eselect".
+        // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
+        // (StatementCompiler.java, line 159)
+        createQuery.setSqltext( xmlquery.getUniqueName().substring(2) );
+        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                          m_hsql,
+                          db.getCatalog(),
+                          db,
+                          estimates,
+                          createQuery,
+                          xmlquery,
+                          createQuery.getSqltext(),
+                          null, // no user-supplied join order
+                          DeterminismMode.FASTER,
+                          StatementPartitioning.forceSP());
     }
 
     /**

@@ -55,6 +55,7 @@
 #include "catalog/database.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewinfo.h"
+#include "catalog/materializedviewhandler.h"
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
@@ -102,6 +103,7 @@
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewHandler);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
@@ -119,6 +121,7 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::MaterializedViewHandler*> LabeledViewHandler;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -1342,6 +1345,22 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *srcCatal
             TABLE::MatViewType::build(srcTable, destTable, catalogView);
         }
 
+    }
+
+    BOOST_FOREACH (LabeledViewHandler labeledViewHandler, srcCatalogTable->mvHandler()) {
+        catalog::MaterializedViewHandler *mvHandler = labeledViewHandler.second;
+        const catalog::Table *destCatalogTable = mvHandler->dest();
+        catalog::Statement *stmt = mvHandler->createQuery().get("createQuery");
+
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0 && stmt) {
+            const string& hexString = stmt->explainplan();
+            assert(hexString.length() % 2 == 0);
+            int bufferLength = (int)hexString.size() / 2 + 1;
+            char* explanation = new char[bufferLength];
+            boost::shared_array<char> memoryGuard(explanation);
+            catalog::Catalog::hexDecodeString(hexString, explanation);
+            cout << "View: " << destCatalogTable->name() << endl << explanation << endl;
+        }
     }
 }
 
