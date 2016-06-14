@@ -185,7 +185,10 @@ public class ImportManager implements ChannelChangeCallback {
             }
             startOSGiFramework();
 
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
+            final String clusterTag = m_distributer.getClusterTag();
+
+            ImportDataProcessor newProcessor = new ImportProcessor(
+                    myHostId, m_distributer, m_framework, m_statsCollector, clusterTag);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             m_formatterFactories.clear();
 

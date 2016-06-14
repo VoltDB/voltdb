@@ -1155,6 +1155,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return false;
     }
 
+    public boolean planNodeClassNeedsProjectionNode() {
+        return true;
+    }
+
     /**
      * When a project node is added to the top of the plan, we need to adjust
      * the differentiator field of TVEs to reflect differences in the scan

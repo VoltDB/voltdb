@@ -1011,6 +1011,14 @@ public abstract class SubPlanAssembler {
         if (!m_parsedStmt.hasOrderByColumns()
                 || m_parsedStmt.orderByColumns().isEmpty()) {
             return 0;
+        } else if (m_parsedStmt instanceof ParsedSelectStmt) {
+            // If this parsed select statement has a windowed expression,
+            // we don't want to consider the order by at all.
+            // Note that this is the content of ENG-10474.
+            ParsedSelectStmt pss = (ParsedSelectStmt)m_parsedStmt;
+            if (pss.hasWindowedExpression()) {
+                return 0;
+            }
         }
         int nSpoilers = 0;
         int countOrderBys = m_parsedStmt.orderByColumns().size();

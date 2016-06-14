@@ -1071,18 +1071,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
-        getSES(true).submit(new Runnable() {
-            @Override
-            public void run()
-            {
-                // Cleanup the rejoin blocker in case the rejoining node failed.
-                // This has to run on a separate thread because the callback is
-                // invoked on the ZooKeeper server thread.
-                for (int hostId : failedHosts) {
-                    VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+        final ScheduledExecutorService es = getSES(true);
+        if (es != null) {
+            es.submit(new Runnable() {
+                @Override
+                public void run()
+                {
+                    // First check to make sure that the cluster still is viable before
+                    // before allowing the fault log to be updated by the notifications
+                    // generated below.
+                    Set<Integer> hostsOnRing = new HashSet<Integer>();
+                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                        VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                                false, null);
+                    }
+                    // Cleanup the rejoin blocker in case the rejoining node failed.
+                    // This has to run on a separate thread because the callback is
+                    // invoked on the ZooKeeper server thread.
+                    //
+                    // I'm trying to be defensive to have this cleanup code run on
+                    // all live nodes. One of them will succeed in cleaning up the
+                    // rejoin ZK nodes. The others will just do nothing if the ZK
+                    // nodes are already gone. If this node is still initializing
+                    // when a rejoining node fails, there must be a live node that
+                    // can clean things up. It's okay to skip this if the executor
+                    // services are not set up yet.
+                    for (int hostId : failedHosts) {
+                        VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     class DailyLogTask implements Runnable {
@@ -2336,8 +2355,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Integer partition = siteTracker.getPartitionForSite(site);
                 partitions.add(partition);
             }
-            // Update catalog for import processor this should be just/stop start and updat partitions.
-            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
@@ -2376,6 +2393,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
+
+            // Update catalog for import processor this should be just/stop start and updat partitions.
+            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 6. Perform updates required by the DR subsystem
 

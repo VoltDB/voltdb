@@ -1044,11 +1044,15 @@ public class ArrayUtil {
     }
 
     /**
+     * <p>
      *  Copies some elements of row into newRow by using columnMap as
-     *  the list of indexes into row. <p>
-     *
+     *  the list of indexes into row. That is, newRow[i] = row[columnMap[i]]
+     *  for each i.
+     * </p>
+     * <p>
      *  columnMap and newRow are of equal length and are normally
-     *  shorter than row. <p>
+     *  shorter than row.
+     * </p>
      *
      *  @param row the source array
      *  @param columnMap the list of indexes into row
@@ -1062,6 +1066,17 @@ public class ArrayUtil {
         }
     }
 
+    /**
+     * <p>
+     *   Copies integers from row to newRow, using columnMap as
+     *   a list of indices into the source.  That is,
+     *   newRow[i] = row[columnMap[i]] for each i.
+     * </p>
+     *
+     * @param row
+     * @param columnMap
+     * @param newRow
+     */
     public static void projectRow(int[] row, int[] columnMap, int[] newRow) {
 
         for (int i = 0; i < columnMap.length; i++) {
@@ -1070,7 +1085,10 @@ public class ArrayUtil {
     }
 
     /**
-     *  As above but copies in reverse direction. <p>
+     * <p>
+     *   Copies from newRow to row, using the columnMap as a list of indices
+     *   into the source.  That is row[columnMap[i]] = newRow[i] for all i.
+     * </p>
      *
      *  @param row the target array
      *  @param columnMap the list of indexes into row

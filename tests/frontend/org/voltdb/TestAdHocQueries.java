@@ -860,10 +860,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                           AND PNUM > 'P2';";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not support constant Boolean values, like TRUE or FALSE") > 0);
+                fail("failed on static clause");
             }
             adHocQuery = "ROLLBACK;";
             try {
