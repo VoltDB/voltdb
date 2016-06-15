@@ -610,6 +610,13 @@ public class ProcedureRunner {
 
         updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
+
+        if (log.isDebugEnabled()) {
+            if (!queuedSQL.stmt.isReadOnly) {
+                log.debug("voltQueueSQL receives " + queuedSQL.stmt.getText() + " " + queuedSQL.params.toString() +
+                        " txnid: " + m_txnState.txnId + ", hash: " + (int)m_inputCRC.getValue() );
+            }
+        }
     }
 
     public void voltQueueSQL(final String sql, Object... args) {
