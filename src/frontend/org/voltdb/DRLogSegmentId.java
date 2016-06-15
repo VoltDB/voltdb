@@ -94,6 +94,12 @@ public class DRLogSegmentId implements Serializable {
     }
 
     public static String getDebugStringFromDRId(long drId) {
+        if (drId == Long.MAX_VALUE) {
+            return "QUEUE EMPTY";
+        }
+        if (drId < 0) {
+            return String.format("%d", drId);
+        }
         return String.format("%d:%d", getClusterIdFromDRId(drId), getSequenceNumberFromDRId(drId));
     }
 
