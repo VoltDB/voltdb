@@ -76,8 +76,9 @@ public class DeterminismHash {
      * hash for the first int value in the array.
      */
     public int[] getHashes() {
-        int[] retval = new int[m_stmtCount * 2 + HEADER_OFFSET];
-        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, m_stmtCount * 2);
+        int includedStmts = Math.min(m_stmtCount, MAX_STATEMENTS_WITH_DETAIL);
+        int[] retval = new int[includedStmts * 2 + HEADER_OFFSET];
+        System.arraycopy(m_hashes, 0, retval, HEADER_OFFSET, includedStmts * 2);
 
         m_inputCRC.update(m_catalogVersion);
         m_inputCRC.update(m_stmtCount);
