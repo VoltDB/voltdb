@@ -47,7 +47,8 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
-
+    private static long GREGORIAN_EPOCH = -12212553600000000L;
+    private static long NYE9999         = 253402300799999999L;
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -249,7 +250,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
-
+        // Test MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP
+        project.addStmtProcedure("GET_MAX_VALID_TIMESTAMP", "select MAX_VALID_TIMESTAMP() from P2 limit 1");
+        project.addStmtProcedure("GET_MIN_VALID_TIMESTAMP", "select MIN_VALID_TIMESTAMP() from P2 limit 1");
+        // Test IS_VALID_TIMESTAMP
+        project.addStmtProcedure("TEST_IS_VALID_TIMESTAMP", "select ID from P2 where ID = ? and IS_VALID_TIMESTAMP(TM)");
         project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
                 "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
                 "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
@@ -2907,5 +2912,62 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // clear test data
         cr = client.callProcedure("@AdHoc", "DELETE FROM P1 WHERE ID IN (200, 201, 202);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
     }
+
+    private void doTestTimestampLimit(String procName, long value) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure(procName);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        vt.advanceRow();
+        assertEquals(1,  vt.getRowCount());
+        assertEquals(value, vt.getTimestampAsLong(0));
+    }
+
+    private void doTestIsValidTimestamp(long id, boolean expected) throws Exception {
+        Client client = getClient();
+        ClientResponse cr = client.callProcedure("TEST_IS_VALID_TIMESTAMP", id);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        vt.advanceRow();
+        // If we expect the timestamp to be valid, we expect one
+        // row of answer.  If we expect it to be invalid, we expect
+        // no answers.
+        if (expected) {
+            assertEquals(1, vt.getRowCount());
+            assertEquals(id, vt.getLong(0));
+        } else {
+            assertEquals(0, vt.getRowCount());
+        }
+    }
+
+    public void testTimestampValidityFunctions() throws Exception {
+        // Insert some valid and invalid data.
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        cr = client.callProcedure("P2.insert", 100, GREGORIAN_EPOCH - 1000);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 101, NYE9999 + 1000);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 200, GREGORIAN_EPOCH);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 201, 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 202, NYE9999);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Test MIN_VALID_TIMESTAMP
+        doTestTimestampLimit("GET_MIN_VALID_TIMESTAMP", GREGORIAN_EPOCH);
+        doTestTimestampLimit("GET_MAX_VALID_TIMESTAMP", NYE9999);
+
+        // Test IS_VALID_TIMESTAMP too low.
+        doTestIsValidTimestamp(100, false);
+        doTestIsValidTimestamp(101, false);
+        doTestIsValidTimestamp(200, true);
+        doTestIsValidTimestamp(201, true);
+        doTestIsValidTimestamp(202, true);
+    }
+
 }
