@@ -558,7 +558,6 @@ class AdminTest extends TestBase {
                 waitFor(35) {
                     overview.sitePerHost.isDisplayed()
                     overview.sitePerHost.text().toLowerCase().equals("Sites Per Host".toLowerCase())
-                    println(overview.sitePerHost.text())
                 }
                 then:
                 testStatus = true
