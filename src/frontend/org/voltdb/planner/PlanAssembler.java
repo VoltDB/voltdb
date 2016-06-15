@@ -93,6 +93,7 @@ import org.voltdb.utils.CatalogUtil;
  *
  */
 public class PlanAssembler {
+    public static boolean HANDLE_WINDOWED_OPERATORS = Boolean.valueOf(System.getProperty("org.voltdb.handlewindowedfunctions", "False"));
 
     // The convenience struct to accumulate results after parsing multiple statements
     private static class ParsedResultAccumulator {
@@ -2113,6 +2114,9 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
+        if ( ! HANDLE_WINDOWED_OPERATORS ) {
+            throw new PlanningErrorException("Windowed operators are not supported in this version of VoltDB.");
+        }
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
         ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();

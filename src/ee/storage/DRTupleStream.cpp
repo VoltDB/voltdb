@@ -58,13 +58,17 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     std::string tableName,
                                     int partitionColumn,
                                     int64_t spHandle,
-                                    int64_t uniqueId) {
+                                    int64_t uniqueId)
+{
+    if (m_guarded) return INVALID_DR_MARK;
+
     size_t startingUso = m_uso;
+
+    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
 
     //Drop the row, don't move the USO
     if (!m_enabled) return INVALID_DR_MARK;
 
-    transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, LONG_MAX);
 
     if (!m_currBlock) {
@@ -113,7 +117,8 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn) {
+int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn)
+{
     if (partitionColumn != -1) {
         return static_cast<int64_t>(tuple.getNValue(partitionColumn).murmurHash3());
     } else {
@@ -121,7 +126,8 @@ int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn
     }
 }
 
-bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash) {
+bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
+{
     if (isReplicatedTable) {
         // For replicated table changes, the hash flag should stay the same as
         // the initial value, which is TXN_PAR_HASH_REPLICATED
@@ -169,16 +175,19 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
-    size_t startingUso = m_uso;
+    if (m_guarded) return INVALID_DR_MARK;
 
-    //Drop the row, don't move the USO
-    if (!m_enabled) return INVALID_DR_MARK;
+    size_t startingUso = m_uso;
 
     size_t rowHeaderSz = 0;
     size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
 
     transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+
+    //Drop the row, don't move the USO
+    if (!m_enabled) return INVALID_DR_MARK;
+
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(tuple, partitionColumn));
 
     // Compute the upper bound on bytes required to serialize tuple.
@@ -232,7 +241,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update row count
     m_txnRowCount += rowCostForDRRecord(type);
 
-//    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
+    // std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
@@ -242,11 +251,11 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                          int64_t spHandle,
                                          int64_t uniqueId,
                                          TableTuple &oldTuple,
-                                         TableTuple &newTuple) {
-    size_t startingUso = m_uso;
+                                         TableTuple &newTuple)
+{
+    if (m_guarded) return INVALID_DR_MARK;
 
-    //Drop the row, don't move the USO
-    if (!m_enabled) return INVALID_DR_MARK;
+    size_t startingUso = m_uso;
 
     size_t oldRowHeaderSz = 0;
     size_t oldRowMetadataSz = 0;
@@ -255,6 +264,10 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     size_t maxLength = TXN_RECORD_HEADER_SIZE;
 
     transactionChecks(lastCommittedSpHandle, spHandle, uniqueId);
+
+    //Drop the row, don't move the USO
+    if (!m_enabled) return INVALID_DR_MARK;
+
     bool requireHashDelimiter = updateParHash(partitionColumn == -1, getParHashForTuple(oldTuple, partitionColumn));
 
     DRRecordType type = DR_RECORD_UPDATE;
@@ -307,11 +320,12 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     // update row count
     m_txnRowCount += rowCostForDRRecord(type);
 
-//    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
+    // std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
-void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) {
+void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId)
+{
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
@@ -321,9 +335,15 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
     if (!m_opened) {
-        beginTransaction(m_openSequenceNumber, uniqueId);
+        ++m_openSequenceNumber;
+
+        if (m_enabled) {
+            beginTransaction(m_openSequenceNumber, spHandle, uniqueId);
+        }
+        else {
+            openTransactionCommon(spHandle, uniqueId);
+        }
     }
     assert(m_opened);
 }
@@ -331,7 +351,8 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
 void DRTupleStream::writeRowTuple(TableTuple& tuple,
         size_t rowHeaderSz,
         size_t rowMetadataSz,
-        ExportSerializeOutput &io) {
+        ExportSerializeOutput &io)
+{
     size_t startPos = io.position();
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
@@ -354,7 +375,8 @@ void DRTupleStream::writeRowTuple(TableTuple& tuple,
 size_t DRTupleStream::computeOffsets(DRRecordType &type,
         TableTuple &tuple,
         size_t &rowHeaderSz,
-        size_t &rowMetadataSz) {
+        size_t &rowMetadataSz)
+{
     rowMetadataSz = sizeof(int32_t);
     int columnCount;
     switch (type) {
@@ -371,7 +393,8 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     return rowHeaderSz + tuple.maxDRSerializationSize();
 }
 
-void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
+{
     assert(!m_opened);
 
     if (!m_currBlock) {
@@ -418,11 +441,30 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_firstParHash = LONG_MAX;
      m_lastParHash = LONG_MAX;
 
-     m_opened = true;
+     openTransactionCommon(spHandle, uniqueId);
 }
 
-void DRTupleStream::endTransaction(int64_t uniqueId) {
+void DRTupleStream::endTransaction(int64_t uniqueId)
+{
     if (!m_opened) {
+        return;
+    }
+
+    if (!m_enabled) {
+        if (m_openUniqueId != uniqueId) {
+            throwFatalException(
+                "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
+                " DR sequence number is out of sync with UniqueId",
+                (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+        }
+
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            m_lastCommittedMpUniqueId = uniqueId;
+        } else {
+            m_lastCommittedSpUniqueId = uniqueId;
+        }
+
+        commitTransactionCommon();
         return;
     }
 
@@ -493,7 +535,8 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     extraio.position(txnLength - 4);
     extraio.writeInt(crc);
 
-    m_opened = false;
+    m_committedUso = m_uso;
+    commitTransactionCommon();
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -505,7 +548,8 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso)
+{
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
@@ -531,7 +575,24 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
 }
 
 void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
-        int64_t uniqueId, ByteArray payloads) {
+        int64_t uniqueId, ByteArray payloads)
+{
+    assert(!m_opened);
+
+    ++m_openSequenceNumber;
+
+    if (!m_enabled) {
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            m_lastCommittedMpUniqueId = uniqueId;
+        } else {
+            m_lastCommittedSpUniqueId = uniqueId;
+        }
+
+        openTransactionCommon(spHandle, uniqueId);
+        commitTransactionCommon();
+        return;
+    }
+
     switch (type) {
     case CATALOG_UPDATE: {
         // Make sure current block is empty
@@ -541,7 +602,24 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         m_currBlock->consumed(io.position());
         m_uso += io.position();
 
-        commit(lastCommittedSpHandle, spHandle, uniqueId, false, true, type);
+        m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+        m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            m_lastCommittedMpUniqueId = uniqueId;
+            m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+        } else {
+            m_lastCommittedSpUniqueId = uniqueId;
+            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        }
+        m_currBlock->markAsEventBuffer(type);
+
+        m_committedUso = m_uso;
+        openTransactionCommon(spHandle, uniqueId);
+        commitTransactionCommon();
+
+        extendBufferChain(0);
+
+        pushPendingBlocks();
         break;
     }
     default:
@@ -551,9 +629,10 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 
 int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     std::vector<int32_t> partitionKeyValueList,
-    std::vector<int32_t> flagList, long startSequenceNumber,
-    char *outBytes) {
-
+    std::vector<int32_t> flagList,
+    long startSequenceNumber,
+    char *outBytes)
+{
     DRTupleStream stream(partitionId, 2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
@@ -605,9 +684,6 @@ int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
     }
 
     TupleSchema::freeTupleSchema(schema);
-
-    int64_t committedUID = lastUID;
-    stream.commit(committedUID, committedUID, committedUID, false, false);
 
     size_t headerSize = MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING;
     const int32_t adjustedLength = static_cast<int32_t>(stream.m_currBlock->rawLength() - headerSize);
