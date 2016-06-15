@@ -373,10 +373,10 @@ class AdminExportTest extends TestBase {
                 }
             }
         }
-        else
-        {
-            println("Could not update the value of \"Export Configuration\". Unable to update deployment configuration: Error validating deployment configuration: Export is a PRO version only feature")
-        }
+//        else
+//        {
+//            println("Could not update the value of \"Export Configuration\". Unable to update deployment configuration: Error validating deployment configuration: Export is a PRO version only feature")
+//        }
 
         then: 'Display the created FILE'
         if(isPro){
@@ -579,7 +579,7 @@ class AdminExportTest extends TestBase {
                 }
             }
             and: 'Expand export'
-            if (!waitFor(15){updateInnerErrorPopup.isDisplayed()}) {
+            if (!waitFor(10){page.overview.addconfig.isDisplayed()}) {
                 isPro = true
                 count = 0
                 while (count < numberOfTrials) {
