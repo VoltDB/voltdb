@@ -21,9 +21,9 @@ class Stats():
         self.jhost='http://ci.voltdb.lan'
         self.dbhost='volt2.voltdb.lan'
         self.cmdHelp = """
-        usage: junit-stats <branch> <job> <range>
-        ex: junit-stats A-master branch-2-pro-junit-master 800-802
-        ex: junit-stats A-master branch-2-community-junit-master 550-550
+        usage: junit-stats <job> <range>
+        ex: junit-stats branch-2-pro-junit-master 800-802
+        ex: junit-stats branch-2-community-junit-master 550-550
         """
 
     def read_url(self, url):
@@ -42,13 +42,13 @@ class Stats():
             print('Could not read data from url: %s. The data at the url may not be readable.\n' % url)
         return data
 
-    def build_history(self, branch, job, build_range):
+    def build_history(self, job, build_range):
         """
-        Displays build history for a job on a branch. Can specify an inclusive build range.
-        For every build specified on the branch, prints the full test results of the
+        Displays build history for a job. Can specify an inclusive build range.
+        For every build specified on the job, saves the test results
         """
 
-        if branch is None or job is None or build_range is None:
+        if job is None or build_range is None:
             print(self.cmdHelp)
             return
         else:
@@ -63,7 +63,7 @@ class Stats():
                 print(self.cmdHelp)
                 return
 
-        url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/lastCompletedBuild/api/python'
+        url = self.jhost + '/job/' + job + '/lastCompletedBuild/api/python'
         build = self.read_url(url)
         if build is None:
             return
@@ -75,7 +75,7 @@ class Stats():
         cursor = db.cursor()
 
         for build in range(build_low, build_high+1):
-            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/testReport/api/python'
+            url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             report = self.read_url(url)
             if report is None:
                 print('Could not retrieve report because url is invalid. This may be because the build %d might not '
@@ -140,7 +140,7 @@ class Stats():
                 print(sys.exc_info()[1])
 
             # Get timestamp job ran on.
-            url = self.jhost + '/view/Branch-jobs/view/' + branch + '/job/' + job + '/' + str(build) + '/api/python'
+            url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
             report = self.read_url(url)
             if report is None:
                 print('Could not retrieve report because url is invalid. This may be because the build %d might not '
@@ -169,19 +169,15 @@ class Stats():
 
 if __name__ == '__main__':
     stats = Stats()
-    branch = os.environ.get('branch', None)
     job = os.environ.get('job', None)
     build_range = os.environ.get('build_range', None)
 
     args = sys.argv
 
     if len(args) > 1:
-        branch = args[1]
+        job = args[1]
 
     if len(args) > 2:
-        job = args[2]
+        build_range = args[2]
 
-    if len(args) > 3:
-        build_range = args[3]
-
-    stats.build_history(branch, job, build_range)
+    stats.build_history(job, build_range)
