@@ -2120,7 +2120,9 @@ public class FunctionSQL extends Expression {
         sb.append(name).append("(");
 
         for (int i = 0; i < nodes.length; i++) {
-            sb.append("[").append(nodes[i].describe(session)).append("]");
+        	if (nodes[i] != null) {
+                sb.append("[").append(nodes[i].describe(session)).append("]");
+        	}
         }
 
         sb.append(") returns ").append(dataType.getNameString());

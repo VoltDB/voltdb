@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Queue;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -2313,5 +2314,17 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 }
             }
         }
+    }
+
+    /*
+     * ENG-10497 wants to make generated column names not conflict with
+     * user column names.
+     */
+    public void testGeneratedNamesDontConflict() {
+        String sql = "select C1 from ( select cast(a as varchar), c as c1 from r5 ) as SQ where SQ.C1 < 0;";
+    AbstractPlanNode pn = compile(sql);
+    assertNotNull(pn);
+    VoltType vt = pn.getOutputSchema().getColumns().get(0).getType();
+    assert(VoltType.INTEGER.equals(vt));
     }
 }
