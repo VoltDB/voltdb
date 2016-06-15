@@ -53,7 +53,8 @@ TEST_F(CompactingPoolTest, basic_ops)
     char* elem = reinterpret_cast<char*>(dut.malloc(&elem));
     EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY())* num_elements,
             dut.getBytesAllocated());
-    dut.free(elem);
+    dut.markAllocationAsPendingRelease(elem);
+    dut.freePendingAllocations();
     EXPECT_EQ(0, dut.getBytesAllocated());
 
     // fill up a buffer + 1, then free something in the middle and
@@ -66,7 +67,8 @@ TEST_F(CompactingPoolTest, basic_ops)
     EXPECT_EQ(2, *reinterpret_cast<int8_t*>(elems[2]));
     EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements * 2,
             dut.getBytesAllocated());
-    dut.free(elems[2]);
+    dut.markAllocationAsPendingRelease(elems[2]);
+    dut.freePendingAllocations();
     // 2 should now have the last element, filled with num_elements
     EXPECT_EQ(num_elements, *reinterpret_cast<int8_t*>(elems[2]));
     // and we should have shrunk back to 1 buffer
@@ -77,7 +79,8 @@ TEST_F(CompactingPoolTest, basic_ops)
     elems[num_elements + 1] = reinterpret_cast<char*>(dut.malloc(&(elems[num_elements + 1])));
     EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements * 2,
             dut.getBytesAllocated());
-    dut.free(elems[num_elements + 1]);
+    dut.markAllocationAsPendingRelease(elems[num_elements + 1]);
+    dut.freePendingAllocations();
     EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements,
             dut.getBytesAllocated());
 }
@@ -109,8 +112,9 @@ TEST_F(CompactingPoolTest, bytes_allocated_test)
         // bonus extra hack test.  If we keep freeing the first
         // element, it should get compacted into and we can free it
         // again!
-        dut.free(elems[0]);
+        dut.markAllocationAsPendingRelease(elems[0]);
     }
+    dut.freePendingAllocations();
 }
 
 int main() {
