@@ -89,6 +89,7 @@ public class VoltLogger {
             }
             // Any logging that falls after the official shutdown flush of the
             // asynch logger can just fall back to synchronous on the caller thread.
+            m_asynchLoggerPool.shutdown();
             m_asynchLoggerPool = null;
         }
     }

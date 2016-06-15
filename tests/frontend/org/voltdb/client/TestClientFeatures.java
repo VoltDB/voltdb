@@ -102,6 +102,35 @@ public class TestClientFeatures extends TestCase {
         }
     }
 
+    public void testThreadsKilledClientClose() throws Exception {
+        ClientConfig config = new ClientConfig();
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+        client.close();
+        Thread.sleep(2000);
+        Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
+            // skip the current thread
+            Thread t = e.getKey();
+            StackTraceElement[] st = e.getValue();
+            if (t == Thread.currentThread()) {
+                continue;
+            }
+            // check thread name and whether the thread should be close.
+            String threadName = t.getName();
+            if (threadName.contains("Reverse DNS lookups")
+                    || threadName.contains("Estimated Time Updater")
+                    || threadName.contains("VoltDB Client Reaper Thread")
+                    || threadName.contains("Async Logger")) {
+                System.out.println("threadName: " + threadName);
+                for (StackTraceElement element : st) {
+                    System.out.println("stack trace element: " + element);
+                }
+                fail("Something failed to clean up.");
+            }
+        }
+    }
+
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
