@@ -60,7 +60,7 @@ public class DeterminismHash {
     int m_catalogVersion = 0;
     int m_stmtCount = 0;
 
-    final int[] m_hashes = new int[MAX_STATEMENTS_WITH_DETAIL];
+    final int[] m_hashes = new int[MAX_STATEMENTS_WITH_DETAIL * 2 + HEADER_OFFSET];
 
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
     protected final PureJavaCrc32C m_stmtParamCRC = new PureJavaCrc32C();
