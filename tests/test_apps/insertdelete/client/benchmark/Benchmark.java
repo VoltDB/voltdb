@@ -1,34 +1,63 @@
 package benchmark;
 
 import java.util.Random;
+
 import org.voltdb.*;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.*;
 
 public class Benchmark {
 
+    protected final InsertDeleteConfig config;
     private Client client;
     private Random rand = new Random();
     private BenchmarkStats stats;
 
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class InsertDeleteConfig extends CLIConfig {
+        @Option(desc = "Comma separated list of the form server[:port] to connect to database for queries.")
+        String servers = "localhost";
 
-    public Benchmark(String servers) throws Exception {
+        @Option(desc = "If true (default), leave the database empty; otherwise, seed it with data.")
+        boolean empty = true;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "insertdelete.csv";
+    }
+
+    public Benchmark(String[] args, boolean emptyDefault) throws Exception {
+        config = new InsertDeleteConfig();
+        config.empty = emptyDefault;
+        config.parse(Benchmark.class.getName(), args);
+
         client = ClientFactory.createClient();
-        String[] serverArray = servers.split(",");
+        String[] serverArray = config.servers.split(",");
         for (String server : serverArray) {
             client.createConnection(server);
         }
+
         stats = new BenchmarkStats(client);
     }
 
+    public Benchmark(String[] args) throws Exception {
+        this(args, true);
+    }
 
-    public void init() throws Exception {
 
-        // any initial setup can go here
+    public void init(boolean empty, String servers) throws Exception {
+
+        if (!empty) {
+            SeedTables.seedTables(servers);
+        }
 
     }
 
 
-    public void runBenchmark() throws Exception {
+    public void runBenchmark(String statsfile) throws Exception {
 
         stats.startBenchmark();
 
@@ -54,7 +83,7 @@ public class Benchmark {
 
         }
 
-        stats.endBenchmark();
+        stats.endBenchmark(statsfile);
 
         client.drain();
         BenchmarkCallback.printAllResults();
@@ -65,29 +94,9 @@ public class Benchmark {
 
     public static void main(String[] args) throws Exception {
 
-        String serverlist = "localhost";
-        boolean seed = false, client = false;
-        for (int i=0; i < args.length; i++) {
-            String arg = args[i];
-            if ("--servers".equalsIgnoreCase(arg)) {
-                serverlist = args[++i];
-            } else if ("--seed".equalsIgnoreCase(arg)) {
-                seed = true;
-            } else if ("--client".equalsIgnoreCase(arg)) {
-                client = true;
-            } else {
-                System.out.println("Unknown argument: " + arg);
-            }
-        }
-
-        if (seed) {
-            SeedTables.seedTables();
-        }
-        if (client) {
-            Benchmark benchmark = new Benchmark(serverlist);
-            benchmark.init();
-            benchmark.runBenchmark();
-        }
+        Benchmark benchmark = new Benchmark(args);
+        benchmark.init(benchmark.config.empty, benchmark.config.servers);
+        benchmark.runBenchmark(benchmark.config.statsfile);
 
     }
 }

@@ -76,17 +76,17 @@ function client-help() {
 # run the client that drives the example with some editable options
 function client() {
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark --servers $SERVERS --client
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark --servers $SERVERS
 }
 
 function seed() {
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark --servers $SERVERS --seed
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.SeedTables --servers $SERVERS
 }
 
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|jars-ifneeded|server|init|seed|client|client-help|help}"
 }
 
 # Run the targets pass on the command line

@@ -3,16 +3,19 @@ package benchmark;
 import org.voltdb.*;
 import org.voltdb.client.*;
 
+import benchmark.Benchmark.InsertDeleteConfig;
+
 public class SeedTables {
 
-    public static void seedTables() throws Exception {
+    public static void seedTables(String serverList) throws Exception {
 
         /*
          * Instantiate a client and connect to the database.
          */
         org.voltdb.client.Client myApp;
         myApp = ClientFactory.createClient();
-        myApp.createConnection("localhost");
+        String firstServer = serverList.split(",")[0];
+        myApp.createConnection(firstServer);
 
 
         VoltTable p = myApp.callProcedure("@GetPartitionKeys","INTEGER").getResults()[0];
@@ -47,6 +50,8 @@ public class SeedTables {
     }
 
     public static void main(String[] args) throws Exception {
-        seedTables();
+        InsertDeleteConfig config = new InsertDeleteConfig();
+        config.parse(Benchmark.class.getName(), args);
+        seedTables(config.servers);
     }
 }

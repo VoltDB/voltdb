@@ -9,7 +9,6 @@ import org.voltdb.client.*;
 
 public class BenchmarkStats {
 
-    private final InsertDeleteConfig config;
     private Timer timer;
     private Client client;
     private long startTimeMillis;
@@ -17,21 +16,10 @@ public class BenchmarkStats {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
-    /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
-     */
-    static class InsertDeleteConfig extends CLIConfig {
-        @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
-    }
-
     public BenchmarkStats(Client client) {
         this.client = client;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
-        this.config = new InsertDeleteConfig();
 
         // start benchmark
 
@@ -44,10 +32,10 @@ public class BenchmarkStats {
         schedulePeriodicStats();
     }
 
-    public void endBenchmark() throws Exception {
+    public void endBenchmark(String statsfile) throws Exception {
         timer.cancel();
         client.drain();
-        printResults();
+        printResults(statsfile);
     }
 
     public void schedulePeriodicStats() {
@@ -76,7 +64,7 @@ public class BenchmarkStats {
         System.out.printf("\n");
     }
 
-    public synchronized void printResults() throws Exception {
+    public synchronized void printResults(String statsfile) throws Exception {
         final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
@@ -111,6 +99,6 @@ public class BenchmarkStats {
         System.out.println(stats.latencyHistoReport());
 
         // 4. Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+        client.writeSummaryCSV(stats, statsfile);
     }
 }
