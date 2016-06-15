@@ -33,7 +33,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -56,6 +55,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
@@ -138,7 +138,7 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
+    protected final DeterminismHash m_determinismHash = new DeterminismHash();
 
     // running procedure info
     //  - track the current call to voltExecuteSQL for logging progress
@@ -170,8 +170,6 @@ public class ProcedureRunner {
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
-        assert(m_inputCRC.getValue() == 0L);
-
         String language = catProc.getLanguage();
 
         if (language != null && !language.trim().isEmpty()) {
@@ -258,9 +256,6 @@ public class ProcedureRunner {
         assert(m_appStatusString == null);
         assert(m_cachedRNG == null);
 
-        // reset the hash of results
-        m_inputCRC.reset();
-
         // reset batch context info
         m_batchIndex = -1;
 
@@ -272,6 +267,15 @@ public class ProcedureRunner {
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
+
+        // reset the hash of results for a new call
+        if (m_systemProcedureContext != null) {
+            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        }
+        else {
+            m_determinismHash.reset(0);
+        }
+        assert(m_determinismHash.getHashes()[0] == 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -420,15 +424,9 @@ public class ProcedureRunner {
                         m_statusString);
             }
 
-            int hash = (int) m_inputCRC.getValue();
-            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
-                retval.setHash(hash);
-            }
-            if ((m_txnState != null) && // may be null for tests
-                (m_txnState.getInvocation() != null) &&
-                (ProcedureInvocationType.isDeprecatedInternalDRType(m_txnState.getInvocation().getType())))
-            {
-                retval.convertResultsToHashForDeterminism();
+            int[] hashes = m_determinismHash.getHashes();
+            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hashes != null)) {
+                retval.setHashes(hashes);
             }
         }
         finally {
@@ -582,12 +580,12 @@ public class ProcedureRunner {
 
     private void updateCRC(QueuedSQL queuedSQL) {
         if (!queuedSQL.stmt.isReadOnly) {
-            m_inputCRC.update(queuedSQL.stmt.sqlCRC);
+            byte[] serializedParams = null;
             try {
                 ByteBuffer buf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
                 queuedSQL.params.flattenToBuffer(buf);
                 buf.flip();
-                m_inputCRC.update(buf.array());
+                serializedParams = buf.array();
                 queuedSQL.serialization = buf;
             } catch (IOException e) {
                 log.error("Unable to compute CRC of parameters to " +
@@ -596,6 +594,7 @@ public class ProcedureRunner {
                 // presumably, this will fail deterministically at all replicas
                 // just log the error and hope people report it
             }
+            m_determinismHash.offerStatement(queuedSQL.stmt, serializedParams);
         }
     }
 
@@ -614,7 +613,7 @@ public class ProcedureRunner {
         if (log.isDebugEnabled()) {
             if (!queuedSQL.stmt.isReadOnly) {
                 log.debug("voltQueueSQL receives " + queuedSQL.stmt.getText() + " " + queuedSQL.params.toString() +
-                        " txnid: " + m_txnState.txnId + ", hash: " + (int)m_inputCRC.getValue() );
+                        " txnid: " + m_txnState.txnId + ", hash: " + stmt.sqlCRC );
             }
         }
     }

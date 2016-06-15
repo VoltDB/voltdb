@@ -43,8 +43,10 @@ public class DuplicateCounter
 
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
+    static final int[] ZERO_HASHES = new int[] { 0, 0, 0 };
+
     final long m_destinationId;
-    Long m_responseHash = null;
+    int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
     final List<Long> m_expectedHSIds;
@@ -78,13 +80,13 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismatchInformation(long hash, VoltMessage recentMessage) {
+    void logRelevantMismatchInformation(int[] hashes, VoltMessage recentMessage) {
         String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
                 + "CURR REsPONSE MESSAGE: %s\n",
-                hash,
-                m_responseHash,
+                m_responseHashes[0],
+                hashes[0],
                 m_openMessage.toString(),
                 m_lastResponse.toString(),
                 recentMessage.toString());
@@ -128,17 +130,17 @@ public class DuplicateCounter
         return "UNKNOWN_PROCEDURE_NAME";
     }
 
-    protected int checkCommon(long hash, boolean rejoining, VoltTable resultTables[], VoltMessage message)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message)
     {
         if (!rejoining) {
-            if (m_responseHash == null) {
-                m_responseHash = Long.valueOf(hash);
+            if (m_responseHashes == null) {
+                m_responseHashes = hashes;
             }
-            else if (!m_responseHash.equals(hash)) {
+            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation(hash, message);
+                logRelevantMismatchInformation(hashes, message);
                 return MISMATCH;
             }
             m_lastResponse = message;
@@ -169,17 +171,16 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = 0;
-        Integer sqlHash = r.getHash();
-        if (sqlHash != null) {
-            hash = sqlHash.intValue();
+        int[] hashes = r.getHashes();
+        if (hashes == null) {
+            hashes = ZERO_HASHES;
         }
-        return checkCommon(hash, message.isRecovering(), r.getResults(), message);
+        return checkCommon(hashes, message.isRecovering(), r.getResults(), message);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), null, message);
+        return checkCommon(null, message.isRecovering(), null, message);
     }
 
     VoltMessage getLastResponse()
