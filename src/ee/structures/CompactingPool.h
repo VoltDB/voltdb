@@ -75,27 +75,6 @@ class CompactingPool
         return result->m_data;
     }
 
-    void free(void* element)
-    {
-        Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
-        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
-        if (last != vacated) {
-            // Notify last's referrer that it is about to relocate
-            // to the location vacated by element.
-            // Use relative addresses to maintain the same byte offset between
-            // *(last->m_referringPtr) and its referent.
-            // This allows layered allocators to have injected their own header
-            // structures between the start of the Relocatable's m_data and the
-            // address that the top allocator returned to its caller to store
-            // and use for its own data.
-            *(last->m_referringPtr) += (vacated->m_data - last->m_data);
-            // copy the last entry into the newly vacated spot
-            memcpy(vacated, last, m_allocator.allocationSize());
-        }
-        // retire the last entry.
-        m_allocator.trim();
-    }
-
     /**
      * Put this pointer to allocated data in a set of items
      * that will be freed when client calls freePendingAllocations().
@@ -174,6 +153,27 @@ class CompactingPool
         }
 
         return m_allocationsPendingRelease.empty();
+    }
+
+    void free(void* element)
+    {
+        Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
+        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+        if (last != vacated) {
+            // Notify last's referrer that it is about to relocate
+            // to the location vacated by element.
+            // Use relative addresses to maintain the same byte offset between
+            // *(last->m_referringPtr) and its referent.
+            // This allows layered allocators to have injected their own header
+            // structures between the start of the Relocatable's m_data and the
+            // address that the top allocator returned to its caller to store
+            // and use for its own data.
+            *(last->m_referringPtr) += (vacated->m_data - last->m_data);
+            // copy the last entry into the newly vacated spot
+            memcpy(vacated, last, m_allocator.allocationSize());
+        }
+        // retire the last entry.
+        m_allocator.trim();
     }
 
     ContiguousAllocator m_allocator;

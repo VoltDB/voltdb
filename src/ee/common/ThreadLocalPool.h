@@ -35,21 +35,10 @@ public:
     ~ThreadLocalPool();
 
     /**
-     * Put relocatable allocations (non-inlined table data) into
-     * "deferred release mode" which means that calls to free will
-     * mark allocations for release, but will not release them until a
-     * call is mode to enableImmediateReleaseMode().
-     *
-     * The advantage of doing this is that we can release many items
-     * at once, and avoid some of the overhead of compacting.
-     */
-    static void enableDeferredReleaseMode();
-
-    /**
      * Releases all allocations that are pending release, and returns
      * to normal, "immediate release" mode.
      */
-    static void enableImmediateReleaseMode();
+    static void releaseAllFreedRelocatables();
 
     /// The layout of an allocation segregated by size,
     /// including overhead to help identify the size-specific

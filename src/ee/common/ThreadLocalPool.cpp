@@ -48,7 +48,6 @@ const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
  */
 static pthread_key_t m_key;
 static pthread_key_t m_stringKey;
-static pthread_key_t m_releaseModeKey;
 /**
  * Thread local key for storing integer value of amount of memory allocated
  */
@@ -64,14 +63,10 @@ typedef PairType* PairTypePtr;
 
 typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
 
-static const bool IMMEDIATE_RELEASE = false;
-static const bool DEFERRED_RELEASE = true;
-
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
     (void)pthread_key_create( &m_stringKey, NULL);
     (void)pthread_key_create( &m_keyAllocated, NULL);
-    (void)pthread_key_create( &m_releaseModeKey, NULL);
 }
 
 ThreadLocalPool::ThreadLocalPool() {
@@ -82,7 +77,6 @@ ThreadLocalPool::ThreadLocalPool() {
                 new PairType(
                         1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
-        pthread_setspecific(m_releaseModeKey, static_cast<const void*>(&IMMEDIATE_RELEASE));
     } else {
         PairTypePtr p =
                 static_cast<PairTypePtr>(pthread_getspecific(m_key));
@@ -103,7 +97,6 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific(m_stringKey, NULL);
             delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
             pthread_setspecific( m_keyAllocated, NULL);
-            pthread_setspecific( m_releaseModeKey, NULL);
         } else {
             pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
         }
@@ -111,27 +104,6 @@ ThreadLocalPool::~ThreadLocalPool() {
     }
 }
 
-static CompactingStringStorage& getStringPoolMap()
-{
-    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
-}
-
-void ThreadLocalPool::enableDeferredReleaseMode() {
-    pthread_setspecific(m_releaseModeKey, &DEFERRED_RELEASE);
-}
-
-void ThreadLocalPool::enableImmediateReleaseMode() {
-    auto& poolMap = getStringPoolMap();
-    BOOST_FOREACH(auto entry, poolMap) {
-        entry.second->freePendingAllocations();
-    }
-    pthread_setspecific(m_releaseModeKey, &IMMEDIATE_RELEASE);
-}
-
-static bool isDeferredReleaseMode() {
-    bool* v = static_cast<bool*>(pthread_getspecific(m_releaseModeKey));
-    return *v == DEFERRED_RELEASE;
-}
 static int32_t getAllocationSizeForObject(int length)
 {
     static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
@@ -194,18 +166,21 @@ int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
 
 void ThreadLocalPool::freeRelocatable(Sized* data)
 {
-    // Following line exists just to silence warnings about "unused
-    // function" in memcheck build.
-    (void) isDeferredReleaseMode();
     delete [] reinterpret_cast<char*>(data);
+}
+
+void ThreadLocalPool::releaseAllFreedRelocatables() {
 }
 
 #else // not MEMCHECK
 
+static CompactingStringStorage& getStringPoolMap()
+{
+    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+}
+
 ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
 {
-    assert(! isDeferredReleaseMode());
-
     // The size provided to this function determines the
     // approximate-size-specific pool selection. It gets
     // reflected (after rounding and padding) in the size
@@ -263,12 +238,13 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
                             alloc_size);
     }
 
-    if (! isDeferredReleaseMode()) {
-        // Free the raw allocation from the found pool.
-        iter->second->free(sized);
-    }
-    else {
-        iter->second->markAllocationAsPendingRelease(sized);
+    iter->second->markAllocationAsPendingRelease(sized);
+}
+
+void ThreadLocalPool::releaseAllFreedRelocatables() {
+    auto& poolMap = getStringPoolMap();
+    BOOST_FOREACH(auto entry, poolMap) {
+        entry.second->freePendingAllocations();
     }
 }
 
