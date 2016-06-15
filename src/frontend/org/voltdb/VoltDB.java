@@ -760,7 +760,12 @@ public class VoltDB {
             }
             if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
                 isValid = false;
-                hostLog.fatal("seed hosts are missing");
+                hostLog.fatal("Coordinator hosts are missing");
+            }
+
+            if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
+                isValid = false;
+                hostLog.fatal("Option hostcount may only be specified when the start action is probe");
             }
             return isValid;
         }

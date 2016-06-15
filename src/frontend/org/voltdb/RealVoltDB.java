@@ -1936,7 +1936,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (changed.isPresent()) {
                     deploymentBytes = changed.get();
                 }
-            } else if (config.m_hostCount == VoltDB.UNDEFINED) {
+            } else {
                 config.m_hostCount = deployment.getCluster().getHostcount();
             }
             /*
