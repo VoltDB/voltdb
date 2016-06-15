@@ -61,8 +61,6 @@
 
 package org.voltcore.network;
 
-import io.netty_voltpatches.NinjaKeySet;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousCloseException;
@@ -83,12 +81,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jsr166y.ThreadLocalRandom;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
+
+import io.netty_voltpatches.NinjaKeySet;
+import jsr166y.ThreadLocalRandom;
 
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable, IOStatsIntf

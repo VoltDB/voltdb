@@ -17,6 +17,8 @@
 
 package org.voltcore.utils;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.voltcore.logging.VoltLogger;
 
 public class EstTimeUpdater {
@@ -28,11 +30,12 @@ public class EstTimeUpdater {
     public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
 
     public static volatile boolean pause = false;
+    private static final AtomicBoolean m_updaterContinue = new AtomicBoolean(true);
 
     private static final Thread updater = new Thread("Estimated Time Updater") {
         @Override
         public void run() {
-            while (true) {
+            while (m_updaterContinue.get()) {
                 try {
                     Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
                 } catch (InterruptedException e) {}
@@ -48,6 +51,10 @@ public class EstTimeUpdater {
     static {
         updater.setDaemon(true);
         updater.start();
+    }
+
+    public static void stop() {
+        m_updaterContinue.set(false);
     }
 
     /**

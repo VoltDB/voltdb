@@ -82,6 +82,8 @@ public class VoltNetworkPool {
         for (VoltNetwork vn : m_networks) {
             vn.shutdown();
         }
+        // end "Reverse DNS lookups" thread before shutdown
+        ReverseDNSCache.m_es.shutdown();
     }
 
     public Connection registerChannel(

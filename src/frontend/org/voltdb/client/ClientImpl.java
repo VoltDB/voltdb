@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -572,6 +573,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         m_distributer.shutdown();
+        VoltLogger.shutdownAsynchronousLogging();
     }
 
     @Override
