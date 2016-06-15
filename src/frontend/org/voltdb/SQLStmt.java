@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import java.nio.ByteBuffer;
-
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.ActivePlanRepository;
@@ -54,7 +52,7 @@ public class SQLStmt {
     String sqlTextStr;
     String joinOrder;
     // hash of the SQL string for determinism checks
-    byte[] sqlCRC;
+    int sqlCRC;
 
     byte statementParamJavaTypes[];
 
@@ -87,7 +85,7 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(sqlText.getBytes(Constants.UTF8ENCODING), joinOrder);
+        this(canonicalizeStmt(sqlText).getBytes(Constants.UTF8ENCODING), joinOrder);
     }
 
     /**
@@ -100,8 +98,7 @@ public class SQLStmt {
         // create a hash for determinism purposes
         PureJavaCrc32C crc = new PureJavaCrc32C();
         crc.update(sqlText);
-        // ugly hack to get bytes from an int
-        this.sqlCRC = ByteBuffer.allocate(4).putInt((int) crc.getValue()).array();
+        this.sqlCRC = (int) crc.getValue();
 
         inCatalog = true;
     }
@@ -206,5 +203,19 @@ public class SQLStmt {
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    // In SQL statement the input without ending with a semicolon is legitimate,
+    // however in order to do a reverse look up (crc -> sql str), we'd like to
+    // use the same statement to compute crc.
+    private static String canonicalizeStmt(String stmtStr) {
+        // Cleanup whitespace newlines and adding semicolon for catalog compatibility
+        stmtStr = stmtStr.replaceAll("\n", " ");
+        stmtStr = stmtStr.trim();
+
+        if (!stmtStr.endsWith(";")) {
+            stmtStr += ";";
+        }
+        return stmtStr;
     }
 }
