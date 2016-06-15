@@ -721,7 +721,11 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         }
         default:
-            sb.append(nodes[0].getSQL());
+        	// If this is a nullary function, we don't want to
+        	// crash here.
+        	if (0 < nodes.length) {
+        		sb.append(nodes[0].getSQL());
+        	}
             break;
         }
         for (int ii = 1; ii < nodes.length; ii++) {

@@ -1,7 +1,6 @@
 {
    stlvector
    Memcheck:Leak
-   match-leak-kinds: reachable
    fun:malloc
    obj:/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.22
    fun:call_init.part.0
