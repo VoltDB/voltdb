@@ -50,6 +50,9 @@ public:
     /** truncate stream back to mark */
     virtual void rollbackTo(size_t mark, size_t drRowCost);
 
+    virtual void periodicFlush(int64_t timeInMillis,
+                       int64_t lastComittedSpHandle);
+
     virtual void setSecondaryCapacity(size_t capacity);
 
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
@@ -85,12 +88,14 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId) = 0;
 
-    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId) = 0;
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId) = 0;
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId) = 0;
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) = 0;
+
+    void handleOpenTransaction(StreamBlock *oldBlock);
 
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() = 0;
 
@@ -98,7 +103,15 @@ public:
                                  int64_t uniqueId, ByteArray payloads) = 0;
 
     bool m_enabled;
+    bool m_guarded; // strongest guard, reject all actions for DRTupleStream
+
+    int64_t m_openSequenceNumber;
+    int64_t m_committedSequenceNumber;
 protected:
+    virtual void openTransactionCommon(int64_t spHandle, int64_t uniqueId);
+
+    virtual void commitTransactionCommon();
+
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     int64_t m_rowTarget;
@@ -109,31 +122,32 @@ protected:
 class DRTupleStreamDisableGuard {
 public:
     DRTupleStreamDisableGuard(ExecutorContext *ec, bool ignore) :
-            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
         if (!ignore) {
             setGuard();
         }
     }
     DRTupleStreamDisableGuard(ExecutorContext *ec) :
-            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
-            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_guarded),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_guarded:true)
     {
         setGuard();
     }
     ~DRTupleStreamDisableGuard() {
-        m_drStream->m_enabled = m_drStreamOldValue;
+        m_drStream->m_guarded = m_drStreamOldValue;
         if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = m_drReplicatedStreamOldValue;
+            m_drReplicatedStream->m_guarded = m_drReplicatedStreamOldValue;
         }
     }
 
 private:
-    inline void setGuard() {
-        m_drStream->m_enabled = false;
+    inline void setGuard()
+    {
+        m_drStream->m_guarded = true;
         if (m_drReplicatedStream) {
-            m_drReplicatedStream->m_enabled = false;
+            m_drReplicatedStream->m_guarded = true;
         }
     }
 
