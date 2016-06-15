@@ -115,7 +115,13 @@ abstract public class ProcedureTask extends TransactionTask
                 // execute the procedure
                 cr = runner.call(callerParams);
 
-                m_txnState.setHash(cr.getHash());
+                // pass in the first value in the hashes array if it's not null
+                Integer hash = null;
+                int[] hashes = cr.getHashes();
+                if (hashes != null && hashes.length > 0) {
+                    hash = hashes[0];
+                }
+                m_txnState.setHash(hash);
                 //Don't pay the cost of returning the result tables for a replicated write
                 //With reads don't apply the optimization just in case
                 //                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {

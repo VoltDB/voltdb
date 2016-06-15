@@ -62,13 +62,13 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTrace;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -760,7 +760,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             String finalTraceName = traceName;
             if (traceLog != null) {
                 traceLog.add(() -> VoltTrace.endAsync(finalTraceName, MiscUtils.hsIdPairTxnIdToString(m_mailbox.getHSId(), message.m_sourceHSId, message.getSpHandle(), message.getClientInterfaceHandle()),
-                                                      "hash", message.getClientResponseData().getHash()));
+                                                      "hash", message.getClientResponseData().getHashes()[0]));
             }
 
             int result = counter.offer(message);

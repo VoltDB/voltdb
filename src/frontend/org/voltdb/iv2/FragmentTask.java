@@ -28,6 +28,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SQLStmt;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -324,8 +325,8 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        new boolean[] { false },    // FragmentTasks don't generate statement hashes
                         null,
+                        new SQLStmt[] { null },  // FragmentTasks don't generate statement hashes
                         stmtText == null ? null : new String[] { stmtText },
                         m_txnState.txnId,
                         m_txnState.m_spHandle,

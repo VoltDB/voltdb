@@ -26,6 +26,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
 
@@ -113,8 +114,8 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
-            boolean[] isWriteFrag,
-            HybridCrc32 writeCRC,
+            DeterminismHash determinismHash,
+            SQLStmt[] stmts,
             String[] sqlTexts,
             long txnId,
             long spHandle,

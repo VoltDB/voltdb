@@ -992,7 +992,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             clientResponse.setClientHandle(clientData.m_clientHandle);
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
-            clientResponse.setHash(null); // not part of wire protocol
+            clientResponse.setHashes(null); // not part of wire protocol
 
             return clientResponse.getSerializedSize() + 4;
         }

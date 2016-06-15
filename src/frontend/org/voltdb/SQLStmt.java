@@ -213,4 +213,13 @@ public class SQLStmt {
     public String getJoinOrder() {
         return joinOrder;
     }
+
+    /**
+     * Is this a read only statement?
+     *
+     * @return true if it's read only, false otherwise
+     */
+    public boolean isReadOnly() {
+        return isReadOnly();
+    }
 }

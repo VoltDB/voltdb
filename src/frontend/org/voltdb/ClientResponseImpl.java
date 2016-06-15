@@ -43,7 +43,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
-    private Integer m_hash = null;
+    private int[] m_hashes = null;
 
     private int clusterRoundTripTime = 0;
     private int clientRoundTripTime = 0;
@@ -109,8 +109,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this.setProperly = true;
     }
 
-    public void setHash(Integer hash) {
-        m_hash = hash;
+    public void setHashes(int[] hashes) {
+        m_hashes = hashes;
     }
 
     @Override
@@ -140,8 +140,8 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return clientHandle;
     }
 
-    public Integer getHash() {
-        return m_hash;
+    public int[] getHashes() {
+        return m_hashes;
     }
 
     public void initFromBuffer(ByteBuffer buf) throws IOException {
@@ -165,9 +165,13 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             throw new RuntimeException("Use of deprecated exception in Client Response serialization.");
         }
         if ((presentFields & (1 << 4)) != 0) {
-            m_hash = buf.getInt();
+            int hashArrayLen = buf.getShort();
+            m_hashes = new int[hashArrayLen];
+            for (int i = 0; i < hashArrayLen; ++i) {
+                m_hashes[i] = buf.getInt();
+            }
         } else {
-            m_hash = null;
+            m_hashes = null;
         }
         int tableCount = buf.getShort();
         if (tableCount < 0) {
@@ -203,8 +207,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             encodedStatusString = statusString.getBytes(Constants.UTF8ENCODING);
             msgsize += encodedStatusString.length + 4;
         }
-        if (m_hash != null) {
-            msgsize += 4;
+        if (m_hashes != null) {
+            msgsize += 2; // short array len
+            msgsize += m_hashes.length * 4; // array of ints
         }
         for (VoltTable vt : results) {
             msgsize += vt.getSerializedSize();
@@ -227,7 +232,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
-        if (m_hash != null) {
+        if (m_hashes != null) {
             presentFields |= 1 << 4;
         }
         buf.put(presentFields);
@@ -242,8 +247,12 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             buf.put(encodedAppStatusString);
         }
         buf.putInt(clusterRoundTripTime);
-        if (m_hash != null) {
-            buf.putInt(m_hash.intValue());
+        if (m_hashes != null) {
+            assert(m_hashes.length <= Short.MAX_VALUE) : "CRI hash array length overflow";
+            buf.putShort((short) m_hashes.length);
+            for (int hash : m_hashes) {
+                buf.putInt(hash);
+            }
         }
         buf.putShort((short) results.length);
         for (VoltTable vt : results)
@@ -335,23 +344,6 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             e.printStackTrace();
             return 0;
         }
-    }
-
-    /**
-     * Take the perfectly good results and convert them to a single long value
-     * that stores the hash for determinism.
-     *
-     * This presumes the DR agent has no need for results. This probably saves
-     * some small amount of bandwidth. The other proposed idea was using the status
-     * string to hold the sql hash. Tossup... this seemed slightly more performant,
-     * but also a bit icky.
-     */
-    public void convertResultsToHashForDeterminism() {
-        int hash = m_hash == null ? 0 : m_hash;
-
-        VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.INTEGER));
-        t.addRow(hash);
-        results = new VoltTable[] { t };
     }
 
     public void dropResultTable() {

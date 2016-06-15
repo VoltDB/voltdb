@@ -53,6 +53,7 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -64,9 +65,9 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
-import org.voltdb.utils.VoltTrace;
 
 public class ProcedureRunner {
 
@@ -140,7 +141,7 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected final HybridCrc32 m_inputCRC = new HybridCrc32();
+    protected final DeterminismHash m_determinismHash = new DeterminismHash();
 
     // running procedure info
     //  - track the current call to voltExecuteSQL for logging progress
@@ -169,8 +170,6 @@ public class ProcedureRunner {
                     SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
-
-        assert(m_inputCRC.getValue() == 0L);
         if (catProc.getHasjava() == false) {
             m_procedureName = catProc.getTypeName().intern();
         } else {
@@ -333,9 +332,6 @@ public class ProcedureRunner {
         assert(m_appStatusString == null);
         assert(m_cachedRNG == null);
 
-        // reset the hash of results
-        m_inputCRC.reset();
-
         // reset batch context info
         m_batchIndex = -1;
 
@@ -347,6 +343,10 @@ public class ProcedureRunner {
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
+
+        // reset the hash of results for a new call
+        m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        assert(m_determinismHash.getHeader()[0] == 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -482,9 +482,9 @@ public class ProcedureRunner {
                         m_statusString);
             }
 
-            int hash = (int) m_inputCRC.getValue();
-            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
-                retval.setHash(hash);
+            int[] hashes = m_determinismHash.get();
+            if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hashes != null)) {
+                retval.setHashes(hashes);
             }
         }
         finally {
@@ -646,12 +646,6 @@ public class ProcedureRunner {
         return m_site.getCorrespondingClusterId();
     }
 
-    private void updateCRC(QueuedSQL queuedSQL) {
-        if (!queuedSQL.stmt.isReadOnly) {
-            m_inputCRC.update(queuedSQL.stmt.sqlCRC);
-        }
-    }
-
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
@@ -661,8 +655,14 @@ public class ProcedureRunner {
         queuedSQL.params = getCleanParams(stmt, true, args);
         queuedSQL.stmt = stmt;
 
-        updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
+
+        if (log.isDebugEnabled()) {
+            if (!queuedSQL.stmt.isReadOnly) {
+                log.debug("voltQueueSQL receives " + queuedSQL.stmt.getText() + " " + queuedSQL.params.toString() +
+                        " txnid: " + m_txnState.txnId + ", hash: " + stmt.sqlCRC );
+            }
+        }
     }
 
     public void voltQueueSQL(final String sql, Object... args) {
@@ -736,7 +736,6 @@ public class ProcedureRunner {
             }
             queuedSQL.params = getCleanParams(queuedSQL.stmt, false, argumentParams);
 
-            updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
         }
         catch (Exception e) {
@@ -1616,9 +1615,9 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
+       SQLStmt[] stmts = new SQLStmt[batchSize];
        String[] sqlTexts = new String[batchSize];
        int succeededFragmentsCount = 0;
-       boolean[] isWriteFrag = new boolean[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1626,8 +1625,9 @@ public class ProcedureRunner {
            fragmentIds[i] = qs.stmt.aggregator.id;
            // use the pre-serialized params if it exists
            params[i] = qs.params;
+           stmts[i] = qs.stmt;
+           // to save a for loop in executePlanFragments()
            sqlTexts[i] = qs.stmt.getText();
-           isWriteFrag[i] = !qs.stmt.isReadOnly;
            i++;
        }
 
@@ -1640,8 +1640,8 @@ public class ProcedureRunner {
                    fragmentIds,
                    null,
                    params,
-                   isWriteFrag,
-                   m_inputCRC,
+                   m_determinismHash,
+                   stmts,
                    sqlTexts,
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
