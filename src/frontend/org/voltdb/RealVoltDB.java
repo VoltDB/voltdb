@@ -2169,7 +2169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.criteria = criteria;
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, (m_config.m_startAction != StartAction.INITIALIZE));
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 

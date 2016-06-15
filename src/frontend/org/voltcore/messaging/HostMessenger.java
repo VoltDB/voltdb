@@ -339,7 +339,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param membershipAcceptor
      * @param m_hostWatcher
      */
-    public HostMessenger(Config config, HostWatcher hostWatcher) {
+    public HostMessenger(Config config, HostWatcher hostWatcher, final boolean crashMessage) {
         m_config = config;
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
@@ -361,7 +361,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // a random network thread which is already shutting down and we'll get delicious
         // deadlocks.  Take the coward's way out and just don't do this if we're already
         // crashing (read as: I refuse to hunt for more shutdown deadlocks).
-        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, new Runnable() {
+        ShutdownHooks.registerShutdownHook(ShutdownHooks.MIDDLE, false, crashMessage, new Runnable() {
             @Override
             public void run()
             {

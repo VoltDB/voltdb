@@ -54,6 +54,7 @@ public class ShutdownHooks
     }
 
     private static final ShutdownHooks m_instance = new ShutdownHooks();
+    private static boolean m_crashMessage = false;
 
     /**
      * Register an action to be run when the JVM exits.
@@ -62,9 +63,10 @@ public class ShutdownHooks
      *                    due to a call to crashVoltDB()
      * @param action   A Runnable containing the action to be run on shutdown.
      */
-    public static void registerShutdownHook(int priority, boolean runOnCrash, Runnable action)
+    public static void registerShutdownHook(int priority, boolean runOnCrash, boolean crashMessage, Runnable action)
     {
         m_instance.addHook(priority, runOnCrash, action);
+        ShutdownHooks.m_crashMessage = crashMessage;
     }
 
     /**
@@ -125,7 +127,7 @@ public class ShutdownHooks
 
     private synchronized void runHooks()
     {
-        if (m_iAmAServer && !m_crashing) {
+        if (m_iAmAServer && !m_crashing && ShutdownHooks.m_crashMessage) {
             new VoltLogger("CONSOLE").warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
