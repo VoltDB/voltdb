@@ -19,6 +19,12 @@ public class Benchmark {
      * and validation.
      */
     static class InsertDeleteConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        int displayinterval = 5;
+
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 300;
+
         @Option(desc = "Comma separated list of the form server[:port] to connect to database for queries.")
         String servers = "localhost";
 
@@ -27,6 +33,14 @@ public class Benchmark {
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "insertdelete.csv";
+
+        @Override
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (servers.length() == 0) servers = "localhost";
+            if (statsfile.length() == 0) statsfile = "insertdelete.csv";
+        }
     }
 
     public Benchmark(String[] args, boolean emptyDefault) throws Exception {
@@ -48,20 +62,21 @@ public class Benchmark {
     }
 
 
-    public void init(boolean empty, String servers) throws Exception {
+    public void init() throws Exception {
 
-        if (!empty) {
-            SeedTables.seedTables(servers);
+        if (!config.empty) {
+            SeedTables.seedTables(config.servers);
         }
 
     }
 
 
-    public void runBenchmark(String statsfile) throws Exception {
+    public void runBenchmark() throws Exception {
 
-        stats.startBenchmark();
+        stats.startBenchmark(config.displayinterval);
 
-        for (int i=0; i<1000000; i++) {
+        final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
+        while (benchmarkEndTime > System.currentTimeMillis()) {
 
             int appid = rand.nextInt(50);
             int deviceid = rand.nextInt(1000000)+500; // add 500 to avoid low values that may be used for seed data
@@ -83,7 +98,7 @@ public class Benchmark {
 
         }
 
-        stats.endBenchmark(statsfile);
+        stats.endBenchmark(config.statsfile);
 
         client.drain();
         BenchmarkCallback.printAllResults();
@@ -95,8 +110,8 @@ public class Benchmark {
     public static void main(String[] args) throws Exception {
 
         Benchmark benchmark = new Benchmark(args);
-        benchmark.init(benchmark.config.empty, benchmark.config.servers);
-        benchmark.runBenchmark(benchmark.config.statsfile);
+        benchmark.init();
+        benchmark.runBenchmark();
 
     }
 }

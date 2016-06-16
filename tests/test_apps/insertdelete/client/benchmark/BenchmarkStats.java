@@ -25,11 +25,11 @@ public class BenchmarkStats {
 
     }
 
-    public void startBenchmark() {
+    public void startBenchmark(int displayIntervalInSeconds) {
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
         startTimeMillis = System.currentTimeMillis();
-        schedulePeriodicStats();
+        schedulePeriodicStats(displayIntervalInSeconds);
     }
 
     public void endBenchmark(String statsfile) throws Exception {
@@ -38,15 +38,15 @@ public class BenchmarkStats {
         printResults(statsfile);
     }
 
-    public void schedulePeriodicStats() {
+    public void schedulePeriodicStats(int displayIntervalInSeconds) {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
                 @Override
                 public void run() { printStatistics(); }
             };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  5 * 1000,
-                                  5 * 1000);
+                displayIntervalInSeconds * 1000,
+                displayIntervalInSeconds * 1000);
     }
 
     public synchronized void printStatistics() {
