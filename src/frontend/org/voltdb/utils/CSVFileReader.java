@@ -101,7 +101,8 @@ class CSVFileReader implements Runnable {
         //if header option is true, check whether csv first line is valid
         if (m_config.header) {
             if (!checkHeader()) {
-                m_log.error("CSV file '" + m_config.file + "' header does not match the table");
+                m_log.error("In the CSV file " + m_config.file + ", the header "+ m_listReader.getUntokenizedRow() +" does not match "
+                        + "an existing column in the table " + m_config.table + ".");
                 System.exit(-1);
             }
         }
