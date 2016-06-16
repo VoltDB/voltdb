@@ -587,25 +587,13 @@ function alertNodeClicked(obj) {
                 alert("Error: Unable to extract cluster health information.");
                 return;
             }
-
-            if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
-                if (totalServerCount == 0) {
-                    totalServerCount = activeCount + joiningCount;
-                }
-
-                if (activeCount == activeCountCopied) {
-                    activeCount--;
-                }
-
-                missingCount = totalServerCount - (activeCount + joiningCount);
-                adminClusterObjects.ignoreServerListUpdateCount--;
-
-            }
-            else {
+            var hostCount =  0
+            VoltDBService.GetSystemInformationDeployment(function(connection){
                 activeCount = 0;
                 joiningCount = 0;
                 missingCount = 0;
                 alertCount = 0;
+                hostCount = getHostCount(connection.Metadata['@SystemInformation_DEPLOYMENT'])
 
                 jQuery.each(systemOverview, function (id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
@@ -615,46 +603,53 @@ function alertNodeClicked(obj) {
                     //    joiningCount++;
                 });
 
-                if (totalServerCount == 0) {
-                    totalServerCount = activeCount + joiningCount;
-                }
+                totalServerCount = hostCount
 
                 missingCount = totalServerCount - (activeCount + joiningCount);
-                activeCountCopied = activeCount;
 
-            }
+                if (missingCount < 0)
+                    missingCount = 0;
 
-            if (missingCount < 0)
-                missingCount = 0;
+                var html =
+                    '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
+                        '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
+                        '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
-            var html =
-                '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
-                    '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
-                    '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
+                var alertHtml = "";
 
-            var alertHtml = "";
+                jQuery.each(systemOverview, function(id, val) {
+                    var hostName;
+                    var hostIp;
+                    hostName = val["HOSTNAME"];
+                    hostIp = val["IPADDRESS"];
+                    var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
+                    if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
+                        alertHtml += '<tr><td class="active alertAlign"  width="40%"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
+                            '<td width="30%">' + hostIp + '</td>' +
+                            '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
+                        alertCount++;
+                    }
 
-            
-            jQuery.each(systemOverview, function(id, val) {
-                var hostName;
-                var hostIp;
-                hostName = val["HOSTNAME"];
-                hostIp = val["IPADDRESS"];
-                var threshold = VoltDbUI.getCookie("alert-threshold") != undefined ? VoltDbUI.getCookie("alert-threshold") : 70;
-                if (systemMemory[hostName]["MEMORYUSAGE"] >= threshold) {
-                    alertHtml += '<tr><td class="active alertAlign"  width="40%"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick="alertNodeClicked(this);" href="#">' + hostName + '</a> </td>' +
-                        '<td width="30%">' + hostIp + '</td>' +
-                        '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
-                    alertCount++;
+                });
+                if (alertCount > 0) {
+                    html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
                 }
 
-            });
-            if (alertCount > 0) {
-                html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
-            }
+                callback(html, alertHtml);
+            })
 
-            callback(html, alertHtml);
         };
+
+        var getHostCount = function(deploymentInfo){
+            var hostCount = 0;
+            if(deploymentInfo != undefined && !$.isEmptyObject(deploymentInfo.data)){
+                deploymentInfo.data.forEach(function (entry) {
+                    if (entry[0] == 'hostcount')
+                        hostCount = entry[1];
+                });
+            }
+            return hostCount;
+        }
 
         var configureRequestedHost = function (hostName) {
             $.each(systemOverview, function (id, val) {
