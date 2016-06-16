@@ -272,7 +272,8 @@ public class VoltFile extends File {
             else {
                 int offset = pathname.indexOf(m_magic) + m_magic.length();
                 String relativePath = pathname.substring(offset);
-                // The this is probably a snapshot path and needs to be re-mapped to our snapshot dir
+                // The this is probably a snapshot path and needs to be re-mapped to our snapshot
+                // directory because truncation snapshot requests specify absolute paths
                 return m_voltFilePrefix.getAbsolutePath() + relativePath;
             }
         }
