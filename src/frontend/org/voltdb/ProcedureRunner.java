@@ -269,7 +269,12 @@ public class ProcedureRunner {
         Object[] paramList = paramListIn;
 
         // reset the hash of results for a new call
-        m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        if (m_systemProcedureContext != null) {
+            m_determinismHash.reset(m_systemProcedureContext.getCatalogVersion());
+        }
+        else {
+            m_determinismHash.reset(0);
+        }
         assert(m_determinismHash.getHashes()[0] == 0);
 
         ClientResponseImpl retval = null;
