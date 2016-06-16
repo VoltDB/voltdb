@@ -45,7 +45,7 @@ public class ServerThread extends Thread {
         if (m_config.m_leader == null) {
             m_config.m_leader = "";
         }
-        if (m_config.m_coordinators == null) {
+        if (m_config.m_coordinators == null || m_config.m_coordinators.isEmpty()) {
             m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         }
 
