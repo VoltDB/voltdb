@@ -217,7 +217,7 @@ CTX.INPUT['catalog'] = """
  planfragment.cpp
  statement.cpp
  table.cpp
- viewtrigger.cpp
+ tableref.cpp
 """
 
 CTX.INPUT['structures'] = """
