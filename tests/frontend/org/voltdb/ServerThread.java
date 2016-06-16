@@ -26,6 +26,7 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltcore.messaging.JoinerCriteria;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.utils.MiscUtils;
 
@@ -43,6 +44,9 @@ public class ServerThread extends Thread {
         }
         if (m_config.m_leader == null) {
             m_config.m_leader = "";
+        }
+        if (m_config.m_coordinators == null) {
+            m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         }
 
         if (!m_config.validate()) {
@@ -64,6 +68,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
@@ -83,6 +88,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = "";
+        m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         VoltDB.instance().setMode(OperationMode.INITIALIZING);
 
 
@@ -120,6 +126,7 @@ public class ServerThread extends Thread {
             m_config.m_pathToLicense = getTestLicensePath();
         }
         m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
+        m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         m_config.m_internalPort = internalPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
         VoltDB.instance().setMode(OperationMode.INITIALIZING);

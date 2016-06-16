@@ -414,11 +414,12 @@ public class VoltDB {
                     }
                     m_meshBrokers = sbld.toString();
                 } else if (arg.startsWith("mesh ")) {
+                    int next = i + 1;
                     StringBuilder sbld = new StringBuilder(64).append(arg.substring("mesh ".length()));
                     while ((++i < args.length && args[i].endsWith(",")) || (i+1 < args.length && args[i+1].startsWith(","))) {
                         sbld.append(args[i]);
                     }
-                    if (i < args.length) {
+                    if (i > next && i < args.length) {
                         sbld.append(args[i]);
                     }
                     m_meshBrokers = sbld.toString();
@@ -637,7 +638,7 @@ public class VoltDB {
                     m_leader = m_coordinators.first();
                 }
             }
-            if (m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
+            if (m_startAction == StartAction.PROBE && m_hostCount == UNDEFINED && m_coordinators.size() > 1) {
                 m_hostCount = m_coordinators.size();
             }
         }

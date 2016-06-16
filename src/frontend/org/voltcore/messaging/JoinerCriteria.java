@@ -48,7 +48,10 @@ public class JoinerCriteria {
     public static ImmutableSortedSet<String> hosts(String option) {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
-            return ImmutableSortedSet.of("");
+            return ImmutableSortedSet.of(
+                    HostAndPort.fromString("")
+                        .withDefaultPort(DEFAULT_INTERNAL_PORT)
+                        .toString());
         }
         Splitter commaSplitter = Splitter.on(',').omitEmptyStrings().trimResults();
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();

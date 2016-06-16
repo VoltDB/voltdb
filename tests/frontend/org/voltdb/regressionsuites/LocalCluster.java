@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
@@ -41,6 +42,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -122,6 +125,7 @@ public class LocalCluster implements VoltServerConfig {
 
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    private InternalPortGeneratorForTest internalPortGenerator;
     private String m_voltdbroot = "";
     private VoltFile m_filePrefix;
 
@@ -220,9 +224,12 @@ public class LocalCluster implements VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        assert (jarFileName != null);
-        assert (siteCount > 0);
-        assert (hostCount > 0);
+        assert jarFileName != null : "jar file name is null";
+        assert siteCount > 0 : "site count is less than 0";
+        assert hostCount > 0 : "host count is less than 0";
+
+        int coordinatorsSize = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, coordinatorsSize);
 
         m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
         if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
@@ -478,9 +485,9 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
-        cmdln.internalPort(portGenerator.nextInternalPort());
         cmdln.voltFilePrefix(subroot.getPath());
-        cmdln.internalPort(portGenerator.nextInternalPort());
+        cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
+        cmdln.coordinators(internalPortGenerator.getCoordinators());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
@@ -609,7 +616,11 @@ public class LocalCluster implements VoltServerConfig {
         // reset the port generator. RegressionSuite always expects
         // to find ClientInterface and Admin mode on known ports.
         portGenerator.reset();
+        int coordinatorsSize = m_hostCount <= 2 ? m_hostCount : m_hostCount <= 4 ? 2 : 3;
+        internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, coordinatorsSize);
+
         templateCmdLine.leaderPort(portGenerator.nextInternalPort());
+        templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
 
         m_eeProcs.clear();
         for (int ii = 0; ii < m_hostCount; ii++) {
@@ -726,7 +737,8 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         try {
-            cmdln.internalPort(portGenerator.nextInternalPort());
+            cmdln.internalPort(internalPortGenerator.nextInternalPort(hostId));
+            cmdln.coordinators(internalPortGenerator.getCoordinators());
             if (m_replicationPort != -1) {
                 int index = m_hasLocalServer ? hostId + 1 : hostId;
                 cmdln.drAgentStartPort(m_replicationPort + index);
@@ -962,7 +974,8 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
             rejoinCmdLn.m_httpPort = portGenerator.nextHttp();
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
-            rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
+            rejoinCmdLn.m_internalPort = internalPortGenerator.nextInternalPort(hostId);
+            rejoinCmdLn.m_coordinators = internalPortGenerator.getCoordinators();
             setPortsFromConfig(hostId, rejoinCmdLn);
             if (this.m_additionalProcessEnv != null) {
                 for (String name : this.m_additionalProcessEnv.keySet()) {
@@ -1423,6 +1436,10 @@ public class LocalCluster implements VoltServerConfig {
         return m_cmdLines.get(hostId).internalPort();
     }
 
+    public NavigableSet<String> coordinators(int hostId) {
+        return m_cmdLines.get(hostId).coordinators();
+    }
+
     public int port(int hostId) {
         return m_cmdLines.get(hostId).port();
     }
@@ -1439,6 +1456,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
         cl.m_leader = config.m_leader;
+        cl.m_coordinators = ImmutableSortedSet.copyOf(cl.m_coordinators);
     }
 
     public static boolean isMemcheckDefined() {
