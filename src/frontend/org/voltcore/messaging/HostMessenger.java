@@ -345,10 +345,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_paused.set(m_config.criteria.isPaused());
         m_criteria = config.criteria;
-        if (m_criteria.getStartAction() != StartAction.PROBE) {
-            m_probedDetermination.set(new Determination(
-                    m_criteria.getStartAction(), m_criteria.getHostCount()));
-        }
         m_joiner = new SocketJoiner(
                 m_config.internalInterface,
                 m_config.internalPort,
@@ -1164,10 +1160,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     private void determineStartActionIfNecessary() {
-        if (m_criteria.getStartAction() != StartAction.PROBE) {
-            return;
-        }
-
         if (m_probedDetermination.isDone()) {
             return;
         }
@@ -1204,6 +1196,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (operational > 0 && m_paused.get() != paused) {
             m_paused.set(paused);
+        }
+
+        if (m_criteria.getStartAction() != StartAction.PROBE) {
+            m_probedDetermination.set(new Determination(
+                    m_criteria.getStartAction(), m_criteria.getHostCount()));
+            return;
         }
 
         StartAction determination = m_criteria.isBare() ?
