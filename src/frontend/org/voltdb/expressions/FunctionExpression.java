@@ -360,9 +360,9 @@ public class FunctionExpression extends AbstractExpression {
             }
             result += ")";
         } else {
-        	// The two functions MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP
-        	// are nullary.  Others may be in the future.
-        	result += "()";
+            // The two functions MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP
+            // are nullary.  Others may be in the future.
+            result += "()";
         }
         return result;
     }
