@@ -629,13 +629,13 @@ public class VoltDB {
                     referToDocAndExit();
                 }
             } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                if (m_leader != null && !m_leader.trim().isEmpty()) {
+                if (m_leader != null) {
                     m_meshBrokers = m_leader;
                 }
             }
             if (m_meshBrokers != null) {
                 m_coordinators = JoinerCriteria.hosts(m_meshBrokers);
-                if (m_leader == null || m_leader.trim().isEmpty()) {
+                if (m_leader == null) {
                     m_leader = m_coordinators.first();
                 }
             }
