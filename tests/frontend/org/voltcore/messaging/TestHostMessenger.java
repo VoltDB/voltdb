@@ -101,7 +101,7 @@ public class TestHostMessenger {
                 .build();
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
-        HostMessenger hm = new HostMessenger(config, null, true);
+        HostMessenger hm = new HostMessenger(config, null);
         createdMessengers.add(hm);
         if (start) {
             hm.start();
@@ -122,7 +122,7 @@ public class TestHostMessenger {
         config.internalPort = config.internalPort + index;
         config.zkInterface = "127.0.0.1:" + (7181 + index);
         config.criteria = jc;
-        HostMessenger hm = new HostMessenger(config, null, true);
+        HostMessenger hm = new HostMessenger(config, null);
         createdMessengers.add(hm);
         if (start) {
             hm.start();

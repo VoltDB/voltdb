@@ -63,10 +63,11 @@ public class ShutdownHooks
      *                    due to a call to crashVoltDB()
      * @param action   A Runnable containing the action to be run on shutdown.
      */
-    public static void registerShutdownHook(int priority, boolean runOnCrash, boolean crashMessage, Runnable action)
+    public static void registerShutdownHook(int priority, boolean runOnCrash, Runnable action)
     {
         m_instance.addHook(priority, runOnCrash, action);
-        ShutdownHooks.m_crashMessage = crashMessage;
+        //Any hook registered lets print crash messsage.
+        ShutdownHooks.m_crashMessage = true;
     }
 
     /**
