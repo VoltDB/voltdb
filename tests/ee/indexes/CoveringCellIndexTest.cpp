@@ -553,7 +553,7 @@ TEST_F(CoveringCellIndexTest, Simple) {
     tempTuple.setNValue(GEOG_COL_INDEX, NValue::getNullValue(VALUE_TYPE_GEOGRAPHY));
     TableTuple foundTuple = table->lookupTupleByValues(tempTuple);
     ASSERT_FALSE(foundTuple.isNullTuple());
-    ASSERT_TRUE(table->deleteTuple(foundTuple));
+    table->deleteTuple(foundTuple);
 
     // Verify deleted table is gone from index
     searchKey.tuple().setNValue(0, pointWktToNval("point(0.01 0.01)"));

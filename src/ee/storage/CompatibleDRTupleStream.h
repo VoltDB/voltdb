@@ -71,19 +71,21 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
     virtual void endTransaction(int64_t uniqueId);
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+    virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds()
+    {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
 
     virtual void generateDREvent(DREventType type, int64_t lastCommittedSpHandle, int64_t spHandle,
-                                 int64_t uniqueId, ByteArray payloads) {
+                                 int64_t uniqueId, ByteArray payloads)
+    {
         // This method is not supported in compatible stream
     }
 

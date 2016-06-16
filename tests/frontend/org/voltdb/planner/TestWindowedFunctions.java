@@ -60,53 +60,59 @@ import org.voltdb.types.SortDirectionType;
 
 public class TestWindowedFunctions extends PlannerTestCase {
     public void testRank() {
-        AbstractPlanNode node = compile("SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A,B ORDER BY B DESC ) AS ARANK FROM AAA;");
-        // The plan should look like:
-        // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
-        // We also do some santity checking on the PartitionPlan node.
-        // First dissect the plan.
-        assertTrue(node instanceof SendPlanNode);
-        AbstractPlanNode sendNode = node;
+        // Save the guard and restore it after.
+        boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
+        PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
+        try {
+            AbstractPlanNode node = compile("SELECT A+B, MOD(A, B), B, RANK() OVER (PARTITION BY A,B ORDER BY B DESC ) AS ARANK FROM AAA;");
+            // The plan should look like:
+            // SendNode -> PartitionByPlanNode -> OrderByPlanNode -> SeqScanNode
+            // We also do some santity checking on the PartitionPlan node.
+            // First dissect the plan.
+            assertTrue(node instanceof SendPlanNode);
+            AbstractPlanNode sendNode = node;
 
-        AbstractPlanNode projPlanNode = node.getChild(0);
-        assertTrue(projPlanNode instanceof ProjectionPlanNode);
+            AbstractPlanNode projPlanNode = node.getChild(0);
+            assertTrue(projPlanNode instanceof ProjectionPlanNode);
 
-        AbstractPlanNode partitionByPlanNode = projPlanNode.getChild(0);
-        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+            AbstractPlanNode partitionByPlanNode = projPlanNode.getChild(0);
+            assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
 
-        AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
-        assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
-        OrderByPlanNode orderByNode = (OrderByPlanNode)abstractOrderByNode;
-        NodeSchema input_schema = orderByNode.getOutputSchema();
-        assertNotNull(input_schema);
+            AbstractPlanNode abstractOrderByNode = partitionByPlanNode.getChild(0);
+            assertTrue(abstractOrderByNode instanceof OrderByPlanNode);
+            OrderByPlanNode orderByNode = (OrderByPlanNode)abstractOrderByNode;
+            NodeSchema input_schema = orderByNode.getOutputSchema();
+            assertNotNull(input_schema);
 
-        AbstractPlanNode seqScanNode = orderByNode.getChild(0);
-        assertTrue(seqScanNode instanceof SeqScanPlanNode);
+            AbstractPlanNode seqScanNode = orderByNode.getChild(0);
+            assertTrue(seqScanNode instanceof SeqScanPlanNode);
 
-        PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
-        NodeSchema  schema = pbPlanNode.getOutputSchema();
+            PartitionByPlanNode pbPlanNode = (PartitionByPlanNode)partitionByPlanNode;
+            NodeSchema  schema = pbPlanNode.getOutputSchema();
 
-        //
-        // Check that the order by node has the right number of expressions.
-        // and that they have the correct order.
-        //
-        assertEquals(2, orderByNode.getSortExpressions().size());
-        assertEquals(SortDirectionType.ASC, orderByNode.getSortDirections().get(0));
-        assertEquals(SortDirectionType.DESC, orderByNode.getSortDirections().get(1));
-        //
-        // Check that the partition by plan node's output schema correct.  First,
-        // look at the first expression, to verify that it's the windowed expression.
-        // Then check that the TVEs all make sense.
-        //
-        SchemaColumn column = schema.getColumns().get(0);
-        assertTrue(column.getExpression() instanceof WindowedExpression);
-        assertEquals("ARANK", column.getColumnAlias());
-        assertEquals(2, pbPlanNode.getNumberOfPartitionByExpressions());
-        validateTVEs(input_schema, pbPlanNode);
+            //
+            // Check that the order by node has the right number of expressions.
+            // and that they have the correct order.
+            //
+            assertEquals(2, orderByNode.getSortExpressions().size());
+            assertEquals(SortDirectionType.ASC, orderByNode.getSortDirections().get(0));
+            assertEquals(SortDirectionType.DESC, orderByNode.getSortDirections().get(1));
+            //
+            // Check that the partition by plan node's output schema correct.  First,
+            // look at the first expression, to verify that it's the windowed expression.
+            // Then check that the TVEs all make sense.
+            //
+            SchemaColumn column = schema.getColumns().get(0);
+            assertTrue(column.getExpression() instanceof WindowedExpression);
+            assertEquals("ARANK", column.getColumnAlias());
+            assertEquals(2, pbPlanNode.getNumberOfPartitionByExpressions());
+            validateTVEs(input_schema, pbPlanNode);
+        } finally {
+            PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
+        }
     }
 
     public void validateTVEs(NodeSchema input_schema, PartitionByPlanNode pbPlanNode) {
-        // System.out.printf("Validating TVEs\n");
         List<AbstractExpression> tves = pbPlanNode.getAllTVEs();
         List<SchemaColumn> columns = input_schema.getColumns();
         for (AbstractExpression ae : tves) {
@@ -139,28 +145,35 @@ public class TestWindowedFunctions extends PlannerTestCase {
     }
 
     public void testRankWithSubqueries() {
-        AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A, B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
-        // Dissect the plan.
-        assertTrue(node instanceof SendPlanNode);
-        AbstractPlanNode projectionPlanNode = node.getChild(0);
-        assertTrue(projectionPlanNode instanceof ProjectionPlanNode);
+        // Save the guard and restore it after.
+        boolean savedGuard = PlanAssembler.HANDLE_WINDOWED_OPERATORS;
+        PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
+        try {
+            AbstractPlanNode node = compile("SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A, B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;");
+            // Dissect the plan.
+            assertTrue(node instanceof SendPlanNode);
+            AbstractPlanNode projectionPlanNode = node.getChild(0);
+            assertTrue(projectionPlanNode instanceof ProjectionPlanNode);
 
-        AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
-        assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
+            AbstractPlanNode partitionByPlanNode = projectionPlanNode.getChild(0);
+            assertTrue(partitionByPlanNode instanceof PartitionByPlanNode);
 
-        AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
-        assertTrue(orderByPlanNode instanceof OrderByPlanNode);
-        NodeSchema input_schema = orderByPlanNode.getOutputSchema();
+            AbstractPlanNode orderByPlanNode = partitionByPlanNode.getChild(0);
+            assertTrue(orderByPlanNode instanceof OrderByPlanNode);
+            NodeSchema input_schema = orderByPlanNode.getOutputSchema();
 
-        AbstractPlanNode scanNode = orderByPlanNode.getChild(0);
-        assertTrue(scanNode instanceof NestLoopPlanNode);
+            AbstractPlanNode scanNode = orderByPlanNode.getChild(0);
+            assertTrue(scanNode instanceof NestLoopPlanNode);
 
-        NodeSchema  schema = partitionByPlanNode.getOutputSchema();
-        SchemaColumn column = schema.getColumns().get(0);
-        assertTrue(column.getExpression() instanceof WindowedExpression);
-        assertEquals("ARANK", column.getColumnAlias());
+            NodeSchema  schema = partitionByPlanNode.getOutputSchema();
+            SchemaColumn column = schema.getColumns().get(0);
+            assertTrue(column.getExpression() instanceof WindowedExpression);
+            assertEquals("ARANK", column.getColumnAlias());
 
-        validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+            validateTVEs(input_schema, (PartitionByPlanNode)partitionByPlanNode);
+        } finally {
+            PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
+        }
     }
 
     public void testRankFailures() {
