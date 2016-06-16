@@ -31,16 +31,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.codehaus.jackson.JsonFactory;
-import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -56,6 +55,7 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
@@ -89,7 +89,6 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
 
 public class HTTPAdminListener {
 
@@ -104,7 +103,6 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
-    final AtomicBoolean m_ready = new AtomicBoolean(false);
 
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
@@ -161,12 +159,6 @@ public class HTTPAdminListener {
 
         @Override
         public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-            if (!m_ready.get()) {
-                response.setStatus(HttpServletResponse.SC_OK);
-                response.getWriter().print("<html><head><meta http-equiv=\"refresh\" content=\"10\"></head><body>VoltDB Instance is not yet ready to accept request. Please wait</body></html>");
-                rqst.setHandled(true);
-                return;
-            }
             response.setHeader("Host", getHostHeader());
         }
 
