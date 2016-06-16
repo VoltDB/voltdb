@@ -84,3 +84,5 @@ build.gradle
 /tests/.idea/*
 /tests/geb/vmc/.idea/*
 /build/lib/voltdb.war
+/tests/geb/vmc/.nb-gradle/
+/lib/python/vdm/tests/geb_vdm/.nb-gradle/
