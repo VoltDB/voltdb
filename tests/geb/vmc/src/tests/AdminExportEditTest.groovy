@@ -108,7 +108,7 @@ class AdminExportEditTest extends TestBase {
 
         // Add property in the existing Configuration
         when: 'Expand export'
-        if (!waitFor(10) { updateInnerErrorPopup.isDisplayed() }) {
+        if (! waitFor(waitTime) { page.overview.addconfig.isDisplayed() }) {
             isPro = true
             count = 0
             while (count < numberOfTrials) {
