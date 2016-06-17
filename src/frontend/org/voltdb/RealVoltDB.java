@@ -377,6 +377,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_licenseInformation;
     }
 
+    public static String getPath(String name) {
+        if (name.contains("voltdbroot")) {
+            return "/tmp/voltdbroot";
+        }
+        System.out.println("Asking for path property: " + name);
+        return "/tmp";
+    }
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute())
@@ -405,17 +413,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final List<String> managedPathsWithFiles(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
         PathsType paths = deployment.getPaths();
-        String voltDbRoot = paths.getVoltdbroot().getPath();
+        String voltDbRoot = paths.getVoltdbroot().getNodePath();
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
             nonEmptyPaths.add(path);
         return nonEmptyPaths.build();
     }
@@ -1511,7 +1519,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 
-        String deprootFN = dt.getPaths().getVoltdbroot().getPath();
+        String deprootFN = dt.getPaths().getVoltdbroot().getNodePath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
 
@@ -1560,11 +1568,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (config.m_isEnterprise) {
             List<String> failed = new ArrayList<>();
             List<File> paths = ImmutableList.<File>builder()
-                    .add(new VoltFile(dt.getPaths().getCommandlog().getPath()))
-                    .add(new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath()))
-                    .add(new VoltFile(dt.getPaths().getSnapshots().getPath()))
-                    .add(new VoltFile(dt.getPaths().getExportoverflow().getPath()))
-                    .add(new VoltFile(dt.getPaths().getDroverflow().getPath()))
+                    .add(new VoltFile(dt.getPaths().getCommandlog().getNodePath()))
+                    .add(new VoltFile(dt.getPaths().getCommandlogsnapshot().getNodePath()))
+                    .add(new VoltFile(dt.getPaths().getSnapshots().getNodePath()))
+                    .add(new VoltFile(dt.getPaths().getExportoverflow().getNodePath()))
+                    .add(new VoltFile(dt.getPaths().getDroverflow().getNodePath()))
                     .build();
             for (File path: paths) {
                 if (!path.isAbsolute()) {

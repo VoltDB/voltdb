@@ -28,6 +28,9 @@
   -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
+           xmlns:jaxb="http://java.sun.com/xml/ns/jaxb" jaxb:version="2.1"
+           jaxb:extensionBindingPrefixes="ci"
             elementFormDefault="unqualified">
 
   <!-- <deployment> -->
@@ -59,7 +62,7 @@
           <xs:enumeration value="ddl"/>
       </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- restriction on id -->
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">
@@ -77,14 +80,14 @@
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
-  
-  <xs:simpleType name="readlevelType"> 
-    <xs:restriction base="xs:string"> 
+
+  <xs:simpleType name="readlevelType">
+    <xs:restriction base="xs:string">
       <xs:enumeration value="fast"/>
       <xs:enumeration value="safe"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
     <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
@@ -99,31 +102,97 @@
     <xs:all>
         <xs:element name="voltdbroot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.voltdbroot");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="voltdbroot"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.snapshots");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="snapshots"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.exportoverflow");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="export_overflow"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="droverflow" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.droverflow");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="dr_overflow"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.commandlog");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="command_log"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="commandlogsnapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
+            <xs:annotation>
+                <xs:appinfo>
+                    <ci:code>
+        <![CDATA[
+        public String getNodePath() {
+            return org.voltdb.RealVoltDB.getPath("org.voltdb.path.commandlogsnapshot");
+        }
+        ]]>
+                    </ci:code>
+                </xs:appinfo>
+            </xs:annotation>
               <xs:attribute name="path" type="xs:string" default="command_log_snapshot"/>
             </xs:complexType>
         </xs:element>

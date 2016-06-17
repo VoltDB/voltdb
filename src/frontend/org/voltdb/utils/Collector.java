@@ -488,10 +488,10 @@ public class Collector {
                 if (deploymentPaths != null) {
                     PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
                     if (drPath != null)
-                        drOverflowPath = drPath.getPath();
+                        drOverflowPath = drPath.getNodePath();
                     PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
                     if (exportPath != null)
-                        exportOverflowPath = exportPath.getPath();
+                        exportOverflowPath = exportPath.getNodePath();
                 }
                 String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
                 cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
