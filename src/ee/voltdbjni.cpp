@@ -269,6 +269,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
+    jbyteArray pathName,
     jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
@@ -284,6 +285,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
         std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
         env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
+        jbyte *pathChars = env->GetByteArrayElements( pathName, NULL);
+        std::string pathString(reinterpret_cast<char*>(pathChars), env->GetArrayLength(pathName));
+        env->ReleaseByteArrayElements( pathName, pathChars, JNI_ABORT);
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
@@ -297,6 +301,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    defaultDrBufferSize,
                                    tempTableMemory,
                                    createDrReplicatedStream,
+                                   pathString,
                                    static_cast<int32_t>(compactionThreshold));
         if (success) {
             VOLT_DEBUG("initialize succeeded");

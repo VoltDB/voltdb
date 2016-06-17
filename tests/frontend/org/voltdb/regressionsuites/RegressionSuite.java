@@ -28,7 +28,10 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.net.ConnectException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -39,6 +42,7 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.LRRHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -425,6 +429,14 @@ public class RegressionSuite extends TestCase {
         assertNotNull(expected);
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfScalarLongs(vt, expected);
+    }
+
+    static protected void validateTableOfScalarLongsRO(Client client, String sql, long[] expected)
+            throws NoConnectionsException, IOException, ProcCallException {
+        assertNotNull(expected);
+        VoltTable vt = client.callProcedure("@ReadOnlySlow", sql).getResults()[0];
+        VoltTable vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, expected);
     }
 
     static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)

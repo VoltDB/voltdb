@@ -242,6 +242,17 @@ TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema()
     return schema;
 }
 
+TupleSchema* AbstractPlanNode::generateHighVolumeTupleSchema()
+{
+    // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
+    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_VARCHAR);
+    vector<int32_t> columnSizes(1,255);
+    vector<bool> columnAllowNull(1, false);
+    vector<bool> columnInBytes(1, false);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes,
+            columnAllowNull, columnInBytes);
+    return schema;
+}
 
 // ----------------------------------------------------
 //  Serialization Functions

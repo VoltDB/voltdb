@@ -58,6 +58,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // Assume the batch is read-only until we see the first non-select statement.
     public final boolean readOnly;
 
+    // Indicates whether there is a high volume statement in the batch
+    public final boolean highVolume;
+
     // The original work request to the planner
     public final AdHocPlannerWork work;
 
@@ -101,6 +104,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             }
         }
         this.readOnly = allReadOnly;
+
+        boolean highVolume = false;
+        for (AdHocPlannedStatement plannedStmt : stmts) {
+            if (plannedStmt.core.highVolume) {
+                highVolume = true;
+                break;
+            }
+        }
+        this.highVolume = highVolume;
         this.partitionParamIndex = partitionParamIndex;
         this.partitionParamType = partitionParamType;
         this.partitionParamValue = partitionParamValue;
@@ -141,6 +153,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 partitionParamIndex == -1 ? new byte[20] : null,
                 false,
                 readOnly,
+                false,
                 paramTypes,
                 catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
@@ -242,6 +255,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public boolean isReadOnly() {
         return readOnly;
+    }
+
+    /**
+     * high volume flag accessor
+     *
+     * @return true if read-only
+     */
+    public boolean isHighVolume() {
+        return highVolume;
     }
 
     /**

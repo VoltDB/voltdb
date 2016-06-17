@@ -366,6 +366,7 @@ public class AsyncCompilerAgent {
         // when the batch has one statement.
         StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
+        boolean highVolume = work.invocationName.equalsIgnoreCase("@ReadOnlySlow");
 
         if (work.userParamSet != null && work.userParamSet.length > 0) {
             if (work.sqlStatements.length != 1) {
@@ -384,7 +385,7 @@ public class AsyncCompilerAgent {
             }
             try {
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
-                        work.explainMode != ExplainMode.NONE, work.userParamSet);
+                        work.explainMode != ExplainMode.NONE, highVolume, work.userParamSet);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 if (inferSP) {

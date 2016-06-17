@@ -62,6 +62,7 @@ public:
         : AbstractExecutor(engine, abstractNode)
     {
         m_engine = engine;
+        m_highVolume = false;
     }
 
 protected:
@@ -71,6 +72,7 @@ protected:
 
 private:
     VoltDBEngine *m_engine;
+    bool m_highVolume;
 };
 
 }

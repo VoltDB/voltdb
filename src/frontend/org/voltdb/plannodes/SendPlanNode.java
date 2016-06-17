@@ -29,6 +29,13 @@ import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
 
+    public enum Members {
+        HIGH_VOLUME;
+    }
+
+    /** True if plan node should write to disk **/
+    boolean m_highVolume = false;
+
     public SendPlanNode() {
         super();
     }
@@ -36,6 +43,13 @@ public class SendPlanNode extends AbstractPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.SEND;
+    }
+
+    public boolean isHighVolume() {
+        return m_highVolume;
+    }
+    public void setHighVolume(boolean highVolume) {
+        m_highVolume = highVolume;
     }
 
     @Override
@@ -75,14 +89,20 @@ public class SendPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+        stringer.key(Members.HIGH_VOLUME.name()).value(m_highVolume);
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        if (m_parents.size() == 0)
-            return "RETURN RESULTS TO STORED PROCEDURE";
-        else
-            return "SEND PARTITION RESULTS TO COORDINATOR";
+        if (m_highVolume) {
+            assert(m_parents.size() == 0);
+            return "WRITE RESULTS TO DISK";
+        } else {
+            if (m_parents.size() == 0)
+                return "RETURN RESULTS TO STORED PROCEDURE";
+            else
+                return "SEND PARTITION RESULTS TO COORDINATOR";
+        }
 
 
     }
@@ -90,6 +110,11 @@ public class SendPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
+        if (jobj.has(Members.HIGH_VOLUME.name())) {
+            m_highVolume = jobj.getBoolean( Members.HIGH_VOLUME.name() );
+        } else {
+            m_highVolume = false;
+        }
     }
 
     @Override

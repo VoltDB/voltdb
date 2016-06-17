@@ -87,7 +87,7 @@ struct FunctionTest : public Test {
                                   0,
                                   (AbstractDRTupleStream *)0,
                                   (AbstractDRTupleStream *)0,
-                                  0) {}
+                                  0, "") {}
 
         /**
          * A template for calling nullary function call expressions.

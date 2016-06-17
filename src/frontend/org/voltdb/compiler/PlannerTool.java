@@ -106,7 +106,7 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer, false, null);
+        return planSql(sqlIn, infer, false, false, null);
     }
 
     private void logException(Exception e, String fmtLabel) {
@@ -121,7 +121,7 @@ public class PlannerTool {
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
+            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, false,
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
@@ -152,7 +152,7 @@ public class PlannerTool {
     }
 
     synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams) {
+            boolean isExplainMode, boolean isHighVolume, final Object[] userParams) {
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
@@ -174,7 +174,8 @@ public class PlannerTool {
             // If this presents a planning performance problem, we could consider maintaining
             // separate caches for the 3 cases or maintaining up to 3 plans per cache entry
             // if the cases tended to have mostly overlapping queries.
-            if (partitioning.isInferred()) {
+            // No caching for high volume queries
+            if (partitioning.isInferred() && !isHighVolume) {
                 // Check the literal cache for a match.
                 AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
                 if (cachedPlan != null) {
@@ -197,7 +198,7 @@ public class PlannerTool {
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, isHighVolume,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
@@ -221,7 +222,7 @@ public class PlannerTool {
                 hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
 
                 // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred()) {
+                if (!wrongNumberParameters && partitioning.isInferred() && !isHighVolume) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -305,8 +306,10 @@ public class PlannerTool {
 
 
                 assert(parsedToken != null);
-                // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                if (!isHighVolume) {
+                    // Again, plans with inferred partitioning are the only ones supported in the cache.
+                    m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                }
             }
             return ahps;
         }

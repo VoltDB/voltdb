@@ -94,6 +94,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
+#include <iostream>
 #include <sstream>
 #include <locale>
 #include <typeinfo>
@@ -178,6 +179,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
+                         std::string pathName,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
@@ -240,7 +242,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             hostId,
                                             m_drStream,
                                             m_drReplicatedStream,
-                                            drClusterId);
+                                            drClusterId,
+                                            pathName);
     return true;
 }
 
@@ -430,10 +433,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
+
     /*
      * Reserve space in the result output buffer for the number of
      * result dependencies and for the dirty byte. Necessary for a
-     * plan fragment because the number of produced depenencies may
+     * plan fragment because the number of produced dependencies may
      * not be known in advance.
      */
     if (first) {
@@ -554,6 +558,20 @@ bool VoltDBEngine::send(Table* dependency) {
     if (!dependency->serializeTo(m_resultOutput))
         return false;
     m_numResultDependencies++;
+    return true;
+}
+
+bool VoltDBEngine::writeToDisk(Table* dependency) {
+    VOLT_DEBUG("Writing Dependency from C++");
+
+    SerializeOutputFile serialize_iof;
+    string outFileName = m_executorContext->nextOutFileName();
+
+    serialize_iof.initialize(outFileName);
+    if (!dependency->serializeToFile(serialize_iof))
+            return false;
+    serialize_iof.close();
+
     return true;
 }
 
@@ -1279,7 +1297,6 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
         PlanSet::iterator iter = plans.get<0>().begin();
         plans.erase(iter);
     }
-
     m_currExecutorVec = ev_guard.get();
     assert(m_currExecutorVec);
     // update the context

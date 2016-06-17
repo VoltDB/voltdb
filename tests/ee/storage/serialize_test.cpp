@@ -66,6 +66,7 @@
 
 using namespace std;
 using namespace voltdb;
+using stupidunit::ChTempDir;
 
 #define NUM_OF_COLUMNS 6
 ValueType col_types[NUM_OF_COLUMNS] = { VALUE_TYPE_TINYINT, VALUE_TYPE_BIGINT, VALUE_TYPE_BIGINT, VALUE_TYPE_BIGINT, VALUE_TYPE_VARCHAR, VALUE_TYPE_DOUBLE };
@@ -157,6 +158,68 @@ TEST_F(TableSerializeTest, RoundTrip) {
     delete deserialized;
 }
 
+TEST_F(TableSerializeTest, FileRoundTrip) {
+    // Serialize the table
+	ChTempDir tempdir;
+    std::string filename = tempdir.name() + "/test";
+    SerializeOutputFile serialize_outf;
+    serialize_outf.initialize(filename);
+    table_->serializeToFile(serialize_outf);
+    serialize_outf.close();
+
+    std::fstream serialize_stream;
+    serialize_stream.open(filename.c_str(),std::fstream::in);
+    serialize_stream.seekg(0,serialize_stream.end);
+    int size = serialize_stream.tellg();
+    serialize_stream.seekg(0,serialize_stream.beg);
+
+    assert(size >= 0);
+    char * buffer = new char [size];
+    serialize_stream.read(buffer,size);
+    serialize_stream.close();
+    printf("Serialize size %d\n",size);
+
+    // Deserialize the table: verify that it matches the existing table
+    CopySerializeInputBE serialize_in(buffer + sizeof(int32_t), size - sizeof(int32_t));
+    TempTableLimits limits;
+    TupleSchema *schema = TupleSchema::createTupleSchema(table_->schema());
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
+    deserialized->loadTuplesFrom(serialize_in, NULL);
+    int colnum = table_->columnCount();
+    EXPECT_EQ(colnum, deserialized->columnCount());
+    for (int i = 0; i < colnum; ++i) {
+        EXPECT_EQ(table_->columnName(i), deserialized->columnName(i));
+    }
+
+    // Serialize the table a second time, verify that it
+
+    std::string filename2 = tempdir.name() + "/test2";
+    SerializeOutputFile serialize_outf2;
+    serialize_outf2.initialize(filename2);
+    deserialized->serializeToFile(serialize_outf2);
+    serialize_outf2.close();
+
+    std::fstream serialize_stream2;
+    serialize_stream2.open(filename2.c_str(),std::fstream::in);
+    serialize_stream2.seekg(0,serialize_stream2.end);
+    int size2 = serialize_stream2.tellg();
+    serialize_stream2.seekg(0,serialize_stream2.beg);
+
+    assert(size2 >= 0);
+    char * buffer2 = new char [size2];
+    serialize_stream2.read(buffer2,size2);
+    serialize_stream2.close();
+
+    ASSERT_EQ(size, size2);
+    const void *data1 = buffer;
+    const void *data2 = buffer2;
+    EXPECT_EQ(0, ::memcmp(data1, data2, size));
+    deserialized->deleteAllTuples(true);
+    delete deserialized;
+    delete[] buffer;
+    delete[] buffer2;
+}
+
 TEST_F(TableSerializeTest, NullStrings) {
     std::vector<std::string> columnNames(1);
     std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
@@ -209,6 +272,76 @@ TEST_F(TableSerializeTest, NullStrings) {
     }
     EXPECT_EQ(1, count);
     delete deserialized;
+}
+
+TEST_F(TableSerializeTest, NullStringsFile) {
+    std::vector<std::string> columnNames(1);
+    std::vector<voltdb::ValueType> columnTypes(1, voltdb::VALUE_TYPE_VARCHAR);
+    std::vector<int32_t> columnSizes(1, 20);
+    std::vector<bool> columnAllowNull(1, false);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnAllowNull);
+    columnNames[0] = "";
+    table_->deleteAllTuples(true);
+    delete table_;
+    table_ = TableFactory::getTempTable(this->database_id, "temp_table", schema, columnNames, NULL);
+
+    TableTuple& tuple = table_->tempTuple();
+    tuple.setNValue(0, ValueFactory::getNullStringValue());
+    table_->insertTuple(tuple);
+
+    // Serialize the table
+	ChTempDir tempdir;
+    std::string filename = tempdir.name() + "/test";
+    SerializeOutputFile serialize_outf;
+    serialize_outf.initialize(filename);
+    table_->serializeToFile(serialize_outf);
+    serialize_outf.close();
+
+    std::fstream serialize_stream;
+    serialize_stream.open(filename.c_str(),std::fstream::in);
+    serialize_stream.seekg(0,serialize_stream.end);
+    int size = serialize_stream.tellg();
+    serialize_stream.seekg(0,serialize_stream.beg);
+
+    assert(size >= 0);
+    char * buffer = new char [size];
+    serialize_stream.read(buffer,size);
+    serialize_stream.close();
+
+    // Deserialize the table: verify that it matches the existing table
+    CopySerializeInputBE serialize_in(buffer + sizeof(int32_t), size - sizeof(int32_t));
+    TempTableLimits limits;
+    schema = TupleSchema::createTupleSchema(table_->schema());
+    Table* deserialized = TableFactory::getTempTable(this->database_id, "foo", schema, columnNames, &limits);
+    deserialized->loadTuplesFrom(serialize_in, NULL);
+
+    EXPECT_EQ(1, deserialized->activeTupleCount());
+    EXPECT_EQ(1, table_->activeTupleCount());
+    EXPECT_EQ(1, deserialized->columnCount());
+    EXPECT_EQ(1, table_->columnCount());
+    EXPECT_EQ("", table_->columnName(0));
+    EXPECT_EQ("", deserialized->columnName(0));
+    EXPECT_EQ(VALUE_TYPE_VARCHAR, table_->schema()->columnType(0));
+    EXPECT_EQ(VALUE_TYPE_VARCHAR, deserialized->schema()->columnType(0));
+    EXPECT_EQ(false, table_->schema()->columnIsInlined(0));
+
+    TableIterator iter = deserialized->iterator();
+    TableTuple t(deserialized->schema());
+    int count = 0;
+    while (iter.next(t)) {
+        const TupleSchema::ColumnInfo *columnInfo = tuple.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, columnInfo->getVoltType());
+        const TupleSchema::ColumnInfo *tcolumnInfo = t.getSchema()->getColumnInfo(0);
+        EXPECT_EQ(VALUE_TYPE_VARCHAR, tcolumnInfo->getVoltType());
+        EXPECT_TRUE(tuple.getNValue(0).isNull());
+        EXPECT_TRUE(t.getNValue(0).isNull());
+        EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(tuple.getNValue(0)).isTrue());
+        EXPECT_TRUE(ValueFactory::getNullStringValue().op_equals(t.getNValue(0)).isTrue());
+        count += 1;
+    }
+    EXPECT_EQ(1, count);
+    delete deserialized;
+    delete[] buffer;
 }
 
 int main() {

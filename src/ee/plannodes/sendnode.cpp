@@ -60,6 +60,12 @@ std::string SendPlanNode::debugInfo(const std::string &spacer) const
     return (buffer.str());
 }
 
-void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    if(obj.hasKey("HIGH_VOLUME")) {
+        m_highVolume = obj.valueForKey("HIGH_VOLUME").asBool();
+    } else {
+        m_highVolume = false;
+    }
+}
 
 } // namespace voltdb
