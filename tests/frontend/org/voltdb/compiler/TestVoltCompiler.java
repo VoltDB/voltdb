@@ -2468,10 +2468,6 @@ public class TestVoltCompiler extends TestCase {
         tableDDL = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                    "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                    "CREATE TABLE T3 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n";
-        // 0. Test final guard (to be removed after the feature is done.)
-        viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
-                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" has 2 sources. Only one source table is allowed.");
         // 1. Test INNER JOIN
         // 1.1 Test one join
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
@@ -2510,12 +2506,6 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
                 "create table t2(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (id, num, total) " +
-                "as select t1.id, t2.num, count(*) from t1 join t2 on t1.id = t2.id group by t1.id, t2.num; \n";
-        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" has 2 sources. Only one source table is allowed.");
-
-        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
-                "create table t2(id integer not null, num integer, wage integer);\n" +
-                "create view my_view1 (id, num, total) " +
                 "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
@@ -2529,6 +2519,15 @@ public class TestVoltCompiler extends TestCase {
 
                 "create view my_view2 (num, total, sumwage) " +
                 "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
+        checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+
+        // Make sure the same restriction applies for the joint table view case.
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total, sumwage) " +
+                "as select num, count(*), sum(wage) from t group by num; \n" +
+
+                "create view my_view2 (num, total, sumwage) " +
+                "as select t.num, count(*), sum(t.wage) from my_view1 join t on t.num=my_view1.num group by t.num; ";
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
 
         ddl = "create table t(id integer not null, num integer);\n" +

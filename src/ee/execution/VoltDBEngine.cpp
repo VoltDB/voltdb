@@ -54,6 +54,7 @@
 #include "catalog/connector.h"
 #include "catalog/database.h"
 #include "catalog/index.h"
+#include "catalog/materializedviewhandler.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
@@ -1342,6 +1343,23 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *srcCatal
             TABLE::MatViewType::build(srcTable, destTable, catalogView);
         }
 
+    }
+
+    // Only for checking the plan in EE, will be disabled / removed after the feature is done.
+    if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+        catalog::MaterializedViewHandler *mvHandler = srcCatalogTable->mvHandler().get("mvHandler");
+        if (mvHandler) {
+            catalog::Statement *createQueryStatement = mvHandler->createQuery().get("createQuery");
+            if (createQueryStatement) {
+                const string& hexString = createQueryStatement->explainplan();
+                assert(hexString.length() % 2 == 0);
+                int bufferLength = (int)hexString.size() / 2 + 1;
+                char* explanation = new char[bufferLength];
+                boost::shared_array<char> memoryGuard(explanation);
+                catalog::Catalog::hexDecodeString(hexString, explanation);
+                cout << "View: " << srcCatalogTable->name() << endl << explanation << endl;
+            }
+        }
     }
 }
 

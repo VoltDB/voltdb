@@ -34,9 +34,11 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.IndexRef;
+import org.voltdb.catalog.MaterializedViewHandler;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -117,14 +119,21 @@ public class MaterializedViewProcessor {
                 }
             }
 
-            // create the materializedviewinfo catalog node for the source table
-            Table srcTable = stmt.m_tableList.get(0);
-            if (viewTableNames.contains(srcTable.getTypeName())) {
-                String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
-                        viewName, srcTable.getTypeName());
-                throw m_compiler.new VoltCompilerException(msg);
+            // Add mvHandler to the destTable:
+            MaterializedViewHandler mvHandler = destTable.getMvhandler().add("mvHandler");
+            for (Table srcTable : stmt.m_tableList) {
+                if (viewTableNames.contains(srcTable.getTypeName())) {
+                    String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
+                            viewName, srcTable.getTypeName());
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                // Add the reference to destTable to the affectedViewTables of each source table.
+                TableRef tableRef = srcTable.getAffectedviewtables().add(destTable.getTypeName());
+                tableRef.setTable(destTable);
             }
 
+            // create the materializedviewinfo catalog node for the source table
+            Table srcTable = stmt.m_tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
@@ -220,12 +229,15 @@ public class MaterializedViewProcessor {
                 if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
                         col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
                     minMaxAggs.add(aggExpr);
-                }            }
+                }
+            }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
-            compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, matviewinfo);
+            compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, matviewinfo);
+            compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandler);
+            compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandler);
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {
@@ -410,11 +422,11 @@ public class MaterializedViewProcessor {
         }
 
         checkViewSources(stmt.m_tableList);
-        if (stmt.m_tableList.size() != 1) {
-            msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-                       "Only one source table is allowed.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
-        }
+        // if (stmt.m_tableList.size() != 1) {
+        //     msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
+        //                "Only one source table is allowed.");
+        //     throw m_compiler.new VoltCompilerException(msg.toString());
+        // }
 
      }
 
@@ -432,20 +444,15 @@ public class MaterializedViewProcessor {
 
     // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
     private void compileFallbackQueriesAndUpdateCatalog(Database db,
-                                                List<VoltXMLElement> fallbackQueryXMLs,
-                                                MaterializedViewInfo matviewinfo) throws VoltCompilerException {
+                                                        String query,
+                                                        List<VoltXMLElement> fallbackQueryXMLs,
+                                                        MaterializedViewInfo matviewinfo) throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
             String key = String.valueOf(i);
             Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
-            // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
-            // Normally for select statements, the unique names will start with "Eselect".
-            // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
-            // (StatementCompiler.java, line 159)
-            fallbackQueryStmt.setSqltext( fallbackQueryXML.getUniqueName().substring(2) );
-            // For debug:
-            // System.out.println(fallbackQueryXML.toString());
+            fallbackQueryStmt.setSqltext(query);
             StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                               m_hsql,
                               db.getCatalog(),
@@ -458,6 +465,51 @@ public class MaterializedViewProcessor {
                               DeterminismMode.FASTER,
                               StatementPartitioning.forceSP());
         }
+    }
+
+    // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
+    private void compileFallbackQueriesAndUpdateCatalog(Database db,
+                                                        String query,
+                                                        List<VoltXMLElement> fallbackQueryXMLs,
+                                                        MaterializedViewHandler mvHandler) throws VoltCompilerException {
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
+            String key = String.valueOf(i);
+            Statement fallbackQueryStmt = mvHandler.getFallbackquerystmts().add(key);
+            VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
+            fallbackQueryStmt.setSqltext(query);
+            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                              m_hsql,
+                              db.getCatalog(),
+                              db,
+                              estimates,
+                              fallbackQueryStmt,
+                              fallbackQueryXML,
+                              fallbackQueryStmt.getSqltext(),
+                              null, // no user-supplied join order
+                              DeterminismMode.FASTER,
+                              StatementPartitioning.forceSP());
+        }
+    }
+
+    private void compileCreateQueryAndUpdateCatalog(Database db,
+                                                    String query,
+                                                    VoltXMLElement xmlquery,
+                                                    MaterializedViewHandler mvHandler) throws VoltCompilerException {
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        Statement createQuery = mvHandler.getCreatequery().add("createQuery");
+        createQuery.setSqltext(query);
+        StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                          m_hsql,
+                          db.getCatalog(),
+                          db,
+                          estimates,
+                          createQuery,
+                          xmlquery,
+                          createQuery.getSqltext(),
+                          null, // no user-supplied join order
+                          DeterminismMode.FASTER,
+                          StatementPartitioning.inferPartitioning());
     }
 
     /**

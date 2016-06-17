@@ -117,6 +117,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         } else if ((suspect instanceof Index && isUniqueIndex(suspect) == isUniqueIndex(prevType)) ||
                    (suspect instanceof ColumnRef && !isUniqueIndexColumn(suspect))) {
             return null;
+        } else if (suspect instanceof TableRef) {
+            return null;
         }
         return "Incompatible schema between master and replica: field " + field + " in schema object " + suspect;
     }
