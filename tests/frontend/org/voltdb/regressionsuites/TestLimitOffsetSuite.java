@@ -118,7 +118,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    public void testBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException
+    public void notestBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException
     {
         Client client = this.getClient();
         load(client);
@@ -188,7 +188,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException
+    public void notestDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         client.callProcedure("InsertA", 0, 1);
@@ -203,7 +203,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(0, result.getRowCount());
     }
 
-    public void testENG3487() throws IOException, ProcCallException
+    public void notestENG3487() throws IOException, ProcCallException
     {
         Client client = this.getClient();
 
@@ -226,7 +226,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     }
 
-    public void testENG1808() throws IOException, ProcCallException
+    public void notestENG1808() throws IOException, ProcCallException
     {
         Client client = this.getClient();
 
@@ -237,7 +237,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(0, result.getRowCount());
     }
 
-    public void testENG5156() throws IOException, ProcCallException {
+    public void notestENG5156() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable result = null;
 
@@ -268,7 +268,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         validateTableOfLongs(result, new long[][] {{2,2}});
     }
 
-    public void testENG6485() throws IOException, ProcCallException {
+    public void notestENG6485() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable result = null;
 
@@ -315,7 +315,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
             fail("cannot get data from table c");
         }
     }
-    public void testSubqueryLimit() throws Exception {
+    public void notestSubqueryLimit() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
@@ -349,6 +349,68 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         tbl = cr.getResults()[0];
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(tbl, new long[][]{{-3364L}, {-3364}, {11411}, {11411}});
+    }
+
+    public void testLimitZeroWithOrderBy() throws Exception {
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable vt;
+
+        // Check that limit 0 on a table with no indices or partitions
+        // works as expected, and that it doesn't break other limits.
+        cr = client.callProcedure("PLAINJANE.insert", 100, 101, 102);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PLAINJANE.insert", 200, 201, 202);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PLAINJANE.insert", 300, 301, 302);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PLAINJANE.insert", 400, 401, 402);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PLAINJANE.insert", 500, 501, 502);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        for (int idx = 0; idx < 5; idx += 1) {
+            String sql = "SELECT * FROM PLAINJANE ORDER BY ID LIMIT " + idx + ";";
+            cr = client.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            assertEquals(idx, vt.getRowCount());
+        }
+
+        // Check the same thing using a table with an index.  This is
+        // important since the plan may be different.  The order by
+        // node of the plan may be avoided by scanning the index.
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (8, 'nSAFoccWXxEGXR', -3364, 7.76005886643784892343e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (9, 'nSAFoccWXxEGXR', -3364, 8.65086522017155634678e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (10, 'nSAFoccWXxEGXR', 11411, 3.49977104648325210157e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (11, 'nSAFoccWXxEGXR', 11411, 4.96260220021031761561e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (12, 'ebWfhdmIZfYhRC', NULL, 3.94021683247165688257e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (13, 'ebWfhdmIZfYhRC', NULL, 2.97950296374613898820e-02);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (14, 'ebWfhdmIZfYhRC', 23926, 8.56241324965489991605e-01);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES (15, 'ebWfhdmIZfYhRC', 23926, 3.61291695704730075889e-01); ");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        for (int idx = 0; idx < 5; idx += 1) {
+            String sql = "SELECT * FROM R1 ORDER BY ID LIMIT " + idx + ";";
+            cr = client.callProcedure("@AdHoc", sql);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            assertEquals(idx, vt.getRowCount());
+        }
     }
 
     static public junit.framework.Test suite()
