@@ -733,7 +733,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Verify if a subquery can be replace with a direct select from table(s)
+     * Verify if a subquery can be replaced with a direct select from table(s)
      * @param subquery
      * @return TRUE/FALSE
      */
@@ -751,11 +751,10 @@ public abstract class AbstractParsedStmt {
         if (selectSubquery.hasAggregateDistinct()) {
             return false;
         }
-        // No WINDOW Functions.
-        // @TODO Commented out for now until hasWindowFunction will be available
-//        if (selectSubquery.hasWindowFunction()) {
-//            return false;
-//        }
+        // No windowed aggregate functions like RANK.
+        if (selectSubquery.hasWindowedExpression()) {
+            return false;
+        }
         // No LIMIT/OFFSET
         if (selectSubquery.hasLimitOrOffset() || selectSubquery.hasLimitOrOffsetParameters()) {
             return false;

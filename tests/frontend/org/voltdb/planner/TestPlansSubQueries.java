@@ -88,19 +88,13 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
-        if (columns.length > 0) {
-            checkOutputSchema(planNode, null, columns);
-        }
-    }
-
-    private void checkOutputSchema(AbstractPlanNode planNode, String tableAlias, String... columns) {
         NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
 
         for (int i = 0; i < schemaColumn.size(); ++i) {
             SchemaColumn col = schemaColumn.get(i);
-            checkOutputColumn(tableAlias, columns[i], col);
+            checkOutputColumn(null, columns[i], col);
         }
     }
 
@@ -135,7 +129,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
             assertEquals(tableAlias, snode.getTargetTableAlias());
         }
 
-        checkOutputSchema(snode, columns);
+        if (columns.length > 0) {
+            checkOutputSchema(snode, columns);
+        }
     }
 
     private void checkPredicateComparisonExpression(AbstractPlanNode pn, String tableAlias) {
@@ -157,7 +153,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
             assertTrue(actualIndexName.contains(indexName));
         }
 
-        checkOutputSchema(idxNode, columns);
+        if (columns.length > 0) {
+            checkOutputSchema(idxNode, columns);
+        }
     }
 
     private void checkPrimaryKeyIndexScan(AbstractPlanNode indexNode, String tableName, String... columns) {
