@@ -186,6 +186,16 @@ public:
         return bytes;
     }
 
+    // return the number of bytes when serialized for regular usage (other
+    // than export and DR).
+    size_t serializationSizeNoHeader() const {
+        size_t bytes = 0;
+        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+            bytes += maxSerializedColumnSize(colIdx);
+        }
+        return bytes;
+    }
+
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
@@ -415,6 +425,7 @@ public:
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
     void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
+    void serializeToFile(voltdb::SerializeOutputFile &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -949,6 +960,25 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
                             hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
                             static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
     }
+}
+
+inline void TableTuple::serializeToFile(voltdb::SerializeOutputFile &output, bool includeHiddenColumns) {
+    // TODO This is small enough that it seems worthwhile to just allocate a temp buffer
+    output.writeInt(serializationSizeNoHeader());
+
+    for (int j = 0; j < m_schema->columnCount(); ++j) {
+        //int fieldStart = output.position();
+        NValue value = getNValue(j);
+        value.serializeToFile(output);
+    }
+
+    if (includeHiddenColumns) {
+        for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
+            NValue value = getHiddenNValue(j);
+            value.serializeToFile(output);
+        }
+    }
+
 }
 
 inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) {

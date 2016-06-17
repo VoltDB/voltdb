@@ -118,6 +118,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
+                        std::string pathName = "",
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
@@ -185,6 +186,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Dependency Transfer Functions
         // -------------------------------------------------
         bool send(Table* dependency);
+        bool writeToDisk(Table* dependency);
         int loadNextDependency(Table* destination);
 
         // -------------------------------------------------
@@ -413,6 +415,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_partitionId;
         }
 
+        std::string getLastOutFileName() {
+            return m_executorContext->lastOutFileName();
+        }
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 
@@ -550,6 +556,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         char* m_reusedResultBuffer;
         /** size of reused_result_buffer. */
         int m_reusedResultCapacity;
+
+        /** name of output file for large result sets */
+        string m_outputFileName;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?

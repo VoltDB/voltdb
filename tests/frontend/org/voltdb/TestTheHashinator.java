@@ -240,7 +240,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        config, false);
+                        config, false,"");
 
         long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 39: 2;
 
@@ -275,7 +275,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        hashinatorConfig, false);
+                        hashinatorConfig, false,"");
 
 
         long valueToHash = 0;
@@ -349,7 +349,7 @@ public class TestTheHashinator {
                             0,
                             64*1024,
                             100,
-                            hashinatorConfig, false);
+                            hashinatorConfig, false,"");
 
             // use a short value hashed as a long type
             for (short valueToHash = -7; valueToHash <= 7; valueToHash++) {
@@ -396,7 +396,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false,"");
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -430,7 +430,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(hashinatorType, configBytes, 0, 0), false,"");
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -471,7 +471,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false);
+                        new HashinatorConfig(hashinatorType, configBytes, 0, 0), false, "");
 
         for (int i = 0; i < 1500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -542,7 +542,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false);
+                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(2), 0, 0), false,"");
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), configBytes);
         int jHash =
@@ -608,7 +608,7 @@ public class TestTheHashinator {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(6), 0, 0), false);
+                        new HashinatorConfig(hashinatorType, TheHashinator.getConfigureBytes(6), 0, 0), false,"");
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];

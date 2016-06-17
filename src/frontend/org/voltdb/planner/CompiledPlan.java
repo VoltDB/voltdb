@@ -86,6 +86,9 @@ public class CompiledPlan {
     /** Does the statement write? */
     private boolean m_readOnly = false;
 
+    /** Is this statement high volume? */
+    private boolean m_highVolume = false;
+
     /**
      * Whether the plan's statement mandates a result with nondeterministic content;
      */
@@ -330,6 +333,14 @@ public class CompiledPlan {
 
     public void setReadOnly(boolean newValue) {
         m_readOnly = newValue;
+    }
+
+    public boolean isHighVolume() {
+        return m_highVolume;
+    }
+
+    public void setHighVolume(boolean newValue) {
+        m_highVolume = newValue;
     }
 
     public void setStatementPartitioning(StatementPartitioning partitioning) {

@@ -148,6 +148,12 @@ class AbstractExecutor {
      */
     void setDMLCountOutputTable(TempTableLimits* limits);
 
+    /**
+     * Set up a single-column temp output table for send executors that require one to return high volume output file names.
+     * Called from p_init.
+     */
+    void setHighVolumeOutputTable(TempTableLimits* limits);
+
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;

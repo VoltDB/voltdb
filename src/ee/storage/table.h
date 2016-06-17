@@ -204,9 +204,13 @@ class Table {
     int getApproximateSizeToSerialize() const;
     size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
     size_t getAccurateSizeToSerialize(bool includeTotalSize);
+
     bool serializeTo(SerializeOutput &serialize_out);
     bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
     bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
+
+    bool serializeToFile(SerializeOutputFile &serialize_iof);
+    bool serializeColumnHeaderToFile(SerializeOutputFile &serialize_iof);
 
     /*
      * Serialize a single tuple as a table so it can be sent to Java.

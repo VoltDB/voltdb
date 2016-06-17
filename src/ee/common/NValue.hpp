@@ -314,6 +314,9 @@ class NValue {
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
 
+    /* Serialize this NValue to a SerializeOutputFile */
+    void serializeToFile(SerializeOutputFile &output) const;
+
     /* Serialize this NValue to an Export stream */
     void serializeToExport_withoutNull(ExportSerializeOutput&) const;
 
@@ -3159,6 +3162,77 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
                               "with ValueType '%s' that is not handled", getValueTypeString().c_str());
 }
 
+/**
+ * Serialize this NValue to the provided SerializeOutputFile
+ */
+inline void NValue::serializeToFile(SerializeOutputFile &output) const {
+    const ValueType type = getValueType();
+    switch (type) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY: {
+        if (isNull()) {
+            output.writeInt(OBJECTLENGTH_NULL);
+            return;
+        }
+        int32_t length;
+        const char* buf = getObject_withoutNull(&length);
+        if (length <= OBJECTLENGTH_NULL) {
+            throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
+        }
+        output.writeInt(length);
+
+        // Not a null string: write it out
+        if (type != VALUE_TYPE_GEOGRAPHY) {
+            output.writeBytes(buf, length);
+        }
+        else {
+            // geography gets its own serialization to deal with
+            // byteswapping and endianness
+            getGeographyValue().serializeTo(output);
+        }
+        return;
+    }
+    case VALUE_TYPE_TINYINT:
+        output.writeByte(getTinyInt());
+        return;
+
+    case VALUE_TYPE_SMALLINT:
+        output.writeShort(getSmallInt());
+        return;
+
+    case VALUE_TYPE_INTEGER:
+        output.writeInt(getInteger());
+        return;
+
+    case VALUE_TYPE_TIMESTAMP:
+        output.writeLong(getTimestamp());
+        return;
+
+    case VALUE_TYPE_BIGINT:
+        output.writeLong(getBigInt());
+        return;
+
+    case VALUE_TYPE_DOUBLE:
+        output.writeDouble(getDouble());
+        return;
+
+    case VALUE_TYPE_DECIMAL:
+        output.writeLong(getDecimal().table[1]);
+        output.writeLong(getDecimal().table[0]);
+        return;
+
+    case VALUE_TYPE_POINT:
+        getGeographyPointValue().serializeTo(output);
+        return;
+
+    default:
+        break;
+    }
+
+    throwDynamicSQLException( "NValue::serializeTo() found a column "
+                              "with ValueType '%s' that is not handled", getValueTypeString().c_str());
+}
 
 inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
 {

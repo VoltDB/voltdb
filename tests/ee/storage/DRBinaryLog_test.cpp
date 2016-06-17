@@ -109,7 +109,7 @@ public:
     MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
                      DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
       : m_context(new ExecutorContext(1, 1, NULL, topend, pool, NULL, this,
-                                      "localhost", 2, drStream, drReplicatedStream, clusterId))
+                                      "localhost", 2, drStream, drReplicatedStream, clusterId, ""))
     {
 
         std::vector<ValueType> exportColumnType;

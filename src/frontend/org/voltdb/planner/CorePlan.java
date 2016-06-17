@@ -54,6 +54,9 @@ public class CorePlan {
     /** Does the statement write? */
     public final boolean readOnly;
 
+    /** Is the statement high volume? */
+    public final boolean highVolume;
+
     /** What SHA-1 hash of the catalog is this plan good for? */
     private final byte[] catalogHash;
 
@@ -101,6 +104,7 @@ public class CorePlan {
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.isReadOnly();
+        highVolume = plan.isHighVolume();
     }
 
     /***
@@ -119,6 +123,7 @@ public class CorePlan {
                     byte[] collectorHash,
                     boolean isReplicatedTableDML,
                     boolean isReadOnly,
+                    boolean isHighVolume,
                     VoltType[] paramTypes,
                     byte[] catalogHash)
     {
@@ -128,6 +133,7 @@ public class CorePlan {
         this.collectorHash = collectorHash;
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.readOnly = isReadOnly;
+        this.highVolume = isHighVolume;
         this.parameterTypes = paramTypes;
         this.catalogHash = catalogHash;
     }
@@ -154,7 +160,7 @@ public class CorePlan {
         else {
             size += 4;
         }
-        size += 2; // booleans
+        size += 3; // booleans
         size += 20;  // catalog hash SHA-1 is 20b
 
         size += 2; // params count
@@ -180,6 +186,7 @@ public class CorePlan {
         // booleans
         buf.put((byte) (isReplicatedTableDML ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
+        buf.put((byte) (highVolume ? 1 : 0));
 
         // catalog hash
         buf.put(catalogHash);
@@ -210,6 +217,7 @@ public class CorePlan {
         // booleans
         boolean isReplicatedTableDML = buf.get() == 1;
         boolean isReadOnly = buf.get() == 1;
+        boolean isHighVolume = buf.get() == 1;
 
         // catalog hash
         byte[] catalogHash = new byte[20];  // Catalog sha-1 hash is 20b
@@ -229,6 +237,7 @@ public class CorePlan {
                 collectorHash,
                 isReplicatedTableDML,
                 isReadOnly,
+                isHighVolume,
                 paramTypes,
                 catalogHash);
     }
@@ -258,6 +267,9 @@ public class CorePlan {
             return false;
         }
         if (readOnly != other.readOnly) {
+            return false;
+        }
+        if (highVolume != other.highVolume) {
             return false;
         }
         if (!Arrays.equals(catalogHash, other.catalogHash)) {
