@@ -24,26 +24,14 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */package benchmark;
+
+package benchmark;
 
 import java.util.Timer;
 import java.util.TimerTask;
+
 import org.voltdb.*;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.*;
 
 public class BenchmarkStats {
@@ -64,28 +52,28 @@ public class BenchmarkStats {
 
     }
 
-    public void startBenchmark() {
+    public void startBenchmark(int displayIntervalInSeconds) {
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
         startTimeMillis = System.currentTimeMillis();
-        schedulePeriodicStats();
+        schedulePeriodicStats(displayIntervalInSeconds);
     }
 
-    public void endBenchmark() throws Exception {
+    public void endBenchmark(String statsfile) throws Exception {
         timer.cancel();
         client.drain();
-        printResults();
+        printResults(statsfile);
     }
 
-    public void schedulePeriodicStats() {
+    public void schedulePeriodicStats(int displayIntervalInSeconds) {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
                 @Override
                 public void run() { printStatistics(); }
             };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  5 * 1000,
-                                  5 * 1000);
+                displayIntervalInSeconds * 1000,
+                displayIntervalInSeconds * 1000);
     }
 
     public synchronized void printStatistics() {
@@ -103,7 +91,7 @@ public class BenchmarkStats {
         System.out.printf("\n");
     }
 
-    public synchronized void printResults() throws Exception {
+    public synchronized void printResults(String statsfile) throws Exception {
         final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
@@ -136,5 +124,8 @@ public class BenchmarkStats {
         System.out.println(" Latency Histogram");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(stats.latencyHistoReport());
+
+        // 4. Write stats to file if requested
+        client.writeSummaryCSV(stats, statsfile);
     }
 }
