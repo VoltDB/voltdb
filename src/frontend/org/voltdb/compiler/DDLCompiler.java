@@ -53,6 +53,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -1210,6 +1211,132 @@ public class DDLCompiler {
         m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
+    private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
+            throws VoltCompilerException {
+        // skip checking for non-unique indexes.
+        if (!index.getUnique()) {
+            return;
+        }
+
+        boolean containsPartitionColumn = false;
+        String jsonExpr = index.getExpressionsjson();
+        // if this is a pure-column index...
+        if (jsonExpr.isEmpty()) {
+            for (ColumnRef cref : index.getColumns()) {
+                Column col = cref.getColumn();
+                // unique index contains partitioned column
+                if (col.equals(partitionCol)) {
+                    containsPartitionColumn = true;
+                    break;
+                }
+            }
+        }
+        // if this is a fancy expression-based index...
+        else {
+            try {
+                int partitionColIndex = partitionCol.getIndex();
+                List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                for (AbstractExpression expr: indexExpressions) {
+                    if (expr instanceof TupleValueExpression &&
+                            ((TupleValueExpression) expr).getColumnIndex() == partitionColIndex ) {
+                        containsPartitionColumn = true;
+                        break;
+                    }
+                }
+            } catch (JSONException e) {
+                e.printStackTrace(); // danger will robinson
+                assert(false);
+            }
+        }
+
+        if (containsPartitionColumn) {
+            if (index.getAssumeunique()) {
+                String exceptionMsg = String.format("ASSUMEUNIQUE is not valid " +
+                "for an index that includes the partitioning column. Please use UNIQUE instead.");
+                throw m_compiler.new VoltCompilerException(exceptionMsg);
+            }
+        }
+        else if ( ! index.getAssumeunique()) {
+            // Throw compiler exception.
+            String indexName = index.getTypeName();
+            String keyword = "";
+            if (indexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX)) {
+                indexName = "PRIMARY KEY";
+                keyword = "PRIMARY KEY";
+            } else {
+                indexName = "UNIQUE INDEX " + indexName;
+                keyword = "UNIQUE";
+            }
+
+            String exceptionMsg = "Invalid use of " + keyword +
+                    ". The " + indexName + " on the partitioned table " + tableName +
+                    " does not include the partitioning column " + partitionCol.getName() +
+                    ". See the documentation for the 'CREATE TABLE' and 'CREATE INDEX' commands and the 'ASSUMEUNIQUE' keyword.";
+            throw m_compiler.new VoltCompilerException(exceptionMsg);
+        }
+
+    }
+
+    void handlePartitions(Database db) throws VoltCompilerException {
+        // Actually parse and handle all the partitions
+        // this needs to happen before procedures are compiled
+        String msg = "In database, ";
+        final CatalogMap<Table> tables = db.getTables();
+        for (Table table : tables) {
+            String tableName = table.getTypeName();
+
+            if (m_tracker.m_partitionMap.containsKey(tableName.toLowerCase())) {
+                String colName = m_tracker.m_partitionMap.get(tableName.toLowerCase());
+                // A null column name indicates a replicated table. Ignore it here
+                // because it defaults to replicated in the catalog.
+                if (colName != null) {
+                    assert(tables.getIgnoreCase(tableName) != null);
+                    if (m_matViewMap.containsKey(table)) {
+                        msg += "the materialized view is automatically partitioned based on its source table. "
+                                + "Invalid PARTITION statement on view table " + tableName + ".";
+                        throw m_compiler.new VoltCompilerException(msg);
+                    }
+
+                    final Column partitionCol = table.getColumns().getIgnoreCase(colName);
+                    // make sure the column exists
+                    if (partitionCol == null) {
+                        msg += "PARTITION has unknown COLUMN '" + colName + "'";
+                        throw m_compiler.new VoltCompilerException(msg);
+                    }
+                    // make sure the column is marked not-nullable
+                    if (partitionCol.getNullable() == true) {
+                        msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
+                            "Partition columns must be constrained \"NOT NULL\".";
+                        throw m_compiler.new VoltCompilerException(msg);
+                    }
+                    // verify that the partition column is a supported type
+                    VoltType pcolType = VoltType.get((byte) partitionCol.getType());
+                    switch (pcolType) {
+                        case TINYINT:
+                        case SMALLINT:
+                        case INTEGER:
+                        case BIGINT:
+                        case STRING:
+                        case VARBINARY:
+                            break;
+                        default:
+                            msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
+                            "Partition columns must be an integer, varchar or varbinary type.";
+                            throw m_compiler.new VoltCompilerException(msg);
+                    }
+
+                    table.setPartitioncolumn(partitionCol);
+                    table.setIsreplicated(false);
+
+                    // Check valid indexes, whether they contain the partition column or not.
+                    for (Index index : table.getIndexes()) {
+                        checkValidPartitionTableIndex(index, partitionCol, tableName);
+                    }
+                }
+            }
+        }
+    }
+
     void compileToCatalog(Database db) throws VoltCompilerException {
         // note this will need to be decompressed to be used
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
@@ -1226,8 +1353,9 @@ public class DDLCompiler {
             }
         }
 
-        m_mvProcessor.startProcessing(db, m_matViewMap);
         fillTrackerFromXML();
+        handlePartitions(db);
+        m_mvProcessor.startProcessing(db, m_matViewMap);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when

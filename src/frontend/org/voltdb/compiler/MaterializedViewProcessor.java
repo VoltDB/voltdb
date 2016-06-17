@@ -279,6 +279,69 @@ public class MaterializedViewProcessor {
                 // Otherwise HSQLDB might promote types differently than Volt.
                 destColumn.setType(col.expression.getValueType().getValue());
             }
+            if (srcTable.getPartitioncolumn() != null) {
+                // Set the partitioning of destination tables of associated views.
+                // If a view's source table is replicated, then a full scan of the
+                // associated view is single-sited. If the source is partitioned,
+                // a full scan of the view must be distributed, unless it is filtered
+                // by the original table's partitioning key, which, to be filtered,
+                // must also be a GROUP BY key.
+                destTable.setIsreplicated(false);
+                setGroupedTablePartitionColumn(matviewinfo, srcTable.getPartitioncolumn());
+            }
+        }
+    }
+
+    private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
+            throws VoltCompilerException {
+        // A view of a replicated table is replicated.
+        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
+        // -- it certainly isn't replicated!
+        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
+        // Otherwise, the view table just doesn't have a partitioning column
+        // -- it is seemingly randomly distributed,
+        // and its grouped columns are only locally unique but not globally unique.
+        Table destTable = mvi.getDest();
+        // Get the grouped columns in "index" order.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's group by columns.
+        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
+
+        if (mvi.getGroupbycols().size() > 0) {
+            int index = 0;
+            for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
+                Column srcCol = cref.getColumn();
+                if (srcCol.getName().equals(partitionColName)) {
+                    Column destCol = destColumnArray.get(index);
+                    destTable.setPartitioncolumn(destCol);
+                    return;
+                }
+                ++index;
+            }
+        } else {
+            String complexGroupbyJson = mvi.getGroupbyexpressionsjson();
+            if (complexGroupbyJson.length() > 0) {
+                int partitionColIndex =  partitionColumn.getIndex();
+
+                  List<AbstractExpression> mvComplexGroupbyCols = null;
+                  try {
+                      mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                  } catch (JSONException e) {
+                      e.printStackTrace();
+                  }
+                  int index = 0;
+                  for (AbstractExpression expr: mvComplexGroupbyCols) {
+                      if (expr instanceof TupleValueExpression) {
+                          TupleValueExpression tve = (TupleValueExpression) expr;
+                          if (tve.getColumnIndex() == partitionColIndex) {
+                              Column destCol = destColumnArray.get(index);
+                              destTable.setPartitioncolumn(destCol);
+                              return;
+                          }
+                      }
+                      ++index;
+                  }
+            }
         }
     }
 
@@ -434,7 +497,7 @@ public class MaterializedViewProcessor {
             Column destColumn, ExpressionType type, TupleValueExpression colExpr) {
 
         if (colExpr != null) {
-            assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
+            // assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
             String srcColName = colExpr.getColumnName();
             Column srcColumn = srcTable.getColumns().getIgnoreCase(srcColName);
             destColumn.setMatviewsource(srcColumn);
