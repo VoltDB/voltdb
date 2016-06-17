@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -74,7 +75,8 @@ public class MaterializedViewProcessor {
      * materialized views.
      * @throws VoltCompilerException
      */
-    public void startProcessing(Database db, HashMap<Table, String> matViewMap) throws VoltCompilerException {
+    public void startProcessing(Database db, HashMap<Table, String> matViewMap, TreeSet<String> exportTableNames)
+            throws VoltCompilerException {
         HashSet <String> viewTableNames = new HashSet<>();
         for (Entry<Table, String> entry : matViewMap.entrySet()) {
             viewTableNames.add(entry.getKey().getTypeName());
@@ -121,11 +123,20 @@ public class MaterializedViewProcessor {
 
             // Add mvHandler to the destTable:
             MaterializedViewHandler mvHandler = destTable.getMvhandler().add("mvHandler");
+            boolean hasStreamedTableAsSource = false;
             for (Table srcTable : stmt.m_tableList) {
                 if (viewTableNames.contains(srcTable.getTypeName())) {
                     String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
                             viewName, srcTable.getTypeName());
                     throw m_compiler.new VoltCompilerException(msg);
+                }
+                if (! hasStreamedTableAsSource && exportTableNames.contains(srcTable.getTypeName())) {
+                    hasStreamedTableAsSource = true;
+                    if (stmt.m_tableList.size() > 1) {
+                        String msg = String.format("A materialized view (%s) on joint tables cannot have streamed table (%s) as its source.",
+                                                   viewName, srcTable.getTypeName());
+                        throw m_compiler.new VoltCompilerException(msg);
+                    }
                 }
                 // Add the reference to destTable to the affectedViewTables of each source table.
                 TableRef tableRef = srcTable.getAffectedviewtables().add(destTable.getTypeName());
@@ -237,7 +248,9 @@ public class MaterializedViewProcessor {
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
             compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, matviewinfo);
             compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandler);
-            compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandler);
+            if (! hasStreamedTableAsSource) {
+                compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandler);
+            }
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {

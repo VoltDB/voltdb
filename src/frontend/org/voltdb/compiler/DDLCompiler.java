@@ -30,9 +30,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 
 import org.apache.commons.lang3.StringUtils;
@@ -53,7 +56,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
@@ -1337,6 +1339,17 @@ public class DDLCompiler {
         }
     }
 
+    private TreeSet<String> getExportTableNames() {
+        TreeSet<String> exportTableNames = new TreeSet<String>();
+        NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
+        for (Entry<String, NavigableSet<String>> e : exportsByTargetName.entrySet()) {
+            for (String tableName : e.getValue()) {
+                exportTableNames.add(tableName);
+            }
+        }
+        return exportTableNames;
+    }
+
     void compileToCatalog(Database db) throws VoltCompilerException {
         // note this will need to be decompressed to be used
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
@@ -1355,7 +1368,7 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
-        m_mvProcessor.startProcessing(db, m_matViewMap);
+        m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
