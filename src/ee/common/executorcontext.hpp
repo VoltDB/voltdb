@@ -31,6 +31,7 @@
 namespace voltdb {
 
 extern const int64_t VOLT_EPOCH;
+extern const int64_t VOLT_EPOCH_IN_MILLIS;
 
 class AbstractExecutor;
 class AbstractDRTupleStream;
@@ -84,7 +85,7 @@ class ExecutorContext {
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_uniqueId = uniqueId;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH;
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
