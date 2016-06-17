@@ -388,7 +388,7 @@ class SchemaPageTest extends TestBase {
         waitFor(waitTime) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
-            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
+            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2016 VoltDB Inc. All rights reserved.".toLowerCase())
         }
     }
 
@@ -497,13 +497,33 @@ class SchemaPageTest extends TestBase {
         ddlActualSourceLines.remove(0).equals('-- This file represents the current database schema.')
         ddlActualSourceLines.remove(0).equals('-- Use this file as input to reproduce the current database structure in another database instance.')
 
+//        ddlActualSourceLines.remove(0).equals('-- ')
+        ddlActualSourceLines.remove(0).startsWith('--')
+        ddlActualSourceLines.remove(0).equals('-- This file uses the --inlinebatch feature. Batching processes all of the DDL in a single step')
+        ddlActualSourceLines.remove(0).equals('-- dramatically reducing the time required to apply the schema compared to processing each')
+        ddlActualSourceLines.remove(0).equals('-- command separately.')
+
+        ddlActualSourceLines.remove(0).startsWith('--')
+        ddlActualSourceLines.remove(0).equals('-- If the schema declares Java stored procedures, be sure to load the .jar file')
+        ddlActualSourceLines.remove(0).equals('-- with the classes before loading the schema. For example:')
+        ddlActualSourceLines.remove(0).startsWith('--')
+        ddlActualSourceLines.remove(0).equals('-- LOAD CLASSES voltdb-procs.jar;')
+        ddlActualSourceLines.remove(0).equals('-- FILE ddl.sql;')
+
+        println("expected" + ddlExpectedSourceLines)
+        println("actual" + ddlActualSourceLines)
+
+
+
+
+        println(fileName)
         and: 'DDL Source should match expected text'
         printAndCompare('DDL Source', fileName, true, ddlExpectedSourceLines, ddlActualSourceLines)
     }
 
     // Overview Tab
 
-    def "Overview Tab:Check Schema Overview"() {
+    def OverviewTabCheckSchemaOverview() {
         when: 'go to overview tab'
         page.openSchemaPageOverviewTab()
         then: 'at overview tab'
