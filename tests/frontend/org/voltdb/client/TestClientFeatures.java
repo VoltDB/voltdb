@@ -512,7 +512,41 @@ public class TestClientFeatures extends TestCase {
             }
         }
         if (preNumClientReaper != postNumClientReaper) {
-            fail("Something failed to clean up.");
+            fail("Something failed to clean up. ClientReaper");
+        }
+    }
+
+    public void testThreadsKilledOneOfClientClose() {
+        ClientConfig config = new ClientConfig();
+        Client client1 = ClientFactory.createClient(config);
+        Client client2 = ClientFactory.createClient(config);
+        try {
+            client1.createConnection("localhost");
+            client2.createConnection("localhost");
+        } catch (UnknownHostException ue) {
+            fail("Something failed in connecting to localhost, io exception");
+        } catch (IOException ioe) {
+            fail("Something failed in connecting to localhost, unknow exception");
+        }
+        //String m_procName = "@LoadSinglepartitionTable";
+        try {
+            VoltTable configData1 = client1.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
+        } catch (IOException | ProcCallException e) {
+            fail("Something failed in call procedure for client1.");
+        }
+        try {
+            client1.close();
+        } catch (InterruptedException e1) {
+            fail("Something failed in closing client.");
+        }
+        Map<Thread, StackTraceElement[]> preStMap = Thread.getAllStackTraces();
+        for (Thread t : preStMap.keySet()) {
+            System.out.println(t.getName());
+        }
+        try {
+            VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
+        } catch (IOException | ProcCallException e) {
+            fail("Something failed in call procedure for client1.");
         }
     }
 }
