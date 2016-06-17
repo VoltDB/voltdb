@@ -145,6 +145,7 @@ end
 begin MaterializedViewHandler       "Information used to build and update a materialized view"
   Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
   Statement* createQuery            "The SELECT statement that defines the view"
+  bool isJointTableView             "May be removed after the feature is finished."
 end
 
 begin MaterializedViewInfo          "Information used to build and update a materialized view"

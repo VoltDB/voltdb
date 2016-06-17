@@ -123,6 +123,9 @@ public class MaterializedViewProcessor {
 
             // Add mvHandler to the destTable:
             MaterializedViewHandler mvHandler = destTable.getMvhandler().add("mvHandler");
+            if (stmt.m_tableList.size() > 1) {
+                mvHandler.setIsjointtableview(true);
+            }
             boolean hasStreamedTableAsSource = false;
             for (Table srcTable : stmt.m_tableList) {
                 if (viewTableNames.contains(srcTable.getTypeName())) {
@@ -498,12 +501,6 @@ public class MaterializedViewProcessor {
         }
 
         checkViewSources(stmt.m_tableList);
-        // if (stmt.m_tableList.size() != 1) {
-        //     msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-        //                "Only one source table is allowed.");
-        //     throw m_compiler.new VoltCompilerException(msg.toString());
-        // }
-
      }
 
     private static void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
