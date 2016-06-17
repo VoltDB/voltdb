@@ -88,12 +88,15 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
+<<<<<<< e08f435a78e514befcfa21ba5cf22bb2db86f485
         if (columns.length > 0) {
             checkOutputSchema(planNode, null, columns);
         }
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String tableAlias, String[] columns) {
+=======
+>>>>>>> tweak tests and typos in subquqery simplification
         NodeSchema schema = planNode.getOutputSchema();
         List<SchemaColumn> schemaColumn = schema.getColumns();
         assertEquals(columns.length, schemaColumn.size());
@@ -101,7 +104,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         for (int i = 0; i < schemaColumn.size(); ++i) {
             SchemaColumn col = schemaColumn.get(i);
             checkOutputColumn(null, columns[i], col);
+<<<<<<< e08f435a78e514befcfa21ba5cf22bb2db86f485
             checkOutputColumn(tableAlias, columns[i], col);
+=======
+>>>>>>> tweak tests and typos in subquqery simplification
         }
     }
 
