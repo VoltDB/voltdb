@@ -23,12 +23,14 @@
 
 namespace voltdb
 {
+const static int64_t VOLT_EPOCH = 1199145600000000L;
+const static int64_t VOLT_EPOCH_IN_MILLIS = 1199145600000L;
+
 class UniqueId {
 public:
     const static int64_t TIMESTAMP_BITS = 40;
     const static int64_t COUNTER_BITS = 9;
     const static int64_t PARTITIONID_BITS = 14;
-    const static int64_t VOLT_EPOCH = 1199145600000L;
     const static int64_t TIMESTAMP_MAX_VALUE = (1L << TIMESTAMP_BITS) - 1L;
     const static int64_t COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
     const static int64_t TIMESTAMP_PLUS_COUNTER_MAX_VALUE = (1LL << (TIMESTAMP_BITS + COUNTER_BITS)) - 1LL;
@@ -37,8 +39,8 @@ public:
     const static int64_t MP_INIT_PID = PARTITION_ID_MASK;
 
     static UniqueId makeIdFromComponents(int64_t ts, int64_t seqNo, int64_t partitionId) {
-        // compute the time in millis since VOLT_EPOCH
-        int64_t uniqueId = ts - VOLT_EPOCH;
+        // compute the time in millis since VOLT_EPOCH_IN_MILLIS
+        int64_t uniqueId = ts - VOLT_EPOCH_IN_MILLIS;
         // verify all fields are the right size
         assert(uniqueId <= TIMESTAMP_MAX_VALUE);
         assert(seqNo <= COUNTER_MAX_VALUE);
