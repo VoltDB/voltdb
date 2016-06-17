@@ -155,6 +155,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.util.Properties;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -177,6 +178,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "    </httpd>",
         "</deployment>"
     };
+
+    private static Properties m_pathList = new Properties();
 
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
@@ -378,11 +381,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public static String getPath(String name) {
-        if (name.contains("voltdbroot")) {
-            return "/tmp/voltdbroot";
-        }
-        System.out.println("Asking for path property: " + name);
-        return "/tmp";
+        return m_pathList.getProperty(name);
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -413,17 +412,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final List<String> managedPathsWithFiles(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
         PathsType paths = deployment.getPaths();
-        String voltDbRoot = paths.getVoltdbroot().getNodePath();
+        String voltDbRoot = paths.getVoltdbroot().getPath();
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getPath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getPath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getPath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getPath())) != null)
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getPath())) != null)
             nonEmptyPaths.add(path);
         return nonEmptyPaths.build();
     }
@@ -488,6 +487,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (config.m_startAction == StartAction.INITIALIZE) {
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
+                stagePathConfiguration(config);
                 hostLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
@@ -502,6 +502,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             + rootFH + " that was initialized with the init command");
                     return;
                 }
+            } else {
+                loadPathConfiguration(config);
             }
 
             if (config.m_hostCount == VoltDB.UNDEFINED) {
@@ -1517,9 +1519,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    //This will make all deployment path elements as fake and real one will be saved in config file.
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 
-        String deprootFN = dt.getPaths().getVoltdbroot().getNodePath();
+        String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
 
@@ -1567,14 +1570,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         if (config.m_isEnterprise) {
             List<String> failed = new ArrayList<>();
-            List<File> paths = ImmutableList.<File>builder()
-                    .add(new VoltFile(dt.getPaths().getCommandlog().getNodePath()))
-                    .add(new VoltFile(dt.getPaths().getCommandlogsnapshot().getNodePath()))
-                    .add(new VoltFile(dt.getPaths().getSnapshots().getNodePath()))
-                    .add(new VoltFile(dt.getPaths().getExportoverflow().getNodePath()))
-                    .add(new VoltFile(dt.getPaths().getDroverflow().getNodePath()))
+            Map<String, File> paths = ImmutableMap.<String, File>builder()
+                    .put(dt.getPaths().getCommandlog().getKey(), new VoltFile(dt.getPaths().getCommandlog().getPath()))
+                    .put(dt.getPaths().getCommandlogsnapshot().getKey(), new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath()))
+                    .put(dt.getPaths().getSnapshots().getKey(), new VoltFile(dt.getPaths().getSnapshots().getPath()))
+                    .put(dt.getPaths().getExportoverflow().getKey(), new VoltFile(dt.getPaths().getExportoverflow().getPath()))
+                    .put(dt.getPaths().getDroverflow().getKey(), new VoltFile(dt.getPaths().getDroverflow().getPath()))
                     .build();
-            for (File path: paths) {
+            for (File path: paths.values()) {
                 if (!path.isAbsolute()) {
                     path = new VoltFile(config.m_voltdbRoot, path.getPath());
                 }
@@ -1618,6 +1621,34 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
         }
+
+        //Get all paths and put it in properties
+        try {
+            m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
+                    (new VoltFile(dt.getPaths().getVoltdbroot().getPath())).getCanonicalPath());
+            m_pathList.put(dt.getPaths().getCommandlog().getKey(),
+                    (new VoltFile(dt.getPaths().getCommandlog().getPath())).getCanonicalPath());
+            m_pathList.put(dt.getPaths().getCommandlogsnapshot().getKey(),
+                (new VoltFile(dt.getPaths().getCommandlogsnapshot().getPath())).getCanonicalPath());
+            m_pathList.put(dt.getPaths().getSnapshots().getKey(),
+                (new VoltFile(dt.getPaths().getSnapshots().getPath())).getCanonicalPath());
+            m_pathList.put(dt.getPaths().getExportoverflow().getKey(),
+                (new VoltFile(dt.getPaths().getExportoverflow().getPath())).getCanonicalPath());
+            m_pathList.put(dt.getPaths().getDroverflow().getKey(),
+                (new VoltFile(dt.getPaths().getDroverflow().getPath())).getCanonicalPath());
+        } catch (IOException ex) {
+            VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
+        }
+
+        //Now that we are done with deployment configuration set all path to fake ones.
+        dt.getPaths().getVoltdbroot().setPath("");
+        if (config.m_isEnterprise) {
+            dt.getPaths().getCommandlog().setPath("");
+            dt.getPaths().getCommandlogsnapshot().setPath("");
+            dt.getPaths().getSnapshots().setPath("");
+            dt.getPaths().getExportoverflow().setPath("");
+            dt.getPaths().getDroverflow().setPath("");
+        }
     }
 
     private void stageInitializedMarker(Configuration config) {
@@ -1626,6 +1657,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             pw.println(config.m_clusterName);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB("Unable to stage cluster name designtion", false, e);
+        }
+    }
+
+    private void stagePathConfiguration(Configuration config) {
+        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_PATHS);
+        try (PrintWriter pw = new PrintWriter(new FileWriter(depFH), true)) {
+            m_pathList.store(pw, "DO NOT MODIFY THIS FILE");
+            pw.flush();
+            pw.close();
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to stage configuratio path designtion", false, e);
+        }
+    }
+
+    private void loadPathConfiguration(Configuration config) {
+        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_PATHS);
+        try (FileInputStream is = new FileInputStream(depFH)) {
+            consoleLog.info("Loading Path configuration from " + depFH.getAbsolutePath());
+            m_pathList.load(is);
+            System.out.println("Paths are: " + m_pathList.toString());
+            is.close();
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB("Unable to read configuratio path designtion", false, e);
         }
     }
 
