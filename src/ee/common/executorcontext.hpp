@@ -61,7 +61,8 @@ class ExecutorContext {
                     CatalogId hostId,
                     AbstractDRTupleStream *drTupleStream,
                     AbstractDRTupleStream *drReplicatedStream,
-                    CatalogId drClusterId);
+                    CatalogId drClusterId,
+                    std::string pathName);
 
     ~ExecutorContext();
 
@@ -149,6 +150,33 @@ class ExecutorContext {
 
     Topend* getTopend() {
         return m_topEnd;
+    }
+
+    std::string getPathName() {
+        return m_pathName;
+    }
+
+    std::string nextOutFileName() {
+        // 255 is typical system limit on file name size
+        char outFileChars[255];
+        snprintf(outFileChars,255,"%s/%ld_%d.vtbl",m_pathName.c_str(),m_uniqueId,m_outFileCount);
+        ++m_outFileCount;
+        string outFileName;
+        outFileName.assign(outFileChars);
+        m_outFileName = outFileName;
+        return outFileName;
+    }
+
+    std::string lastOutFileName() {
+        return m_outFileName;
+    }
+
+    int getOutFileCount() {
+        return m_outFileCount;
+    }
+
+    void incrOutFileCount() {
+        ++m_outFileCount;
     }
 
     /** Current or most recent sp handle */
@@ -269,6 +297,11 @@ class ExecutorContext {
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
+
+    std::string m_pathName;
+    std::string m_outFileName;
+    int m_outFileCount;
+
   public:
     int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;

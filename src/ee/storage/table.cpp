@@ -271,6 +271,56 @@ size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
     return bytes;
 }
 
+bool Table::serializeColumnHeaderToFile(SerializeOutputFile &serialize_iof) {
+
+    /* NOTE:
+       VoltDBEngine uses a binary template to create tables of single integers.
+       It's called m_templateSingleLongTable and if you are seeing a serialization
+       bug in tables of single integers, make sure that's correct.
+    */
+
+    // use a cache
+    if (m_columnHeaderData) {
+        assert(m_columnHeaderSize != -1);
+        serialize_iof.writeBytes(m_columnHeaderData, m_columnHeaderSize);
+        return true;
+    }
+    assert(m_columnHeaderSize == -1);
+
+    // header
+    m_columnHeaderSize = getColumnHeaderSizeToSerialize(false);
+    int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
+    serialize_iof.writeInt(nonInclusiveHeaderSize);
+
+    //status code
+    serialize_iof.writeByte(-128);
+
+    // column counts as a short
+    serialize_iof.writeShort(static_cast<int16_t>(m_columnCount));
+
+    // write an array of column types as bytes
+    for (int i = 0; i < m_columnCount; ++i) {
+        ValueType type = m_schema->columnType(i);
+        serialize_iof.writeByte(static_cast<int8_t>(type));
+    }
+
+    // write the array of column names as voltdb strings
+    // NOTE: strings are ASCII only in metadata (UTF-8 in table storage)
+    for (int i = 0; i < m_columnCount; ++i) {
+        // column name: write (offset, length) for column definition, and string to string table
+        const string& name = columnName(i);
+        // column names can't be null, so length must be >= 0
+        int32_t length = static_cast<int32_t>(name.size());
+        assert(length >= 0);
+
+        // this is standard string serialization for voltdb
+        serialize_iof.writeInt(length);
+        serialize_iof.writeBytes(name.data(), length);
+    }
+
+    return true;
+
+}
 
 bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 
@@ -336,6 +386,36 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     return true;
 
 }
+
+
+bool Table::serializeToFile(SerializeOutputFile &serialize_iof) {
+    // The table is serialized as:
+    // [(int) total size]
+    // [(int) header size] [num columns] [column types] [column names]
+    // [(int) num tuples] [tuple data]
+
+    // warning: getting size in advance is expensive
+    int32_t sz = getAccurateSizeToSerialize(false);
+    serialize_iof.writeInt(sz);
+
+    if (!serializeColumnHeaderToFile(serialize_iof))
+        return false;
+
+    // active tuple counts
+    serialize_iof.writeInt(static_cast<int32_t>(m_tupleCount));
+    int64_t written_count = 0;
+    TableIterator titer = iterator();
+    TableTuple tuple(m_schema);
+    while (titer.next(tuple)) {
+        tuple.serializeToFile(serialize_iof);
+        ++written_count;
+    }
+    assert(written_count == m_tupleCount);
+
+
+    return true;
+}
+
 
 bool Table::serializeTo(SerializeOutput &serialize_io) {
     // The table is serialized as:

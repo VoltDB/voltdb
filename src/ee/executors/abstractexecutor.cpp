@@ -178,6 +178,20 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
+/**
+ * Set up a single-column temp output table for send executors that require one to return high volume output file names.
+ * Called from p_init.
+ */
+void AbstractExecutor::setHighVolumeOutputTable(TempTableLimits* limits) {
+    TupleSchema* schema = m_abstractNode->generateHighVolumeTupleSchema();
+    const std::vector<std::string> columnNames(1, "filenames");
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              "outputfiles",
+                                                              schema,
+                                                              columnNames,
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
+}
 
 AbstractExecutor::~AbstractExecutor() {}
 

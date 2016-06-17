@@ -358,6 +358,18 @@ public class TestClientInterface {
     }
 
     @Test
+    public void testReadOnlySlow() throws IOException {
+        ByteBuffer msg = createMsg("@ReadOnlySlow", "select * from a");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
+        String payloadString = captor.getValue().payload.toString();
+        assertTrue(payloadString.contains("user partitioning: none"));
+    }
+
+    @Test
     public void testFinishedSPAdHocPlanning() throws Exception {
         // Need a batch and a statement
         String query = "select * from a where i = ?";
@@ -656,6 +668,18 @@ public class TestClientInterface {
             resp.initFromBuffer(buf);
             assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
         }
+
+        responses.clear();
+        query = "select * from A";
+        msg = createMsg("@ReadOnlySlow", query);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        // fake plan
+        plannedStmt =
+                AdHocPlannedStmtBatch.mockStatementBatch(0, query, null, new VoltType[] { }, null, -1, m_context.getCatalogHash());
+        plannedStmt.clientData = m_cxn;
+        m_ci.getDispatcher().processFinishedCompilerWork(plannedStmt).run();
+        assertEquals(0, responses.size());
 
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
     }

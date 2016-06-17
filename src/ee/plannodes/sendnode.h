@@ -57,13 +57,15 @@ class Table;
  */
 class SendPlanNode : public AbstractPlanNode {
 public:
-    SendPlanNode() { }
+    SendPlanNode() : m_highVolume(false) { }
     ~SendPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
+    bool isHighVolume() const { return m_highVolume; }
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
+    bool m_highVolume;
 };
 
 } // namespace voltdb

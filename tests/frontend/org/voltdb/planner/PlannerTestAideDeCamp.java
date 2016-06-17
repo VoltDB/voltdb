@@ -146,7 +146,7 @@ public class PlannerTestAideDeCamp {
         String procName = catalogStmt.getParent().getTypeName();
         Cluster catalogCluster = catalog.getClusters().get("cluster");
         QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
-                partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;

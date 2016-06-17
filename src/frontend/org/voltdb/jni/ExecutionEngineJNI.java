@@ -120,7 +120,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean createDrReplicatedStream,
+            final String pathName)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -148,6 +149,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
                     createDrReplicatedStream,
+                    getStringBytes(pathName),
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 

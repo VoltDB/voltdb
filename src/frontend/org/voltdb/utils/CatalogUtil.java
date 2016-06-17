@@ -901,6 +901,11 @@ public abstract class CatalogUtil {
             PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
             paths.setCommandlogsnapshot(clsnap);
         }
+        if (paths.getHighvolumeoutput() == null) {
+            //export overflow
+            PathsType.Highvolumeoutput hvout = new PathsType.Highvolumeoutput();
+            paths.setHighvolumeoutput(hvout);
+        }
         if (paths.getExportoverflow() == null) {
             //export overflow
             PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
@@ -1683,6 +1688,10 @@ public abstract class CatalogUtil {
         voltDbRoot = getVoltDbRoot(paths);
         //Snapshot
         File snapshotPath = getSnapshot(paths.getSnapshots(), voltDbRoot);
+
+        //High volume output
+        File highVolumeOutputPath = getHighVolumeOutput(paths.getHighvolumeoutput(), voltDbRoot);
+
         //export overflow
         File exportOverflowPath = getExportOverflow(paths.getExportoverflow(), voltDbRoot);
         // only use these directories in the enterprise version
@@ -1706,6 +1715,9 @@ public abstract class CatalogUtil {
         if (schedule != null) {
             schedule.setPath(snapshotPath.getPath());
         }
+
+        //Set high volume directory
+        cluster.setHighvolumeoutput(highVolumeOutputPath.getPath());
 
         //Also set the export overflow directory
         cluster.setExportoverflow(exportOverflowPath.getPath());
@@ -1747,6 +1759,29 @@ public abstract class CatalogUtil {
         validateDirectory("volt root", voltDbRoot);
 
         return voltDbRoot;
+    }
+
+    public static File getHighVolumeOutput(PathsType.Highvolumeoutput paths, File voltDbRoot) {
+        File highVolumeOutputPath;
+        highVolumeOutputPath = new File(paths.getPath());;
+        if (!highVolumeOutputPath.isAbsolute())
+        {
+            highVolumeOutputPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!highVolumeOutputPath.exists()) {
+            hostLog.info("Creating high volume output path directory: " +
+                         highVolumeOutputPath.getAbsolutePath());
+            if (!highVolumeOutputPath.mkdirs()) {
+                hostLog.fatal("Failed to create high volume output path directory \"" +
+                              highVolumeOutputPath + "\"");
+
+            }
+        }
+        validateDirectory("high volume output path", highVolumeOutputPath);
+
+        return highVolumeOutputPath;
+
     }
 
     public static File getSnapshot(PathsType.Snapshots paths, File voltDbRoot) {

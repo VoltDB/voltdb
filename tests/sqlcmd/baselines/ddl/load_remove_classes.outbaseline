@@ -61,6 +61,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
+@ReadOnlySlow             	varchar
 @ResetDR                  
 @Resume                   
 @Shutdown                 
@@ -97,6 +98,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
+@ReadOnlySlow             	varchar
 @ResetDR                  
 @Resume                   
 @Shutdown                 
@@ -197,6 +199,7 @@ Command succeeded.
 @Pause                    
 @Promote                  
 @Quiesce                  
+@ReadOnlySlow             	varchar
 @ResetDR                  
 @Resume                   
 @Shutdown                 

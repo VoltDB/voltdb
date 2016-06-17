@@ -187,6 +187,11 @@ public:
      */
     static TupleSchema* generateDMLCountTupleSchema();
 
+    /**
+     * Convenience method:
+     * Generate a TupleSchema based on the expected format for DML results.
+     */
+    static TupleSchema* generateHighVolumeTupleSchema();
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------

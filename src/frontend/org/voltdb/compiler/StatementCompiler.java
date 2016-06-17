@@ -178,7 +178,7 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
-                partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
+                partitioning, hsql, estimates, false, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
         try {
             try {

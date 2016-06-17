@@ -594,7 +594,102 @@ private:
 };
 
 
+/** Class for writing to disk. */
+class SerializeOutputFile {
+public:
+    SerializeOutputFile() : ofile(){}
 
+    /** Set the buffer to buffer with capacity. Note this does not change the position. */
+    void initialize(std::string outputFileName) {
+        ofile.open(outputFileName.c_str(),std::ofstream::binary | std::ofstream::trunc);
+    }
+
+    void close() {
+        ofile.flush();
+        ofile.close();
+    }
+private:
+    std::ofstream ofile;
+public:
+    virtual ~SerializeOutputFile() {};
+
+    // functions for serialization
+    inline void writeChar(char value) {
+        writePrimitive(value);
+    }
+
+    inline void writeByte(int8_t value) {
+        writePrimitive(value);
+    }
+
+    inline void writeShort(int16_t value) {
+        writePrimitive(static_cast<uint16_t>(htons(value)));
+    }
+
+    inline void writeInt(int32_t value) {
+        writePrimitive(htonl(value));
+    }
+
+    inline void writeBool(bool value) {
+        writeByte(value ? int8_t(1) : int8_t(0));
+    };
+
+    inline void writeLong(int64_t value) {
+        writePrimitive(htonll(value));
+    }
+
+    inline void writeFloat(float value) {
+        int32_t data;
+        memcpy(&data, &value, sizeof(data));
+        writePrimitive(htonl(data));
+    }
+
+    inline void writeDouble(double value) {
+        int64_t data;
+        memcpy(&data, &value, sizeof(data));
+        writePrimitive(htonll(data));
+    }
+
+    inline void writeEnumInSingleByte(int value) {
+        assert(std::numeric_limits<int8_t>::min() <= value &&
+                value <= std::numeric_limits<int8_t>::max());
+        writeByte(static_cast<int8_t>(value));
+    }
+
+    // this explicitly accepts char* and length (or ByteArray)
+    // as std::string's implicit construction is unsafe!
+    inline void writeBinaryString(const void* value, size_t length) {
+        int32_t stringLength = static_cast<int32_t>(length);
+
+        // do a network order conversion
+        int32_t networkOrderLen = htonl(stringLength);
+        ofile.write((char*)&networkOrderLen, sizeof(networkOrderLen));
+        ofile.write((char*)&value,length);
+    }
+
+    inline void writeBinaryString(const ByteArray &value) {
+        writeBinaryString(value.data(), value.length());
+    }
+
+    inline void writeTextString(const std::string &value) {
+        writeBinaryString(value.data(), value.size());
+    }
+
+    inline void writeBytes(const void *value, size_t length) {
+        ofile.write((const char*)value,length);
+    }
+
+private:
+    template <typename T>
+    void writePrimitive(T value) {
+        ofile.write((char*)&value,sizeof(value));
+    }
+
+    // No implicit copies
+    SerializeOutputFile(const SerializeOutputFile&);
+    SerializeOutputFile& operator=(const SerializeOutputFile&);
+
+};
 
 
 }
