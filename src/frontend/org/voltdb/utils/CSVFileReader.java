@@ -18,8 +18,10 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.exception.SuperCsvException;
@@ -28,6 +30,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.common.Constants;
+
+import com.google_voltpatches.common.collect.BiMap;
+import com.google_voltpatches.common.collect.HashBiMap;
 
 /**
  *
@@ -38,6 +43,9 @@ import org.voltdb.common.Constants;
 class CSVFileReader implements Runnable {
     private static final String COLUMN_COUNT_ERROR =
             "Incorrect number of columns. %d found, %d expected. Please check the table schema " +
+            "and the line content";
+    private static final String HEADER_COUNT_ERROR =
+            "Incorrect number of columns. %d found, %d expected. Please check the csv file header " +
             "and the line content";
     private static final String BLANK_ERROR =
             "A blank value is detected in column %d while \"--blank error\" is used. " +
@@ -58,6 +66,8 @@ class CSVFileReader implements Runnable {
     private final BulkLoaderErrorHandler m_errHandler;
     private final VoltType[] m_columnTypes;
     private final int m_columnCount;
+    private int headerlen;
+    private Integer[] order;
 
     static {
         m_blankStrings.put(VoltType.TINYINT, "0");
@@ -87,6 +97,15 @@ class CSVFileReader implements Runnable {
     @Override
     public void run() {
         List<String> lineList;
+
+        //if header option is true, check whether csv first line is valid
+        if (m_config.header) {
+            if (!checkHeader()) {
+                m_log.error("In the CSV file " + m_config.file + ", the header "+ m_listReader.getUntokenizedRow() +" does not match "
+                        + "an existing column in the table " + m_config.table + ".");
+                System.exit(-1);
+            }
+        }
 
         while ((m_config.limitrows-- > 0)) {
             if (m_errHandler.hasReachedErrorLimit()) {
@@ -118,7 +137,8 @@ class CSVFileReader implements Runnable {
 
                 String[] lineValues = lineList.toArray(new String[0]);
                 String lineCheckResult;
-                if ((lineCheckResult = checkparams_trimspace(lineValues)) != null) {
+                String[] reorderValues = new String[m_columnCount];
+                if ((lineCheckResult = checkparams_trimspace_reorder(lineValues, reorderValues)) != null) {
                     final RowWithMetaData metaData
                             = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                     m_totalLineCount.get() + 1);
@@ -131,7 +151,7 @@ class CSVFileReader implements Runnable {
                 RowWithMetaData lineData
                         = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_listReader.getLineNumber());
-                m_loader.insertRow(lineData, lineValues);
+                m_loader.insertRow(lineData, reorderValues);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
@@ -161,39 +181,94 @@ class CSVFileReader implements Runnable {
         }
     }
 
-    private String checkparams_trimspace(String[] lineValues) {
-        if (lineValues.length != m_columnCount) {
+    private boolean checkHeader() {
+        try {
+            String[] firstline = m_listReader.getHeader(false);
+            Set<String> firstset = new HashSet<String>();
+            BiMap<Integer, String> colNames = HashBiMap.create(m_loader.getColumnNames());
+            headerlen = firstline.length;
+            // remove duplicate.
+            for (String name : firstline) {
+                if (name != null) {
+                    firstset.add(name.toUpperCase());
+                } else {
+                    return false;
+                }
+            }
+            // whether column num matches.
+            if (headerlen < m_columnCount) {
+                return false;
+            } else {
+                // whether column name has according table column.
+                int matchColCount = 0;
+                for (String name : firstset) {
+                    if (colNames.containsValue(name)) {
+                        matchColCount++;
+                    }
+                }
+                if (matchColCount != m_columnCount) {
+                    return false;
+                }
+            }
+            // get the mapping from file column num to table column num.
+            order = new Integer[headerlen];
+            for (int fileCol = 0; fileCol < headerlen; fileCol++) {
+                String name = firstline[fileCol];
+                Integer tableCol = colNames.inverse().get(name.toUpperCase());
+                order[fileCol] = tableCol;
+            }
+        } catch (IOException ex) {
+            m_log.error("Failed to read CSV line from file: " + ex);
+        }
+        return true;
+    }
+
+    private String checkparams_trimspace_reorder(String[] lineValues, String[] reorderValues) {
+        if (lineValues.length != m_columnCount && !m_config.header) {
             return String.format(COLUMN_COUNT_ERROR, lineValues.length, m_columnCount);
         }
 
-        for (int i = 0; i<lineValues.length; i++) {
+        if (lineValues.length != headerlen && m_config.header) {
+            return String.format(HEADER_COUNT_ERROR, lineValues.length, headerlen);
+        }
+
+        for (int fileCol = 0; fileCol<lineValues.length; fileCol++) {
+            int i = fileCol;
+            if (m_config.header) {
+                if (order[fileCol] != null) {
+                    i = order[fileCol];
+                } else {
+                    continue;
+                }
+            }
+            reorderValues[i] = lineValues[fileCol];
             //supercsv read "" to null
-            if (lineValues[i] == null) {
+            if (reorderValues[i] == null) {
                 if (m_config.blank.equalsIgnoreCase("error")) {
                     return String.format(BLANK_ERROR, i + 1);
                 } else if (m_config.blank.equalsIgnoreCase("empty")) {
-                    lineValues[i] = m_blankStrings.get(m_columnTypes[i]);
+                    reorderValues[i] = m_blankStrings.get(m_columnTypes[i]);
                 }
                 //else m_config.blank == null which is already the case
             } // trim white space in this correctedLine. SuperCSV preserves all the whitespace by default
             else {
                 if (m_config.nowhitespace
-                        && (lineValues[i].charAt(0) == ' ' || lineValues[i].charAt(lineValues[i].length() - 1) == ' ')) {
+                        && (reorderValues[i].charAt(0) == ' ' || reorderValues[i].charAt(reorderValues[i].length() - 1) == ' ')) {
                     return String.format(WHITESPACE_ERROR, i + 1);
                 } else {
-                    lineValues[i] = lineValues[i].trim();
+                    reorderValues[i] = reorderValues[i].trim();
                 }
 
                 if(!m_config.customNullString.isEmpty()){
                     if(lineValues[i].equals(m_config.customNullString)){
-                        lineValues[i] = null;
+                        reorderValues[i] = null;
                     }
                 }
                 // treat NULL, \N and "\N" as actual null value
-                else if (lineValues[i].equals("NULL")
-                        || lineValues[i].equals(Constants.CSV_NULL)
-                        || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
-                    lineValues[i] = null;
+                else if (reorderValues[i].equals("NULL")
+                        || reorderValues[i].equals(Constants.CSV_NULL)
+                        || reorderValues[i].equals(Constants.QUOTED_CSV_NULL)) {
+                    reorderValues[i] = null;
                 }
             }
         }

@@ -555,10 +555,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
     {
+        /**
+         * A shortcut read is a read operation sent to any replica and completed with no
+         * confirmation or communication with other replicas. In a partition scenario, it's
+         * possible to read an unconfirmed transaction's writes that will be lost.
+         */
+        final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-        if (!msg.isReadOnly()) {
+        if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
             //Durability future is always null for sync command logging
@@ -845,7 +851,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
-            logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
+            if (msg.getInitiateTask() != null) {
+                /**
+                 * A shortcut read is a read operation sent to any replica and completed with no
+                 * confirmation or communication with other replicas. In a partition scenario, it's
+                 * possible to read an unconfirmed transaction's writes that will be lost.
+                 */
+                final boolean shortcutRead = msg.getInitiateTask().isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+                logThis = !shortcutRead;
+            }
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early
