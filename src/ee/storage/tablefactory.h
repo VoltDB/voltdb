@@ -57,10 +57,10 @@
 #include "indexes/tableindexfactory.h"
 
 namespace voltdb {
-
-class Table;
 class PersistentTable;
 template <Endianess E> class SerializeInput;
+class StreamedTable;
+class Table;
 class TempTable;
 class TempTableLimits;
 class TableColumn;
@@ -92,7 +92,7 @@ public:
         int32_t compactionThreshold = 95,
         bool drEnabled = false);
 
-    static Table* getStreamedTableForTest(
+    static StreamedTable* getStreamedTableForTest(
                 voltdb::CatalogId databaseId,
                 const std::string &name,
                 TupleSchema* schema,

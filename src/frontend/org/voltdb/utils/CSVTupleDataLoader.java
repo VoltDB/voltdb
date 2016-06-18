@@ -17,8 +17,13 @@
 
 package org.voltdb.utils;
 
-import com.google_voltpatches.common.collect.Lists;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -28,10 +33,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import org.voltdb.ClientResponseImpl;
+import com.google_voltpatches.common.collect.Lists;
 
 /**
  * A CSVDataLoader implementation that inserts one row at a time.
@@ -167,5 +169,12 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     public long getFailedRows()
     {
         return m_failedCount.get();
+    }
+
+    @Override
+    public Map<Integer, String> getColumnNames()
+    {
+        //No operation.
+        return null;
     }
 }

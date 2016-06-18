@@ -559,6 +559,7 @@ TEST_F(CompactingHashTest, Trivial) {
 
     // UNIQUE MAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m(true);
+    ASSERT_FALSE(m.hasCachedLastBuffer());
     success = (m.insert(two,two) == NULL);
     ASSERT_TRUE(success);
     success = (m.insert(one,one) == NULL);
@@ -572,13 +573,34 @@ TEST_F(CompactingHashTest, Trivial) {
     iter = m.find(two);
     ASSERT_FALSE(iter.isEnd());
     ASSERT_EQ(iter.key(), two);
-
     success = m.erase(iter);
     ASSERT_TRUE(success);
-    ASSERT_TRUE(m.verify());
     ASSERT_TRUE(m.size() == 2);
-
+    ASSERT_FALSE(m.hasCachedLastBuffer());
+    ASSERT_TRUE(m.verify());
     iter = m.find(two);
+    ASSERT_TRUE(iter.isEnd());
+
+    iter = m.find(one);
+    ASSERT_FALSE(iter.isEnd());
+    ASSERT_EQ(iter.key(), one);
+    success = m.erase(iter);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(m.size() == 1);
+    ASSERT_FALSE(m.hasCachedLastBuffer());
+    ASSERT_TRUE(m.verify());
+    iter = m.find(two);
+    ASSERT_TRUE(iter.isEnd());
+
+    iter = m.find(three);
+    ASSERT_FALSE(iter.isEnd());
+    ASSERT_EQ(iter.key(), three);
+    success = m.erase(iter);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(m.size() == 0);
+    ASSERT_TRUE(m.hasCachedLastBuffer());
+    ASSERT_TRUE(m.verify());
+    iter = m.find(three);
     ASSERT_TRUE(iter.isEnd());
 
     // MULTIMAP

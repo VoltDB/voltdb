@@ -106,7 +106,7 @@ Table* TableFactory::getPersistentTable(
 }
 
 // This is a convenient wrapper for test only.
-Table* TableFactory::getStreamedTableForTest(
+StreamedTable* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
@@ -115,7 +115,7 @@ Table* TableFactory::getStreamedTableForTest(
             bool exportEnabled,
             int32_t compactionThreshold)
 {
-    Table *table = new StreamedTable(exportEnabled, wrapper);
+    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
 
     initCommon(databaseId,
                table,

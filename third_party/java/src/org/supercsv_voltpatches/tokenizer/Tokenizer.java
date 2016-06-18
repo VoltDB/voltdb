@@ -57,7 +57,9 @@ public class Tokenizer extends AbstractTokenizer {
 
     private final long columnSizeLimit;
 
-    private final long skip;
+    private long skip;
+
+    private boolean header;
 
     /**
      * Enumeration of tokenizer states. QUOTE_MODE is activated between quotes.
@@ -77,7 +79,7 @@ public class Tokenizer extends AbstractTokenizer {
      *             if reader or preferences is null
      */
     public Tokenizer(final Reader reader, final CsvPreference preferences, boolean strictquotes, char escapechar,
-            long columnsizelimit, long skipNum) {
+            long columnsizelimit, long skipNum, boolean header) {
 	super(reader, preferences);
 	this.quoteChar = preferences.getQuoteChar();
 	this.delimeterChar = preferences.getDelimiterChar();
@@ -87,6 +89,12 @@ public class Tokenizer extends AbstractTokenizer {
 	this.escapeChar = escapechar;
 	this.columnSizeLimit = columnsizelimit;
 	this.skip = skipNum;
+	this.header = header;
+    }
+
+    public Tokenizer(final Reader reader, final CsvPreference preferences, boolean strictquotes, char escapechar,
+            long columnsizelimit, long skipNum) {
+    this(reader, preferences, strictquotes, escapechar, columnsizelimit, skipNum, false);
     }
 
     /**
@@ -106,14 +114,20 @@ public class Tokenizer extends AbstractTokenizer {
 
 	// keep reading lines until data is found
 	String line;
+
 	do {
-	    line = readLine();
-	    if( line == null ) {
-		return false; // EOF
-	    }
+        line = readLine();
+        if( line == null ) {
+        return false; // EOF
+        }
+    }
+    while( line.length() == 0 || line.trim().isEmpty() || (commentMatcher != null && commentMatcher.isComment(line))
+            || (!header && skip >= getLineNumber()));
+
+	if (header) {
+	    header = false;
+	    skip++;
 	}
-	while( line.length() == 0 || (commentMatcher != null && commentMatcher.isComment(line))
-	        || skip >= getLineNumber());
 
 	// update the untokenized CSV row
 	currentRow.append(line);
