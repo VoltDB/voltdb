@@ -471,7 +471,21 @@ public class ParameterSet implements JSONString {
         try {
             js.array();
             for (Object o : m_params) {
-                js.value(o);
+                if(o instanceof Double) {
+                    Double dval = (Double) o;
+                    if (dval.isNaN()) {
+                        js.value(dval.toString());
+                    }
+                    else if (dval.isInfinite()) {
+                        js.value(dval.toString());
+                    }
+
+                    else
+                        js.value(o);
+                }
+                else {
+                    js.value(o);
+                }
             }
             js.endArray();
         }

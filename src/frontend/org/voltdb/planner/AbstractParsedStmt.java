@@ -49,6 +49,7 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -61,6 +62,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.QuantifierType;
+import org.voltdb.types.SortDirectionType;
 
 public abstract class AbstractParsedStmt {
 
@@ -356,6 +358,9 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("row")) {
             retval = parseRowExpression(exprNode);
         }
+        else if (elementName.equals("rank")) {
+            retval = parseRankValueExpression(exprNode);
+        }
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
@@ -451,12 +456,26 @@ public abstract class AbstractParsedStmt {
         }
         String columnName = exprNode.attributes.get("column");
         String columnAlias = exprNode.attributes.get("alias");
-        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias, columnName, columnAlias);
+
+        // Whether or not this column is the coalesced column produced by a join with a
+        // USING predicate.
+        String usingAttr = exprNode.attributes.get("using");
+        boolean isUsingColumn = usingAttr != null ? Boolean.parseBoolean(usingAttr) : false;
 
         // Use the index produced by HSQL as a way to differentiate columns that have
         // the same name with a single table (which can happen for subqueries containing joins).
         int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
-        expr.setDifferentiator(differentiator);
+        if (differentiator == -1 && isUsingColumn) {
+            for (VoltXMLElement usingElem : exprNode.children) {
+                String usingTableAlias = usingElem.attributes.get("tablealias");
+                if (usingTableAlias != null && usingTableAlias.equals(tableAlias)) {
+                    differentiator = Integer.parseInt(usingElem.attributes.get("index"));
+                }
+            }
+        }
+
+        TupleValueExpression expr = new TupleValueExpression(tableName, tableAlias,
+                columnName, columnAlias, -1, differentiator);
         // Collect the unique columns used in the plan for a given scan.
 
         // Resolve the tve and add it to the scan's cache of referenced columns
@@ -497,7 +516,51 @@ public abstract class AbstractParsedStmt {
         return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, stmtSubqueryScan);
     }
 
-    /**
+    private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
+        // Parse individual rank expressions
+        List<AbstractExpression> partitionbyExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> orderbyExprs = new ArrayList<AbstractExpression>();
+        List<SortDirectionType>  orderbyDirs  = new ArrayList<SortDirectionType>();
+        boolean areAllDecending = false;
+
+        boolean isPercentRank = Boolean.valueOf(exprNode.attributes.get("isPercentRank"));
+
+        for (VoltXMLElement ele : exprNode.children) {
+            if (ele.name.equals("partitionbyList")) {
+                for (int i = 0; i < ele.children.size(); i++) {
+                    VoltXMLElement childNode = ele.children.get(i);
+                    AbstractExpression expr = parseExpressionNode(childNode);
+                    partitionbyExprs.add(expr);
+                }
+
+            } else if (ele.name.equals("orderbyList")) {
+                for (int i = 0; i < ele.children.size(); i++) {
+                    VoltXMLElement childNode = ele.children.get(i);
+                    SortDirectionType sortDir
+                        = Boolean.valueOf(childNode.attributes.get("decending"))
+                            ? SortDirectionType.DESC
+                            : SortDirectionType.ASC;
+
+                    AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                    orderbyExprs.add(expr);
+                    orderbyDirs.add(sortDir);
+                }
+            } else {
+                throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
+            }
+        }
+
+        WindowedExpression rankExpr = new WindowedExpression(ExpressionType.AGGREGATE_WINDOWED_RANK,
+                                                             partitionbyExprs,
+                                                             orderbyExprs,
+                                                             orderbyDirs,
+                                                             m_db,
+                                                             areAllDecending,
+                                                             isPercentRank);
+        return rankExpr;
+    }
+
+   /**
     *
     * @param exprNode
     * @return
@@ -591,7 +654,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Verify if a subquery can be replace with a direct select from table(s)
+     * Verify if a subquery can be replaced with a direct select from table(s)
      * @param subquery
      * @return TRUE/FALSE
      */
@@ -609,11 +672,10 @@ public abstract class AbstractParsedStmt {
         if (selectSubquery.hasAggregateDistinct()) {
             return false;
         }
-        // No WINDOW Functions.
-        // @TODO Commented out for now until hasWindowFunction will be available
-//        if (selectSubquery.hasWindowFunction()) {
-//            return false;
-//        }
+        // No windowed aggregate functions like RANK.
+        if (selectSubquery.hasWindowedExpression()) {
+            return false;
+        }
         // No LIMIT/OFFSET
         if (selectSubquery.hasLimitOrOffset() || selectSubquery.hasLimitOrOffsetParameters()) {
             return false;
@@ -811,7 +873,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            List<AbstractExpression> tves = arg.findBaseTVEs();
+            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -1479,20 +1541,6 @@ public abstract class AbstractParsedStmt {
         return subqueries;
     }
 
-    /*
-     *  Extract all subexpressions of a given type from this statement
-     */
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-        if (m_joinTree != null) {
-            AbstractExpression treeExpr = m_joinTree.getAllFilters();
-            if (treeExpr != null) {
-                exprs.addAll(treeExpr.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        return exprs;
-    }
-
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
     /// the parameter is being used in a BIGINT context.
@@ -1607,7 +1655,7 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findBaseTVEs();
+            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
             Set<String> baseTableNames = new HashSet<String>();
             for (AbstractExpression ae : baseTVEExpressions) {
                 assert(ae instanceof TupleValueExpression);
@@ -1839,7 +1887,7 @@ public abstract class AbstractParsedStmt {
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+    protected Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         HashSet<AbstractExpression> exprs = new HashSet<AbstractExpression>();
         if (m_joinTree != null) {
             AbstractExpression treeExpr = m_joinTree.getAllFilters();
@@ -1863,10 +1911,13 @@ public abstract class AbstractParsedStmt {
             return true;
         }
         // Verify expression subqueries
-        Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
-                SelectSubqueryExpression.class);
-        return !subqueryExprs.isEmpty();
+        return !findSubquerySubexpressions().isEmpty();
     }
+
+    protected Set<AbstractExpression> findSubquerySubexpressions() {
+        return findAllSubexpressionsOfClass(SelectSubqueryExpression.class);
+    }
+
     public abstract boolean isDML();
 
     /**

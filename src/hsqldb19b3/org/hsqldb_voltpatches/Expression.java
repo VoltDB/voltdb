@@ -1539,11 +1539,13 @@ public class Expression {
         prototypes.put(OpTypes.VAR_SAMP,      (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
-        prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.CASEWHEN,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
         prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
+        prototypes.put(OpTypes.RANK,          new VoltXMLElement("rank").withValue("percentage", "false"));
+        prototypes.put(OpTypes.PERCENT_RANK,  new VoltXMLElement("rank").withValue("percentage", "true"));
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
+        prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
     }
 
@@ -1597,9 +1599,6 @@ public class Expression {
                     throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                             "VoltDB does not support this complex query currently.");
                 }
-                // convert the SIMPLE_COLUMN into a COLUMN
-                opType = OpTypes.COLUMN;
-                exprOp = OpTypes.COLUMN;
             } else {
                 // find the substitue from displayCols list
                 for (int ii=startKey+1; ii < displayCols.size(); ++ii)
@@ -1619,8 +1618,11 @@ public class Expression {
                         return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey, getAlias());
                     }
                 }
-                assert(false);
             }
+            // ENG-10429 moved the following two lines here. See fix note https://issues.voltdb.com/browse/ENG-10429.
+            // convert the SIMPLE_COLUMN into a COLUMN
+            opType = OpTypes.COLUMN;
+            exprOp = OpTypes.COLUMN;
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -1642,7 +1644,7 @@ public class Expression {
             exp.attributes.put("alias", getAlias());
         }
 
-        // Add expresion sub type
+        // Add expression sub type
         if (exprSubType == OpTypes.ANY_QUANTIFIED) {
             exp.attributes.put("opsubtype", "any");
         } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
@@ -1675,23 +1677,6 @@ public class Expression {
                 }
                 exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
                 return exp;
-            }
-
-            if (dataType.isBooleanType()) {
-                // FIXME: Since BOOLEAN is not a valid user data type a BOOLEAN VALUE is always the result of a constant logical
-                // expression (WHERE clause) like "2 > 1" that HSQL has optimized to a constant value.
-                // VoltDB could someday be enabled to support a Boolean-valued ConstantExpression.
-                // OR VoltDB's native representation for logical values (BIG INT 1 or 0) could be substituted here
-                // and MAYBE that would solve this whole problem.
-                // There used to be VoltDB code to deserialize an expression into a (BIGINT 1 or 0) ConstantExpression.
-                // BIGINT IS the VoltDB planner's native type for logical expressions.
-                // That code was only triggered by an impossible case of (essentially) optype=="boolean"
-                // -- a victim of past ambiguity in the "type" attributes -- sometimes meaning "optype" sometimes "valuetype"
-                // -- so that code got dropped.
-                // Going forward, it seems to make more sense to leverage the surviving VoltDB code path by hard-wiring here:
-                // valueType="BIGINT", value="1"/"0".
-                throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                        "VoltDB does not support WHERE clauses containing only constants");
             }
 
             exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
@@ -1780,6 +1765,12 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.RANK:
+            exp.attributes.put("valuetype", Type.SQL_NUMERIC.getNameString());
+            ExpressionRank erank = (ExpressionRank) this;
+
+            return erank.voltAnnotateRankXML(exp, session);
+            
         default:
             return exp;
         }

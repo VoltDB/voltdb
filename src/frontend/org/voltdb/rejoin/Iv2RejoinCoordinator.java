@@ -187,8 +187,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
         boolean schemaHasNoTables = catalog.getTables().isEmpty();
-        final String node = VoltZK.rejoinNodesBlockerHost+m_hostId;
-        VoltZK.createRejoinNodeIndicator(m_messenger.getZK(),node);
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;

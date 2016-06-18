@@ -125,12 +125,22 @@ public class StmtTargetTableScan extends StmtTableScan {
             // The TA1(TA1).(CA)CA1 TVE needs to be adjusted to be T(TA1).C(CA) since the original
             // SELECT T.C CA FROM T TA subquery was optimized out
             // Table name TA1 to be replace with the original table name T
-            // Column name CA to be replace wit the original column name C
+            // Column name CA to be replace with the original column name C
+            // Expression differentiator to be replaced with the differentiator from the original column (T.C)
             expr.setTableName(getTableName());
-            Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName);
+            Integer columnIndex = m_origSubqueryScan.getColumnIndex(columnName, expr.getDifferentiator());
             assert(columnIndex != null);
-            String origColumnName = m_origSubqueryScan.getColumnName(columnIndex);
-            expr.setColumnName(origColumnName);
+            SchemaColumn origColumnSchema = m_origSubqueryScan.getSchemaColumn(columnIndex);
+            assert(origColumnSchema != null);
+            expr.setColumnName(origColumnSchema.getColumnName());
+            // The differentiator value must be taken from the column TVE expression and not the
+            // column schema itself because the TVE value could be adjusted to take a projection
+            // into the account. At the moment, the subquery columns expressions can be TVE only.
+            // The TVE cast should be safe
+            assert(origColumnSchema.getExpression() instanceof TupleValueExpression);
+            TupleValueExpression origTve = (TupleValueExpression) origColumnSchema.getExpression();
+            expr.setColumnName(origColumnSchema.getColumnName());
+            expr.setDifferentiator(origTve.getDifferentiator());
         }
         expr.resolveForTable(m_table);
     }

@@ -1918,4 +1918,44 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 spi.getSerializedSize(), System.nanoTime());
 
     }
+
+    /**
+     * This is not designed to be a safe shutdown.
+     * This is designed to stop sending messages to clients as fast as possible.
+     * It is currently called from VoltDB.crash...
+     *
+     * Note: this really needs to work. We CAN'T respond back to the client anything
+     * after we've decided to crash or it might break some of our contracts.
+     *
+     * @return false if we can't be assured this safely worked
+     */
+    public boolean ceaseAllPublicFacingTrafficImmediately() {
+        try {
+            if (m_acceptor != null) {
+                // This call seems to block until the shutdown is done
+                // which is good becasue we assume there will be no new
+                // connections afterward
+                m_acceptor.shutdown();
+            }
+            if (m_adminAcceptor != null) {
+                m_adminAcceptor.shutdown();
+            }
+        }
+        catch (InterruptedException e) {
+            // this whole method is really a best effort kind of thing...
+            log.error(e);
+            // if we didn't succeed, let the caller know and take action
+            return false;
+        }
+        finally {
+            // this feels like an unclean thing to do... but should work
+            // for the purposes of cutting all responses right before we deliberatly
+            // end the process
+            // m_cihm itself is threadsafe, and the regular shutdown code won't
+            // care if it's empty... so... this.
+            m_cihm.clear();
+        }
+
+        return true;
+    }
 }

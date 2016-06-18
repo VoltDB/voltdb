@@ -52,18 +52,22 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     public void testInExistsGuard() {
         String errorMsg = PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE;
         String sql;
+        List<AbstractPlanNode> pns;
 
         sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select p2.c from p2 where p2.a in (select c from r1)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
         failToCompile(sql, errorMsg);
 
         sql = "select * from P1 as parent where (A,C) in (select 2, C from r2 where r2.c > parent.c group by c)";
-        failToCompile(sql, errorMsg);
+        pns = compileToFragments(sql);
+        assertEquals(2, pns.size());
 
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c and "
                 + "exists (select c from p1 where p1.c = r1.c ))";
@@ -757,14 +761,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
     }
 
-    public void testConstantExpressionInWhereClause() {
-        failToCompile("select * from r1 where 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
-
-        failToCompile("select a from r1 where exists " +
-                " (select max(c) from r2) and 3 > 1;", "VoltDB does not support WHERE clauses containing only constants");
-    }
-
-    // HSQL failed to parse  these statement
+    // HSQL failed to parse these statement
     public void testHSQLFailed() {
         {
             failToCompile("select a from r1 where exists (" +
@@ -778,6 +775,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
         {
+            // This may not actually an HSQL failure
+            // -- at any rate, it gets detected later in the planner.
             failToCompile("select * from r1 join r2 on exists " +
                     " (select a from r2 where a > 1) ",
                     "Join with filters that do not depend on joined tables is not supported in VoltDB");

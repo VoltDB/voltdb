@@ -48,6 +48,7 @@ public interface VoltDBInterface
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
+     * @param config Configuration from command line.
      */
     public void initialize(VoltDB.Configuration config);
 

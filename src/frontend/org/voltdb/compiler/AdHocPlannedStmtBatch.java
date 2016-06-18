@@ -360,29 +360,30 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * @param db the database context (for adding catalog details).
      */
     public String explainStatement(int i, Database db) {
-        String str = "";
         AdHocPlannedStatement plannedStatement = plannedStatements.get(i);
         String aggplan = new String(plannedStatement.core.aggregatorFragment, Constants.UTF8ENCODING);
         PlanNodeTree pnt = new PlanNodeTree();
         try {
-            JSONObject jobj = new JSONObject( aggplan );
+            JSONObject jobj = new JSONObject(aggplan);
             pnt.loadFromJSONPlan(jobj, db);
 
-            if( plannedStatement.core.collectorFragment != null ) {
-                //multi-partition query plan
+            if (plannedStatement.core.collectorFragment != null) {
+                // multi-partition query plan
                 String collplan = new String(plannedStatement.core.collectorFragment, Constants.UTF8ENCODING);
                 PlanNodeTree collpnt = new PlanNodeTree();
-                //reattach plan fragments
-                JSONObject jobMP = new JSONObject( collplan );
+                // reattach plan fragments
+                JSONObject jobMP = new JSONObject(collplan);
                 collpnt.loadFromJSONPlan(jobMP, db);
-                assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
-                pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
+                assert(collpnt.getRootPlanNode() instanceof SendPlanNode);
+                pnt.getRootPlanNode().reattachFragment(collpnt.getRootPlanNode());
             }
-            str = pnt.getRootPlanNode().toExplainPlanString();
-        } catch (JSONException e) {
-            System.out.println(e.getMessage());
+            String result = pnt.getRootPlanNode().toExplainPlanString();
+            return result;
         }
-        return str;
+        catch (JSONException e) {
+            System.out.println(e);
+            return "Internal Error (JSONException): " + e.getMessage();
+        }
     }
 
 }

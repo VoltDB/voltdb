@@ -38,7 +38,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -47,6 +46,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.WindowedExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -68,6 +68,7 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -92,6 +93,7 @@ import org.voltdb.utils.CatalogUtil;
  *
  */
 public class PlanAssembler {
+    public static boolean HANDLE_WINDOWED_OPERATORS = Boolean.valueOf(System.getProperty("org.voltdb.handlewindowedfunctions", "False"));
 
     // The convenience struct to accumulate results after parsing multiple statements
     private static class ParsedResultAccumulator {
@@ -126,7 +128,7 @@ public class PlanAssembler {
     private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
-    private PlanSelector m_planSelector;
+    private final PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -451,8 +453,7 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        Set<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
-                SelectSubqueryExpression.class);
+        Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
                 m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
@@ -461,15 +462,11 @@ public class PlanAssembler {
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
-                // no partition tables in parent query
-                for (Table tb: parsedStmt.m_tableList) {
-                    if (! tb.getIsreplicated()) {
-                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                        return null;
-                    }
-                }
-
-                // no partition tables in subqueries
+                // Don't allow partitioned tables in subqueries.
+                // This restriction stems from the lack of confidence that the
+                // planner can reliably identify all cases of adequate and
+                // inadequate partition key join criteria across different
+                // levels of correlated subqueries.
                 for (AbstractExpression e: subqueryExprs) {
                     assert(e instanceof SelectSubqueryExpression);
                     SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
@@ -478,7 +475,7 @@ public class PlanAssembler {
                         return null;
                     }
                 }
-             }
+            }
 
             if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
                 // There was at least one sub-query and we should have a compiled plan for it
@@ -606,9 +603,9 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
+            assert(expr instanceof SelectSubqueryExpression);
             if (!(expr instanceof SelectSubqueryExpression)) {
-                // it can be IN (values)
-                continue;
+                continue; // DEAD CODE?
             }
             SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getSubqueryScan();
@@ -942,12 +939,10 @@ public class PlanAssembler {
         HashAggregatePlanNode mvReAggTemplate = m_parsedSelect.m_mvFixInfo.getReAggregationPlanNode();
         if (mvReAggTemplate != null) {
             reAggNode = new HashAggregatePlanNode(mvReAggTemplate);
-            List<AbstractExpression> subqueryExprs =
-                    ExpressionUtil.findAllExpressionsOfClass(reAggNode.getPostPredicate(),
-                    AbstractSubqueryExpression.class);
-            if ( ! subqueryExprs.isEmpty()) {
+            AbstractExpression postPredicate = reAggNode.getPostPredicate();
+            if (postPredicate != null && postPredicate.hasSubquerySubexpression()) {
                 // For now, this is just a special case violation of the limitation on
-                // use of expression subqueries in MP queries on partitioned data.
+                // use of subquery expressions in MP queries on partitioned data.
                 // That special case was going undetected when we didn't flag it here.
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
                 return null;
@@ -1052,6 +1047,12 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
+        // If we have a windowed expression in the display list we want to
+        // add a PartitionByPlanNode here.
+        if (m_parsedSelect.hasWindowedExpression()) {
+            root = handleWindowedOperators(root);
+        }
+
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
@@ -1087,6 +1088,9 @@ public class PlanAssembler {
             }
         }
 
+        // Add a project node if we need one.  Some types of nodes can have their
+        // own inline projection nodes, while others need an out-of-line projection
+        // node.
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
@@ -1123,8 +1127,7 @@ public class PlanAssembler {
      * @return true if a project node is required
      */
     private boolean needProjectionNode (AbstractPlanNode root) {
-        if ( root instanceof AggregatePlanNode ||
-             root.getPlanNodeType() == PlanNodeType.PROJECTION) {
+        if (!root.planNodeClassNeedsProjectionNode()) {
             return false;
         }
         // If there is a complexGroupby at his point, it means that
@@ -1675,9 +1678,22 @@ public class PlanAssembler {
 
         // Build the output schema for the projection based on the display columns
         NodeSchema proj_schema = m_parsedSelect.getFinalProjectionSchema();
+        List<TupleValueExpression> allTves =  new ArrayList<>();
+        for (SchemaColumn col : proj_schema.getColumns()) {
+            allTves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+        }
+
+        // Adjust the differentiator fields of TVEs, since they need to reflect
+        // the inlined projection node in scan nodes.
+        for (TupleValueExpression tve : allTves) {
+            tve.setDifferentiator(rootNode.adjustDifferentiatorField(tve.getColumnIndex()));
+        }
         projectionNode.setOutputSchemaWithoutClone(proj_schema);
 
-        // if the projection can be done inline...
+        // If the projection can be done inline. then add the
+        // projection node inline.  Even if the rootNode is a
+        // scan, if we have a windowed expression we need to
+        // add it out of line.
         if (rootNode instanceof AbstractScanPlanNode) {
             rootNode.addInlinePlanNode(projectionNode);
             return rootNode;
@@ -2089,6 +2105,67 @@ public class PlanAssembler {
 
         // parent is null and switched to index scan from sequential scan
         return true;
+    }
+
+    /**
+     * Create nodes for windowed operations.
+     *
+     * @param root
+     * @return
+     */
+    private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
+        if ( ! HANDLE_WINDOWED_OPERATORS ) {
+            throw new PlanningErrorException("Windowed operators are not supported in this version of VoltDB.");
+        }
+        // Get the windowed expression.  We need to set its output
+        // schema from the display list.
+        ParsedColInfo colInfo = m_parsedSelect.getWindowedColinfo();
+        assert(colInfo != null);
+        SchemaColumn windowedSchemaColumn = colInfo.asSchemaColumn();
+
+        // This will set the output schema to contain the
+        // windowed schema column only.  In generateOutputSchema
+        // we will add the input columns.
+        PartitionByPlanNode pnode = new PartitionByPlanNode();
+        pnode.setWindowedColumn(windowedSchemaColumn);
+        OrderByPlanNode onode = new OrderByPlanNode();
+        // We need to extract more information from the windowed expression.
+        // to construct the output schema.
+        WindowedExpression windowedExpression = (WindowedExpression)windowedSchemaColumn.getExpression();
+        List<AbstractExpression> partitionByExpressions = windowedExpression.getPartitionByExpressions();
+        // If the order by expression list contains a partition by expression then
+        // we won't have to sort by it twice.  We sort by the partition by expressions
+        // first, and we don't care what order we sort by them.  So, find the
+        // sort direction in the order by list and use that in the partition by
+        // list, and then mark that it was deleted in the order by
+        // list.
+        //
+        // We choose to make this dontsort rather than dosort because the
+        // Java default value for boolean is false, and we want to sort by
+        // default.
+        boolean dontsort[] = new boolean[windowedExpression.getOrderbySize()];
+        List<AbstractExpression> orderByExpressions = windowedExpression.getOrderByExpressions();
+        List<SortDirectionType>  orderByDirections  = windowedExpression.getOrderByDirections();
+        for (int idx = 0; idx < windowedExpression.getPartitionbySize(); idx += 1) {
+            SortDirectionType pdir = SortDirectionType.ASC;
+            AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
+            int sidx = windowedExpression.getSortIndexOfOrderByExpression(partitionByExpression);
+            if (0 <= sidx) {
+                pdir = orderByDirections.get(sidx);
+                dontsort[sidx] = true;
+            }
+            onode.addSort(partitionByExpression, pdir);
+        }
+        for (int idx = 0; idx < windowedExpression.getOrderbySize(); idx += 1) {
+            if (!dontsort[idx]) {
+                AbstractExpression orderByExpr = orderByExpressions.get(idx);
+                SortDirectionType  orderByDir  = orderByDirections.get(idx);
+                onode.addSort(orderByExpr, orderByDir);
+            }
+        }
+        onode.addAndLinkChild(root);
+        pnode.addAndLinkChild(onode);
+        return pnode;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
@@ -2651,7 +2728,7 @@ public class PlanAssembler {
         for (ParsedColInfo col : orderBys) {
             AbstractExpression rootExpr = col.expression;
             // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
-            ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
+            Collection<AbstractExpression> tves = rootExpr.findAllTupleValueSubexpressions();
             for (AbstractExpression tve: tves) {
                 if  (((TupleValueExpression) tve).hasAggregate()) {
                     return true;

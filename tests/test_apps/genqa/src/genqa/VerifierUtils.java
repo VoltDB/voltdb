@@ -82,6 +82,10 @@ public class VerifierUtils {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "examine geo specific tables")
+        boolean usegeo = false;
+
+
         @Override
         public void validate() {
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");

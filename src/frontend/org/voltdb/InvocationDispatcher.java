@@ -52,6 +52,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
+import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
@@ -110,6 +111,8 @@ public final class InvocationDispatcher {
     private final int [] m_allPartitions;
     private final SnapshotDaemon m_snapshotDaemon;
     private final AtomicBoolean m_isInitialRestore = new AtomicBoolean(true);
+    // used to decide if we should shortcut reads
+    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
@@ -219,6 +222,9 @@ public final class InvocationDispatcher {
                 "given all partitions is null or empty");
         m_allPartitions = allPartitions;
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
+
+        // try to get the global default setting for read consistency, but fall back to SAFE
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     /*
@@ -445,13 +451,14 @@ public final class InvocationDispatcher {
                         task.getSerializedSize(),
                         nowNanos);
         if (!success) {
-            // HACK: this return is for the DR agent so that it
-            // will move along on duplicate replicated transactions
-            // reported by the slave cluster.  We report "SUCCESS"
-            // to keep the agent from choking.  ENG-2334
+            // when VoltDB.crash... is called, we close off the client interface
+            // and it might not be possible to create new transactions.
+            // Return an error.
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
-                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                    + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
         }
 
@@ -1507,16 +1514,28 @@ public final class InvocationDispatcher {
     {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
+        if (cihm == null) {
+            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+                    + "This is likely due to VoltDB ceasing client communication as it "
+                    + "shuts down.");
+            return false;
+        }
 
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
 
         /*
+         * ReadLevel.FAST:
          * If this is a read only single part, check if there is a local replica,
          * if there is, send it to the replica as a short circuit read
+         *
+         * ReadLevel.SAFE:
+         * Send the read to the partition leader always (reads & writes)
+         *
+         * Someday could support per-transaction consistency for reads.
          */
         if (isSinglePartition && !isEveryPartition) {
-            if (isReadOnly) {
+            if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
                 initiatorHSId = m_localReplicas.get().get(partition);
             }
             if (initiatorHSId != null) {

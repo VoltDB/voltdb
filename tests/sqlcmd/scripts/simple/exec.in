@@ -4,6 +4,89 @@ drop table t2 if exists;
 create table t ( c integer, d varchar(4) );
 create procedure p as
     select * from t where d between ? and ?;
+
+-- procedure with max allowable predicates in where clause 
+create procedure max_predicates as 
+select count(*) FROM t WHERE 
+c > ? and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+
+-- procedure with lots of predicates in where clause to cause stack overflow error 
+create procedure max_plus_predicates as 
+select count(*) FROM t WHERE c > ? and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and 
+c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0 and c > 0;
+
 create table t2 ( c integer, d varchar(4), e varchar(4) );
 
 exec T.insert 1,'a';
@@ -71,8 +154,14 @@ exec p '((' '))';
 -- error out on unquoted parens
 exec p ( );
 
+exec max_predicates 90;
+ 
 select * from t order by c;
 select * from t2 order by c;
+
 drop table t2;
+
+drop procedure max_predicates;
 drop procedure p;
+
 drop table t;

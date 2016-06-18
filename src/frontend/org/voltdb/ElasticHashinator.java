@@ -17,9 +17,12 @@
 package org.voltdb;
 
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.Thread.State;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -27,11 +30,17 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 import org.voltdb.utils.CompressionService;
+
+import sun.misc.Cleaner;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
@@ -41,8 +50,6 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.SortedMapDifference;
 import com.google_voltpatches.common.collect.UnmodifiableIterator;
-
-import sun.misc.Cleaner;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -91,6 +98,13 @@ public class ElasticHashinator extends TheHashinator {
         @Override
         public Long get() {
             return TheHashinator.computeConfigurationSignature(m_configBytes.get());
+        }
+    });
+
+    private final Supplier<byte[]> m_configJSONCompressed = Suppliers.memoize(new Supplier<byte[]>() {
+        @Override
+        public byte[] get() {
+            return toJSONStringCompressed();
         }
     });
 
@@ -196,6 +210,69 @@ public class ElasticHashinator extends TheHashinator {
             buf.putInt(pid);
         }
         return buf.array();
+    }
+
+    /**
+     * Serializes the configuration into JSON, also updates the currently cached m_configJSON.
+     * @return The JSONString of the current configuration.
+     */
+
+    private String toJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+            js.object();
+            for (Map.Entry<Integer, Integer> entry : m_tokensMap.get().entrySet()) {
+                js.key(entry.getKey().toString()).value(entry.getValue());
+            }
+            js.endObject();
+        } catch (JSONException e) {
+            throw new RuntimeException("Failed to serialize Hashinator Configuration to JSON.", e);
+        }
+        return js.toString();
+    }
+
+    /**
+     * Serializes the configuration into JSON, also updates the currently cached m_configJSON.
+     * @return The JSONString of the current configuration.
+     */
+
+    private byte[] toJSONStringCompressed() {
+        String str = toJSONString();
+        if (str == null || str.length() == 0) {
+            return new byte[0] ;
+        }
+        byte[] outStr;
+        try {
+            outStr = compressJSONString(str);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialize Hashinator Configuration to Compressed JSON .", e);
+        }
+        return outStr;
+    }
+
+    public static byte[] compressJSONString(String data) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(data.length());
+        try (GZIPOutputStream gzip = new GZIPOutputStream(bos)) {
+            gzip.write(data.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw e;
+        }
+        return bos.toByteArray();
+    }
+
+    public static String decompressJSONString(byte[] compressed) throws IOException {
+        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(compressed);
+                GZIPInputStream gis = new GZIPInputStream(bis)) {
+            int length;
+            while ((length = gis.read(buffer)) != -1) {
+                result.write(buffer, 0, length);
+            }
+        } catch (IOException e) {
+            throw e;
+        }
+        return result.toString("UTF-8");
     }
 
     /**
@@ -415,6 +492,26 @@ public class ElasticHashinator extends TheHashinator {
     public byte[] getConfigBytes()
     {
         return m_configBytes.get();
+    }
+
+    /**
+     * Returns raw config JSONString.
+     * @return config JSONString
+     */
+    @Override
+    public String getConfigJSON()
+    {
+        return toJSONString();
+    }
+
+    /**
+     * Returns compressed config JSONString.
+     * @return config compressed JSONString
+     */
+    @Override
+    public byte[] getConfigJSONCompressed()
+    {
+        return m_configJSONCompressed.get();
     }
 
     /**

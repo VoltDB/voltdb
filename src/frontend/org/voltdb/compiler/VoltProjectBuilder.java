@@ -39,6 +39,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
@@ -47,6 +48,7 @@ import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
+import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.DrType;
@@ -61,7 +63,6 @@ import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -274,6 +275,10 @@ public class VoltProjectBuilder {
     private boolean m_ppdEnabled = false;
     private String m_ppdPrefix = "none";
 
+    private Integer m_heartbeatTimeout = null;
+
+    private Consistency.ReadLevel m_consistencyReadLevel = null;
+
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
     private Boolean m_commandLogSync;
@@ -347,6 +352,14 @@ public class VoltProjectBuilder {
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_internalSnapshotPath = internalSnapshotPath;
         m_commandLogPath = commandLogPath;
+        m_commandLogSync = commandLogSync;
+        m_commandLogEnabled = commandLogEnabled;
+        m_commandLogFsyncInterval = fsyncInterval;
+        m_commandLogMaxTxnsBeforeFsync = maxTxnsBeforeFsync;
+        m_commandLogSize = logSize;
+    }
+
+    public void configureLogging(Boolean commandLogSync, Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_commandLogSync = commandLogSync;
         m_commandLogEnabled = commandLogEnabled;
         m_commandLogFsyncInterval = fsyncInterval;
@@ -609,14 +622,23 @@ public class VoltProjectBuilder {
         m_snapshotPath = path;
     }
 
-    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
-    {
-        m_ppdEnabled = true;
-        m_snapshotPath = snapshotPath;
-        m_ppdPrefix = ppdPrefix;
+    public void setPartitionDetectionEnabled(boolean ppdEnabled) {
+        m_ppdEnabled = ppdEnabled;
+    }
+
+    public void setHeartbeatTimeoutSeconds(int seconds) {
+        m_heartbeatTimeout = seconds;
+    }
+
+    public void setDefaultConsistencyReadLevel(Consistency.ReadLevel level) {
+        m_consistencyReadLevel = level;
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
+         addImport(enabled, importType, importFormat, importBundle, config, new Properties());
+    }
+
+    public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
         HashMap<String, Object> importConnector = new HashMap<String, Object>();
         importConnector.put("ilEnabled", enabled);
         importConnector.put("ilModule", importBundle);
@@ -624,6 +646,10 @@ public class VoltProjectBuilder {
         importConnector.put("ilConfig", config);
         if (importFormat != null) {
             importConnector.put("ilFormatter", importFormat);
+        }
+
+        if (formatConfig != null) {
+            importConnector.put("ilFormatterConfig", formatConfig);
         }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
@@ -1034,9 +1060,22 @@ public class VoltProjectBuilder {
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
         deployment.setPartitionDetection(ppd);
         ppd.setEnabled(m_ppdEnabled);
-        Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
-        ppd.setSnapshot(ppdsnapshot);
-        ppdsnapshot.setPrefix(m_ppdPrefix);
+
+        // <heartbeat>
+        // don't include this element if not explicitly set
+        if (m_heartbeatTimeout != null) {
+            HeartbeatType hb = factory.createHeartbeatType();
+            deployment.setHeartbeat(hb);
+            hb.setTimeout((int) m_heartbeatTimeout);
+        }
+
+        // <consistency>
+        // don't include this element if not explicitly set
+        if (m_consistencyReadLevel != null) {
+            ConsistencyType ct = factory.createConsistencyType();
+            deployment.setConsistency(ct);
+            ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
+        }
 
         // <admin-mode>
         // can't be disabled, but only write out the non-default config if
@@ -1093,13 +1132,13 @@ public class VoltProjectBuilder {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_keystore);
                 store.setPassword(m_keystorePassword);
-                httpsType.setKeyStore(store);
+                httpsType.setKeystore(store);
             }
             if (m_certstore!=null) {
                 KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
                 store.setPath(m_certstore);
                 store.setPassword(m_certstorePassword);
-                httpsType.setTrustStore(store);
+                httpsType.setTruststore(store);
             }
             httpd.setHttps(httpsType);
         }
@@ -1167,6 +1206,21 @@ public class VoltProjectBuilder {
                     configProperties.add(prop);
                 }
             }
+
+            Properties formatConfig = (Properties) importConnector.get("ilFormatterConfig");
+            if ((formatConfig != null) && (formatConfig.size() > 0)) {
+                List<PropertyType> configProperties = importConfig.getFormatProperty();
+
+                for (Object nameObj : formatConfig.keySet()) {
+                    String name = String.class.cast(nameObj);
+                    PropertyType prop = factory.createPropertyType();
+                    prop.setName(name);
+                    prop.setValue(formatConfig.getProperty(name));
+
+                    configProperties.add(prop);
+                }
+            }
+
             importt.getConfiguration().add(importConfig);
         }
 

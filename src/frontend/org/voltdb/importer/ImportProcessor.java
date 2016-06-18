@@ -37,7 +37,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -52,12 +52,19 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterServerAdapter m_importServerAdapter;
+    private final String m_clusterTag;
 
-    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework, ImporterStatsCollector statsCollector)
+    public ImportProcessor(
+            int myHostId,
+            ChannelDistributer distributer,
+            Framework framework,
+            ImporterStatsCollector statsCollector,
+            String clusterTag)
             throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
         m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
+        m_clusterTag = clusterTag;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -70,15 +77,16 @@ public class ImportProcessor implements ImportDataProcessor {
             m_bundle = bundle;
             m_importerFactory = (AbstractImporterFactory) o;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
-            m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory, m_distributer);
+            m_importerTypeMgr = new ImporterLifeCycleManager(
+                    m_importerFactory, m_distributer, m_clusterTag);
         }
 
         public String getImporterType() {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props, AbstractFormatterFactory formatterFactory) {
-            m_importerTypeMgr.configure(props, formatterFactory);
+        public void configure(Properties props, FormatterBuilder formatterBuilder) {
+            m_importerTypeMgr.configure(props, formatterBuilder);
         }
 
         public void stop() {
@@ -98,12 +106,13 @@ public class ImportProcessor implements ImportDataProcessor {
 
     public void addProcessorConfig(ImportConfiguration config) {
         Properties properties = config.getmoduleProperties();
+
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
         String moduleType = attrs[0];
 
-        AbstractFormatterFactory formatterFactory = config.getFormatterFactory();
+        FormatterBuilder formatterBuilder = config.getFormatterBuilder();
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
             if (wrapper == null) {
@@ -136,12 +145,10 @@ public class ImportProcessor implements ImportDataProcessor {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                wrapper.configure(properties, formatterFactory);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
-            } else {
-                wrapper.configure(properties, formatterFactory);
             }
+            wrapper.configure(properties, formatterBuilder);
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
             Throwables.propagate(t);
