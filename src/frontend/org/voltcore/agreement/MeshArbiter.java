@@ -363,12 +363,6 @@ public class MeshArbiter {
             m_recoveryLog.info("Agreement, Telling " + CoreUtils.hsIdToString(failedSite) + " it is excluded");
             m_mailbox.send(failedSite, new FaultDecisionMessage(failedSite, true));
         }
-        for (long survivorSite : sfm.m_survivors) {
-            if (survivorSite != m_hsId) {
-                m_recoveryLog.info("Agreement, Telling " + CoreUtils.hsIdToString(survivorSite) + " it is included");
-                m_mailbox.send(survivorSite, new FaultDecisionMessage(survivorSite, false));
-            }
-        }
 
         m_mailbox.send(Longs.toArray(dests), sfm);
 
@@ -489,6 +483,23 @@ public class MeshArbiter {
                     if (m_sitesPendingDecisions.add(m.m_sourceHSId)) {
                         m_recoveryLog.info("Agreement, Will wait for final decision from " + CoreUtils.hsIdToString(m.m_sourceHSId) +
                                            " because it claimed the local host gone");
+                    }
+                }
+                if (!sfm.m_decision.isEmpty()) {
+                    if (m_sitesPendingDecisions.remove(sfm.m_sourceHSId)) {
+                        if (sfm.m_survivors.contains(m_hsId)) {
+                            m_recoveryLog.info("Agreement, Received final decision to include this host from host " +
+                                               CoreUtils.hsIdToString(sfm.m_sourceHSId));
+                        } else if (sfm.m_failed.contains(m_hsId)) {
+                            // Generate a fake fault message for the source host
+                            final FaultMessage fm = new FaultMessage(m_hsId, sfm.m_sourceHSId);
+                            fm.m_sourceHSId = m_hsId;
+                            m_mailbox.deliverFront(fm);
+                            // Force the loop to iterate at least one more time
+                            // to process the generated fault message, or the check
+                            // below may cause the loop to terminate prematurely.
+                            continue;
+                        }
                     }
                 }
 
