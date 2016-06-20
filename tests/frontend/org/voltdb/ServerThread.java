@@ -48,6 +48,9 @@ public class ServerThread extends Thread {
         if (m_config.m_coordinators == null || m_config.m_coordinators.isEmpty()) {
             m_config.m_coordinators = JoinerCriteria.hosts(m_config.m_leader);
         }
+        if (m_config.m_startAction != StartAction.PROBE) {
+            m_config.m_hostCount = VoltDB.UNDEFINED;
+        }
 
         if (!m_config.validate()) {
             System.exit(-1);
