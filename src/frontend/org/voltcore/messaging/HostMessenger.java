@@ -1378,11 +1378,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void cutLink(int hostIdA, int hostIdB) {
         if (m_localHostId == hostIdA) {
             ForeignHost fh = m_foreignHosts.get(hostIdB);
-            fh.cutLink();
+            if (fh != null) {
+                fh.cutLink();
+            }
         }
         if (m_localHostId == hostIdB) {
             ForeignHost fh = m_foreignHosts.get(hostIdA);
-            fh.cutLink();
+            if (fh != null) {
+                fh.cutLink();
+            }
         }
     }
 

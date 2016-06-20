@@ -21,7 +21,8 @@ public enum Subject {
     DEFAULT,                 // All original message types are in the default subject
     SITE_FAILURE_UPDATE,     // Execution site data exchange when processing post-failure
     FAILURE,                 // Notification of node failures
-    SITE_FAILURE_FORWARD;    // Agreement site forwards for failures detected on other sites
+    SITE_FAILURE_FORWARD,    // Agreement site forwards for failures detected on other sites
+    FAULT_DECISION;          // Decision of a fault resolution
 
     private final byte m_id;
 
