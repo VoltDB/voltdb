@@ -318,8 +318,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 SnapshotCheckResponseMessage response;
                 while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
                     // ignore responses to previous requests
-                    if (jsObj.getString("path").equals(response.getPath()) &&
-                        jsObj.getString("nonce").equals(response.getNonce())) {
+                    if (jsObj.getString("nonce").equals(response.getNonce())) {
                         responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
                     }
 
