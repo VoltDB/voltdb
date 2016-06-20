@@ -527,7 +527,7 @@ class VoltDatabase:
         try:
             processId = self.Get_Voltdb_Process().processId
             if processId is not None and processId != -1:
-                os.kill(processId, signal.SIGKILL)
+                os.kill(int(processId), signal.SIGKILL)
                 return create_response('success', 200)
             else:
                 return create_response('process not found', 200)
