@@ -301,7 +301,7 @@ public class VoltDB {
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
             m_startAction = StartAction.CREATE;
-            m_coordinators = JoinerCriteria.hosts(":" + Integer.toString(m_internalPort));
+            m_coordinators = JoinerCriteria.hosts(m_internalPort);
         }
 
         public Configuration(String args[]) {
@@ -507,6 +507,7 @@ public class VoltDB {
                     m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
+                    m_enableAdd = true;
                 } else if (arg.equals("noadd")) {
                     m_enableAdd = false;
                 } else if (arg.equals("replica")) {
@@ -768,6 +769,10 @@ public class VoltDB {
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
                 isValid = false;
                 hostLog.fatal("Option hostcount may only be specified when the start action is probe");
+            }
+            if (m_startAction == StartAction.JOIN && !m_enableAdd) {
+                isValid = false;
+                hostLog.fatal("Add and noadd cannot be specified at the same time");
             }
             return isValid;
         }

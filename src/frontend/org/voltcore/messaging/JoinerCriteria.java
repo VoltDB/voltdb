@@ -49,15 +49,25 @@ public class JoinerCriteria {
         checkArgument(option != null, "option is null");
         if (option.trim().isEmpty()) {
             return ImmutableSortedSet.of(
-                    HostAndPort.fromString("")
-                        .withDefaultPort(DEFAULT_INTERNAL_PORT)
-                        .toString());
+                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
         }
         Splitter commaSplitter = Splitter.on(',').omitEmptyStrings().trimResults();
         ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
         for (String h: commaSplitter.split(option)) {
             checkArgument(isValidCoordinatorSpec(h), "%s is not a valid host spec", h);
             sbld.add(HostAndPort.fromString(h).withDefaultPort(DEFAULT_INTERNAL_PORT).toString());
+        }
+        return sbld.build();
+    }
+
+    public static ImmutableSortedSet<String> hosts(int...ports) {
+        if (ports.length == 0) {
+            return ImmutableSortedSet.of(
+                    HostAndPort.fromParts("", DEFAULT_INTERNAL_PORT).toString());
+        }
+        ImmutableSortedSet.Builder<String> sbld = ImmutableSortedSet.naturalOrder();
+        for (int p: ports) {
+            sbld.add(HostAndPort.fromParts("", p).toString());
         }
         return sbld.build();
     }

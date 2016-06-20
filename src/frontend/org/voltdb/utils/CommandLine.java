@@ -226,6 +226,15 @@ public class CommandLine extends VoltDB.Configuration
         m_isPaused = true;
     }
 
+    public CommandLine enableAdd(boolean enableAdd) {
+        m_enableAdd = enableAdd;
+        return this;
+    }
+
+    public boolean enableAdd() {
+        return m_enableAdd;
+    }
+
     public CommandLine leader(String leader)
     {
         m_leader = leader;
