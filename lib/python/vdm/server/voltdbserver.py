@@ -565,46 +565,6 @@ class VoltDatabase:
                                    ('voltserver.output.%s.%u') % (G.OUTFILE_TIME, G.OUTFILE_COUNTER))
         return self.run_voltdb_cmd('voltadmin', 'shutdown', args, outfilename, server)
 
-    def stop_local_server(self, server_id):
-        """
-        Stops voltdb server running locally for this database
-        """
-        members = []
-        current_database = HTTPListener.Global.DATABASES.get(self.database_id)
-        if not current_database:
-            abort(404)
-        else:
-            members = current_database['members']
-        if not members:
-            return create_response('No servers configured for the database', 500)
-
-        server = HTTPListener.Global.SERVERS.get(server_id)
-        if not server:
-            return create_response('Server details not found for id ' + server_id, 404)
-
-        try:
-            process_id = self.get_voltdb_process_id().processId
-            if process_id is not None and process_id != -1:
-                os.kill(int(process_id), signal.SIGTERM)
-                return create_response('Server shutdown successfully.', 200)
-            else:
-                return create_response('Process not found.', 200)
-        except Exception, err:
-            return create_response(str(err), 500)
-
-    def get_voltdb_process_id(self):
-        VoltdbProcess.isProcessRunning = False
-        VoltdbProcess.processId = -1
-        process = subprocess.Popen("jps", shell=True, stdout=subprocess.PIPE)
-        process_list = process.communicate()[0].split('\n')
-        for process_cmd in process_list:
-            if 'VoltDB' in process_cmd:
-                VoltdbProcess.isProcessRunning = True
-                VoltdbProcess.processId = process_cmd.split()[0]
-                break
-        return VoltdbProcess
-
-
     def kill_database(self, database_id):
         members = []
         current_database = HTTPListener.Global.DATABASES.get(self.database_id)
