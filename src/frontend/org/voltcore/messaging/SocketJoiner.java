@@ -101,7 +101,6 @@ public class SocketJoiner {
         public void requestJoin(
                 SocketChannel socket,
                 InetSocketAddress listeningAddress,
-                String request,
                 HostCriteria joinerCriteria) throws Exception;
 
         /*
@@ -471,7 +470,7 @@ public class SocketJoiner {
 
             hostLog.info("Received request type " + type);
             if (type.equals("REQUEST_HOSTID")) {
-                m_joinHandler.requestJoin( sc, listeningAddress, jsObj.optString("request"), joinerCriteria);
+                m_joinHandler.requestJoin( sc, listeningAddress, joinerCriteria);
             } else if (type.equals("PUBLISH_HOSTID")){
                 m_joinHandler.notifyOfJoin(jsObj.getInt("hostId"), sc, listeningAddress, joinerCriteria);
             } else {
@@ -633,7 +632,6 @@ public class SocketJoiner {
 
             JSONObject jsObj = new JSONObject();
             jsObj.put("type", "REQUEST_HOSTID");
-            jsObj.put("request", m_criteria.getNodeState().name());
 
             // put the version compatibility status in the json
             jsObj.put("versionString", versionChecker.getVersionString());
