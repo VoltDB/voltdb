@@ -427,6 +427,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
+    private final List<String> managedPathsWithFilesPrimed(DeploymentType deployment) {
+        ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
+        PathsType paths = deployment.getPaths();
+        String voltDbRoot = paths.getVoltdbroot().getNodePath();
+        String path;
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getSnapshots().getNodePath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getExportoverflow().getNodePath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getDroverflow().getNodePath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlog().getNodePath())) != null)
+            nonEmptyPaths.add(path);
+        if ((path = managedPathEmptyCheck(voltDbRoot, paths.getCommandlogsnapshot().getNodePath())) != null)
+            nonEmptyPaths.add(path);
+        return nonEmptyPaths.build();
+    }
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config configuration that gets passed in from commandline.
@@ -502,8 +520,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             + rootFH + " that was initialized with the init command");
                     return;
                 }
-            } else {
-                loadPathConfiguration(config);
             }
 
             if (config.m_hostCount == VoltDB.UNDEFINED) {
@@ -1990,6 +2006,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // adjust deployment host count when the cluster members are given by mesh configuration
             // providers
             if (config.m_startAction == StartAction.PROBE) {
+                loadPathConfiguration(config);
                 if (config.m_hostCount == VoltDB.UNDEFINED) {
                     config.m_hostCount = 1;
                 }
@@ -2197,7 +2214,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     HostMessenger.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
-                || managedPathsWithFiles(readDepl.deployment).isEmpty();
+                || managedPathsWithFilesPrimed(readDepl.deployment).isEmpty();
 
         JoinerCriteria criteria = JoinerCriteria.builder()
                 .coordinators(m_config.m_coordinators)
