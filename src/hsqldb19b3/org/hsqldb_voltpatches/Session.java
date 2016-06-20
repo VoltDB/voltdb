@@ -1315,7 +1315,13 @@ public class Session implements SessionInterface {
 
             try {
                 in = executeDirectStatement(sql);
-            } catch (Throwable t) {
+            }
+            catch (StackOverflowError caught) {
+                // Don't mask stack overflows. Allow them to be consistently handled
+                // in a higher-level caller.
+                throw caught;
+            }
+            catch (Throwable t) {
                 in = Result.newErrorResult(t);
 
                 // if (t instanceof OutOfMemoryError) {

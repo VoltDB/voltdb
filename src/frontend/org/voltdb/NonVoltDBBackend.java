@@ -473,7 +473,7 @@ public abstract class NonVoltDBBackend {
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer(qt.m_initialText);
             String wholeMatch = matcher.group();
-            String group = wholeMatch;
+            String lastGroup = wholeMatch;
             List<String> groups = new ArrayList<String>();
             if (qt.m_debugPrint) {
                 if (count < 1) {
@@ -491,7 +491,7 @@ public abstract class NonVoltDBBackend {
                 System.out.println("  " + ++count + ".wholeMatch: " + wholeMatch);
             }
             for (String groupName : qt.m_groups) {
-                group = matcher.group(groupName);
+                String group = matcher.group(groupName);
                 groups.add(group);
                 if (qt.m_debugPrint) {
                     System.out.println("    group     : " + group);
@@ -511,18 +511,22 @@ public abstract class NonVoltDBBackend {
                     // Make sure not to swallow up extra ')', in this group
                     replaceText.append(handleParens(groupValue, qt.m_prefix, suffixValue));
                 }
+                lastGroup = group;
+            }
+            if (qt.m_debugPrint) {
+                System.out.println("    lastGroup : " + lastGroup);
             }
             if (qt.m_useWholeMatch) {
                 if (qt.m_columnType != null && (
-                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(group))
-                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
+                           (qt.m_columnType == ColumnType.INTEGER && !isIntegerColumn(lastGroup))
+                        || (qt.m_columnType == ColumnType.GEO     && !isGeoColumn(lastGroup)) )) {
                     // Make no changes to query (when columnType is specified,
                     // but does not match the column type found in this query)
                     replaceText.append(wholeMatch);
                 } else {
                     // Check for the case where the group (or the whole text) is to be replaced with replacementText
                     if (qt.m_replacementText != null) {
-                        wholeMatch = wholeMatch.replace(group, qt.m_replacementText);
+                        wholeMatch = wholeMatch.replace(lastGroup, qt.m_replacementText);
                     }
                     // Check for the case where each group is to be replaced using groupReplacementTexts
                     if (qt.m_groupReplacementTexts != null && !qt.m_groupReplacementTexts.isEmpty()) {

@@ -788,7 +788,7 @@ public class ExpressionColumn extends Expression {
 
             case OpTypes.DYNAMIC_PARAM :
                 sb.append("DYNAMIC PARAM: ");
-                sb.append(", TYPE = ").append(dataType.getNameString());
+                sb.append(", TYPE = ").append((dataType != null) ? dataType.getNameString() : "null");
                 break;
 
             case OpTypes.SEQUENCE :

@@ -394,6 +394,6 @@ public class TestSelfJoins  extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestJoinOrder.class.getResource("testself-joins-ddl.sql"), "testselfjoins", false);
+        setupSchema(TestJoinOrder.class.getResource("testplans-selfjoins-ddl.sql"), "testselfjoins", false);
     }
 }

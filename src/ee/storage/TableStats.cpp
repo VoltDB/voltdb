@@ -21,6 +21,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include <vector>
 #include <string>
@@ -135,8 +136,9 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
-    if (!m_table->isExport()) {
-        occupied_tuple_mem_kb = m_table->occupiedTupleMemory() / 1024;
+    PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(m_table);
+    if (persistentTable) {
+        occupied_tuple_mem_kb = persistentTable->occupiedTupleMemory() / 1024;
     }
     int64_t string_data_mem_kb = m_table->nonInlinedMemorySize() / 1024;
 
@@ -148,7 +150,9 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
         m_lastAllocatedTupleMemory = m_table->allocatedTupleMemory();
         occupied_tuple_mem_kb =
             occupied_tuple_mem_kb - (m_lastOccupiedTupleMemory / 1024);
-        m_lastOccupiedTupleMemory = m_table->occupiedTupleMemory();
+        if (persistentTable) {
+            m_lastOccupiedTupleMemory = persistentTable->occupiedTupleMemory();
+        }
         string_data_mem_kb =
             string_data_mem_kb - (m_lastStringDataMemory / 1024);
         m_lastStringDataMemory = m_table->nonInlinedMemorySize();

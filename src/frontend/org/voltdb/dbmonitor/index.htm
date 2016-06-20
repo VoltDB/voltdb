@@ -709,7 +709,7 @@
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>
-                                        <a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>
+                                        <a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: none;" title="Add Configuration">&nbsp;</a>
                                         <div id="loadingConfiguration" class="loading-small loadExport" style="display: none"></div>
                                         <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
@@ -1228,6 +1228,23 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn">Ok</a></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: none"><a href="#unAuthorizedPopup" id="unAuthorized">UnAuthorized</a></div>
+    <div id="unAuthorizedPopup" style="display: none">
+        <div id="kerberosPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser.
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="unAuthorizedOk">Ok</a></div>
             </div>
         </div>
     </div>
@@ -1915,7 +1932,7 @@
         <div id="queryTimeoutConfigControls">
           <div class="queryTimeout">
             <form id="formQueryTimeoutConfiguration" method="get" action="">
-              <table id="tblAddNewProperty" width="100%" class="QueryTbl">
+              <table id="tblQueryTimeout" width="100%" class="QueryTbl">
                 <tbody><tr>
                   <td>Query Timeout</td>
                   <td align="center">

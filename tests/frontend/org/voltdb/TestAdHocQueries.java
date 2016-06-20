@@ -613,7 +613,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         String sql = getQueryForLongQueryTable(750);
         try {
             m_client.callProcedure("@AdHoc", sql);
-            fail("Query was expected to generate stack over flow error");
+            fail("Query was expected to generate stack overflow error");
         }
         catch (Exception exception) {
             System.out.println(exception.getMessage());
@@ -621,7 +621,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             expectedMsg = "Encountered stack overflow error. " +
                           "Try reducing the number of predicate expressions in the query.";
             boolean foundMsg = exception.getMessage().contains(expectedMsg);
-            assert foundMsg : exception.getMessage();
+            assertTrue("Expected text \"" + expectedMsg + "\" did not appear in exception "
+                    + "\"" + exception.getMessage() + "\"", foundMsg);
         }
         finally {
             if (m_client != null) {
@@ -859,10 +860,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                           AND PNUM > 'P2';";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on static clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("does not support constant Boolean values, like TRUE or FALSE") > 0);
+                fail("failed on static clause");
             }
             adHocQuery = "ROLLBACK;";
             try {

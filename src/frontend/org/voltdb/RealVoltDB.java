@@ -154,7 +154,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.MembershipAcceptor, HostMessenger.HostWatcher {
     private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
 
     /** Default deployment file contents if path to deployment is null */
@@ -164,10 +164,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         "                Changes to this file will be overwritten. Copy it elsewhere if you",
         "                want to use it as a starting point for a custom configuration. -->",
         "<deployment>",
-        "   <cluster hostcount=\"1\" />",
-        "   <httpd enabled=\"true\">",
-        "      <jsonapi enabled=\"true\" />",
-        "   </httpd>",
+        "    <cluster hostcount=\"1\" />",
+        "    <httpd enabled=\"true\">",
+        "        <jsonapi enabled=\"true\" />",
+        "    </httpd>",
         "</deployment>"
     };
 
@@ -1038,6 +1038,72 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         }
     }
 
+    /**
+     * This is currently used to prevent simultaneous rejoins and rejoins during network partition.
+     * It returns true for non-rejoin cases.
+     */
+    @Override
+    public boolean shouldAccept(int hostId, String request, StringBuilder errMsg)
+    {
+        Preconditions.checkNotNull(m_messenger);
+
+        StartAction action = null;
+        try {
+            action = StartAction.valueOf(request);
+        } catch (IllegalArgumentException e) {}
+
+        if (action != null && action.doesRejoin()) {
+            final int rejoiningHost = VoltZK.createRejoinNodeIndicator(m_messenger.getZK(), hostId);
+
+            if (rejoiningHost == -1) {
+                return true;
+            } else {
+                errMsg.append("Only one host can rejoin at a time. Host ")
+                      .append(rejoiningHost)
+                      .append(" is still rejoining.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    public void hostsFailed(Set<Integer> failedHosts)
+    {
+        final ScheduledExecutorService es = getSES(true);
+        if (es != null) {
+            es.submit(new Runnable() {
+                @Override
+                public void run()
+                {
+                    // First check to make sure that the cluster still is viable before
+                    // before allowing the fault log to be updated by the notifications
+                    // generated below.
+                    Set<Integer> hostsOnRing = new HashSet<Integer>();
+                    if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
+                        VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                                false, null);
+                    }
+                    // Cleanup the rejoin blocker in case the rejoining node failed.
+                    // This has to run on a separate thread because the callback is
+                    // invoked on the ZooKeeper server thread.
+                    //
+                    // I'm trying to be defensive to have this cleanup code run on
+                    // all live nodes. One of them will succeed in cleaning up the
+                    // rejoin ZK nodes. The others will just do nothing if the ZK
+                    // nodes are already gone. If this node is still initializing
+                    // when a rejoining node fails, there must be a live node that
+                    // can clean things up. It's okay to skip this if the executor
+                    // services are not set up yet.
+                    for (int hostId : failedHosts) {
+                        VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                    }
+                }
+            });
+        }
+    }
+
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
@@ -1758,12 +1824,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.isPaused.set(m_config.m_isPaused);
 
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, this);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
         try {
-            m_messenger.start();
+            m_messenger.start(m_config.m_startAction.name());
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -2289,8 +2355,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 Integer partition = siteTracker.getPartitionForSite(site);
                 partitions.add(partition);
             }
-            // Update catalog for import processor this should be just/stop start and updat partitions.
-            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
@@ -2329,6 +2393,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_MPI != null) {
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
+
+            // Update catalog for import processor this should be just/stop start and updat partitions.
+            ImportManager.instance().updateCatalog(m_catalogContext, m_messenger);
 
             // 6. Perform updates required by the DR subsystem
 
@@ -2561,8 +2628,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
+                if (m_rejoining) {
+                    VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
+                    m_rejoining = false;
+                }
+
                 String actionName = m_joining ? "join" : "rejoin";
-                m_rejoining = false;
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
@@ -2756,8 +2827,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
                 // remove the rejoin blocker
-                final String node = VoltZK.rejoinNodesBlockerHost+String.valueOf(m_myHostId);
-                VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(),node);
+                VoltZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;

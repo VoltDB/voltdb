@@ -224,12 +224,7 @@ public final class InvocationDispatcher {
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
         // try to get the global default setting for read consistency, but fall back to SAFE
-        if ((VoltDB.instance() != null) && (VoltDB.instance().getConfig() != null)) {
-            m_defaultConsistencyReadLevel = VoltDB.instance().getConfig().m_consistencyReadLevel;
-        }
-        else {
-            m_defaultConsistencyReadLevel = Consistency.ReadLevel.SAFE;
-        }
+        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     /*
@@ -456,13 +451,14 @@ public final class InvocationDispatcher {
                         task.getSerializedSize(),
                         nowNanos);
         if (!success) {
-            // HACK: this return is for the DR agent so that it
-            // will move along on duplicate replicated transactions
-            // reported by the slave cluster.  We report "SUCCESS"
-            // to keep the agent from choking.  ENG-2334
+            // when VoltDB.crash... is called, we close off the client interface
+            // and it might not be possible to create new transactions.
+            // Return an error.
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
-                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                    + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
+                    + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
         }
 
@@ -1520,7 +1516,7 @@ public final class InvocationDispatcher {
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
             hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
-                    + "This is likely due VoltDB ceasing client communication as it "
+                    + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
         }

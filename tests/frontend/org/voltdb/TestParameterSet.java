@@ -405,6 +405,16 @@ public class TestParameterSet extends TestCase {
         p2 = ParameterSet.fromJSONString(json);
 
         assertEquals("0a1A0A", p2.toArray()[6]);
+
+        // this tests that JSON handles special floats
+        params = ParameterSet.fromArrayNoCopy(new Object[]{
+                Double.NaN,
+                Double.POSITIVE_INFINITY,
+                Double.NEGATIVE_INFINITY } );
+
+        json = params.toJSONString();
+        p2 = ParameterSet.fromJSONString(json);
+        assertEquals(p2.toJSONString(), json);
     }
 
     public void testGetCRCWithoutCrash() throws IOException {

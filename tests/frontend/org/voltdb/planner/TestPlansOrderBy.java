@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -225,6 +224,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "from T " +
                      "group by T.T_D0 " +
                      "order by T.T_D0;");
+    }
+
+    public void testOrderByBooleanConstants()
+    {
+        String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
+        for (String condition : conditions) {
+            failToCompile(String.format("SELECT * FROM T WHERE T_D0 = 2 ORDER BY %s", condition),
+                          "invalid ORDER BY expression");
+        }
     }
 
     public void testOrderDescWithEquality() {
@@ -783,7 +791,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         int idx = 0;
         List<AbstractExpression> sesTves = new ArrayList<>();
         for (AbstractExpression se : ses) {
-            sesTves.addAll(ExpressionUtil.findAllExpressionsOfClass(se, TupleValueExpression.class));
+            sesTves.addAll(se.findAllTupleValueSubexpressions());
         }
         assertEquals(sortColumnIdx.length, sesTves.size());
         for (AbstractExpression seTve : sesTves) {

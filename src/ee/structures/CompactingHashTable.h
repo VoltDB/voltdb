@@ -122,6 +122,7 @@ namespace voltdb {
         KeyEqChecker m_keyEq;             // instance of the key eq checker
         DataEqChecker m_dataEq;           // instance of the value eq checker
 
+
     public:
 
         /**
@@ -177,6 +178,8 @@ namespace voltdb {
 
         /** verification for debugging and testing */
         bool verify();
+        /** Do we have a cached last buffer?  This is used in testing. */
+        bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
 
     protected:
         /** find, given a bucket/key */

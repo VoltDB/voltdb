@@ -31,7 +31,16 @@ load classes sqlcmdtest-procs.jar;
 Command succeeded.
 
 --- Potential Procedure Classes ----------------------------
- sqlcmdtest.InsertEmployee
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
 
 
 drop table EMPLOYEE if exists;
@@ -115,8 +124,19 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 InsertEmployee            	varchar, varchar, varchar
 
 
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.Trivial                       
+
 --- Active Procedure Classes  ------------------------------
- sqlcmdtest.InsertEmployee
+ sqlcmdtest.InsertEmployee                
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
 
 
 select * from EMPLOYEE;
@@ -204,10 +224,34 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 
 
 --- Potential Procedure Classes ----------------------------
- sqlcmdtest.InsertEmployee
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.InsertEmployee                
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
 
 
 remove classes sqlcmdtest.InsertEmployee;
+Command succeeded.
+
+--- Potential Procedure Classes ----------------------------
+ sqlcmdtest.Breakable0                    
+ sqlcmdtest.Breakable1                    
+ sqlcmdtest.Breakable2                    
+ sqlcmdtest.Trivial                       
+
+--- Non-Procedure Classes ----------------------------------
+ sqlcmdtest.Breakable0$NestedGetsSabotaged
+ sqlcmdtest.Breakable1$NestedGetsKilled   
+ sqlcmdtest.ReferencedGetsSabotaged       
+
+
+remove classes sqlcmdtest.*;
 Command succeeded.
 
 --- Empty Class List -----------------------
