@@ -118,7 +118,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    public void notestBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException
+    public void testBasicLimitOffsets() throws IOException, ProcCallException, InterruptedException
     {
         Client client = this.getClient();
         load(client);
@@ -188,7 +188,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         }
     }
 
-    public void notestDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException
+    public void testDistinctLimitOffset() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         client.callProcedure("InsertA", 0, 1);
@@ -203,7 +203,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(0, result.getRowCount());
     }
 
-    public void notestENG3487() throws IOException, ProcCallException
+    public void testENG3487() throws IOException, ProcCallException
     {
         Client client = this.getClient();
 
@@ -226,7 +226,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     }
 
-    public void notestENG1808() throws IOException, ProcCallException
+    public void testENG1808() throws IOException, ProcCallException
     {
         Client client = this.getClient();
 
@@ -237,7 +237,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(0, result.getRowCount());
     }
 
-    public void notestENG5156() throws IOException, ProcCallException {
+    public void testENG5156() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable result = null;
 
@@ -268,7 +268,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         validateTableOfLongs(result, new long[][] {{2,2}});
     }
 
-    public void notestENG6485() throws IOException, ProcCallException {
+    public void testENG6485() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable result = null;
 
@@ -315,7 +315,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
             fail("cannot get data from table c");
         }
     }
-    public void notestSubqueryLimit() throws Exception {
+    public void testSubqueryLimit() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
