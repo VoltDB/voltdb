@@ -1677,13 +1677,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //Now that we are done with deployment configuration set all path to fake ones.
-        dt.getPaths().getVoltdbroot().setPath("");
+        dt.getPaths().getVoltdbroot().setPath("fake");
         if (config.m_isEnterprise) {
-            dt.getPaths().getCommandlog().setPath("");
-            dt.getPaths().getCommandlogsnapshot().setPath("");
-            dt.getPaths().getSnapshots().setPath("");
-            dt.getPaths().getExportoverflow().setPath("");
-            dt.getPaths().getDroverflow().setPath("");
+            dt.getPaths().getCommandlog().setPath("fake");
+            dt.getPaths().getCommandlogsnapshot().setPath("fake");
+            dt.getPaths().getSnapshots().setPath("fake");
+            dt.getPaths().getExportoverflow().setPath("fake");
+            dt.getPaths().getDroverflow().setPath("fake");
         }
     }
 
