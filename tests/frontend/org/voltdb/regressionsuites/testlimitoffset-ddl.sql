@@ -48,3 +48,10 @@ CREATE TABLE R1 (
   PRIMARY KEY (ID)
 );
  
+-- This table has no key, no indices and no partition specification.
+CREATE TABLE PLAINJANE (
+  ID INTEGER,
+  A  INTEGER,
+  B  INTEGER
+);
+
