@@ -75,12 +75,20 @@ public class TestClientClose extends TestCase {
     }
 
     public void testThreadsKilledClientClose() throws Exception {
+        int preNumClientReaper = 0;
+        Map<Thread, StackTraceElement[]> preStMap = Thread.getAllStackTraces();
+        for (Thread t : preStMap.keySet()) {
+            if (t.getName().contains("VoltDB Client Reaper Thread")) {
+                preNumClientReaper++;
+            }
+        }
         ClientConfig config = new ClientConfig();
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
         client.close();
         Thread.sleep(2000);
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
+        int postNumClientReaper = 0;
         for (Entry<Thread, StackTraceElement[]> e : stMap.entrySet()) {
             // skip the current thread
             Thread t = e.getKey();
@@ -90,15 +98,22 @@ public class TestClientClose extends TestCase {
             }
             // check thread name and whether the thread should be close.
             String threadName = t.getName();
+            if (threadName.contains("VoltDB Client Reaper Thread")) {
+                postNumClientReaper++;
+            }
             if (threadName.contains("Reverse DNS lookups")
                     || threadName.contains("Estimated Time Updater")
-                    || threadName.contains("Async Logger")
-                    || threadName.contains("VoltDB Client Reaper Thread")) {
+                    || threadName.contains("Async Logger")) {
                 System.out.println("threadName: " + threadName);
                 for (StackTraceElement element : st) {
                     System.out.println("stack trace element: " + element);
                 }
                 fail("Something failed to clean up.");
+            }
+            System.out.println("preNumClientReaper : " + preNumClientReaper);
+            System.out.println("postNumClientReaper : " + postNumClientReaper);
+            if (preNumClientReaper > postNumClientReaper) {
+                fail("Something failed to clean up. ClientReaper");
             }
         }
     }
