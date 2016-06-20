@@ -2503,11 +2503,11 @@ public class TestVoltCompiler extends TestCase {
                   "SELECT t1.a, count(*), sum(t2.b) FROM t1 JOIN t2 ON true GROUP BY t1.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
 
-        // 6. Test view defined on joint tables where some source tables are streamed table.
+        // 6. Test view defined on joined tables where some source tables are streamed table.
         viewDDL = "EXPORT TABLE T2;\n" +
                   "CREATE VIEW V (aint, cnt, sumint) AS \n" +
                   "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joint tables cannot have streamed table (T2) as its source.");
+        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T2) as its source.");
     }
 
     public void testDDLCompilerMatView()

@@ -286,12 +286,12 @@ public class PlanAssembler {
                 throw new PlanningErrorException(
                 "Illegal to read a stream.");
             }
-            // Check if the select target is a joint table view, guard against that.
+            // Check if the select target is a joined table view, guard against that.
             // Will remove this after the feature is done.
             for (Table t : parsedStmt.m_tableList) {
                 MaterializedViewHandler mvHandler = t.getMvhandler().get("mvHandler");
                 if (mvHandler != null && mvHandler.getIsjointtableview()) {
-                    throw new PlanningErrorException("Materialized view on joint tables will be supported soon.");
+                    throw new PlanningErrorException("Materialized view on joined tables will be supported soon.");
                 }
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;

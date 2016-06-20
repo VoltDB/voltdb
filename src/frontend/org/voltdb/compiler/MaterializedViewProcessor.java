@@ -136,7 +136,7 @@ public class MaterializedViewProcessor {
                 if (! hasStreamedTableAsSource && exportTableNames.contains(srcTable.getTypeName())) {
                     hasStreamedTableAsSource = true;
                     if (stmt.m_tableList.size() > 1) {
-                        String msg = String.format("A materialized view (%s) on joint tables cannot have streamed table (%s) as its source.",
+                        String msg = String.format("A materialized view (%s) on joined tables cannot have streamed table (%s) as its source.",
                                                    viewName, srcTable.getTypeName());
                         throw m_compiler.new VoltCompilerException(msg);
                     }
@@ -362,7 +362,7 @@ public class MaterializedViewProcessor {
     }
 
     /**
-     * If the view is defined on joint tables (>1 source table),
+     * If the view is defined on joined tables (>1 source table),
      * check if there are self-joins.
      *
      * @param tableList The list of view source tables.
