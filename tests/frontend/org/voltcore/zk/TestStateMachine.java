@@ -1404,14 +1404,18 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(boolsSynchronized(m_booleanStateMachinesForGroup2));
             assertTrue(g2i0.state);
             assertTrue(g2i0.notifiedOfReset);
-            assertEquals(2, g2i0.getResetCounter());
-            assertFalse(g2i0.isDirectVictim);
+            // when the handler for the second exception is executed, reinitialization caused by the first
+            // exception may or may not have completed; if it is completed, the handler will be ignored, hence
+            // only 1 reset, otherwise there will be 2 resets
+            assertTrue(g2i0.getResetCounter() == 1 || g2i0.getResetCounter() == 2);
 
             assertTrue(bytesSynchronized(m_byteStateMachinesForGroup2));
             assertEquals(rawByteStates[1], g2j0.state);
             assertTrue(g2j0.notifiedOfReset);
-            assertEquals(2, g2j0.getResetCounter());
-            assertTrue(g2j0.isDirectVictim);
+            assertEquals(g2i0.getResetCounter(), g2j0.getResetCounter());
+
+            // only one of the two state machines will be direct victim at a time, depending on the resets executed
+            assertTrue(g2i0.isDirectVictim ^ g2j0.isDirectVictim);
         }
         catch (Exception e) {
             fail("Exception occurred during test.");
