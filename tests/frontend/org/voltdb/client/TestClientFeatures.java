@@ -511,6 +511,8 @@ public class TestClientFeatures extends TestCase {
                 fail("Something failed to clean up.");
             }
         }
+        System.out.println("preNumClientReaper : " + preNumClientReaper);
+        System.out.println("postNumClientReaper : " + postNumClientReaper);
         if (preNumClientReaper != postNumClientReaper) {
             fail("Something failed to clean up. ClientReaper");
         }
@@ -541,7 +543,7 @@ public class TestClientFeatures extends TestCase {
         }
         Map<Thread, StackTraceElement[]> preStMap = Thread.getAllStackTraces();
         for (Thread t : preStMap.keySet()) {
-            System.out.println(t.getName());
+            System.out.println("Thread After Close client1: " + t.getName());
         }
         try {
             VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
