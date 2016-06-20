@@ -384,6 +384,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_pathList.getProperty(name);
     }
 
+    @Override
+    public String getCommandLogSnapshotPath() {
+        return m_pathList.getProperty("org.voltdb.path.command_log_snapshot");
+    }
+
+    @Override
+    public String getCommandLogPath() {
+        return m_pathList.getProperty("org.voltdb.path.command_log");
+    }
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute())

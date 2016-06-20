@@ -16,19 +16,17 @@
  */
 package org.voltdb;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
-
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
@@ -45,6 +43,10 @@ public interface VoltDBInterface
     public void readBuildInfo(String editionTag);
 
     public CommandLog getCommandLog();
+
+    public String getCommandLogSnapshotPath();
+
+    public String getCommandLogPath();
 
     /**
      * Initialize all the global components, then initialize all the m_sites.

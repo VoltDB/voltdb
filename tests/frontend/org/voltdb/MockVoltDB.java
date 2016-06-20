@@ -489,6 +489,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getCommandLogSnapshotPath() {
+        return "";
+    }
+
+    @Override
+    public String getCommandLogPath() {
+        return "";
+    }
+
+    @Override
     public boolean rejoinDataPending() {
         return false;
     }
