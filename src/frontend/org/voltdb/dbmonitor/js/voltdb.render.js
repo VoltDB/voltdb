@@ -122,6 +122,8 @@ function alertNodeClicked(obj) {
 
         this.exportTablesArray = [];
 
+        this.memoryDetails = [];
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -2094,6 +2096,8 @@ function alertNodeClicked(obj) {
 
                         var memoryUsage = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["PHYSICALMEMORY"]) * 100;
                         sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
+
+                        voltDbRenderer.memoryDetails.push(memoryInfo[timeStampIndex])
                     }
 
                 });
@@ -2498,7 +2502,12 @@ function alertNodeClicked(obj) {
             }
 
             var dataCount = 0;
-            connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
+            if(jQuery.isEmptyObject(connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data) && voltDbRenderer.memoryDetails.length != 0){
+                sysTransaction["TimeStamp"] = voltDbRenderer.memoryDetails[voltDbRenderer.memoryDetails.length - 1]
+                currentTimerTick =sysTransaction["TimeStamp"];
+              }
+            else{
+                connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
                 var srcData = table;
                 var data = null;
                 currentTimerTick = srcData[colIndex["TIMESTAMP"]];
@@ -2518,6 +2527,8 @@ function alertNodeClicked(obj) {
                 }
                 dataCount++;
             });
+            }
+
             var currentTimedTransactionCount = 0.0;
             for (var proc in procStats) {
                 currentTimedTransactionCount += procStats[proc][1];
