@@ -71,7 +71,7 @@ class Stats():
         latestBuild = build['number']
         host = build['builtOn']
 
-        db = mysql.connector.connect(host=self.dbhost, user='oolukoya', password='oolukoya', database='qa')
+        db = mysql.connector.connect(host=self.dbhost, user=os.environ['user'], password=os.environ['pass'], database='qa')
         cursor = db.cursor()
 
         for build in range(build_low, build_high+1):
