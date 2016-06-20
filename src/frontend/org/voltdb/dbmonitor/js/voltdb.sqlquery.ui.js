@@ -258,9 +258,9 @@ $(document).ready(function () {
             var ul = $tabs.find( "ul" );
             var html = ''
             if($('#new-query').length == 0)
-                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" title="Close Tab">Close</span></li><li id="liNewQuery"><button class="btnStudio plusBtn" id="new-query"><span>+</span></button></li>'
+                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><button class="btnStudio plusBtn" id="new-query"><span>+</span></button></li>'
             else
-               html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" title="Close Tab">Close</span></li>'
+               html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
             var html_body = '<div class="querybar"><div class="wrapper"><textarea class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
             var html_query = '<div class="blockWrapper" id="blockContainer02">' +
                              '   <div class="exportType">' +
@@ -286,7 +286,6 @@ $(document).ready(function () {
             $('#ulTabList').append($('#liNewQuery'))
             $('#worktabs').append('<div id="q-'+tab_counter+'" >' + html_body + html_query + '</div>')
             SQLQueryRender.addQueryBtn(tab_counter)
-            SQLQueryRender.addQuerySettingBtnEvent(tab_counter)
             $('#exportType-' + tab_counter).change(function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
@@ -313,28 +312,46 @@ $(document).ready(function () {
             $("#new-query").on('click', function() {
                 SQLQueryRender.createQueryTab()
             });
-            $('.close-tab').unbind('click')
-            $('.close-tab').click(function() {
-                tablist = []
-                $('#worktabs ul li').each(function(){
-                    tablist.push($(this).attr('id').split('-')[1])
-                })
+            $('#close-tab-' + tab_counter).unbind('click')
+            $('#close-tab-' + tab_counter).click(function() {
                 var element_id = $(this.parentElement).attr('id')
-                var id = element_id.split('-')[1]
-                var active_id = $tabs.tabs( "option", "active")
-                var current_position = $.inArray(id, tablist)
-                if(current_position == active_id){
-                    if (current_position > 0)
-                        $tabs.tabs( "option", "active", active_id - 1)
-                    else if (current_position == 0 && tablist.length > 0)
-                        $tabs.tabs( "option", "active", active_id + 1)
-                } else if (active_id > tablist.length){
-
-                }
-                $('#'+ element_id).remove();
-                $('#q-' + id).remove()
-                SQLQueryRender.showHideNewTab()
+                $('#closeTabConfirmation').data('id' , element_id )
             });
+
+            $('#close-tab-' + tab_counter).popup({
+                afterOpen: function () {
+                    var popup = $(this)[0];
+                    $('#btnCloseTabOk').unbind('click');
+                    $('#btnCloseTabOk').on('click', function (e) {
+                        var element_id = $('#closeTabConfirmation').data('id')
+                        var id = element_id.split('-')[1]
+                        tablist = []
+                        $('#worktabs ul li').each(function(){
+                            tablist.push($(this).attr('id').split('-')[1])
+                        })
+                        $tabs.tabs( "refresh");
+                        var active_id = $tabs.tabs( "option", "active")
+                        var current_position = $.inArray(id, tablist)
+                        if(current_position == active_id){
+                            if (current_position > 0)
+                                $tabs.tabs( "option", "active", active_id - 1)
+                            else if (current_position == 0 && tablist.length > 0)
+                                $tabs.tabs( "option", "active", active_id + 1)
+                        } else if (active_id >= tablist.length){
+                            //$tabs.tabs( "option", "active", tablist.length - 3)
+                        }
+                        $('#'+ element_id).remove();
+                        $('#q-' + id).remove()
+                        SQLQueryRender.showHideNewTab()
+                        popup.close()
+                    });
+
+                    $('#btnCloseTabCancel').unbind('click');
+                    $('#btnCloseTabCancel').on('click', function (e) {
+                        popup.close()
+                    });
+                }
+            })
             $tabs.tabs( "refresh");
             $tabs.tabs( "option", "active", tab_counter - 1);
             $tabs.tabs({
@@ -404,48 +421,6 @@ $(document).ready(function () {
                 $('#liNewQuery').hide()
             else
                 $('#liNewQuery').show()
-        }
-
-        this.addQuerySettingBtnEvent = function(query_id){
-            $('#bntTimeoutSetting-' + query_id).popup({
-                open: function (event, ui, ele) {
-                    $("#errorQueryTimeoutConfig").hide();
-                    $("#txtQueryTimeoutConfig").val(SQLQueryRender.getCookie("timeoutTime") == undefined ? "" : SQLQueryRender.getCookie("timeoutTime"))
-                },
-                afterOpen: function () {
-                    $("#formQueryTimeoutConfiguration").validate({
-                        rules: {
-                            txtQueryTimeoutConfig: SQLQueryRender.sqlValidationRule.numericRules
-                        },
-                        messages: {
-                            txtQueryTimeoutConfig: SQLQueryRender.sqlValidationRule.numericMessages
-                        }
-                    });
-                    var popup = $(this)[0];
-                    $("#btnQueryTimeoutConfigSave").unbind("click");
-                    $("#btnQueryTimeoutConfigSave").on("click", function(){
-                        if (!$("#formQueryTimeoutConfiguration").valid()) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        }
-                        var timeoutTime = $("#txtQueryTimeoutConfig").val();
-                        if(timeoutTime == ""){
-                            SQLQueryRender.removeCookie("timeoutTime")
-                        }else{
-                            SQLQueryRender.SaveQueryTimeout(timeoutTime);
-                        }
-                        displayQueryTimeout();
-                        popup.close();
-                    });
-                    $("#btnQueryTimeoutConfigCancel").on("click", function () {
-                        popup.close();
-                    });
-                    $("#btnQueryTimeoutConfigClear").on("click", function(){
-                        $("#txtQueryTimeoutConfig").val("");
-                        $("#errorQueryTimeoutConfig").hide();
-                    });
-                }
-            });
         }
 
         this.saveConnectionKey = function (useAdminPort) {
