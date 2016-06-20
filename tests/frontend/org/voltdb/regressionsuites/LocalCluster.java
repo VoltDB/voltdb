@@ -777,6 +777,7 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.startCommand(startAction);
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
+                cmdln.enableAdd(true);
             }
 
             // If local directories are being cleared

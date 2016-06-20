@@ -1247,7 +1247,7 @@ class StopServerAPI(MethodView):
         else:
             is_force = "false"
 
-        if is_force == "true":
+        if is_force == "false":
             try:
                 server = voltdbserver.VoltDatabase(database_id)
                 response = server.kill_server(server_id)
