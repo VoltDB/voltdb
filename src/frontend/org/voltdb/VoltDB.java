@@ -768,11 +768,11 @@ public class VoltDB {
 
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
                 isValid = false;
-                hostLog.fatal("Option hostcount may only be specified when the start action is probe");
+                hostLog.fatal("Option \"hostcount\" may only be specified when the start action is probe");
             }
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
                 isValid = false;
-                hostLog.fatal("Add and noadd cannot be specified at the same time");
+                hostLog.fatal("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
             return isValid;
         }
