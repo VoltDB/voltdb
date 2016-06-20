@@ -31,6 +31,8 @@ import java.sql.SQLException;
 
 import junit.framework.Test;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -59,7 +61,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         fail("Invalid selector should have resulted in a ProcCallException but didn't");
     }
 
-    public void testTablesSelector() throws IOException, ProcCallException
+    public void testTablesSelector() throws IOException, ProcCallException, JSONException
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("@SystemCatalog", "TABLES").getResults();
@@ -68,7 +70,8 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         results[0].advanceRow();
         assertEquals("{\"partitionColumn\":\"A1\"}", results[0].get("REMARKS", VoltType.STRING));
         results[0].advanceRow();
-        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"T\"}", results[0].get("REMARKS", VoltType.STRING));
+        assertEquals(new JSONObject("{\"partitionColumn\":\"A1\",\"sourceTable\":\"T\"}").toString(), results[0].get("REMARKS", VoltType.STRING));
+
     }
 
     public void testColumnsSelector() throws IOException, ProcCallException
