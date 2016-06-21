@@ -264,7 +264,7 @@ $(document).ready(function () {
             var ul = $tabs.find( "ul" );
             var html = ''
             if($('#new-query').length == 0)
-                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><button class="btnStudio plusBtn" id="new-query"><span>+</span></button></li>'
+                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><a class="btnStudio plusBtn" id="new-query"><span>+</span></a></li>'
             else
                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
             var html_body = '<div class="querybar"><div class="wrapper"><textarea class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'

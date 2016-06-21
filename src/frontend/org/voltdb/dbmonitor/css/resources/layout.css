@@ -2028,7 +2028,7 @@ border:1px solid #FFF;
 #worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
 #worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-3px; }
 #worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
-#worktabs ul li#liNewQuery { border:none!important;}
+#worktabs ul li#liNewQuery { border:none!important; padding-top:4px;}
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
 /*********************jquery ui class override ends*********************/
