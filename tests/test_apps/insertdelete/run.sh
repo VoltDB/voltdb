@@ -79,65 +79,34 @@ function client() {
     local DONE
     local ARG
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark $INLINE $OUTLINE $NUMITERS $SERVERS
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.Benchmark $ARGS
 }
 
 function seed() {
     jars-ifneeded
-    java -classpath client.jar:$CLIENTCLASSPATH benchmark.SeedTables $SERVERS
+    java -classpath client.jar:$CLIENTCLASSPATH benchmark.SeedTables $ARGS
 }
 
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|jars-ifneeded|server|init|seed|client|client-help|help}"
 }
 
-# Run the targets pass on the command line
 # If no first arg, run server
-if [ -n "$1" ] ; then
-    CMD="$1"
-    shift
-fi
-while [ -z "$DONE" ] ; do
-    case "$1" in
-    --#)
-        shift;
-        ECHO=echo
-        ;;
-    --inline)
-        shift;
-        # Both --inline and --outline means nothing.
-        if [ -n "$OUTLINE" ] ; then
-            unset OUTLINE
-        else
-            INLINE="--inline"
-        fi
-        ;;
-    --outline)
-        shift;
-        # Both --inline and --outline means nothing.
-        if [ -n "$INLINE" ] ; then
-            unset INLINE
-        else
-            OUTLINE="--outline"
-        fi
-        ;;
-    --numiters)
-        shift;
-        NUMITERS="--numiters $1"
-        shift
-        ;;
-    "")
-        DONE=YES
-        ;;
-    *)
-	shift
-	CMD="$1"
-	shift
-        ;;
-    esac
-done
+if [ $# -eq 0 ]; then server; exit; fi
 
-if [ -z "$CMD" ]; then server; exit; fi
-echo "Performing $CMD"
-$CMD
+# Run the targets passed on the command line
+while [ -n "$1" ] ; do
+    CMD="$1"
+    ARGS=
+    if [[ "$1" == "client" || "$1" == "seed" ]]; then
+        while [[ "$2" == "--"* ]]; do
+            ARGS="$ARGS $2 $3"
+            shift
+            shift
+        done
+    fi
+    echo "$0 Performing: $CMD$ARGS"
+    $CMD
+    shift
+done
