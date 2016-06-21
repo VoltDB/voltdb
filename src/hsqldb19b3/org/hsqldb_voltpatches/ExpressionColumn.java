@@ -77,28 +77,19 @@ public class ExpressionColumn extends Expression {
     }
 
     ExpressionColumn(ColumnSchema column) {
-
         super(OpTypes.COLUMN);
-
         columnName = column.getName().name;
     }
 
     ExpressionColumn(RangeVariable rangeVar, ColumnSchema column) {
-
         super(OpTypes.COLUMN);
-
-        columnIndex = rangeVar.rangeTable.findColumn(column.getName().name);
-
-        setAttributesAsColumn(rangeVar, columnIndex);
+        setAttributesAsColumn(rangeVar,
+                rangeVar.rangeTable.findColumn(column.getName().name));
     }
 
     ExpressionColumn(RangeVariable rangeVar, ColumnSchema column, int index) {
-
         super(OpTypes.COLUMN);
-
-        columnIndex = index;
-
-        setAttributesAsColumn(rangeVar, columnIndex);
+        setAttributesAsColumn(rangeVar, index);
     }
 
     /**
@@ -157,31 +148,29 @@ public class ExpressionColumn extends Expression {
         dataType      = sequence.getDataType();
     }
 
-    void setAttributesAsColumn(RangeVariable range, int i) {
+    void setAttributesAsColumn(RangeVariable range, int index) {
+        columnIndex   = index;
+        column        = range.getColumn(index);
+        dataType      = column.getDataType();
+        rangeVariable = range;
 
-        if (range.variables != null) {
-            columnIndex   = i;
-            column        = range.getColumn(i);
-            dataType      = column.getDataType();
-            rangeVariable = range;
-        } else {
-            Table t = range.getTable();
-
-            columnIndex = i;
-            column      = range.getColumn(i);
-            dataType    = column.getDataType();
-            columnName  = column.getName().name;
-            tableName   = t.getName().name;
-            schema      = t.getSchemaName().name;
-
-            if (alias == null && range.hasColumnAlias()) {
-                alias = range.getColumnAliasName(i);
-            }
-
-            rangeVariable = range;
-
-            rangeVariable.addColumn(columnIndex);
+        // Note: rangeVariable.variables is only non-null in the
+        // special case of a RangeVariable that is rigged to contain
+        // system settings.
+        // There's a good chance that this special case is not
+        // exercised by VoltDB.
+        if (rangeVariable.variables != null) {
+            return;
         }
+
+        columnName  = column.getName().name;
+        Table table = range.getTable();
+        tableName   = table.getName().name;
+        schema      = table.getSchemaName().name;
+        if (alias == null && rangeVariable.hasColumnAliases()) {
+            alias = rangeVariable.getColumnAliasName(index);
+        }
+        rangeVariable.addColumn(columnIndex);
     }
 
     @Override
@@ -1348,7 +1337,6 @@ public class ExpressionColumn extends Expression {
                 exp.attributes.put("table", tableName.toUpperCase());
             }
         }
-        //TODO: also indicate RangeVariable in case table is ambiguous (for self-joins).
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {
             exp.attributes.put("alias", columnName.toUpperCase());

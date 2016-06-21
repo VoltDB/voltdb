@@ -182,27 +182,20 @@ public class TestWindowedFunctions extends PlannerTestCase {
         PlanAssembler.HANDLE_WINDOWED_OPERATORS = true;
         try {
             String windowedQuery;
-            //TODO: This ambiguous query is not getting properly flagged.
-            // Fix the column resolution code and turn this into a negative test.
-            // -- column A is not properly table-qualified in the PARTITION BY and ORDER BY clauses.
-            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY A, B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-            validateQueryWithSubquery(windowedQuery);
-            // The following variants only work by disabling ALPHA.A as a possible resolution.
-            // There appears to be no way to reference the subquery ALPHA's A
-            // from the PARTITION BY clause without getting the bogus
-            // "Mismatched columns A in subquery" error.
+            // The following variants exercise resolving columns to subquery result columns.
+            // At one point in development, this would only work by disabling ALPHA.A as a possible resolution.
+            // It got a mysterious "Mismatched columns A in subquery" error.
 
             windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY A ORDER BY BBB.B ) AS ARANK FROM (select A AS NOT_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            validateQueryWithSubquery(windowedQuery);
+
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY RENAMED_A ORDER BY BBB.B ) AS ARANK FROM (select A AS RENAMED_A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
             validateQueryWithSubquery(windowedQuery);
 
             windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY BBB.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
             validateQueryWithSubquery(windowedQuery);
 
-            //TODO: This valid query is currently failing with the strange/obscure message:
-            // org.voltdb.planner.PlanningErrorException: "Mismatched columns A in subquery"
-            // -- even though column A is properly alias-qualified in the PARTITION BY clause.
-            // Fix the column resolution code and enable it.
-            //windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+            windowedQuery = "SELECT BBB.B, RANK() OVER (PARTITION BY ALPHA.A ORDER BY BBB.B ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
             validateQueryWithSubquery(windowedQuery);
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
@@ -250,12 +243,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
                           "FROM AAA;",
                           "At most one windowed display column is supported.");
             // Detect that PARTITION BY A is ambiguous when A names multiple columns.
-            //TODO: Fix the column resolver to fail for this statement as it should,
-            // and then enable this test with a proper error string.
-//            failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) AS ARANK " +
-//                          "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
-//                          "WHERE ALPHA.C <> BBB.C;",
-//                          "<ambiguous column complaint goes here>");
+            // Queries like this passed at one point in development, ignoring the subquery
+            // result column as a possible binding for A.
+            failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) AS ARANK " +
+                          "FROM (select A, B, C from AAA where A < B) ALPHA, BBB " +
+                          "WHERE ALPHA.C <> BBB.C;",
+                          "Column \"A\" is ambiguous.  It\'s in tables: ALPHA, BBB");
         } finally {
             PlanAssembler.HANDLE_WINDOWED_OPERATORS = savedGuard;
         }
