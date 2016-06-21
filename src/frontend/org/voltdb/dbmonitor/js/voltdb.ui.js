@@ -283,14 +283,23 @@ $(document).ready(function () {
 
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
-                    $("#runBTn").button().click();
+                    var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                    var element_id = element.split('-')[1]
+                    var btn_id = "#runBTn-" + element_id
+
+                    if ($(btn_id).attr('disabled') != "disabled")
+                        $(btn_id).button().click();
                 });
 
 
             } else {
                 shortcut.add("F5", function () {
-                    if ($("#runBTn").attr('disabled') != "disabled")
-                        $("#runBTn").button().click();
+                    var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                    var element_id = element.split('-')[1]
+                    var btn_id = "#runBTn-" + element_id
+
+                    if ($(btn_id).attr('disabled') != "disabled")
+                        $(btn_id).button().click();
                 });
             }
         } else {

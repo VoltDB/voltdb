@@ -255,12 +255,18 @@ $(document).ready(function () {
             }
         }
         this.createQueryTab = function(){
+            if($('#worktabs ul li').length == 0)
+                queryId = 1
+            else{
+                var last_tab_txt = $($('#worktabs ul li')[$('#worktabs ul li').length -2]).find('a').text()
+                queryId = parseInt(last_tab_txt[last_tab_txt.length -1]) + 1
+            }
             var ul = $tabs.find( "ul" );
             var html = ''
             if($('#new-query').length == 0)
-                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><button class="btnStudio plusBtn" id="new-query"><span>+</span></button></li>'
+                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><button class="btnStudio plusBtn" id="new-query"><span>+</span></button></li>'
             else
-               html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ tab_counter +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
+               html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
             var html_body = '<div class="querybar"><div class="wrapper"><textarea class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
             var html_query = '<div class="blockWrapper" id="blockContainer02">' +
                              '   <div class="exportType">' +
@@ -317,7 +323,6 @@ $(document).ready(function () {
                 var element_id = $(this.parentElement).attr('id')
                 $('#closeTabConfirmation').data('id' , element_id )
             });
-
             $('#close-tab-' + tab_counter).popup({
                 afterOpen: function () {
                     var popup = $(this)[0];
@@ -342,6 +347,7 @@ $(document).ready(function () {
                         }
                         $('#'+ element_id).remove();
                         $('#q-' + id).remove()
+                        $('#queryBtnList-' + id).remove()
                         SQLQueryRender.showHideNewTab()
                         popup.close()
                     });
@@ -353,14 +359,13 @@ $(document).ready(function () {
                 }
             })
             $tabs.tabs( "refresh");
-            $tabs.tabs( "option", "active", tab_counter - 1);
+            $tabs.tabs( "option", "active", $('#worktabs ul li').length - 2);
             $tabs.tabs({
               activate: function( event, ui ) {
                 tab_id = ui.newTab.attr('id').split('-')[1]
                 SQLQueryRender.ShowQueryBtnById(tab_id)
               }
             });
-
             tab_counter++
             this.showHideNewTab()
         }
@@ -393,13 +398,7 @@ $(document).ready(function () {
                 $('.querybox-' + query_id).val('')
             });
 
-            $('#divQueryBtns ul').each(function(){
-                var ul_id = $(this).attr('id')
-                if(ul_id == 'queryBtnList-' + tab_id)
-                    $('#' + ul_id).show()
-                else
-                    $('#' + ul_id).hide()
-            })
+            SQLQueryRender.ShowQueryBtnById(tab_id)
         }
 
         this.ShowQueryBtnById = function(tab_id){
@@ -755,7 +754,10 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 SQLQueryRender.saveConnectionKey(true);
                 popup.close();
                 //Rerun the query
-                $("#runBTn").button().click();
+                var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                var element_id = element.split('-')[1]
+                var btn_id = "#runBTn-" + element_id
+                $(btn_id).button().click();
             });
 
             $("#btnQueryDatabasePausedErrorCancel").unbind("click");
@@ -768,7 +770,10 @@ function loadSQLQueryPage(serverName, portid, userName) {
             if (VoltDbUI.getCookie(sqlChangePortName) != sqlPortForPausedDB.UseAdminPort) {
                 saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseNormalPort);
                 //Rerun the query
-                $("#runBTn").button().click();
+                var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
+                var element_id = element.split('-')[1]
+                var btn_id = "#runBTn-" + element_id
+                $(btn_id).button().click();
             }
         },
         closeContent: '',
