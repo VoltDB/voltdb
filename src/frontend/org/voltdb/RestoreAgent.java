@@ -182,6 +182,7 @@ SnapshotCompletionInterest, Promotable
                                 " in " + m_snapshotToRestore.path);
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
+                        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.stype);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
