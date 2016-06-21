@@ -356,6 +356,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isLegacy() { return voltconfig.m_startAction.isLegacy(); };
+
+    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;

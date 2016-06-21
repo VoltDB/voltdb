@@ -297,6 +297,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
+    private boolean m_isLegacy = true;
+
+    public boolean isLegacy() { return m_isLegacy; };
 
     @Override
     public boolean rejoining() { return m_rejoining; }
@@ -468,6 +471,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
+            m_isLegacy = config.m_startAction.isLegacy();
+
             // check that this is a 64 bit VM
             if (System.getProperty("java.vm.name").contains("64") == false) {
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");

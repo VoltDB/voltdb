@@ -182,7 +182,9 @@ SnapshotCompletionInterest, Promotable
                                 " in " + m_snapshotToRestore.path);
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
-                        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.stype);
+                        if (!VoltDB.instance().isLegacy()) {
+                            jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_snapshotToRestore.stype);
+                        }
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
                         jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
@@ -263,7 +265,11 @@ SnapshotCompletionInterest, Promotable
         {
             txnId = jo.getLong("txnId");
             path = jo.getString(SnapshotUtil.JSON_PATH);
-            stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
+            if (!VoltDB.instance().isLegacy()) {
+                stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
+            } else {
+                stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
+            }
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
             newPartitionCount = jo.getInt("newPartitionCount");
