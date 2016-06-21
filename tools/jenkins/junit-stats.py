@@ -6,8 +6,8 @@
 # A command line tool for getting junit job statistics from Jenkins CI
 
 import mysql.connector
-import sys
 import os
+import sys
 import time
 
 from datetime import datetime
@@ -75,19 +75,19 @@ class Stats():
         cursor = db.cursor()
 
         for build in range(build_low, build_high+1):
-            url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
-            report = self.read_url(url)
-            if report is None:
+            test_url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
+            test_report = self.read_url(test_url)
+            if test_report is None:
                 print('Could not retrieve report because url is invalid. This may be because the build %d might not '
                 'exist on Jenkins' % build)
                 print('Last completed build for this job is %d\n' % latestBuild)
                 continue
 
             try:
-                fails = report.get('failCount', 0)
-                skips = report.get('skipCount', 0)
-                passes = report.get('passCount', 0)
-                total = report.get('totalCount', 0)
+                fails = test_report.get('failCount', 0)
+                skips = test_report.get('skipCount', 0)
+                passes = test_report.get('passCount', 0)
+                total = test_report.get('totalCount', 0)
                 if total == 0:
                     total = fails + skips + passes
                 if total == 0:
@@ -96,19 +96,19 @@ class Stats():
                     percent = fails*100.0/total
 
                 # Get timestamp job ran on.
-                url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
-                report = self.read_url(url)
-                if report is None:
+                job_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
+                job_report = self.read_url(job_url)
+                if job_report is None:
                     print('Could not retrieve report because url is invalid. This may be because the build %d might not '
                     'exist on Jenkins' % build)
                     continue
-                job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
+                job_stamp = datetime.fromtimestamp(job_report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
 
                 # Compile job data to write to database
                 job_data = {
                     'name': job,
                     'stamp': job_stamp,
-                    'url': report['url'] + 'testReport',
+                    'url': job_report['url'] + 'testReport',
                     'build': build,
                     'fails': fails,
                     'total': total,
@@ -121,13 +121,13 @@ class Stats():
                 db.commit()
 
                 # Some of the test results are structured differently, depending on the matrix configurations.
-                childReports = report.get('childReports', None)
+                childReports = test_report.get('childReports', None)
                 if childReports is None:
                     childReports = [
                         {
-                            'result': report,
+                            'result': test_report,
                             'child': {
-                                'url': url.replace('testReport/api/python','')
+                                'url': test_url.replace('testReport/api/python','')
                             }
                         }
                     ]
@@ -164,7 +164,7 @@ class Stats():
                                 db.commit()
             except KeyError as e:
                 print(e)
-                print('Error retriving test data for this particular build: %d\n' % build)
+                print('Error retrieving test data for this particular build: %d\n' % build)
             except:
                 print(sys.exc_info()[1])
 
