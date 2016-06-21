@@ -290,7 +290,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
         if (data != null && !schemaHasNoTables) {
             REJOINLOG.debug("Snapshot request: " + data);
-            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, data,
+            SnapshotUtil.requestSnapshot(0l, "", nonce, !m_liveRejoin, SnapshotFormat.STREAM, SnapshotUtil.SnapthotPathType.SNAP_CL, data,
                     SnapshotUtil.fatalSnapshotResponseHandler, true);
         }
     }

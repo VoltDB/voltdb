@@ -1386,11 +1386,12 @@ public class SnapshotUtil {
                                        final String nonce,
                                        final boolean blocking,
                                        final SnapshotFormat format,
+                                       final SnapshotUtil.SnapthotPathType stype,
                                        final String data,
                                        final SnapshotResponseHandler handler,
                                        final boolean notifyChanges)
     {
-        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, stype, data);
         final SimpleClientResponseAdapter adapter =
                 new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
         final LinkedBlockingQueue<ClientResponse> responses = new LinkedBlockingQueue<ClientResponse>();

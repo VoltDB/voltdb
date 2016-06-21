@@ -21,6 +21,7 @@ import java.net.URI;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
  * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
@@ -34,13 +35,14 @@ public class SnapshotInitiationInfo
     private SnapshotFormat m_format;
     private String m_data;
     private boolean m_truncationRequest;
+    private SnapshotUtil.SnapthotPathType m_stype;
 
     /**
      * Construct the object given the parameters directly.
      * @param data any additional JSON blob params.  Currently only provided by VoltDB internals
      */
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
-            SnapshotFormat format, String data)
+            SnapshotFormat format, SnapshotUtil.SnapthotPathType stype, String data)
     {
         m_path = path;
         m_nonce = nonce;
@@ -48,6 +50,7 @@ public class SnapshotInitiationInfo
         m_format = format;
         m_data = data;
         m_truncationRequest = false;
+        m_stype = stype;
     }
 
     /**
@@ -112,6 +115,7 @@ public class SnapshotInitiationInfo
         m_nonce = (String)params[1];
         m_blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
         m_format = SnapshotFormat.NATIVE;
+        m_stype = SnapshotUtil.SnapthotPathType.SNAP_PATH;
     }
 
     /**
@@ -162,6 +166,8 @@ public class SnapshotInitiationInfo
             }
         }
 
+        m_stype = SnapshotUtil.SnapthotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE,
+                SnapshotUtil.SnapthotPathType.SNAP_PATH.toString()));
         m_path = jsObj.getString("uripath");
         if (m_path.isEmpty()) {
             throw new Exception("uripath cannot be empty");
@@ -249,6 +255,7 @@ public class SnapshotInitiationInfo
     {
         final JSONObject jsObj = new JSONObject();
         jsObj.put("path", m_path);
+        jsObj.put("pathType", m_stype.toString());
         jsObj.put("nonce", m_nonce);
         jsObj.put("block", m_blocking);
         jsObj.put("format", m_format.toString());
