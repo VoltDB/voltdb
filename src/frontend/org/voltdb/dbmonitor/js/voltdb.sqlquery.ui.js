@@ -255,7 +255,7 @@ $(document).ready(function () {
             }
         }
         this.createQueryTab = function(){
-            if($('#worktabs ul li').length == 0)
+            if($('#worktabs ul li').length == 0 || $('#worktabs ul li').length == 1)
                 queryId = 1
             else{
                 var last_tab_txt = $($('#worktabs ul li')[$('#worktabs ul li').length -2]).find('a').text()
