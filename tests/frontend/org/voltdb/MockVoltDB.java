@@ -499,6 +499,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getSnapshotPath() {
+        return "";
+    }
+
+    @Override
     public boolean rejoinDataPending() {
         return false;
     }

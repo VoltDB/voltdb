@@ -22,7 +22,6 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -63,6 +62,7 @@ import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapthotPathType;
 
 /**
  * An agent responsible for the whole restore process when the cluster starts
@@ -234,6 +234,8 @@ SnapshotCompletionInterest, Promotable
         public final Set<String> digestTables = new HashSet<String>();
         // Track the tables for which we found files on the node reporting this SnapshotInfo
         public final Set<String> fileTables = new HashSet<String>();
+        public final SnapthotPathType stype;
+
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
@@ -242,7 +244,7 @@ SnapshotCompletionInterest, Promotable
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId,
-                            Set<String> digestTables)
+                            Set<String> digestTables, SnapthotPathType snaptype)
         {
             this.txnId = txnId;
             this.path = path;
@@ -253,13 +255,15 @@ SnapshotCompletionInterest, Promotable
             this.hostId = hostId;
             this.instanceId = instanceId;
             this.digestTables.addAll(digestTables);
+            this.stype = snaptype;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
         {
             txnId = jo.getLong("txnId");
-            path = jo.getString("path");
-            nonce = jo.getString("nonce");
+            path = jo.getString(SnapshotUtil.JSON_PATH);
+            stype = SnapthotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
+            nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
             newPartitionCount = jo.getInt("newPartitionCount");
             catalogCrc = jo.getLong("catalogCrc");
@@ -305,6 +309,7 @@ SnapshotCompletionInterest, Promotable
                 stringer.object();
                 stringer.key("txnId").value(txnId);
                 stringer.key("path").value(path);
+                stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(stype.name());
                 stringer.key("nonce").value(nonce);
                 stringer.key("partitionCount").value(partitionCount);
                 stringer.key("newPartitionCount").value(newPartitionCount);
@@ -845,7 +850,7 @@ SnapshotCompletionInterest, Promotable
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
                     partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId,
-                    digestTableNames);
+                    digestTableNames, s.m_stype);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -1333,20 +1338,20 @@ SnapshotCompletionInterest, Promotable
          * Use the individual snapshot directories instead of voltroot, because
          * they can be set individually
          */
-        List<String> paths = new ArrayList<String>();
+        Map<String, SnapshotUtil.SnapthotPathType> paths = new HashMap<String, SnapshotUtil.SnapthotPathType>();
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             if (m_clSnapshotPath != null) {
-                paths.add(m_clSnapshotPath);
+                paths.put(m_clSnapshotPath, SnapthotPathType.SNAP_CL);
             }
         }
         if (m_snapshotPath != null) {
-            paths.add(m_snapshotPath);
+            paths.put(m_snapshotPath, SnapthotPathType.SNAP_AUTO);
         }
         HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
-        for (String path : paths) {
-            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, false, LOG);
+        for (String path : paths.keySet()) {
+            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, false, paths.get(path), LOG);
         }
 
         return snapshots;

@@ -48,6 +48,8 @@ public interface VoltDBInterface
 
     public String getCommandLogPath();
 
+    public String getSnapshotPath();
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.

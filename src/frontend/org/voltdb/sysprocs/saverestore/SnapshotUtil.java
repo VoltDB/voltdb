@@ -94,6 +94,7 @@ public class SnapshotUtil {
     public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
+    public static final String JSON_PATH_TYPE = "pathType";
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
@@ -116,6 +117,12 @@ public class SnapshotUtil {
         new ColumnInfo("RESULT", VoltType.STRING),
         new ColumnInfo("ERR_MSG", VoltType.STRING)
     };
+
+    public static enum SnapthotPathType {
+        SNAP_PATH, // For direct path based
+        SNAP_CL,
+        SNAP_AUTO,
+    }
 
     public static final VoltTable constructNodeResultsTable()
     {
@@ -562,10 +569,11 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
-        public Snapshot(String nonce)
+        public Snapshot(String nonce, SnapthotPathType stype)
         {
             m_nonce = nonce;
             m_txnId = Long.MIN_VALUE;
+            m_stype = stype;
         }
 
         public void setInstanceId(InstanceId id)
@@ -609,6 +617,7 @@ public class SnapshotUtil {
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
         public File m_catalogFile = null;
+        public final SnapthotPathType m_stype;
 
         private final String m_nonce;
         private InstanceId m_instanceId = null;
@@ -693,15 +702,17 @@ public class SnapshotUtil {
     private static class NamedSnapshots {
 
         private final Map<String, Snapshot> m_map;
+        private final SnapthotPathType m_stype;
 
-        public NamedSnapshots(Map<String, Snapshot> map) {
+        public NamedSnapshots(Map<String, Snapshot> map, SnapthotPathType stype) {
             m_map = map;
+            m_stype = stype;
         }
 
         public Snapshot get(String nonce) {
             Snapshot named_s = m_map.get(nonce);
             if (named_s == null) {
-                named_s = new Snapshot(nonce);
+                named_s = new Snapshot(nonce, m_stype);
                 m_map.put(nonce, named_s);
             }
             return named_s;
@@ -722,10 +733,11 @@ public class SnapshotUtil {
             Map<String, Snapshot> namedSnapshotMap,
             FileFilter filter,
             boolean validate,
+            SnapthotPathType stype,
             VoltLogger logger) {
 
-        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap);
-        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, logger, 0);
+        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap, stype);
+        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, stype, logger, 0);
     }
 
     private static void retrieveSnapshotFilesInternal(
@@ -733,6 +745,7 @@ public class SnapshotUtil {
             NamedSnapshots namedSnapshots,
             FileFilter filter,
             boolean validate,
+            SnapthotPathType stype,
             VoltLogger logger,
             int recursion) {
 
@@ -759,7 +772,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, logger, recursion++);
+                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, stype, logger, recursion++);
                 }
                 continue;
             }

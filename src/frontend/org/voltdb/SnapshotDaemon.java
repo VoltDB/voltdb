@@ -681,8 +681,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             JSONObject jsData = new JSONObject();
             jsData.put("truncReqId", truncReqId);
             sData = jsData.toString();
-            jsObj.put("path", snapshotPath );
-            jsObj.put("nonce", nonce);
+            jsObj.put(SnapshotUtil.JSON_PATH, snapshotPath );
+            jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             jsObj.put("data", sData);
         } catch (JSONException e) {
