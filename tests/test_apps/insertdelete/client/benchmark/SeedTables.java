@@ -1,10 +1,6 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2016 VoltDB Inc.
  *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -24,38 +20,41 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- */
 
 package benchmark;
 
 import org.voltdb.*;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.*;
+
+import benchmark.Benchmark.InsertDeleteConfig;
 
 public class SeedTables {
 
-    public static void main(String[] args) throws Exception {
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class SeedConfig extends CLIConfig {
+        @Option(desc = "Comma-separated list of the form server[:port] to connect to database for queries.")
+        String servers = "localhost";
+
+        @Override
+        public void validate() {
+            if (servers.length() == 0) servers = "localhost";
+        }
+    }
+
+    public static void seedTables(String serverList) throws Exception {
 
         /*
          * Instantiate a client and connect to the database.
          */
         org.voltdb.client.Client myApp;
         myApp = ClientFactory.createClient();
-        myApp.createConnection("localhost");
+        String firstServer = serverList.split(",")[0];
+        myApp.createConnection(firstServer);
 
 
         VoltTable p = myApp.callProcedure("@GetPartitionKeys","INTEGER").getResults()[0];
@@ -87,5 +86,11 @@ public class SeedTables {
 
         }
         System.out.println("Finished seeding " + i + " partitions.");
+    }
+
+    public static void main(String[] args) throws Exception {
+        SeedConfig config = new SeedConfig();
+        config.parse(SeedTables.class.getName(), args);
+        seedTables(config.servers);
     }
 }
