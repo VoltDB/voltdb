@@ -2074,7 +2074,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else if (config.m_startAction == StartAction.PROBE) {
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
                     String msg = "VoltDB root specified in the command line \"" + optrootFH
-                            + "\" diverges from the one specified in the deployment file \""
+                            + "\" diverges from the one specified at initialization \""
                             + dplrootFH + "\"";
                     hostLog.fatal(msg);
                     VoltDB.crashLocalVoltDB(msg);
