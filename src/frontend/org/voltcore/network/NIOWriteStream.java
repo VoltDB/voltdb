@@ -26,7 +26,6 @@ import java.util.ArrayDeque;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.EstTimeUpdater;
 
 /**
 *
@@ -281,8 +280,6 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         while ((ds = m_queuedWrites.poll()) != null) {
             ds.cancel();
         }
-        //Estimate Time Updater stop updates.
-        EstTimeUpdater.stop();
     }
 
     @Override

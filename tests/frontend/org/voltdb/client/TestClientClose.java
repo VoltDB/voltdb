@@ -85,7 +85,6 @@ public class TestClientClose extends TestCase {
         ClientConfig config = new ClientConfig();
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
-        Thread.sleep(500);
         client.close();
         Thread.sleep(2000);
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
@@ -103,7 +102,6 @@ public class TestClientClose extends TestCase {
                 postNumClientReaper++;
             }
             if (threadName.contains("Reverse DNS lookups")
-                    || threadName.contains("Estimated Time Updater")
                     || threadName.contains("Async Logger")) {
                 System.out.println("threadName: " + threadName);
                 for (StackTraceElement element : st) {
