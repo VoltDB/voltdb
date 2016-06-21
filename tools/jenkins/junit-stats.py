@@ -95,6 +95,31 @@ class Stats():
                 else:
                     percent = fails*100.0/total
 
+                # Get timestamp job ran on.
+                url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
+                report = self.read_url(url)
+                if report is None:
+                    print('Could not retrieve report because url is invalid. This may be because the build %d might not '
+                    'exist on Jenkins' % build)
+                    continue
+                job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
+
+                # Compile job data to write to database
+                job_data = {
+                    'name': job,
+                    'stamp': job_stamp,
+                    'url': report['url'] + 'testReport',
+                    'build': build,
+                    'fails': fails,
+                    'total': total,
+                    'percent': percent
+                }
+                add_job = ('INSERT INTO `junit-job-results` '
+                            '(name, stamp, url, build, fails, total, percent) '
+                            'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
+                cursor.execute(add_job, job_data)
+                db.commit()
+
                 # Some of the test results are structured differently, depending on the matrix configurations.
                 childReports = report.get('childReports', None)
                 if childReports is None:
@@ -113,7 +138,11 @@ class Stats():
                     report_url = child['child']['url'] + 'testReport'
                     for suite in suites:
                         cases = suite['cases']
-                        timestamp = time.strptime(suite['timestamp'].replace('T', ' '), '%Y-%m-%d %H:%M:%S')
+                        timestamp = suite.get('timestamp', None)
+                        if timestamp is None or timestamp == 'None':
+                            timestamp = job_stamp
+                        else:
+                            timestamp = time.strptime(timestamp.replace('T', ' '), '%Y-%m-%d %H:%M:%S')
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
@@ -138,31 +167,6 @@ class Stats():
                 print('Error retriving test data for this particular build: %d\n' % build)
             except:
                 print(sys.exc_info()[1])
-
-            # Get timestamp job ran on.
-            url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
-            report = self.read_url(url)
-            if report is None:
-                print('Could not retrieve report because url is invalid. This may be because the build %d might not '
-                'exist on Jenkins' % build)
-                continue
-            job_stamp = datetime.fromtimestamp(report['timestamp']/1000).strftime('%Y-%m-%d %H:%M:%S')
-
-            # Compile job data to write to database
-            job_data = {
-                'name': job,
-                'stamp': job_stamp,
-                'url': report['url'] + 'testReport',
-                'build': build,
-                'fails': fails,
-                'total': total,
-                'percent': percent
-            }
-            add_job = ('INSERT INTO `junit-job-results` '
-                        '(name, stamp, url, build, fails, total, percent) '
-                        'VALUES (%(name)s, %(stamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
-            cursor.execute(add_job, job_data)
-            db.commit()
 
         cursor.close()
         db.close()
