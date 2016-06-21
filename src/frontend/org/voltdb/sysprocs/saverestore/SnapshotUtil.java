@@ -1578,6 +1578,7 @@ public class SnapshotUtil {
             JSONObject jsObj = new JSONObject();
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
+                jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotUtil.JSON_PATH_TYPE);
                 jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
             } catch (JSONException e) {
                 Throwables.propagate(e);
