@@ -259,7 +259,7 @@ $(document).ready(function () {
                 queryId = 1
             else{
                 var last_tab_txt = $($('#worktabs ul li')[$('#worktabs ul li').length -2]).find('a').text()
-                queryId = parseInt(last_tab_txt[last_tab_txt.length -1]) + 1
+                queryId = parseInt(last_tab_txt.replace(/[^0-9]/gi, '')) + 1
             }
             var ul = $tabs.find( "ul" );
             var html = ''
