@@ -85,6 +85,7 @@ public class TestClientClose extends TestCase {
         ClientConfig config = new ClientConfig();
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
+        Thread.sleep(500);
         client.close();
         Thread.sleep(2000);
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
@@ -113,7 +114,7 @@ public class TestClientClose extends TestCase {
         }
         System.out.println("preNumClientReaper : " + preNumClientReaper);
         System.out.println("postNumClientReaper : " + postNumClientReaper);
-        if (postNumClientReaper != 0) {
+        if (preNumClientReaper != postNumClientReaper) {
             fail("Something failed to clean up. ClientReaper");
         }
     }
