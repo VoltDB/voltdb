@@ -29,12 +29,11 @@ public class VoltMessageFactory {
     final public static byte HEARTBEAT_RESPONSE_ID = 5;
     final public static byte RECOVERY_ID = 6;
     final public static byte SITE_FAILURE_FORWARD_ID = 7;
-    final public static byte SITE_FAULT_DECISION_ID = 8;
     // DON'T JUST ADD A MESSAGE TYPE WITHOUT READING THIS!
     // VoltDbMessageFactory is going to use this to generate non-core message IDs.
     // Update the max value if you add a new message type above, or you
     // will be sad, and I will have no sympathy. --izzy
-    final public static byte VOLTCORE_MESSAGE_ID_MAX = 8;
+    final public static byte VOLTCORE_MESSAGE_ID_MAX = 7;
 
     public VoltMessage createMessageFromBuffer(ByteBuffer buffer, long sourceHSId)
     throws IOException
@@ -87,9 +86,6 @@ public class VoltMessageFactory {
             break;
         case SITE_FAILURE_FORWARD_ID:
             message = new SiteFailureForwardMessage();
-            break;
-        case SITE_FAULT_DECISION_ID:
-            message = new FaultDecisionMessage();
             break;
         default:
             org.voltdb.VoltDB.crashLocalVoltDB("Unrecognized message type " + messageType, true, null);

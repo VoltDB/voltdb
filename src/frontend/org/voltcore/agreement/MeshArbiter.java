@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.FaultDecisionMessage;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.SiteFailureForwardMessage;
@@ -357,13 +356,6 @@ public class MeshArbiter {
         sfmb.safeTxnIds(getSafeTxnIdsForSites(hsIds));
 
         SiteFailureMessage sfm = sfmb.build();
-
-        // Send the decision to each host
-        for (long failedSite : sfm.getFailedSites()) {
-            m_recoveryLog.info("Agreement, Telling " + CoreUtils.hsIdToString(failedSite) + " it is excluded");
-            m_mailbox.send(failedSite, new FaultDecisionMessage(failedSite, true));
-        }
-
         m_mailbox.send(Longs.toArray(dests), sfm);
 
         m_recoveryLog.info("Agreement, Sending ["
@@ -534,6 +526,9 @@ public class MeshArbiter {
 
                 Discard ignoreIt = mayIgnore(hsIds, fm);
                 if (Discard.DoNot == ignoreIt) {
+                    if (fm.reportingSite == m_hsId && fm.witnessed) {
+                        m_sitesPendingDecisions.remove(fm.failedSite);
+                    }
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
@@ -541,26 +536,6 @@ public class MeshArbiter {
                 } else {
                     if (m_recoveryLog.isDebugEnabled()) {
                         ignoreIt.log(fm);
-                    }
-                }
-            } else if (m.getSubject() == Subject.FAULT_DECISION.getId()) {
-                FaultDecisionMessage fd = (FaultDecisionMessage)m;
-
-                if (fd.getFailedSite() == m_hsId
-                    && !m_failedSites.contains(fd.m_sourceHSId)
-                    && m_sitesPendingDecisions.remove(fd.m_sourceHSId)) {
-                    m_recoveryLog.info("Agreement, Received decision from " + CoreUtils.hsIdToString(fd.m_sourceHSId) +
-                                       ", failed: " + fd.isFailed() + ", remaining: " + CoreUtils.hsIdCollectionToString(m_sitesPendingDecisions));
-
-                    if (fd.isFailed()) {
-                        // Generate a fake fault message for the source host
-                        final FaultMessage fm = new FaultMessage(m_hsId, fd.m_sourceHSId);
-                        fm.m_sourceHSId = m_hsId;
-                        m_mailbox.deliverFront(fm);
-                        // Force the loop to iterate at least one more time
-                        // to process the generated fault message, or the check
-                        // below may cause the loop to terminate prematurely.
-                        continue;
                     }
                 }
             }
