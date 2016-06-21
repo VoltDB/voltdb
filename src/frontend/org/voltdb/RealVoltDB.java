@@ -1944,7 +1944,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * in the deployment file differs from the default voltdbroot. When the startup action
              * is PROBE then the value in configs m_voltdbRoot must match the deployment one
              */
-            File optrootFH = m_config.m_voltdbRoot;
+            File optrootFH = config.m_voltdbRoot;
             File dplrootFH = CatalogUtil.getVoltDbRoot(deployment.getPaths());
             if (config.m_startAction.isLegacy()) {
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
@@ -1953,7 +1953,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else if (config.m_startAction == StartAction.PROBE) {
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
                     String msg = "VoltDB root specified in the command line \"" + optrootFH
-                            + "\" diverges from the one specified in the deployment file \""
+                            + "\" diverges from the one specified at initialization \""
                             + dplrootFH + "\"";
                     hostLog.fatal(msg);
                     VoltDB.crashLocalVoltDB(msg);
