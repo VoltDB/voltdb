@@ -110,11 +110,11 @@ public class TestClientClose extends TestCase {
                 }
                 fail("Something failed to clean up.");
             }
-            System.out.println("preNumClientReaper : " + preNumClientReaper);
-            System.out.println("postNumClientReaper : " + postNumClientReaper);
-            if (preNumClientReaper > postNumClientReaper) {
-                fail("Something failed to clean up. ClientReaper");
-            }
+        }
+        System.out.println("preNumClientReaper : " + preNumClientReaper);
+        System.out.println("postNumClientReaper : " + postNumClientReaper);
+        if (postNumClientReaper != 0) {
+            fail("Something failed to clean up. ClientReaper");
         }
     }
 
