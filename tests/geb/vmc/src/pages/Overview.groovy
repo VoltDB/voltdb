@@ -42,7 +42,7 @@ class Overview extends Module {
     static content = {
         title               { $("h1", text:"Overview") }
         sitePerHost         { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(1) > td.configLabel") }
-        ksafety             { $(class:"configLabel", text:"K-Safety") }
+        ksafety             { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(2) > td.configLabel") }
         partitionDetection  { $(class:"configLabel", text:"Partition Detection") }
         security            { $(class:"labelCollapsed", text:"Security") }
         httpAccess          { $(class:"labelCollapsed", text:"HTTP Access") }
