@@ -525,7 +525,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (config.m_startAction == StartAction.INITIALIZE) {
                 stageDeploymemtFileForInitialize(config, readDepl.deployment);
                 stageInitializedMarker(config);
-                stagePathConfiguration(config);
                 hostLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB on " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
@@ -1633,31 +1632,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        if (!deprootFH.equals(cnfrootFH)) {
-            dt.getPaths().getVoltdbroot().setPath(cnfrootFH.getPath());
-            File depFH = getConfigLogDeployment(config);
-            try (FileWriter fw = new FileWriter(depFH)) {
-                fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
-            } catch (IOException|RuntimeException e) {
-                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
-                return;
-            }
-        } else {
-            File optFH = new VoltFile(config.m_pathToDeployment);
-            File depFH = getConfigLogDeployment(config);
-            try {
-                if (!depFH.exists()) {
-                    new FileOutputStream(depFH).close();
-                }
-                if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
-                    Files.copy(optFH, depFH);
-                }
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to set up deployment configuration in " + depFH, false, e);
-                return;
-            }
-        }
-
         //Get all paths and put it in properties
         try {
             m_pathList.put(dt.getPaths().getVoltdbroot().getKey(),
@@ -1695,16 +1669,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("Unable to set up deployment configuration.", false, ex);
         }
+        //Save .paths
+        stagePathConfiguration(config);
 
         //Now that we are done with deployment configuration set all path to fake ones.
-        dt.getPaths().getVoltdbroot().setPath("fake");
+        dt.getPaths().getVoltdbroot().setPath("");
         if (config.m_isEnterprise) {
-            dt.getPaths().getCommandlog().setPath("fake");
-            dt.getPaths().getCommandlogsnapshot().setPath("fake");
-            dt.getPaths().getSnapshots().setPath("fake");
-            dt.getPaths().getExportoverflow().setPath("fake");
-            dt.getPaths().getDroverflow().setPath("fake");
+            dt.getPaths().getCommandlog().setPath("");
+            dt.getPaths().getCommandlogsnapshot().setPath("");
+            dt.getPaths().getSnapshots().setPath("");
+            dt.getPaths().getExportoverflow().setPath("");
+            dt.getPaths().getDroverflow().setPath("");
         }
+
+        //After deployment is emptied out of path now write it.
+        if (!deprootFH.equals(cnfrootFH)) {
+            File depFH = getConfigLogDeployment(config);
+            try (FileWriter fw = new FileWriter(depFH)) {
+                fw.write(CatalogUtil.getDeployment(dt, true /* pretty print indent */));
+            } catch (IOException|RuntimeException e) {
+                VoltDB.crashLocalVoltDB("Unable to marshal deployment configuration to " + depFH, false, e);
+                return;
+            }
+        } else {
+            File optFH = new VoltFile(config.m_pathToDeployment);
+            File depFH = getConfigLogDeployment(config);
+            try {
+                if (!depFH.exists()) {
+                    new FileOutputStream(depFH).close();
+                }
+                if (!depFH.getCanonicalFile().equals(optFH.getCanonicalFile())) {
+                    Files.copy(optFH, depFH);
+                }
+            } catch (IOException e) {
+                VoltDB.crashLocalVoltDB("Unable to set up deployment configuration in " + depFH, false, e);
+                return;
+            }
+        }
+
     }
 
     private void stageInitializedMarker(Configuration config) {
@@ -2063,7 +2065,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * in the deployment file differs from the default voltdbroot. When the startup action
              * is PROBE then the value in configs m_voltdbRoot must match the deployment one
              */
-            File optrootFH = m_config.m_voltdbRoot;
+            File optrootFH = config.m_voltdbRoot;
             File dplrootFH = CatalogUtil.getVoltDbRoot(deployment.getPaths());
             if (config.m_startAction.isLegacy()) {
                 if (!optrootFH.getCanonicalFile().equals(dplrootFH.getCanonicalFile())) {
