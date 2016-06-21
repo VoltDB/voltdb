@@ -43,7 +43,7 @@ class Overview extends Module {
         title               { $("h1", text:"Overview") }
         sitePerHost         { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(1) > td.configLabel") }
         ksafety             { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(2) > td.configLabel") }
-        partitionDetection  { $(class:"configLabel", text:"Partition Detection") }
+        partitionDetection  { $("#admin > div.adminContainer > div.adminContentLeft > div.overviewTbl > table > tbody:nth-child(1) > tr:nth-child(3) > td.configLabel") }
         security            { $(class:"labelCollapsed", text:"Security") }
         httpAccess          { $(class:"labelCollapsed", text:"HTTP Access") }
         autoSnapshots       { $(class:"labelCollapsed", text:"Auto Snapshots") }
