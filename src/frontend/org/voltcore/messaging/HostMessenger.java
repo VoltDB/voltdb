@@ -883,7 +883,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void requestJoin(
             SocketChannel socket,
             InetSocketAddress listeningAddress,
-            String request,
             HostCriteria joinerCriteria) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
@@ -1219,11 +1218,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
                 return;
             }
-        } else if (unmeshed >= ksafety && bare == unmeshed) {
+        } else if (operational == 0 && bare == unmeshed) {
             determination = StartAction.CREATE;
-        } else if (unmeshed >= ksafety && bare < ksafety) {
+        } else if (operational == 0 && bare < ksafety) {
             determination = StartAction.RECOVER;
-        } else if (unmeshed >= ksafety && bare >= ksafety) {
+        } else if (operational == 0 && bare >= ksafety) {
             try { shutdown(); } catch (Exception ignoreIt) {}
             org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
                     + bare + " nodes have no command logs, while "
