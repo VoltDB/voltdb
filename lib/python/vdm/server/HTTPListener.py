@@ -1231,6 +1231,7 @@ class StopDatabaseAPI(MethodView):
                 # because voltadmin shutdown gives 'Connection broken' output
                 resp_json = json.loads(json.loads(response.data)['statusString'])
                 resp_status = {}
+
                 for value in resp_json:
                     resp_status[value] = {'status': json.loads(resp_json[value])['statusString']}
                 return make_response(jsonify({'status': 200, 'statusString': str(resp_status)}),
