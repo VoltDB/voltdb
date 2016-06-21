@@ -54,8 +54,7 @@ public class MeshArbiter {
     protected static final Subject [] receiveSubjects = new Subject [] {
         Subject.FAILURE,
         Subject.SITE_FAILURE_UPDATE,
-        Subject.SITE_FAILURE_FORWARD,
-        Subject.FAULT_DECISION
+        Subject.SITE_FAILURE_FORWARD
     };
 
     /**
