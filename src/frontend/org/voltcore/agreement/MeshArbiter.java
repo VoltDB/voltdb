@@ -360,8 +360,8 @@ public class MeshArbiter {
         // Wait for all survivors in the local decision to send their decisions over.
         // If one of the host's decision conflicts with ours, remove that host's link
         // and repeat the decision process.
-        final Set<Long> expectedSurvivors = Sets.newHashSet(sfm.m_survivors);
-        expectedSurvivors.remove(m_hsId);
+        final Set<Long> expectedSurvivors = Sets.filter(sfm.m_survivors, not(equalTo(m_hsId)));
+        final Set<Long> decidedSurvivors = Sets.newHashSet();
         m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
                            CoreUtils.hsIdCollectionToString(expectedSurvivors));
         do {
@@ -372,7 +372,8 @@ public class MeshArbiter {
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
             } else if (msg.getSubject() == Subject.FAILURE.getId()) {
                 final FaultMessage fm = (FaultMessage) msg;
-                if (fm.decided && expectedSurvivors.remove(fm.reportingSite)) {
+                if (fm.decided && expectedSurvivors.contains(fm.reportingSite)) {
+                    decidedSurvivors.add(fm.reportingSite);
                     if (!sfm.m_survivors.equals(fm.survivors)) {
                         m_recoveryLog.info("Agreement, Received inconsistent decision from " +
                                            CoreUtils.hsIdToString(fm.reportingSite) + ", " + fm);
@@ -381,12 +382,14 @@ public class MeshArbiter {
                         m_mailbox.deliverFront(localFault);
                         return false;
                     }
+                } else if (sfm.m_decision.contains(fm.reportingSite)) {
+                    // Ignore messages from failed sites
                 } else {
                     m_mailbox.deliverFront(fm);
                     return false;
                 }
             }
-        } while (!expectedSurvivors.isEmpty());
+        } while (!expectedSurvivors.equals(decidedSurvivors));
 
         return true;
     }
