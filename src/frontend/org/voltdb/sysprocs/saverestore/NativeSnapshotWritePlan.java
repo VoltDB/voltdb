@@ -153,7 +153,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         if (jsData != null) {
             isTruncationSnapshot = jsData.has("truncReqId");
         }
-        file_path = VoltDB.instance().getCommandLogSnapshotPath();
+        if (isTruncationSnapshot) {
+            file_path = VoltDB.instance().getCommandLogSnapshotPath();
+        }
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
