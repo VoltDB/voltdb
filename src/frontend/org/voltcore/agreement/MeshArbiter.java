@@ -82,13 +82,6 @@ public class MeshArbiter {
             Maps.newHashMap();
 
     /**
-     * A set of sites that have claimed that the local host failed. Wait for
-     * these sites to send their final decisions over so that the local host
-     * knows whether or not to buddy up with that host.
-     */
-    protected final Set<Long> m_sitesPendingDecisions = Sets.newHashSet();
-
-    /**
      * Historic list of failed sites
      */
     protected final Set<Long> m_failedSites = Sets.newTreeSet();
@@ -303,7 +296,7 @@ public class MeshArbiter {
 
         discoverGlobalFaultData_send(hsIds);
 
-        if (discoverGlobalFaultData_rcv(hsIds)) {
+        while (discoverGlobalFaultData_rcv(hsIds)) {
             Map<Long, Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
             if (lastTxnIdByFailedSite.isEmpty()) {
                 return ImmutableMap.of();
@@ -317,7 +310,9 @@ public class MeshArbiter {
                         + "] seeker: " + m_seeker);
             }
 
-            notifyOnKill(hsIds, lastTxnIdByFailedSite);
+            if (!notifyOnKill(hsIds, lastTxnIdByFailedSite)) {
+                continue;
+            }
 
             m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
             m_failedSitesCount = m_failedSites.size();
@@ -331,17 +326,19 @@ public class MeshArbiter {
             m_seeker.clear();
 
             return lastTxnIdByFailedSite;
-        } else {
-            return ImmutableMap.of();
         }
+
+        return ImmutableMap.of();
     }
 
     /**
      * Notify all survivors when you are closing links to nodes
      * @param decision map where the keys contain the kill sites
      *   and its values are their last known safe transaction ids
+     * @return true if successfully confirmed that all survivors
+     * agree on the decision, false otherwise.
      */
-    protected void notifyOnKill(Set<Long> hsIds, Map<Long, Long> decision) {
+    protected boolean notifyOnKill(Set<Long> hsIds, Map<Long, Long> decision) {
 
         SiteFailureMessage.Builder sfmb = SiteFailureMessage.
                 builder()
@@ -349,7 +346,7 @@ public class MeshArbiter {
                 .failures(decision.keySet());
 
         Set<Long> dests = Sets.filter(m_seeker.getSurvivors(), not(equalTo(m_hsId)));
-        if (dests.isEmpty()) return;
+        if (dests.isEmpty()) return true;
 
         sfmb.survivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
         sfmb.safeTxnIds(getSafeTxnIdsForSites(hsIds));
@@ -359,12 +356,44 @@ public class MeshArbiter {
 
         m_recoveryLog.info("Agreement, Sending ["
                 + CoreUtils.hsIdCollectionToString(dests) + "]  " + sfm);
+
+        // Wait for all survivors in the local decision to send their decisions over.
+        // If one of the host's decision conflicts with ours, remove that host's link
+        // and repeat the decision process.
+        final Set<Long> expectedSurvivors = Sets.newHashSet(sfm.m_survivors);
+        expectedSurvivors.remove(m_hsId);
+        m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
+                           CoreUtils.hsIdCollectionToString(expectedSurvivors));
+        do {
+            final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
+            if (msg == null) {
+                // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
+                // generate its own heartbeats to keep this running.
+                m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
+            } else if (msg.getSubject() == Subject.FAILURE.getId()) {
+                final FaultMessage fm = (FaultMessage) msg;
+                if (fm.decided && expectedSurvivors.remove(fm.reportingSite)) {
+                    if (!sfm.m_survivors.equals(fm.survivors)) {
+                        m_recoveryLog.info("Agreement, Received inconsistent decision from " +
+                                           CoreUtils.hsIdToString(fm.reportingSite) + ", " + fm);
+                        final FaultMessage localFault = new FaultMessage(m_hsId, fm.reportingSite);
+                        localFault.m_sourceHSId = m_hsId;
+                        m_mailbox.deliverFront(localFault);
+                        return false;
+                    }
+                } else {
+                    m_mailbox.deliverFront(fm);
+                    return false;
+                }
+            }
+        } while (!expectedSurvivors.isEmpty());
+
+        return true;
     }
 
     protected void clearInTrouble(Set<Long> decision) {
         m_forwardCandidates.clear();
         m_failedSitesLedger.clear();
-        m_sitesPendingDecisions.clear();
         m_inTrouble.clear();
         m_inTroubleCount = 0;
     }
@@ -469,31 +498,6 @@ public class MeshArbiter {
 
                 updateFailedSitesLedger(hsIds, sfm);
 
-                if (sfm.getFailedSites().contains(m_hsId)) {
-                    // Wait for the final decision from this host
-                    if (m_sitesPendingDecisions.add(m.m_sourceHSId)) {
-                        m_recoveryLog.info("Agreement, Will wait for final decision from " + CoreUtils.hsIdToString(m.m_sourceHSId) +
-                                           " because it claimed the local host gone");
-                    }
-                }
-                if (!sfm.m_decision.isEmpty()) {
-                    if (m_sitesPendingDecisions.remove(sfm.m_sourceHSId)) {
-                        if (sfm.m_survivors.contains(m_hsId)) {
-                            m_recoveryLog.info("Agreement, Received final decision to include this host from host " +
-                                               CoreUtils.hsIdToString(sfm.m_sourceHSId));
-                        } else if (sfm.m_failed.contains(m_hsId)) {
-                            // Generate a fake fault message for the source host
-                            final FaultMessage fm = new FaultMessage(m_hsId, sfm.m_sourceHSId);
-                            fm.m_sourceHSId = m_hsId;
-                            m_mailbox.deliverFront(fm);
-                            // Force the loop to iterate at least one more time
-                            // to process the generated fault message, or the check
-                            // below may cause the loop to terminate prematurely.
-                            continue;
-                        }
-                    }
-                }
-
                 m_seeker.add(sfm);
                 addForwardCandidate(new SiteFailureForwardMessage(sfm));
 
@@ -525,9 +529,6 @@ public class MeshArbiter {
 
                 Discard ignoreIt = mayIgnore(hsIds, fm);
                 if (Discard.DoNot == ignoreIt) {
-                    if (fm.reportingSite == m_hsId && fm.witnessed) {
-                        m_sitesPendingDecisions.remove(fm.failedSite);
-                    }
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
@@ -539,7 +540,7 @@ public class MeshArbiter {
                 }
             }
 
-            haveEnough = haveNecessaryFaultInfo(m_seeker.getSurvivors(), false);
+            haveEnough = haveEnough || haveNecessaryFaultInfo(m_seeker.getSurvivors(), false);
             if (haveEnough) {
 
                 Iterator<Map.Entry<Long, SiteFailureForwardMessage>> itr =
@@ -594,7 +595,7 @@ public class MeshArbiter {
             m_recoveryLog.warn("Agreement, Failure resolution stalled waiting for (Reporter +> Failed) " +
                                 "information: " + sb.toString());
         }
-        return missingMessages.isEmpty() && m_sitesPendingDecisions.isEmpty();
+        return missingMessages.isEmpty();
     }
 
     private Map<Long, Long> extractGlobalFaultData(Set<Long> hsIds) {
