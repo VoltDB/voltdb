@@ -376,7 +376,10 @@ public class CatalogDiffEngine {
             // Even if they did show up as Constraints in the catalog (for no apparent functional reason),
             // flagging their changes here would be redundant.
             suspect instanceof Constraint ||
-            suspect instanceof TableRef)
+            suspect instanceof TableRef ||
+            // If one of the source tables of a joined table view is marked export, the createQuery statemnt
+            // will be dropped because we do not support joined table view on streamed table now.
+            suspect instanceof Statement)
         {
             return null;
         }
