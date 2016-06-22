@@ -115,20 +115,13 @@ public class TestClientClose extends TestCase {
         try {
             client1.createConnection("localhost");
             client2.createConnection("localhost");
-        } catch (IOException ioe) {
-            fail("Something failed in connecting to localhost");
-        } finally {
-            client1.close();
-            client2.close();
-        }
-
-        try {
             VoltTable configData1 = client1.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
             client1.close();
             VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
         } catch (IOException | ProcCallException e) {
             fail("Something failed in call procedure for a client after close another one.");
         } finally {
+            client1.close();
             client2.close();
         }
 
