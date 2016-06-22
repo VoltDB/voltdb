@@ -81,6 +81,8 @@ public class MeshArbiter {
     protected final HashMap<Pair<Long, Long>, Long> m_failedSitesLedger =
             Maps.newHashMap();
 
+    protected final Map<Long, SiteFailureMessage> m_decidedSurvivors = Maps.newHashMap();
+
     /**
      * Historic list of failed sites
      */
@@ -381,21 +383,29 @@ public class MeshArbiter {
             if (msg.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
                 final SiteFailureMessage fm = (SiteFailureMessage) msg;
                 if (!fm.m_decision.isEmpty()) {
-                    decidedSurvivors.add(fm.m_sourceHSId);
-                    if (!sfm.m_survivors.equals(fm.m_survivors)) {
-                        m_recoveryLog.info("Agreement, Received inconsistent decision from " +
-                                           CoreUtils.hsIdToString(fm.m_sourceHSId) + ", " + fm);
-                        final FaultMessage localFault = new FaultMessage(m_hsId, fm.m_sourceHSId);
-                        localFault.m_sourceHSId = m_hsId;
-                        m_mailbox.deliverFront(localFault);
-                        return false;
-                    }
+                    m_decidedSurvivors.put(fm.m_sourceHSId, fm);
                 } else {
                     m_mailbox.deliverFront(fm);
                     return false;
                 }
+            } else if (msg.getSubject() == Subject.FAILURE.getId()) {
+                // In case of concurrent fault, handle it
+                m_mailbox.deliverFront(msg);
+                return false;
             }
-        } while (!expectedSurvivors.equals(decidedSurvivors));
+        } while (!expectedSurvivors.equals(m_decidedSurvivors.keySet()));
+
+        for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
+            if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
+                m_decidedSurvivors.clear();
+                m_recoveryLog.info("Agreement, Received inconsistent decision from " +
+                                   CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
+                final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
+                localFault.m_sourceHSId = m_hsId;
+                m_mailbox.deliverFront(localFault);
+                return false;
+            }
+        }
 
         return true;
     }
@@ -403,6 +413,7 @@ public class MeshArbiter {
     protected void clearInTrouble(Set<Long> decision) {
         m_forwardCandidates.clear();
         m_failedSitesLedger.clear();
+        m_decidedSurvivors.clear();
         m_inTrouble.clear();
         m_inTroubleCount = 0;
     }
@@ -504,6 +515,10 @@ public class MeshArbiter {
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)
                     || m_failedSites.containsAll(sfm.getFailedSites())) continue;
+
+                if (!sfm.m_decision.isEmpty()) {
+                    m_decidedSurvivors.put(sfm.m_sourceHSId, sfm);
+                }
 
                 updateFailedSitesLedger(hsIds, sfm);
 
