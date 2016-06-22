@@ -1347,6 +1347,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         JSONObject jsObj = new JSONObject();
         try {
             jsObj.put("path", m_path);
+            jsObj.put("pathType", SnapshotUtil.SnapthotPathType.SNAP_AUTO.toString());
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
             m_snapshots.offer(new Snapshot(m_path, nonce, now));
