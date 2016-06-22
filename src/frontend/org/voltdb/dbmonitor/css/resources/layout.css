@@ -1835,14 +1835,17 @@ ul.topRightList li a {
         color: #FFFFFF;
     }
 
- .plusBtn { background:#ccc;
-          border:1px solid #ccc;
+ .plusBtn {
+          font-size: 20px;
+          background:#ccc;
+          border:none;
           color:#222;
-          font-weight:bold;
+          font-weight:normal;
           padding: 1px 10px;
-            margin: 6px 0 5px 5px;;
+          margin: 6px 3px 5px 3px;
+          border-radius: 12px 2px 0 0;
             }
-.plusBtn:hover {background:#BBB; border:1px solid #BBB;}
+.plusBtn:hover {background:none; border:none;}
 
 
 .contentQuery {
@@ -2028,7 +2031,7 @@ border:1px solid #FFF;
 #worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
 #worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-3px; }
 #worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
-#worktabs ul li#liNewQuery { border:none!important; padding-top:4px;}
+#worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
 /*********************jquery ui class override ends*********************/
