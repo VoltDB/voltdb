@@ -264,10 +264,10 @@ $(document).ready(function () {
             var ul = $tabs.find( "ul" );
             var html = ''
             if($('#new-query').length == 0)
-                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery"><a class="btnStudio plusBtn" id="new-query"><span>+</span></a></li>'
+                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li><li id="liNewQuery" title="New Query Tab"><a class="btnStudio plusBtn" id="new-query"><span>+</span></a></li>'
             else
                html = '<li id="qTab-'+tab_counter+'"><a href="#q-'+tab_counter+'">Query'+ queryId +'</a> <span class="ui-icon ui-icon-close close-tab" id="close-tab-' + tab_counter + '" href="#closeTabConfirmation" title="Close Tab">Close</span></li>'
-            var html_body = '<div class="querybar"><div class="wrapper"><textarea class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
+            var html_body = '<div class="querybar"><div class="wrapper"><textarea id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+'" wrap="off"></textarea></div></div><div class="workspacestatusbar noborder"></div>'
             var html_query = '<div class="blockWrapper" id="blockContainer02">' +
                              '   <div class="exportType">' +
                              '<form name="" id="queryResult-'+tab_counter+'">' +
@@ -395,7 +395,7 @@ $(document).ready(function () {
             $('#clearQuery-' + tab_id).unbind('click')
             $('#clearQuery-' + tab_id).click(function () {
                 query_id = $(this).attr('id').split('-')[1]
-                $('.querybox-' + query_id).val('')
+                $('#querybox-' + query_id).val('')
             });
 
             SQLQueryRender.ShowQueryBtnById(tab_id)

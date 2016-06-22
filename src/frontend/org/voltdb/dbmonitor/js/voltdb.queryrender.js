@@ -185,14 +185,14 @@ function QueryUI(queryTab) {
         }
 
         var connection = VoltDBCore.connections[dataSource];
-        var source = $('.querybox-' + query_id).getSelectedText();
+        var source = $('#querybox-' + query_id).getSelectedText();
         if (source != null){
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
-                source = $('.querybox-' + query_id).val();
+                source = $('#querybox-' + query_id).val();
         }
         else
-            source = $('.querybox-' + query_id).val();
+            source = $('#querybox-' + query_id).val();
 
         source = source.replace(/^\s+|\s+$/g,'');
         if (source == '')
