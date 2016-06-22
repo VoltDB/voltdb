@@ -54,7 +54,7 @@
 #include "catalog/connector.h"
 #include "catalog/database.h"
 #include "catalog/index.h"
-#include "catalog/materializedviewhandler.h"
+#include "catalog/materializedviewhandlerinfo.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
@@ -1343,12 +1343,14 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *catalogT
         }
     }
 
-    // Only for checking the plan in EE, will be disabled / removed after the feature is done.
-    if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-        catalog::MaterializedViewHandler *mvHandler = catalogTable->mvHandler().get("mvHandler");
-        if (mvHandler) {
-            catalog::Statement *createQueryStatement = mvHandler->createQuery().get("createQuery");
-            if (createQueryStatement) {
+    catalog::MaterializedViewHandlerInfo *mvHandlerInfo = catalogTable->mvHandlerInfo().get("mvHandlerInfo");
+    // If the table has a mvHandlerInfo, it means this table is a target table of materialized view.
+    if (mvHandlerInfo) {
+        catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
+        // If the handler has a createQuery, it means the view is defined on non-streamed table(s).
+        if (createQueryStatement && mvHandlerInfo->isJoinedTableView()) {
+// #ifdef VOLT_TRACE_ENABLED
+            if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
                 const string& hexString = createQueryStatement->explainplan();
                 assert(hexString.length() % 2 == 0);
                 int bufferLength = (int)hexString.size() / 2 + 1;
@@ -1357,6 +1359,7 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *catalogT
                 catalog::Catalog::hexDecodeString(hexString, explanation);
                 cout << "View: " << catalogTable->name() << endl << explanation << endl;
             }
+// #endif
         }
     }
 }

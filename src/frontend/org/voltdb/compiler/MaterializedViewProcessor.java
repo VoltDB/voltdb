@@ -35,7 +35,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.IndexRef;
-import org.voltdb.catalog.MaterializedViewHandler;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
@@ -121,10 +121,10 @@ public class MaterializedViewProcessor {
                 }
             }
 
-            // Add mvHandler to the destTable:
-            MaterializedViewHandler mvHandler = destTable.getMvhandler().add("mvHandler");
+            // Add mvHandlerInfo to the destTable:
+            MaterializedViewHandlerInfo mvHandlerInfo = destTable.getMvhandlerinfo().add("mvHandlerInfo");
             if (stmt.m_tableList.size() > 1) {
-                mvHandler.setIsjointtableview(true);
+                mvHandlerInfo.setIsjoinedtableview(true);
             }
             boolean hasStreamedTableAsSource = false;
             for (Table srcTable : stmt.m_tableList) {
@@ -250,9 +250,9 @@ public class MaterializedViewProcessor {
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
             List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
             compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, matviewinfo);
-            compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandler);
+            compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, mvHandlerInfo);
             if (! hasStreamedTableAsSource) {
-                compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandler);
+                compileCreateQueryAndUpdateCatalog(db, query, xmlquery, mvHandlerInfo);
             }
 
             // set Aggregation Expressions.
@@ -544,11 +544,12 @@ public class MaterializedViewProcessor {
     private void compileFallbackQueriesAndUpdateCatalog(Database db,
                                                         String query,
                                                         List<VoltXMLElement> fallbackQueryXMLs,
-                                                        MaterializedViewHandler mvHandler) throws VoltCompilerException {
+                                                        MaterializedViewHandlerInfo mvHandlerInfo)
+                                                        throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
             String key = String.valueOf(i);
-            Statement fallbackQueryStmt = mvHandler.getFallbackquerystmts().add(key);
+            Statement fallbackQueryStmt = mvHandlerInfo.getFallbackquerystmts().add(key);
             VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
             fallbackQueryStmt.setSqltext(query);
             StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
@@ -568,9 +569,10 @@ public class MaterializedViewProcessor {
     private void compileCreateQueryAndUpdateCatalog(Database db,
                                                     String query,
                                                     VoltXMLElement xmlquery,
-                                                    MaterializedViewHandler mvHandler) throws VoltCompilerException {
+                                                    MaterializedViewHandlerInfo mvHandlerInfo)
+                                                    throws VoltCompilerException {
         DatabaseEstimates estimates = new DatabaseEstimates();
-        Statement createQuery = mvHandler.getCreatequery().add("createQuery");
+        Statement createQuery = mvHandlerInfo.getCreatequery().add("createQuery");
         createQuery.setSqltext(query);
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
