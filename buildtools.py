@@ -649,7 +649,13 @@ def runTests(CTX):
                 if targetpath.find(test) != -1:
                     isValgrindTest = False;
             if CTX.PLATFORM == "Linux" and isValgrindTest:
-                process = Popen(executable="valgrind", args=["valgrind", "--leak-check=full", "--show-reachable=yes", "--error-exitcode=-1", targetpath], stderr=PIPE, bufsize=-1)
+                process = Popen(executable="valgrind", args=["valgrind", 
+							     "--leak-check=full", 
+							     "--show-reachable=yes",
+							     "--error-exitcode=-1",
+							     "--suppressions=" + os.path.join(TEST_PREFIX,
+											      "test_utils/vdbsuppressions.supp"),
+							     targetpath], stderr=PIPE, bufsize=-1)
                 #out = process.stdout.readlines()
                 allHeapBlocksFreed = False
                 otherValgrindError = True
