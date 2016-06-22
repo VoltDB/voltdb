@@ -1345,22 +1345,19 @@ template<class TABLE> static void initMaterializedViews(catalog::Table *catalogT
 
     catalog::MaterializedViewHandlerInfo *mvHandlerInfo = catalogTable->mvHandlerInfo().get("mvHandlerInfo");
     // If the table has a mvHandlerInfo, it means this table is a target table of materialized view.
-    if (mvHandlerInfo) {
+    if (mvHandlerInfo && mvHandlerInfo->isJoinedTableView()) {
         catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
-        // If the handler has a createQuery, it means the view is defined on non-streamed table(s).
-        if (createQueryStatement && mvHandlerInfo->isJoinedTableView()) {
 // #ifdef VOLT_TRACE_ENABLED
-            if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
-                const string& hexString = createQueryStatement->explainplan();
-                assert(hexString.length() % 2 == 0);
-                int bufferLength = (int)hexString.size() / 2 + 1;
-                char* explanation = new char[bufferLength];
-                boost::shared_array<char> memoryGuard(explanation);
-                catalog::Catalog::hexDecodeString(hexString, explanation);
-                cout << "View: " << catalogTable->name() << endl << explanation << endl;
-            }
-// #endif
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            const string& hexString = createQueryStatement->explainplan();
+            assert(hexString.length() % 2 == 0);
+            int bufferLength = (int)hexString.size() / 2 + 1;
+            char* explanation = new char[bufferLength];
+            boost::shared_array<char> memoryGuard(explanation);
+            catalog::Catalog::hexDecodeString(hexString, explanation);
+            cout << "View: " << catalogTable->name() << endl << explanation << endl;
         }
+// #endif
     }
 }
 

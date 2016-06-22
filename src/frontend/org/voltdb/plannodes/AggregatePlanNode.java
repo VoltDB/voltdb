@@ -480,10 +480,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (ExpressionType e : m_aggregateTypes) {
             sb.append(sep).append(e.symbol());
             sep = ", ";
-            if (e == ExpressionType.AGGREGATE_COUNT_STAR) {
-                sb.append("(*)");
-            }
-            else {
+            if (e != ExpressionType.AGGREGATE_COUNT_STAR) {
                 if (m_aggregateDistinct.get(ii) == 1) {
                     sb.append(" DISTINCT");
                 }
