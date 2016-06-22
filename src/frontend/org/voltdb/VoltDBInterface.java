@@ -52,6 +52,8 @@ public interface VoltDBInterface
 
     public boolean isLegacy();
 
+    public String getPath(Object base, String name);
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      * @param config Configuration from command line.

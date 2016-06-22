@@ -155,6 +155,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.lang.reflect.Method;
 import java.util.Properties;
 
 /**
@@ -179,7 +180,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private static Properties m_pathList = new Properties();
+    private final Properties m_pathList = new Properties();
 
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
@@ -299,6 +300,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private volatile boolean m_isRunning = false;
     private boolean m_isLegacy = true;
 
+    @Override
     public boolean isLegacy() { return m_isLegacy; };
 
     @Override
@@ -383,7 +385,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_licenseInformation;
     }
 
-    public static String getPath(String name) {
+    private Object m_null_arg[] = { null };
+    @Override
+    public String getPath(Object base, String name) {
+        if (isLegacy()) {
+            try {
+                Method m = base.getClass().getMethod("getPath");
+                return (String )m.invoke(base);
+            } catch (Exception ex) {
+                //Should never happen
+                ex.printStackTrace();
+            }
+        }
         return m_pathList.getProperty(name);
     }
 

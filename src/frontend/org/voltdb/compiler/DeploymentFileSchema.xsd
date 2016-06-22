@@ -107,7 +107,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>
@@ -124,7 +124,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>
@@ -141,7 +141,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>
@@ -158,7 +158,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>
@@ -175,7 +175,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>
@@ -192,7 +192,7 @@ xmlns:ci="http://jaxb.dev.java.net/plugin/code-injector"
                     <ci:code>
         <![CDATA[
         public String getNodePath() {
-            return org.voltdb.RealVoltDB.getPath(getKey());
+            return org.voltdb.VoltDB.instance().getPath(this, getKey());
         }
         ]]>
                     </ci:code>

@@ -62,6 +62,7 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import java.lang.reflect.Method;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -503,6 +504,17 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public String getSnapshotPath() {
+        return "";
+    }
+
+    public String getPath(Object base, String name) {
+        try {
+            Method m = base.getClass().getMethod("getPath");
+            return (String )m.invoke(base);
+        } catch (Exception ex) {
+            //Should never happen
+            ex.printStackTrace();
+        }
         return "";
     }
 
