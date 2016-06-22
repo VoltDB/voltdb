@@ -363,18 +363,45 @@ public class MeshArbiter {
         // If one of the host's decision conflicts with ours, remove that host's link
         // and repeat the decision process.
         final Set<Long> expectedSurvivors = Sets.filter(sfm.m_survivors, not(equalTo(m_hsId)));
-        final Set<Long> decidedSurvivors = Sets.newHashSet();
         m_recoveryLog.info("Agreement, Waiting for agreement on decision from survivors " +
                            CoreUtils.hsIdCollectionToString(expectedSurvivors));
+
+        final Iterator<SiteFailureMessage> iter = m_decidedSurvivors.values().iterator();
+        while (iter.hasNext()) {
+            final SiteFailureMessage remoteDecision = iter.next();
+            if (expectedSurvivors.contains(remoteDecision.m_sourceHSId)) {
+                if (remoteDecision.m_decision.contains(m_hsId)) {
+                    m_decidedSurvivors.clear();
+                    m_recoveryLog.info("Agreement, Received inconsistent decision from " +
+                                       CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
+                    final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
+                    localFault.m_sourceHSId = m_hsId;
+                    m_mailbox.deliverFront(localFault);
+                    return false;
+                } else if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
+                    iter.remove();
+                }
+            }
+        }
+
+        long start = System.currentTimeMillis();
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
                 // Send a heartbeat to keep the dead host timeout active.
                 m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
+                if (System.currentTimeMillis() - start > 20000) {
+                    m_recoveryLog.error("Agreement, still waiting for " +
+                    CoreUtils.hsIdCollectionToString(Sets.difference(expectedSurvivors, m_decidedSurvivors.keySet())) +
+                    " expected " + CoreUtils.hsIdCollectionToString(expectedSurvivors) + " decided " +
+                    CoreUtils.hsIdCollectionToString(m_decidedSurvivors.keySet()));
+                    start = System.currentTimeMillis();
+                }
                 continue;
             }
 
-            if (!expectedSurvivors.contains(msg.m_sourceHSId)) {
+            if (m_hsId != msg.m_sourceHSId && !expectedSurvivors.contains(msg.m_sourceHSId)) {
+                m_recoveryLog.info("Received message from failed site " + CoreUtils.hsIdToString(msg.m_sourceHSId) + " " + msg);
                 // Ignore messages from failed sites
                 continue;
             }
@@ -383,29 +410,31 @@ public class MeshArbiter {
             if (msg.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
                 final SiteFailureMessage fm = (SiteFailureMessage) msg;
                 if (!fm.m_decision.isEmpty()) {
-                    m_decidedSurvivors.put(fm.m_sourceHSId, fm);
+                    if (expectedSurvivors.contains(fm.m_sourceHSId)) {
+                        if (fm.m_decision.contains(m_hsId)) {
+                            m_decidedSurvivors.clear();
+                            // The remote host has decided that we are gone, remove the remote host
+                            final FaultMessage localFault = new FaultMessage(m_hsId, fm.m_sourceHSId);
+                            localFault.m_sourceHSId = m_hsId;
+                            m_mailbox.deliverFront(localFault);
+                            return false;
+                        } else if (sfm.m_survivors.equals(fm.m_survivors)) {
+                            m_decidedSurvivors.put(fm.m_sourceHSId, fm);
+                        }
+                    }
                 } else {
                     m_mailbox.deliverFront(fm);
                     return false;
                 }
             } else if (msg.getSubject() == Subject.FAILURE.getId()) {
-                // In case of concurrent fault, handle it
-                m_mailbox.deliverFront(msg);
-                return false;
+                final FaultMessage fm = (FaultMessage) msg;
+                if (!fm.decided) {
+                    // In case of concurrent fault, handle it
+                    m_mailbox.deliverFront(msg);
+                    return false;
+                }
             }
-        } while (!expectedSurvivors.equals(m_decidedSurvivors.keySet()));
-
-        for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
-            if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
-                m_decidedSurvivors.clear();
-                m_recoveryLog.info("Agreement, Received inconsistent decision from " +
-                                   CoreUtils.hsIdToString(remoteDecision.m_sourceHSId) + ", " + remoteDecision);
-                final FaultMessage localFault = new FaultMessage(m_hsId, remoteDecision.m_sourceHSId);
-                localFault.m_sourceHSId = m_hsId;
-                m_mailbox.deliverFront(localFault);
-                return false;
-            }
-        }
+        } while (!m_decidedSurvivors.keySet().containsAll(expectedSurvivors));
 
         return true;
     }
