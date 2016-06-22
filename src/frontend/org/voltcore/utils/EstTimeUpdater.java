@@ -30,12 +30,12 @@ public class EstTimeUpdater {
     public static final int ESTIMATED_TIME_WARN_INTERVAL = Integer.getInteger("ESTIMATED_TIME_WARN_INTERVAL", 2000);
 
     public static volatile boolean pause = false;
-    private static final AtomicBoolean m_updaterContinue = new AtomicBoolean(true);
+    private static final AtomicBoolean UPDATER_CONTINUE = new AtomicBoolean(true);
 
     private static final Thread updater = new Thread("Estimated Time Updater") {
         @Override
         public void run() {
-            while (m_updaterContinue.get()) {
+            while (UPDATER_CONTINUE.get()) {
                 try {
                     Thread.sleep(ESTIMATED_TIME_UPDATE_FREQUENCY);
                 } catch (InterruptedException e) {}
@@ -54,7 +54,7 @@ public class EstTimeUpdater {
     }
 
     public static void stop() {
-        m_updaterContinue.set(false);
+        UPDATER_CONTINUE.set(false);
     }
 
     /**

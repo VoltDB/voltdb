@@ -112,9 +112,7 @@ public class TestClientClose extends TestCase {
         }
         System.out.println("preNumClientReaper : " + preNumClientReaper);
         System.out.println("postNumClientReaper : " + postNumClientReaper);
-        if (preNumClientReaper != postNumClientReaper) {
-            fail("Something failed to clean up. ClientReaper");
-        }
+        assertEquals(preNumClientReaper, postNumClientReaper);
     }
 
     public void testThreadsKilledOneOfClientClose() {
