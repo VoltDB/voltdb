@@ -106,7 +106,7 @@ public class SnapshotSaveAPI
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
-            final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
+            final String file_path, final String pathType, final String file_nonce, final SnapshotFormat format, final byte block,
             final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
@@ -176,6 +176,7 @@ public class SnapshotSaveAPI
                             remoteDataCenterLastIds);
                     createSetupIv2(
                             file_path,
+                            pathType,
                             file_nonce,
                             format,
                             multiPartTxnId,
@@ -470,7 +471,7 @@ public class SnapshotSaveAPI
     }
 
     private void createSetupIv2(
-            final String file_path, final String file_nonce, SnapshotFormat format,
+            final String file_path, final String pathType, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -495,7 +496,7 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
+        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,
                 tracker, hashinatorData, timestamp);
         m_deferredSetupFuture =

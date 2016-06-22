@@ -148,6 +148,7 @@ public class SnapshotUtil {
         long txnId,
         long catalogCRC,
         String path,
+        String pathType,
         String nonce,
         List<Table> tables,
         int hostId,
