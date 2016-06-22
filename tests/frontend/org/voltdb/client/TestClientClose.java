@@ -101,14 +101,7 @@ public class TestClientClose extends TestCase {
             if (threadName.contains("VoltDB Client Reaper Thread")) {
                 postNumClientReaper++;
             }
-            if (threadName.contains("Reverse DNS lookups")
-                    || threadName.contains("Async Logger")) {
-                System.out.println("threadName: " + threadName);
-                for (StackTraceElement element : st) {
-                    System.out.println("stack trace element: " + element);
-                }
-                fail("Something failed to clean up.");
-            }
+            assertFalse(threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger"));
         }
         System.out.println("preNumClientReaper : " + preNumClientReaper);
         System.out.println("postNumClientReaper : " + postNumClientReaper);
